@@ -139,7 +139,7 @@ public class BackupManager {
     try (IndexInput is = repository.openInput(zkStateDir, COLLECTION_PROPS_FILE, IOContext.DEFAULT)) {
       byte[] arr = new byte[(int) is.length()]; // probably ok since the json file should be small.
       is.readBytes(arr, 0, (int) is.length());
-      ClusterState c_state = ClusterState.load(-1, arr, Collections.emptySet());
+      ClusterState c_state = ClusterState.createFromJson(-1, arr);
       return c_state.getCollection(collectionName);
     }
   }
@@ -206,7 +206,11 @@ public class BackupManager {
     try (IndexInput is = repository.openInput(sourceDir, ZkStateReader.COLLECTION_PROPS_ZKNODE, IOContext.DEFAULT)) {
       byte[] arr = new byte[(int) is.length()];
       is.readBytes(arr, 0, (int) is.length());
-      zkStateReader.getZkClient().create(zkPath, arr, CreateMode.PERSISTENT, true);
+      if (zkStateReader.getZkClient().exists(zkPath)) {
+        zkStateReader.getZkClient().setData(zkPath, arr,true);
+      } else {
+        zkStateReader.getZkClient().create(zkPath, arr, CreateMode.PERSISTENT, true);
+      }
     } catch (KeeperException | InterruptedException e) {
       throw new IOException("Error uploading file to zookeeper path " + source.toString() + " to " + zkPath,
           SolrZkClient.checkInterrupted(e));
@@ -219,13 +223,13 @@ public class BackupManager {
 
 
     try {
-      if (!zkStateReader.getZkClient().exists(zkPath, true)) {
+      if (!zkStateReader.getZkClient().exists(zkPath)) {
         // Nothing to back up
         return;
       }
 
       try (OutputStream os = repository.createOutput(dest)) {
-        byte[] data = zkStateReader.getZkClient().getData(zkPath, null, null, true);
+        byte[] data = zkStateReader.getZkClient().getData(zkPath, null, null);
         os.write(data);
       }
     } catch (KeeperException | InterruptedException e) {
@@ -244,7 +248,7 @@ public class BackupManager {
         List<String> children = zkClient.getChildren(zkPath + "/" + file, null, true);
         if (children.size() == 0) {
           log.debug("Writing file {}", file);
-          byte[] data = zkClient.getData(zkPath + "/" + file, null, null, true);
+          byte[] data = zkClient.getData(zkPath + "/" + file, null, null);
           try (OutputStream os = repository.createOutput(repository.resolve(dir, file))) {
             os.write(data);
           }

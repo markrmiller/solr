@@ -121,7 +121,9 @@ public class CoreDescriptor {
       CORE_COLLECTION,
       CORE_ROLES,
       CORE_NODE_NAME,
-      CloudDescriptor.NUM_SHARDS
+      CloudDescriptor.NUM_SHARDS,
+      "id",
+      "collId"
   );
 
   private final CloudDescriptor cloudDesc;
@@ -148,7 +150,8 @@ public class CoreDescriptor {
   private static Map<String, String> toMap(String... properties) {
     Map<String, String> props = new HashMap<>();
     assert properties.length % 2 == 0;
-    for (int i = 0; i < properties.length; i += 2) {
+    int sz = properties.length;
+    for (int i = 0; i < sz; i += 2) {
       props.put(properties[i], properties[i+1]);
     }
     return props;
@@ -186,25 +189,21 @@ public class CoreDescriptor {
 
     originalCoreProperties.setProperty(CORE_NAME, name);
 
+    Properties sysProperties = System.getProperties();
     name = PropertiesUtil.substituteProperty(checkPropertyIsNotEmpty(name, CORE_NAME),
-                                             containerProperties);
+                                             containerProperties, sysProperties);
 
     coreProperties.putAll(defaultProperties);
     coreProperties.put(CORE_NAME, name);
 
-    for (Map.Entry<String, String> entry : coreProps.entrySet()) {
-      String propname = entry.getKey();
-      String propvalue = entry.getValue();
+    coreProps.forEach((propname, propvalue) -> {
 
-      if (isUserDefinedProperty(propname))
-        originalExtraProperties.put(propname, propvalue);
-      else
-        originalCoreProperties.put(propname, propvalue);
+      if (isUserDefinedProperty(propname)) originalExtraProperties.put(propname, propvalue);
+      else originalCoreProperties.put(propname, propvalue);
 
       if (!requiredProperties.contains(propname))   // Required props are already dealt with
-        coreProperties.setProperty(propname,
-            PropertiesUtil.substituteProperty(propvalue, containerProperties));
-    }
+        coreProperties.setProperty(propname, PropertiesUtil.substituteProperty(propvalue, containerProperties, sysProperties));
+    });
 
     loadExtraProperties();
     buildSubstitutableProperties();

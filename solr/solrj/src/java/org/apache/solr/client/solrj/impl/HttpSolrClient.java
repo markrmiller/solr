@@ -38,7 +38,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 import org.apache.commons.io.IOUtils;
@@ -74,15 +74,14 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.V2RequestSupport;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.request.V2Request;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.Base64;
 import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,7 +147,9 @@ public class HttpSolrClient extends BaseHttpSolrClient {
   private volatile Set<String> queryParams = Collections.emptySet();
   private volatile Integer connectionTimeout;
   private volatile Integer soTimeout;
-  
+
+  private volatile Map<String, String> headers = Collections.emptyMap();
+
   /**
    * @deprecated use {@link HttpSolrClient#HttpSolrClient(Builder)} instead, as it is a more extension/subclassing-friendly alternative
    */
@@ -208,6 +209,13 @@ public class HttpSolrClient extends BaseHttpSolrClient {
     this.invariantParams = builder.invariantParams;
     this.connectionTimeout = builder.connectionTimeoutMillis;
     this.soTimeout = builder.socketTimeoutMillis;
+    this.headers = builder.headers;
+  }
+
+  private void addHeaders(SolrRequest request, HttpRequestBase method) {
+    for (Map.Entry<String, String> entry : headers.entrySet()) {
+      method.addHeader(new BasicHeader(entry.getKey(), entry.getValue()));
+    }
   }
 
   public Set<String> getQueryParams() {
@@ -262,6 +270,7 @@ public class HttpSolrClient extends BaseHttpSolrClient {
         method.setHeader(entry.getKey(), entry.getValue());
       }
     }
+    addHeaders(request, method);
     return executeMethod(method, request.getUserPrincipal(), processor, isV2ApiRequest(request));
   }
 
@@ -303,13 +312,17 @@ public class HttpSolrClient extends BaseHttpSolrClient {
   public HttpUriRequestResponse httpUriRequest(final SolrRequest request, final ResponseParser processor) throws SolrServerException, IOException {
     HttpUriRequestResponse mrr = new HttpUriRequestResponse();
     final HttpRequestBase method = createMethod(request, null);
-    ExecutorService pool = ExecutorUtil.newMDCAwareFixedThreadPool(1, new SolrNamedThreadFactory("httpUriRequest"));
     try {
       MDC.put("HttpSolrClient.url", baseUrl);
-      mrr.future = pool.submit(() -> executeMethod(method, request.getUserPrincipal(), processor, isV2ApiRequest(request)));
+      mrr.future = ParWork.getMyPerThreadExecutor().submit(() -> {
+        try {
+          return executeMethod(method, request.getUserPrincipal(), processor, isV2ApiRequest(request));
+        } catch (SolrServerException e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        }
+      });
  
     } finally {
-      pool.shutdown();
       MDC.remove("HttpSolrClient.url");
     }
     assert method != null;
@@ -415,17 +428,7 @@ public class HttpSolrClient extends BaseHttpSolrClient {
             new HttpPost(fullQueryUrl) : new HttpPut(fullQueryUrl);
         postOrPut.addHeader("Content-Type",
             contentWriter.getContentType());
-        postOrPut.setEntity(new BasicHttpEntity(){
-          @Override
-          public boolean isStreaming() {
-            return true;
-          }
-
-          @Override
-          public void writeTo(OutputStream outstream) throws IOException {
-            contentWriter.write(outstream);
-          }
-        });
+        postOrPut.setEntity(new MyBasicHttpEntity(contentWriter));
         return postOrPut;
 
       } else if (streams == null || isMultipart) {
@@ -460,17 +463,7 @@ public class HttpSolrClient extends BaseHttpSolrClient {
       break;
     }
     Long size = contentStream[0].getSize();
-    postOrPut.setEntity(new InputStreamEntity(contentStream[0].getStream(), size == null ? -1 : size) {
-      @Override
-      public Header getContentType() {
-        return new BasicHeader("Content-Type", contentStream[0].getContentType());
-      }
-
-      @Override
-      public boolean isRepeatable() {
-        return false;
-      }
-    });
+    postOrPut.setEntity(new MyInputStreamEntity(contentStream, size));
 
   }
 
@@ -633,6 +626,7 @@ public class HttpSolrClient extends BaseHttpSolrClient {
       try {
         rsp = processor.processResponse(respBody, charsetName);
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new RemoteSolrException(baseUrl, httpStatus, e.getMessage(), e);
       }
       Object error = rsp == null ? null : rsp.get("error");
@@ -651,7 +645,9 @@ public class HttpSolrClient extends BaseHttpSolrClient {
             }
             metadata = (NamedList<String>)err.get("metadata");
           }
-        } catch (Exception ex) {}
+        } catch (Exception ex) {
+          ParWork.propagateInterrupt(ex);
+        }
         if (reason == null) {
           StringBuilder msg = new StringBuilder();
           msg.append(response.getStatusLine().getReasonPhrase())
@@ -677,7 +673,7 @@ public class HttpSolrClient extends BaseHttpSolrClient {
           "IOException occurred when talking to server at: " + getBaseURL(), e);
     } finally {
       if (shouldClose) {
-        Utils.consumeFully(entity);
+        Utils.readFully(respBody);
       }
     }
   }
@@ -818,6 +814,7 @@ s   * @deprecated since 7.0  Use {@link Builder} methods instead.
     protected String baseSolrUrl;
     protected boolean compression;
     protected ModifiableSolrParams invariantParams = new ModifiableSolrParams();
+    private final Map<String,String> headers = new ConcurrentHashMap<>();
 
     public Builder() {
       this.responseParser = new BinaryResponseParser();
@@ -915,6 +912,26 @@ s   * @deprecated since 7.0  Use {@link Builder} methods instead.
       return this;
     }
 
+    //do not set this from an external client
+    public Builder markInternalRequest() {
+      this.headers.put("Request-Source", "internal");
+      return this;
+    }
+
+    public Builder withHeaders(Map<String, String> headers) {
+      this.headers.putAll(headers);
+      return this;
+    }
+
+    public Builder withHeader(String header, String value) {
+      this.headers.put(header, value);
+      return this;
+    }
+
+    public Map<String, String> getHeaders() {
+      return headers;
+    }
+
     /**
      * Create a {@link HttpSolrClient} based on provided configuration.
      */
@@ -933,6 +950,43 @@ s   * @deprecated since 7.0  Use {@link Builder} methods instead.
     @Override
     public Builder getThis() {
       return this;
+    }
+  }
+
+  private static class MyBasicHttpEntity extends BasicHttpEntity {
+    private final RequestWriter.ContentWriter contentWriter;
+
+    public MyBasicHttpEntity(RequestWriter.ContentWriter contentWriter) {
+      this.contentWriter = contentWriter;
+    }
+
+    @Override
+    public boolean isStreaming() {
+      return true;
+    }
+
+    @Override
+    public void writeTo(OutputStream outstream) throws IOException {
+      contentWriter.write(outstream);
+    }
+  }
+
+  private static class MyInputStreamEntity extends InputStreamEntity {
+    private final ContentStream[] contentStream;
+
+    public MyInputStreamEntity(ContentStream[] contentStream, Long size) throws IOException {
+      super(contentStream[0].getStream(), size == null ? -1 : size);
+      this.contentStream = contentStream;
+    }
+
+    @Override
+    public Header getContentType() {
+      return new BasicHeader("Content-Type", contentStream[0].getContentType());
+    }
+
+    @Override
+    public boolean isRepeatable() {
+      return false;
     }
   }
 }

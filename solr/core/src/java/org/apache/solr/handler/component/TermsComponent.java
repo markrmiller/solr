@@ -42,7 +42,7 @@ import org.apache.lucene.util.mutable.MutableValue;
 import org.apache.solr.client.solrj.response.TermsResponse;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
@@ -51,7 +51,6 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
-import org.apache.solr.handler.component.HttpShardHandlerFactory.WhitelistHostChecker;
 import org.apache.solr.request.SimpleFacets.CountPair;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
@@ -84,7 +83,7 @@ public class TermsComponent extends SearchComponent {
   public static final String COMPONENT_NAME = "terms";
 
   // This needs to be created here too, because Solr doesn't call init(...) on default components. Bug?
-  private WhitelistHostChecker whitelistHostChecker = new WhitelistHostChecker(
+  private HttpShardHandlerFactory.WhitelistHostChecker whitelistHostChecker = new HttpShardHandlerFactory.WhitelistHostChecker(
       null, 
       !HttpShardHandlerFactory.doGetDisableShardsWhitelist());
 
@@ -92,7 +91,7 @@ public class TermsComponent extends SearchComponent {
   public void init( @SuppressWarnings({"rawtypes"})NamedList args )
   {
     super.init(args);
-    whitelistHostChecker = new WhitelistHostChecker(
+    whitelistHostChecker = new HttpShardHandlerFactory.WhitelistHostChecker(
         (String) args.get(HttpShardHandlerFactory.INIT_SHARDS_WHITELIST), 
         !HttpShardHandlerFactory.doGetDisableShardsWhitelist());
   }
@@ -132,11 +131,11 @@ public class TermsComponent extends SearchComponent {
           +" not configured but required when using the '"+ShardParams.SHARDS+"' parameter with the TermsComponent."
           +HttpShardHandlerFactory.SET_SOLR_DISABLE_SHARDS_WHITELIST_CLUE);
     } else {
-      ClusterState cs = null;
+      ZkStateReader zkStateReader = null;
       if (rb.req.getCore().getCoreContainer().getZkController() != null) {
-        cs = rb.req.getCore().getCoreContainer().getZkController().getClusterState();
+        zkStateReader = rb.req.getCore().getCoreContainer().getZkController().getZkStateReader();
       }
-      whitelistHostChecker.checkWhitelist(cs, urls.toString(), urls);
+      whitelistHostChecker.checkWhitelist(zkStateReader, urls.toString(), urls);
     }
   }
 

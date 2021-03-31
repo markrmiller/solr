@@ -19,22 +19,25 @@ package org.apache.solr.cloud;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Future;
 
 import org.apache.lucene.util.LuceneTestCase.Nightly;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.util.TestInjection;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 @Slow
 @Nightly
-@SuppressSSL
+@SolrTestCase.SuppressSSL
+@Ignore // MRM TODO: switch to bridge base class
 public class TlogReplayBufferedWhileIndexingTest extends AbstractFullDistribZkTestBase {
 
   private List<StoppableIndexingThread> threads;
@@ -67,9 +70,7 @@ public class TlogReplayBufferedWhileIndexingTest extends AbstractFullDistribZkTe
   public void test() throws Exception {
     handle.clear();
     handle.put("timestamp", SKIPVAL);
-    
-    waitForRecoveriesToFinish(false);
-    
+
     int numThreads = 3;
     
     threads = new ArrayList<>(numThreads);
@@ -86,26 +87,21 @@ public class TlogReplayBufferedWhileIndexingTest extends AbstractFullDistribZkTe
       int batchSize = random().nextInt(4) + 1;
       indexThread = new StoppableIndexingThread(controlClient, cloudClient, Integer.toString(i), true, 900, batchSize, pauseBetweenUpdates);
       threads.add(indexThread);
-      indexThread.start();
+      Future<?> future = ParWork.submit("StoppableSearchThread", indexThread);
     }
 
     Thread.sleep(2000);
     
     allJetty.get(0).start();
     
-    Thread.sleep(45000);
-  
-    waitForThingsToLevelOut(); // we can insert random update delays, so this can take a while, especially when beasting this test
-    
-    Thread.sleep(2000);
+    Thread.sleep(10000);
+
     
     waitForRecoveriesToFinish(DEFAULT_COLLECTION, cloudClient.getZkStateReader(), false, true);
     
     for (StoppableIndexingThread thread : threads) {
       thread.safeStop();
     }
-    
-    waitForThingsToLevelOut(30, TimeUnit.SECONDS);
 
     checkShardConsistency(false, false);
 
@@ -124,10 +120,6 @@ public class TlogReplayBufferedWhileIndexingTest extends AbstractFullDistribZkTe
     if (threads != null) {
       for (StoppableIndexingThread thread : threads) {
         thread.safeStop();
-      }
-      
-      for (StoppableIndexingThread thread : threads) {
-        thread.join();
       }
     }
 

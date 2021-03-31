@@ -27,10 +27,10 @@ import java.util.Set;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
 
 import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.util.SafeXMLParsing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,8 +164,7 @@ public class FileExchangeRateProvider implements ExchangeRateProvider {
 
     try {
       Document doc = SafeXMLParsing.parseConfigXML(log, loader, currencyConfigFile);
-      XPathFactory xpathFactory = XPathFactory.newInstance();
-      XPath xpath = xpathFactory.newXPath();
+      XPath xpath = ((SolrResourceLoader)loader).getXPath();
       
       // Parse exchange rates.
       NodeList nodes = (NodeList) xpath.evaluate("/currencyConfig/rates/rate", doc, XPathConstants.NODESET);

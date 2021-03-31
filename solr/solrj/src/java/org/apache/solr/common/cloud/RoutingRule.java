@@ -72,6 +72,6 @@ public class RoutingRule extends ZkNodeProps {
 
   @Override
   public String toString() {
-    return Utils.toJSONString(propMap);
+    return Utils.toJSONString(this);
   }
 }

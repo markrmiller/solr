@@ -190,7 +190,7 @@ public class JavaBinUpdateRequestCodec {
     void update(SolrInputDocument document, UpdateRequest req, Integer commitWithin, Boolean override);
   }
 
-  static class MaskCharSequenceSolrInputDoc extends SolrInputDocument {
+  public static class MaskCharSequenceSolrInputDoc extends SolrInputDocument {
     public MaskCharSequenceSolrInputDoc(Map<String, SolrInputField> fields) {
       super(fields);
     }

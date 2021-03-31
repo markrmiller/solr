@@ -33,9 +33,11 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.NumericUtils;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -54,13 +56,13 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   
   @BeforeClass
   public static void beforeClass() throws Exception {
-    noDocs = atLeast(4096);
+    noDocs = TEST_NIGHTLY ? SolrTestUtil.atLeast(4096) : 406;
     distance = (1L << 60) / noDocs;
-    directory = newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), directory,
-        newIndexWriterConfig(new MockAnalyzer(random()))
-        .setMaxBufferedDocs(TestUtil.nextInt(random(), 100, 1000))
-        .setMergePolicy(newLogMergePolicy()));
+    directory = SolrTestUtil.newDirectory();
+    RandomIndexWriter writer = new RandomIndexWriter(LuceneTestCase.random(), directory,
+        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(LuceneTestCase.random()))
+        .setMaxBufferedDocs(TEST_NIGHTLY ? TestUtil.nextInt(random(), 100, 1000) : 1000)
+        .setMergePolicy(LuceneTestCase.newLogMergePolicy()));
 
     final LegacyFieldType storedLong = new LegacyFieldType(LegacyLongField.TYPE_NOT_STORED);
     storedLong.setStored(true);
@@ -129,7 +131,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
       writer.addDocument(doc);
     }
     reader = writer.getReader();
-    searcher=newSearcher(reader);
+    searcher= SolrTestUtil.newSearcher(reader);
     writer.close();
   }
   
@@ -157,7 +159,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   /** test for constant score + boolean query + filter, the other tests only use the constant score mode */
   private void testRange(int precisionStep) throws Exception {
     String field="field"+precisionStep;
-    int count=3000;
+    int count= TEST_NIGHTLY ? 3000 : 30;
     long lower=(distance*3/2)+startOffset, upper=lower + count*distance + (distance/3);
     LegacyNumericRangeQuery<Long> q = LegacyNumericRangeQuery.newLongRange(field, precisionStep, lower, upper, true, true);
     for (byte i=0; i<2; i++) {
@@ -209,7 +211,12 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   
   @Test
   public void testOneMatchQuery() throws Exception {
-    LegacyNumericRangeQuery<Long> q = LegacyNumericRangeQuery.newLongRange("ascfield8", 8, 1000L, 1000L, true, true);
+    LegacyNumericRangeQuery<Long> q;
+    if (TEST_NIGHTLY) {
+      q = LegacyNumericRangeQuery.newLongRange("ascfield8", 8, 1000L, 1000L, true, true);
+    } else {
+      q = LegacyNumericRangeQuery.newLongRange("ascfield8", 8, 200L, 200L, true, true);
+    }
     TopDocs topDocs = searcher.search(q, noDocs);
     ScoreDoc[] sd = topDocs.scoreDocs;
     assertNotNull(sd);
@@ -218,7 +225,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   
   private void testLeftOpenRange(int precisionStep) throws Exception {
     String field="field"+precisionStep;
-    int count=3000;
+    int count= TEST_NIGHTLY ? 3000 : 405;
     long upper=(count-1)*distance + (distance/3) + startOffset;
     LegacyNumericRangeQuery<Long> q= LegacyNumericRangeQuery.newLongRange(field, precisionStep, null, upper, true, true);
 
@@ -264,7 +271,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   
   private void testRightOpenRange(int precisionStep) throws Exception {
     String field="field"+precisionStep;
-    int count=3000;
+    int count=TEST_NIGHTLY ? 3000 : 400;
     long lower=(count-1)*distance + (distance/3) +startOffset;
     LegacyNumericRangeQuery<Long> q= LegacyNumericRangeQuery.newLongRange(field, precisionStep, lower, null, true, true);
     TopDocs topDocs = searcher.search(q, noDocs, Sort.INDEXORDER);
@@ -309,9 +316,9 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   
   @Test
   public void testInfiniteValues() throws Exception {
-    Directory dir = newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir,
-      newIndexWriterConfig(new MockAnalyzer(random())));
+    Directory dir = SolrTestUtil.newDirectory();
+    RandomIndexWriter writer = new RandomIndexWriter(LuceneTestCase.random(), dir,
+        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(LuceneTestCase.random())));
     Document doc = new Document();
     doc.add(new LegacyDoubleField("double", Double.NEGATIVE_INFINITY, Field.Store.NO));
     doc.add(new LegacyLongField("long", Long.MIN_VALUE, Field.Store.NO));
@@ -336,7 +343,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
     writer.close();
     
     IndexReader r = DirectoryReader.open(dir);
-    IndexSearcher s = newSearcher(r);
+    IndexSearcher s = SolrTestUtil.newSearcher(r);
     
     Query q= LegacyNumericRangeQuery.newLongRange("long", null, null, true, true);
     TopDocs topDocs = s.search(q, 10);
@@ -381,7 +388,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   private void testRangeSplit(int precisionStep) throws Exception {
     String field="ascfield"+precisionStep;
     // 10 random tests
-    int num = TestUtil.nextInt(random(), 10, 20);
+    int num = TEST_NIGHTLY ? TestUtil.nextInt(random(), 10, 20) : 5;
     for (int i = 0; i < num; i++) {
       long lower=(long)(random().nextDouble()*noDocs - noDocs/2);
       long upper=(long)(random().nextDouble()*noDocs - noDocs/2);
@@ -438,7 +445,13 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
   /** we fake a double test using long2double conversion of LegacyNumericUtils */
   private void testDoubleRange(int precisionStep) throws Exception {
     final String field="ascfield"+precisionStep;
-    final long lower=-1000L, upper=+2000L;
+
+    long lower=-1000L, upper=+2000L;
+
+    if (!TEST_NIGHTLY) {
+      lower=-100;
+      upper=+202L;
+    }
     
     Query tq= LegacyNumericRangeQuery.newDoubleRange(field, precisionStep,
         NumericUtils.sortableLongToDouble(lower), NumericUtils.sortableLongToDouble(upper), true, true);

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.FlattenGraphFilterFactory;  // javadocs
@@ -43,8 +44,6 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.rest.BaseSolrResource;
 import org.apache.solr.rest.ManagedResource;
 import org.apache.solr.rest.ManagedResourceStorage.StorageIO;
-import org.restlet.data.Status;
-import org.restlet.resource.ResourceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,7 +138,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
       }
 
       boolean ignoreCase = getIgnoreCase(managedInitArgs);
-      synonymMappings = new TreeMap<>();
+      synonymMappings = new ConcurrentSkipListMap<>();
       if (managedData != null) {
         Map<String,Object> storedSyns = (Map<String,Object>)managedData;
         for (Map.Entry<String, Object> entry : storedSyns.entrySet()) {
@@ -180,7 +179,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
       } else if (updates instanceof Map) {
         madeChanges = applyMapUpdates((Map<String,Object>)updates, ignoreCase);
       } else {
-        throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST,
+        throw new SolrException(ErrorCode.BAD_REQUEST,
             "Unsupported data format (" + updates.getClass().getName() + "); expected a JSON object (Map or List)!");
       }
       return madeChanges ? getStoredView() : null;
@@ -249,7 +248,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
           }
 
         } else {
-          throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Unsupported value "+val+
+          throw new SolrException(ErrorCode.BAD_REQUEST, "Unsupported value "+val+
               " for "+term+"; expected single value or a JSON array!");
         }
 
@@ -268,7 +267,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
      * the ignoreCase setting. 
      */
     protected Map<String,Set<String>> getStoredView() {
-      Map<String,Set<String>> storedView = new TreeMap<>();
+      Map<String,Set<String>> storedView = new ConcurrentSkipListMap<>();
       for (CasePreservedSynonymMappings cpsm : synonymMappings.values()) {
         for (Map.Entry<String, Set<String>> entry : cpsm.mappings.entrySet()) {
           storedView.put(entry.getKey(), entry.getValue());
@@ -282,7 +281,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
     }
     
     public boolean getIgnoreCase() {
-      return getIgnoreCase(managedInitArgs);
+      return getIgnoreCase(managedInitArgs.get());
     }
 
     public boolean getIgnoreCase(NamedList<?> initArgs) {
@@ -314,7 +313,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
     }  
 
     @Override
-    public synchronized void doDeleteChild(BaseSolrResource endpoint, String childId) {
+    public void doDeleteChild(BaseSolrResource endpoint, String childId) {
       boolean ignoreCase = getIgnoreCase();
       String key = applyCaseSetting(ignoreCase, childId);
       
@@ -351,7 +350,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
    * mappings from the managed JSON in this class during SynonymMap
    * building.
    */
-  private class ManagedSynonymParser extends SynonymMap.Parser {
+  private static class ManagedSynonymParser extends SynonymMap.Parser {
 
     SynonymManager synonymManager;
     
@@ -428,8 +427,7 @@ public class ManagedSynonymFilterFactory extends BaseManagedTokenFilterFactory {
           (ResourceLoader loader, String cname, boolean dedup, Analyzer analyzer)
           throws IOException, ParseException {
 
-        ManagedSynonymParser parser =
-            new ManagedSynonymParser((SynonymManager)res, dedup, analyzer);
+        ManagedSynonymParser parser = new ManagedSynonymParser((SynonymManager) res, dedup, analyzer);
         // null is safe here because there's no actual parsing done against a input Reader
         parser.parse(null);
         return parser.build(); 

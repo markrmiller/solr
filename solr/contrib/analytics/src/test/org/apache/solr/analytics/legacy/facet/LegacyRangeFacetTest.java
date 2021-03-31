@@ -19,10 +19,12 @@ package org.apache.solr.analytics.legacy.facet;
 
 import java.util.ArrayList;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-
+@LuceneTestCase.Nightly
 public class LegacyRangeFacetTest extends LegacyAbstractAnalyticsFacetTest {
   static String fileName = "rangeFacets.txt";
 
@@ -45,7 +47,7 @@ public class LegacyRangeFacetTest extends LegacyAbstractAnalyticsFacetTest {
   static ArrayList<ArrayList<Float>> floatDateTestStart;
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeLegacyRangeFacetTest() throws Exception {
     initCore("solrconfig-analytics.xml","schema-analytics.xml");
     h.update("<delete><query>*:*</query></delete>");
 
@@ -113,6 +115,20 @@ public class LegacyRangeFacetTest extends LegacyAbstractAnalyticsFacetTest {
     assertU(commit());
 
     setResponse(h.query(request(fileToStringArr(LegacyRangeFacetTest.class, fileName))));
+  }
+
+  @AfterClass
+  public static void afterLegacyRangeFacetTest() throws Exception {
+    deleteCore();
+    //INT
+    intLongTestStart = null;
+    intDoubleTestStart = null;
+    intDateTestStart = null;
+
+    //FLOAT
+    floatLongTestStart = null;
+    floatDoubleTestStart = null;
+    floatDateTestStart = null;
   }
 
   @SuppressWarnings("unchecked")

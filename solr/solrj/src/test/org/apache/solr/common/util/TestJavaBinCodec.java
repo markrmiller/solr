@@ -17,8 +17,10 @@
 package org.apache.solr.common.util;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.EnumFieldValue;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -28,6 +30,8 @@ import org.apache.solr.util.ConcurrentLRUCache;
 import org.apache.solr.util.RTimer;
 import org.junit.Test;
 import org.noggit.CharArr;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -36,6 +40,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -45,6 +50,7 @@ import java.util.Map;
 import java.util.Random;
 
 public class TestJavaBinCodec extends SolrTestCaseJ4 {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final String SOLRJ_JAVABIN_BACKCOMPAT_BIN = "/solrj/javabin_backcompat.bin";
   private static final String BIN_FILE_LOCATION = "./solr/solrj/src/test-files/solrj/javabin_backcompat.bin";
@@ -56,7 +62,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
   private static final String SOLRJ_DOCS_2 = "/solrj/sampleClusteringResponse.xml";
 
   public void testStrings() throws Exception {
-    for (int i = 0; i < 10000 * RANDOM_MULTIPLIER; i++) {
+    for (int i = 0; i < 10000 * LuceneTestCase.RANDOM_MULTIPLIER; i++) {
       String s = TestUtil.randomUnicodeString(random());
       try (JavaBinCodec jbcO = new JavaBinCodec(); ByteArrayOutputStream os = new ByteArrayOutputStream()) {
         jbcO.marshal(s, os);
@@ -210,9 +216,9 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
         byte[] b2 = (byte[]) matchObj.get(i);
         assertTrue(Arrays.equals(b1, b2));
       } else if (unmarshaledObj.get(i) instanceof SolrDocument && matchObj.get(i) instanceof SolrDocument) {
-        assertTrue(compareSolrDocument(unmarshaledObj.get(i), matchObj.get(i)));
+        assertTrue(SolrTestUtil.compareSolrDocument(unmarshaledObj.get(i), matchObj.get(i)));
       } else if (unmarshaledObj.get(i) instanceof SolrDocumentList && matchObj.get(i) instanceof SolrDocumentList) {
-        assertTrue(compareSolrDocumentList(unmarshaledObj.get(i), matchObj.get(i)));
+        assertTrue(SolrTestUtil.compareSolrDocumentList(unmarshaledObj.get(i), matchObj.get(i)));
       } else if (unmarshaledObj.get(i) instanceof SolrInputDocument && matchObj.get(i) instanceof SolrInputDocument) {
         assertTrue(compareSolrInputDocument(unmarshaledObj.get(i), matchObj.get(i)));
       } else if (unmarshaledObj.get(i) instanceof SolrInputField && matchObj.get(i) instanceof SolrInputField) {
@@ -236,7 +242,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
       InputStream is = getClass().getResourceAsStream(SOLRJ_JAVABIN_BACKCOMPAT_BIN_CHILD_DOCS);
       SolrDocument sdoc = (SolrDocument) javabin.unmarshal(is);
       SolrDocument matchSolrDoc = generateSolrDocumentWithChildDocs();
-      assertTrue(compareSolrDocument(sdoc, matchSolrDoc));
+      assertTrue(SolrTestUtil.compareSolrDocument(sdoc, matchSolrDoc));
     } catch (IOException e) {
       throw e;
     }
@@ -606,7 +612,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
         try {
           doDecode(buffers, iter, stringCache);
         } catch (IOException e) {
-          e.printStackTrace();
+          log.error("", e);
         }
       });
     }

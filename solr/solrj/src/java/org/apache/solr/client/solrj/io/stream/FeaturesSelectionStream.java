@@ -34,8 +34,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.io.SolrClientCache;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.comp.StreamComparator;
@@ -49,15 +49,13 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionValue;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 
 import static org.apache.solr.common.params.CommonParams.DISTRIB;
 import static org.apache.solr.common.params.CommonParams.ID;
@@ -83,7 +81,7 @@ public class FeaturesSelectionStream extends TupleStream implements Expressible{
 
   protected transient SolrClientCache cache;
   protected transient boolean isCloseCache;
-  protected transient CloudSolrClient cloudSolrClient;
+  protected transient CloudHttp2SolrClient cloudSolrClient;
 
   protected transient StreamContext streamContext;
   protected ExecutorService executorService;
@@ -242,13 +240,13 @@ public class FeaturesSelectionStream extends TupleStream implements Expressible{
   public void open() throws IOException {
     if (cache == null) {
       isCloseCache = true;
-      cache = new SolrClientCache();
+      cache = new SolrClientCache(zkHost);
     } else {
       isCloseCache = false;
     }
 
-    this.cloudSolrClient = this.cache.getCloudSolrClient(zkHost);
-    this.executorService = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrNamedThreadFactory("FeaturesSelectionStream"));
+    this.cloudSolrClient = this.cache.getCloudSolrClient();
+    this.executorService = ParWork.getRootSharedExecutor();
   }
 
   public List<TupleStream> children() {
@@ -261,8 +259,7 @@ public class FeaturesSelectionStream extends TupleStream implements Expressible{
 
       Slice[] slices = CloudSolrStream.getSlices(this.collection, zkStateReader, false);
 
-      ClusterState clusterState = zkStateReader.getClusterState();
-      Set<String> liveNodes = clusterState.getLiveNodes();
+      Set<String> liveNodes = zkStateReader.getLiveNodes();
 
       List<String> baseUrls = new ArrayList<>();
       for(Slice slice : slices) {
@@ -276,14 +273,14 @@ public class FeaturesSelectionStream extends TupleStream implements Expressible{
 
         Collections.shuffle(shuffler, new Random());
         Replica rep = shuffler.get(0);
-        ZkCoreNodeProps zkProps = new ZkCoreNodeProps(rep);
-        String url = zkProps.getCoreUrl();
+        String url = rep.getCoreUrl();
         baseUrls.add(url);
       }
 
       return baseUrls;
 
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       throw new IOException(e);
     }
   }
@@ -309,9 +306,10 @@ public class FeaturesSelectionStream extends TupleStream implements Expressible{
       cache.close();
     }
 
-    if (executorService != null) {
-      executorService.shutdown();
-    }
+    // We don't own the executorService, so no shutdown
+    //if (executorService != null) {
+    //  executorService.shutdown();
+    //}
   }
 
   /** Return the stream sort - ie, the order in which records are returned */
@@ -417,7 +415,7 @@ public class FeaturesSelectionStream extends TupleStream implements Expressible{
 
     public NamedList<Double> call() throws Exception {
       ModifiableSolrParams params = new ModifiableSolrParams();
-      HttpSolrClient solrClient = cache.getHttpSolrClient(baseUrl);
+      Http2SolrClient solrClient = cache.getHttpSolrClient(baseUrl);
 
       params.add(DISTRIB, "false");
       params.add("fq","{!igain}");

@@ -30,6 +30,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.solr.common.ParWork;
+
 
 /**
  * 
@@ -72,6 +74,7 @@ public class VersionedFile
 
         is = new FileInputStream(f);
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         // swallow exception for now
       }
     }

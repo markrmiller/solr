@@ -59,6 +59,8 @@ import org.apache.solr.client.solrj.request.V2Request;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.routing.RequestReplicaListTransformerGenerator;
 import org.apache.solr.client.solrj.util.ClientUtils;
+import org.apache.solr.common.ParWork;
+import org.apache.solr.common.ParWorkExecutor;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.ToleratedUpdateError;
@@ -71,7 +73,7 @@ import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.ImplicitDocRouter;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
+import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
@@ -81,7 +83,6 @@ import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.Hash;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.common.util.Utils;
 import org.slf4j.Logger;
@@ -97,16 +98,14 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
   private volatile String defaultCollection;
   //no of times collection state to be reloaded if stale state error is received
-  private static final int MAX_STALE_RETRIES = Integer.parseInt(System.getProperty("cloudSolrClientMaxStaleRetries", "5"));
+  private static final int MAX_STALE_RETRIES = Integer.parseInt(System.getProperty("cloudSolrClientMaxStaleRetries", "3"));
   private Random rand = new Random();
 
   private final boolean updatesToLeaders;
   private final boolean directUpdatesToLeadersOnly;
   private final RequestReplicaListTransformerGenerator requestRLTGenerator;
   boolean parallelUpdates; //TODO final
-  private ExecutorService threadPool = ExecutorUtil
-      .newMDCAwareCachedThreadPool(new SolrNamedThreadFactory(
-          "CloudSolrClient ThreadPool"));
+  private final ExecutorService threadPool;
   private String idField = ID;
   public static final String STATE_VERSION = "_stateVer_";
   private long retryExpiryTime = TimeUnit.NANOSECONDS.convert(3, TimeUnit.SECONDS);//3 seconds or 3 million nanos
@@ -127,19 +126,17 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     // NON_ROUTABLE_PARAMS.add(UpdateParams.ROLLBACK);
 
   }
-  private volatile List<Object> locks = objectList(3);
-
 
   static class StateCache extends ConcurrentHashMap<String, ExpiringCachedDocCollection> {
     final AtomicLong puts = new AtomicLong();
     final AtomicLong hits = new AtomicLong();
-    final Lock evictLock = new ReentrantLock(true);
+    final Lock evictLock = new ReentrantLock(false);
     protected volatile long timeToLive = 60 * 1000L;
 
     @Override
     public ExpiringCachedDocCollection get(Object key) {
       ExpiringCachedDocCollection val = super.get(key);
-      if(val == null) {
+      if (val == null) {
         // a new collection is likely to be added now.
         //check if there are stale items and remove them
         evictStale();
@@ -220,14 +217,19 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     }
   }
 
-  protected BaseCloudSolrClient(boolean updatesToLeaders, boolean parallelUpdates, boolean directUpdatesToLeadersOnly) {
+  protected BaseCloudSolrClient(boolean updatesToLeaders, boolean parallelUpdates, boolean directUpdatesToLeadersOnly, boolean createPool) {
+    if (parallelUpdates && createPool) {
+      threadPool = new ParWorkExecutor("ParWork-CloudSolrClient", Math.max(12, Runtime.getRuntime().availableProcessors()));
+    } else {
+      threadPool = null;
+    }
     this.updatesToLeaders = updatesToLeaders;
     this.parallelUpdates = parallelUpdates;
     this.directUpdatesToLeadersOnly = directUpdatesToLeadersOnly;
     this.requestRLTGenerator = new RequestReplicaListTransformerGenerator();
   }
 
-  /** Sets the cache ttl for DocCollection Objects cached  . This is only applicable for collections which are persisted outside of clusterstate.json
+  /** Sets the cache ttl for DocCollection Objects cached.
    * @param seconds ttl value in seconds
    */
   public void setCollectionCacheTTl(int seconds){
@@ -243,8 +245,8 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
   @Override
   public void close() throws IOException {
-    if(this.threadPool != null && !this.threadPool.isShutdown()) {
-      this.threadPool.shutdown();
+    if (threadPool != null) {
+      ExecutorUtil.shutdownAndAwaitTermination(threadPool);
     }
   }
 
@@ -285,7 +287,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       getClusterStateProvider().connect();
       return provider.zkStateReader;
     }
-    throw new IllegalStateException("This has no Zk stateReader");
+    throw new IllegalStateException("This has no Zk stateReader: " + getClusterStateProvider().getClass().getSimpleName());
   }
 
   /**
@@ -358,7 +360,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       catch (RuntimeException e) {
         // not ready yet, then...
       }
-      TimeUnit.MILLISECONDS.sleep(250);
+      TimeUnit.MILLISECONDS.sleep(50);
     }
     throw new TimeoutException("Timed out waiting for cluster");
   }
@@ -385,7 +387,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
    * instead
    * </p>
    *
-   * @see #waitForState(String, long, TimeUnit, Predicate)
+   * @see #waitForState(String, long, TimeUnit, CollectionStatePredicate)
    * @see #registerCollectionStateWatcher
    * @param collection the collection to watch
    * @param wait       how long to wait
@@ -395,27 +397,6 @@ public abstract class BaseCloudSolrClient extends SolrClient {
    * @throws TimeoutException     on timeout
    */
   public void waitForState(String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate)
-      throws InterruptedException, TimeoutException {
-    getClusterStateProvider().connect();
-    assertZKStateProvider().zkStateReader.waitForState(collection, wait, unit, predicate);
-  }
-  /**
-   * Block until a Predicate returns true, or the wait times out
-   *
-   * <p>
-   * Note that the predicate may be called again even after it has returned true, so
-   * implementors should avoid changing state within the predicate call itself.
-   * </p>
-   *
-   * @see #registerDocCollectionWatcher
-   * @param collection the collection to watch
-   * @param wait       how long to wait
-   * @param unit       the units of the wait parameter
-   * @param predicate  a {@link Predicate} to test against the {@link DocCollection}
-   * @throws InterruptedException on interrupt
-   * @throws TimeoutException     on timeout
-   */
-  public void waitForState(String collection, long wait, TimeUnit unit, Predicate<DocCollection> predicate)
       throws InterruptedException, TimeoutException {
     getClusterStateProvider().connect();
     assertZKStateProvider().zkStateReader.waitForState(collection, wait, unit, predicate);
@@ -493,7 +474,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         + collection + " -> " + aliasedCollections);
     }
 
-    DocCollection col = getDocCollection(collection, null);
+    DocCollection col = getDocCollection(collection, null, null);
 
     DocRouter router = col.getRouter();
 
@@ -527,42 +508,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     long start = System.nanoTime();
 
     if (parallelUpdates) {
-      final Map<String, Future<NamedList<?>>> responseFutures = new HashMap<>(routes.size());
-      for (final Map.Entry<String, ? extends LBSolrClient.Req> entry : routes.entrySet()) {
-        final String url = entry.getKey();
-        final LBSolrClient.Req lbRequest = entry.getValue();
-        try {
-          MDC.put("CloudSolrClient.url", url);
-          responseFutures.put(url, threadPool.submit(() -> {
-            return getLbClient().request(lbRequest).getResponse();
-          }));
-        } finally {
-          MDC.remove("CloudSolrClient.url");
-        }
-      }
-
-      for (final Map.Entry<String, Future<NamedList<?>>> entry: responseFutures.entrySet()) {
-        final String url = entry.getKey();
-        final Future<NamedList<?>> responseFuture = entry.getValue();
-        try {
-          shardResponses.add(url, responseFuture.get());
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new RuntimeException(e);
-        } catch (ExecutionException e) {
-          exceptions.add(url, e.getCause());
-        }
-      }
-
-      if (exceptions.size() > 0) {
-        Throwable firstException = exceptions.getVal(0);
-        if(firstException instanceof SolrException) {
-          SolrException e = (SolrException) firstException;
-          throw getRouteException(SolrException.ErrorCode.getErrorCode(e.code()), exceptions, routes);
-        } else {
-          throw getRouteException(SolrException.ErrorCode.SERVER_ERROR, exceptions, routes);
-        }
-      }
+      doParallelUpdate(routes, exceptions, shardResponses);
     } else {
       for (Map.Entry<String, ? extends LBSolrClient.Req> entry : routes.entrySet()) {
         String url = entry.getKey();
@@ -571,6 +517,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           NamedList<Object> rsp = getLbClient().request(lbRequest).getResponse();
           shardResponses.add(url, rsp);
         } catch (Exception e) {
+          ParWork.propagateInterrupt(e);
           if(e instanceof SolrException) {
             throw (SolrException) e;
           } else {
@@ -606,6 +553,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         LBSolrClient.Rsp rsp = getLbClient().request(req);
         shardResponses.add(urlList.get(0), rsp.getResponse());
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, urlList.get(0), e);
       }
     }
@@ -618,6 +566,47 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     return rr;
   }
 
+  protected void doParallelUpdate(Map<String,? extends LBSolrClient.Req> routes,
+      NamedList<Throwable> exceptions, NamedList<NamedList> shardResponses) {
+    final Map<String, Future<NamedList<?>>> responseFutures = new HashMap<>(
+        routes.size());
+    for (final Map.Entry<String, ? extends LBSolrClient.Req> entry : routes.entrySet()) {
+      final String url = entry.getKey();
+      final LBSolrClient.Req lbRequest = entry.getValue();
+      try {
+        MDC.put("CloudSolrClient.url", url);
+        responseFutures.put(url, threadPool.submit(() -> getLbClient().request(lbRequest).getResponse()));
+      } finally {
+        MDC.remove("CloudSolrClient.url");
+      }
+    }
+
+    for (final Map.Entry<String, Future<NamedList<?>>> entry: responseFutures.entrySet()) {
+      final String url = entry.getKey();
+      final Future<NamedList<?>> responseFuture = entry.getValue();
+      try {
+        shardResponses.add(url, responseFuture.get());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        exceptions.add(url, e.getCause());
+      }
+    }
+
+    if (exceptions.size() > 0) {
+      Throwable firstException = exceptions.getVal(0);
+      if(firstException instanceof SolrException) {
+        SolrException e = (SolrException) firstException;
+        throw getRouteException(SolrException.ErrorCode.getErrorCode(e.code()),
+            exceptions, routes);
+      } else {
+        throw getRouteException(SolrException.ErrorCode.SERVER_ERROR,
+            exceptions, routes);
+      }
+    }
+  }
+
   protected RouteException getRouteException(SolrException.ErrorCode serverError, NamedList<Throwable> exceptions, Map<String, ? extends LBSolrClient.Req> routes) {
     return new RouteException(serverError, exceptions, routes);
   }
@@ -628,9 +617,9 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     return urlMap == null ? null : updateRequest.getRoutesToCollection(router, col, urlMap, routableParams, idField);
   }
 
-  private Map<String,List<String>> buildUrlMap(DocCollection col, ReplicaListTransformer replicaListTransformer) {
+  Map<String,List<String>> buildUrlMap(DocCollection col, ReplicaListTransformer replicaListTransformer) {
     Map<String, List<String>> urlMap = new HashMap<>();
-    Slice[] slices = col.getActiveSlicesArr();
+    Collection<Slice> slices = col.getActiveSlices();
     for (Slice slice : slices) {
       String name = slice.getName();
       List<Replica> sortedReplicas = new ArrayList<>();
@@ -665,7 +654,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       // put the leaderUrl first.
       sortedReplicas.add(0, leader);
 
-      urlMap.put(name, sortedReplicas.stream().map(Replica::getCoreUrl).collect(Collectors.toList()));
+      urlMap.put(name, sortedReplicas.stream().map(replica -> replica.getCoreUrl()).collect(Collectors.toList()));
     }
     return urlMap;
   }
@@ -870,9 +859,10 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       Set<String> requestedCollectionNames = resolveAliases(inputCollections, isUpdate);
 
       StringBuilder stateVerParamBuilder = null;
+      if (log.isDebugEnabled()) log.debug("build version params for collections {}", requestedCollectionNames);
       for (String requestedCollection : requestedCollectionNames) {
         // track the version of state we're using on the client side using the _stateVer_ param
-        DocCollection coll = getDocCollection(requestedCollection, null);
+        DocCollection coll = getDocCollection(requestedCollection, null, null);
         if (coll == null) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection not found: " + requestedCollection);
         }
@@ -887,7 +877,8 @@ public abstract class BaseCloudSolrClient extends SolrClient {
             stateVerParamBuilder.append("|"); // hopefully pipe is not an allowed char in a collection name
           }
 
-          stateVerParamBuilder.append(coll.getName()).append(":").append(collVer);
+          Map su = coll.getStateUpdates();
+          stateVerParamBuilder.append(coll.getName()).append(":").append(collVer).append(">").append(su == null ? 0 : su.hashCode());
         }
       }
 
@@ -916,13 +907,17 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         Map invalidStates = (Map) o;
         for (Object invalidEntries : invalidStates.entrySet()) {
           Map.Entry e = (Map.Entry) invalidEntries;
-          getDocCollection((String) e.getKey(), (Integer) e.getValue());
-        }
 
+          String[] versionAndUpdatesHash = ((String)e.getValue()).split(">");
+          int version = Integer.parseInt(versionAndUpdatesHash[0]);
+          int updateHash = Integer.parseInt(versionAndUpdatesHash[1]);
+          log.info("got invalid states", versionAndUpdatesHash);
+          getDocCollection((String) e.getKey(), version, updateHash);
+        }
       }
     } catch (Exception exc) {
-
-      Throwable rootCause = SolrException.getRootCause(exc);
+      ParWork.propagateInterrupt("Request failed", exc);
+      Throwable rootCause = SolrException.getRootCause(exc); // TODO: with http2solrclient, we are getting remoteexception here instead of real root
       // don't do retry support for admin requests
       // or if the request doesn't have a collection specified
       // or request is v2 api and its method is not GET
@@ -931,7 +926,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           throw (SolrServerException)exc;
         } else if (exc instanceof IOException) {
           throw (IOException)exc;
-        }else if (exc instanceof RuntimeException) {
+        } else if (exc instanceof RuntimeException) {
           throw (RuntimeException) exc;
         }
         else {
@@ -971,7 +966,16 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           // and we could not get any information from the server
           //it is probably not worth trying again and again because
           // the state would not have been updated
-          log.info("trying request again");
+//          try {
+//            if (retryCount > 3) {
+//              Thread.sleep(500);
+//            } else {
+//              Thread.sleep(100);
+//            }
+//          } catch (InterruptedException e) {
+//
+//          }
+          log.info("trying request again retryCnt={}", retryCount + 1);
           return requestWithRetryOnStaleState(request, retryCount + 1, inputCollections);
         }
       } else {
@@ -1002,7 +1006,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           !requestedCollections.isEmpty() &&
           wasCommError) {
         for (DocCollection ext : requestedCollections) {
-          DocCollection latestStateFromZk = getDocCollection(ext.getName(), null);
+          DocCollection latestStateFromZk = getDocCollection(ext.getName(), null, null);
           if (latestStateFromZk.getZNodeVersion() != ext.getZNodeVersion()) {
             // looks like we couldn't reach the server because the state was stale == retry
             stateWasStale = true;
@@ -1091,14 +1095,16 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       //   at every shard when getting leaders if we tweaked some things
 
       // Retrieve slices from the cloud state and, for each collection specified, add it to the Map of slices.
+
       Map<String,Slice> slices = new HashMap<>();
       String shardKeys = reqParams.get(ShardParams._ROUTE_);
       for (String collectionName : collectionNames) {
-        DocCollection col = getDocCollection(collectionName, null);
+        DocCollection col = getDocCollection(collectionName, null, null);
+        log.info("doc col is {}", col);
         if (col == null) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Collection not found: " + collectionName);
         }
-        Collection<Slice> routeSlices = col.getRouter().getSearchSlices(shardKeys, reqParams , col);
+        Collection<Slice> routeSlices = new ArrayList<>(col.getRouter().getSearchSlices(shardKeys, reqParams, col));
         ClientUtils.addSlices(slices, collectionName, routeSlices, true);
       }
 
@@ -1132,17 +1138,22 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       Set<String> seenNodes = new HashSet<>();
       sortedReplicas.forEach( replica -> {
         if (seenNodes.add(replica.getNodeName())) {
-          theUrlList.add(ZkCoreNodeProps.getCoreUrl(replica.getBaseUrl(), joinedInputCollections));
+          theUrlList.add(Replica.getCoreUrl(replica.getBaseUrl(), joinedInputCollections));
         }
       });
 
       if (theUrlList.isEmpty()) {
-        collectionStateCache.keySet().removeAll(collectionNames);
-        throw new SolrException(SolrException.ErrorCode.INVALID_STATE,
-            "Could not find a healthy node to handle the request.");
+        if (collectionNames.size() == 0) {
+          collectionStateCache.keySet().removeAll(collectionNames);
+          throw new SolrException(SolrException.ErrorCode.INVALID_STATE, "Could not find a healthy node to handle the request, collection names: " + collectionNames + " live nodes=" + liveNodes);
+        }
+
+        // MRM TODO:
+        theUrlList.add(Utils.getBaseUrlForNodeName(liveNodes.iterator().next(),
+            getClusterStateProvider().getClusterProperty(ZkStateReader.URL_SCHEME,"http")) + "/" + collectionNames.iterator().next());
+       // theUrlList.add( "http://" + liveNodes.iterator().next().replaceAll("_", "/")  + "/" + collectionNames.iterator().next());
       }
     }
-
     LBSolrClient.Req req = new LBSolrClient.Req(request, theUrlList);
     LBSolrClient.Rsp rsp = getLbClient().request(req);
     return rsp.getResponse();
@@ -1176,11 +1187,6 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     return directUpdatesToLeadersOnly;
   }
 
-  /**If caches are expired they are refreshed after acquiring a lock.
-   * use this to set the number of locks
-   */
-  public void setParallelCacheRefreshes(int n){ locks = objectList(n); }
-
   protected static ArrayList<Object> objectList(int n) {
     ArrayList<Object> l =  new ArrayList<>(n);
     for(int i=0;i<n;i++) l.add(new Object());
@@ -1188,7 +1194,8 @@ public abstract class BaseCloudSolrClient extends SolrClient {
   }
 
 
-  protected DocCollection getDocCollection(String collection, Integer expectedVersion) throws SolrException {
+  protected DocCollection getDocCollection(String collection, Integer expectedVersion, Integer updateHash) throws SolrException {
+    log.info("getDocCollection expectedVersion={} expectedUpdateHash={}", expectedVersion, updateHash);
     if (expectedVersion == null) expectedVersion = -1;
     if (collection == null) return null;
     ExpiringCachedDocCollection cacheEntry = collectionStateCache.get(collection);
@@ -1207,10 +1214,10 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       //it is readily available just return it
       return ref.get();
     }
-    List locks = this.locks;
-    final Object lock = locks.get(Math.abs(Hash.murmurhash3_x86_32(collection, 0, collection.length(), 0) % locks.size()));
+
+
     DocCollection fetchedCol = null;
-    synchronized (lock) {
+
       /*we have waited for sometime just check once again*/
       cacheEntry = collectionStateCache.get(collection);
       col = cacheEntry == null ? null : cacheEntry.cached;
@@ -1230,7 +1237,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           collectionStateCache.put(collection, new ExpiringCachedDocCollection(fetchedCol));
       }
       return fetchedCol;
-    }
+
   }
 
   ClusterState.CollectionRef getCollectionRef(String collection) {
@@ -1272,15 +1279,15 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     Map<String,Integer> results = new HashMap<String,Integer>();
     if (resp instanceof RouteResponse) {
       NamedList routes = ((RouteResponse)resp).getRouteResponses();
-      DocCollection coll = getDocCollection(collection, null);
+      DocCollection coll = getDocCollection(collection, null, null);
       Map<String,String> leaders = new HashMap<String,String>();
-      for (Slice slice : coll.getActiveSlicesArr()) {
+      for (Slice slice : coll.getActiveSlices()) {
         Replica leader = slice.getLeader();
         if (leader != null) {
-          ZkCoreNodeProps zkProps = new ZkCoreNodeProps(leader);
-          String leaderUrl = zkProps.getBaseUrl() + "/" + zkProps.getCoreName();
+
+          String leaderUrl = leader.getBaseUrl() + "/" + leader.getName();
           leaders.put(leaderUrl, slice.getName());
-          String altLeaderUrl = zkProps.getBaseUrl() + "/" + collection;
+          String altLeaderUrl = leader.getBaseUrl() + "/" + collection;
           leaders.put(altLeaderUrl, slice.getName());
         }
       }
@@ -1314,7 +1321,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     final boolean hasNoDocuments = (documents == null || documents.isEmpty());
     final boolean hasNoDeleteById = (deleteById == null || deleteById.isEmpty());
     if (hasNoDocuments && hasNoDeleteById) {
-      // no documents and no delete-by-id, so no info to find leader(s)
+      if (log.isDebugEnabled()) log.debug("no documents and no delete-by-id, so no info to find leader(s)");
       return false;
     }
 
@@ -1323,7 +1330,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         final SolrInputDocument doc = entry.getKey();
         final Object fieldValue = doc.getFieldValue(idField);
         if (fieldValue == null) {
-          // a document with no id field value, so can't find leader for it
+          if (log.isDebugEnabled()) log.debug("a document with no id field value, so can't find leader for it");
           return false;
         }
       }
@@ -1331,5 +1338,4 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
     return true;
   }
-
 }

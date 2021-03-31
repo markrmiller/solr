@@ -16,15 +16,15 @@
  */
 package org.apache.solr.cloud;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.lucene.mockfile.FilterPath;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCase;
+import org.apache.solr.SolrTestCaseUtil;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -38,16 +38,22 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.handler.BackupStatusChecker;
 import org.apache.solr.handler.ReplicationHandler;
+import org.junit.Ignore;
 import org.junit.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * This test simply does a bunch of basic things in solrcloud mode and asserts things
  * work as expected.
  */
-@SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@SolrTestCase.SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@LuceneTestCase.Nightly // MRM TODO: - check out more, convert to bridge
+@Ignore // MRM TODO: convert to bridge
 public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
-  private static final String SHARD2 = "shard2";
-  private static final String SHARD1 = "shard1";
+  private static final String SHARD2 = "s2";
+  private static final String SHARD1 = "s1";
   private static final String ONE_NODE_COLLECTION = "onenodecollection";
   private final boolean onlyLeaderIndexes = random().nextBoolean();
 
@@ -80,16 +86,10 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
           "foo_d", 1.414d);
       
       commit();
-      
-      // make sure we are in a steady state...
-      waitForRecoveriesToFinish(false);
 
       assertDocCounts(false);
       
       indexAbunchOfDocs();
-      
-      // check again 
-      waitForRecoveriesToFinish(false);
       
       commit();
       
@@ -111,7 +111,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
       long docId = testUpdateAndDelete();
       
       // index a bad doc...
-      expectThrows(SolrException.class, () -> indexr(t1, "a doc with no id"));
+      SolrTestCaseUtil.expectThrows(SolrException.class, () -> indexr(t1, "a doc with no id"));
       
       // TODO: bring this to its own method?
       // try indexing to a leader that has no replicas up
@@ -132,8 +132,6 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
       
       indexr("id", docId + 1, t1, "slip this doc in");
       
-      waitForRecoveriesToFinish(false);
-      
       checkShardConsistency(SHARD1);
       checkShardConsistency(SHARD2);
       
@@ -148,7 +146,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
   
   private void testNodeWithoutCollectionForwarding() throws Exception {
     assertEquals(0, CollectionAdminRequest
-        .createCollection(ONE_NODE_COLLECTION, "conf1", 1, 1)
+        .createCollection(ONE_NODE_COLLECTION, "_default", 1, 1)
         .setCreateNodeSet("")
         .process(cloudClient).getStatus());
     assertTrue(CollectionAdminRequest
@@ -175,7 +173,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
 
     SolrQuery query = new SolrQuery("*:*");
 
-    try (HttpSolrClient qclient = getHttpSolrClient(baseUrl + "/onenodecollection" + "core")) {
+    try (Http2SolrClient qclient = getHttpSolrClient(baseUrl + "/onenodecollection" + "core")) {
 
       // it might take a moment for the proxy node to see us in their cloud state
       waitForNon403or404or503(qclient);
@@ -191,7 +189,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
       assertEquals(docs - 1, results.getResults().getNumFound());
     }
     
-    try (HttpSolrClient qclient = getHttpSolrClient(baseUrl + "/onenodecollection")) {
+    try (Http2SolrClient qclient = getHttpSolrClient(baseUrl + "/onenodecollection")) {
       QueryResponse results = qclient.query(query);
       assertEquals(docs - 1, results.getResults().getNumFound());
 
@@ -261,10 +259,8 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
     CloudJettyRunner deadShard = chaosMonkey.stopShard(SHARD1, 0);
 
     // ensure shard is dead
-    expectThrows(SolrServerException.class,
-        "This server should be down and this update should have failed",
-        () -> index_specific(deadShard.client.solrClient, id, 999, i1, 107, t1, "specific doc!")
-    );
+    SolrTestCaseUtil.expectThrows(SolrServerException.class, "This server should be down and this update should have failed",
+        () -> index_specific(deadShard.client.solrClient, id, 999, i1, 107, t1, "specific doc!"));
     
     commit();
     
@@ -355,12 +351,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
     
     // this should trigger a recovery phase on deadShard
     deadShard.jetty.start();
-    
-    // make sure we have published we are recovering
-    Thread.sleep(1500);
-    
-    waitForRecoveriesToFinish(false);
-    
+
     deadShardCount = shardToJetty.get(SHARD1).get(0).client.solrClient
         .query(query).getResults().getNumFound();
     // if we properly recovered, we should now have the couple missing docs that
@@ -382,29 +373,18 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
     }
     commit();
     
-    Thread.sleep(1500);
-    
     deadShard.jetty.start();
-    
-    // make sure we have published we are recovering
-    Thread.sleep(1500);
-    
-    waitForThingsToLevelOut(1, TimeUnit.MINUTES);
-    
-    Thread.sleep(500);
-    
-    waitForRecoveriesToFinish(false);
     
     checkShardConsistency(true, false);
     
     // try a backup command
-    try(final HttpSolrClient client = getHttpSolrClient((String) shardToJetty.get(SHARD2).get(0).info.get("base_url"))) {
+    try(final Http2SolrClient client = getHttpSolrClient((String) shardToJetty.get(SHARD2).get(0).info.get("base_url"))) {
       final String backupName = "the_backup";
       ModifiableSolrParams params = new ModifiableSolrParams();
       params.set("qt", ReplicationHandler.PATH);
       params.set("command", "backup");
       params.set("name", backupName);
-      Path location = createTempDir();
+      Path location = SolrTestUtil.createTempDir();
       location = FilterPath.unwrap(location).toRealPath();
       params.set("location", location.toString());
 
@@ -422,9 +402,7 @@ public class BasicDistributedZk2Test extends AbstractFullDistribZkTestBase {
   }
 
   private void addNewReplica() throws Exception {
-    
-    waitForRecoveriesToFinish(false);
-    
+
     // new server should be part of first shard
     // how many docs are on the new shard?
     for (CloudJettyRunner cjetty : shardToJetty.get(SHARD1)) {

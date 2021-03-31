@@ -21,12 +21,14 @@ import java.io.IOException;
 
 import com.codahale.metrics.MetricRegistry;
 import org.apache.solr.cloud.CloudDescriptor;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrInfoBean;
+import org.apache.solr.search.SolrFieldCacheBean;
 
 /**
  * Helper class for managing registration of {@link SolrMetricProducer}'s
@@ -35,7 +37,7 @@ import org.apache.solr.core.SolrInfoBean;
 public class SolrCoreMetricManager implements Closeable {
 
   private final SolrCore core;
-  private SolrMetricsContext solrMetricsContext;
+  private volatile SolrMetricsContext solrMetricsContext;
   private SolrMetricManager metricManager;
   private String collectionName;
   private String shardName;
@@ -63,12 +65,8 @@ public class SolrCoreMetricManager implements Closeable {
       cloudMode = true;
       collectionName = core.getCoreDescriptor().getCollectionName();
       shardName = cd.getShardId();
-      //replicaName = cd.getCoreNodeName();
       String coreName = core.getName();
-      replicaName = Utils.parseMetricsReplicaName(collectionName, coreName);
-      if (replicaName == null) {
-        replicaName = cd.getCoreNodeName();
-      }
+      replicaName = coreName;
     }
   }
 
@@ -142,11 +140,18 @@ public class SolrCoreMetricManager implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    metricManager.closeReporters(solrMetricsContext.getRegistryName(), solrMetricsContext.getTag());
-    if (getLeaderRegistryName() != null) {
-      metricManager.closeReporters(getLeaderRegistryName(), solrMetricsContext.getTag());
+    try (ParWork closer = new ParWork(this)) {
+      closer.collect("CloseReporters", () -> {metricManager.closeReporters(getRegistryName(), solrMetricsContext.tag); return "reporters";});
+
+
+      closer.collect("leaderReporters",    () -> {
+        if (getLeaderRegistryName() != null) metricManager.closeReporters(getLeaderRegistryName(), solrMetricsContext.tag);
+      });
+      closer.addCollect();
+      closer.collect("gauges", () -> {
+        metricManager.unregisterGauges(getRegistryName(), solrMetricsContext.tag);
+      });
     }
-    metricManager.unregisterGauges(solrMetricsContext.getRegistryName(), solrMetricsContext.getTag());
   }
 
   public SolrMetricsContext getSolrMetricsContext() {

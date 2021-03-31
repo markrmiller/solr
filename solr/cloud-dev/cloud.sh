@@ -90,7 +90,7 @@
 #
 ##################################################################################
 
-DEFAULT_VCS_WORKSPACE='../code/lucene-solr'
+DEFAULT_VCS_WORKSPACE="../../"
 
 ############## Normally  no need to edit below this line ##############
 
@@ -106,7 +106,7 @@ MEMORY=1g        # default
 JVM_ARGS=''      # default
 RECOMPILE=false  # default
 NUM_NODES=0      # need to detect if not specified
-VCS_WORK=${DEFAULT_VCS_WORKSPACE}
+VCS_WORK=$DEFAULT_VCS_WORKSPACE
 ZK_PORT=2181
 
 while getopts ":crm:a:n:w:z:" opt; do
@@ -222,7 +222,7 @@ findSolr() {
   SOLR=${CLUSTER_WD}/$(find . -maxdepth 1 -name 'solr*' -type d -print0 | xargs -0 ls -1 -td | sed -E 's/\.\/(solr.*)/\1/' | head -n1)
   popd
 
-  #echo "Found solr at $SOLR"
+  echo "Found solr at $SOLR"
   SAFE_DEST="${CLUSTER_WD_FULL//\//_}";
 }
 
@@ -239,10 +239,10 @@ cleanIfReq() {
     fi
     findSolr
     echo COLLECTIONS FOUND IN ZK | egrep --color=always '.*'
-    COLLECTIONS_TO_CLEAN=`${SOLR}/bin/solr zk ls /solr_${SAFE_DEST}/collections -z     localhost:${ZK_PORT}`; echo $COLLECTIONS_TO_CLEAN | egrep --color=always '.*'
+    COLLECTIONS_TO_CLEAN=`${SOLR}/bin/solr zk ls /solr_${SAFE_DEST}/collections -z     127.0.0.1:${ZK_PORT}`; echo $COLLECTIONS_TO_CLEAN | egrep --color=always '.*'
     for collection in ${COLLECTIONS_TO_CLEAN}; do
       echo nuke $collection
-      ${SOLR}/bin/solr zk rm -r /solr_${SAFE_DEST}/collections/${collection} -z     localhost:${ZK_PORT}
+      ${SOLR}/bin/solr zk rm -r /solr_${SAFE_DEST}/collections/${collection} -z     127.0.0.1:${ZK_PORT}
       echo $?
     done
   fi
@@ -253,8 +253,8 @@ cleanIfReq() {
 #################################
 recompileIfReq() {
   if [[ "$RECOMPILE" = true ]]; then
-    pushd "$VCS_WORK"/solr
-    ant clean server create-package
+    pushd "$VCS_WORK"
+    ./gradlew -p solr distTar
     if [[ "$?" -ne 0 ]]; then
       echo "BUILD FAIL - cloud.sh stopping, see above output for details"; popd; exit 7;
     fi
@@ -274,10 +274,11 @@ copyTarball() {
     echo "baz"
     pushd # back to original dir to properly resolve vcs working dir
     echo "foobar:"$(pwd)
-    if [[ ! -f $(ls "$VCS_WORK"/solr/package/solr-*.tgz) ]]; then
-      echo "No solr tarball found try again with -r"; popd; exit 10;
+    tarball=$(ls "$VCS_WORK"/solr/packaging/build/distributions/solr-*.tgz)
+    if [[ ! -f "${tarball}" ]]; then
+      echo "No solr tarball found try again with -r location=${tarball}"; popd; exit 10;
     fi
-    cp "$VCS_WORK"/solr/package/solr-*.tgz ${CLUSTER_WD}
+    cp "$VCS_WORK"/solr/packaging/build/distributions/solr-*.tgz ${CLUSTER_WD}
     pushd # back into cluster wd to unpack
     tar xzvf solr-*.tgz
     popd
@@ -303,12 +304,12 @@ start(){
   findSolr
 
   echo "SOLR=$SOLR"
-  SOLR_ROOT=$("${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost localhost:${ZK_PORT} -cmd getfile "/solr_${SAFE_DEST}" /dev/stdout);
+  SOLR_ROOT=$("${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost 127.0.0.1:${ZK_PORT} -cmd getfile "/solr_${SAFE_DEST}" /dev/stdout);
   if [[ -z ${SOLR_ROOT} ]]; then
     # Need a fresh root in zookeeper...
-    "${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost localhost:${ZK_PORT} -cmd makepath "/solr_${SAFE_DEST}";
-    "${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost localhost:${ZK_PORT} -cmd put "/solr_${SAFE_DEST}" "created by cloud.sh"; # so we can test for existence next time
-    "${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost localhost:${ZK_PORT} -cmd putfile "/solr_${SAFE_DEST}/solr.xml" "${SOLR}/server/solr/solr.xml";
+    "${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost 127.0.0.1:${ZK_PORT} -cmd makepath "/solr_${SAFE_DEST}";
+    "${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost 127.0.0.1:${ZK_PORT} -cmd put "/solr_${SAFE_DEST}" "created by cloud.sh"; # so we can test for existence next time
+    "${SOLR}/server/scripts/cloud-scripts/zkcli.sh" -zkhost 127.0.0.1:${ZK_PORT} -cmd putfile "/solr_${SAFE_DEST}/solr.xml" "${SOLR}/server/solr/solr.xml";
   fi
 
   ACTUAL_NUM_NODES=$(ls -1 -d ${CLUSTER_WD}/n* | wc -l )
@@ -329,13 +330,16 @@ start(){
   echo "Final NUM_NODES is $NUM_NODES"
   for i in `seq 1 $NUM_NODES`; do
     mkdir -p "${CLUSTER_WD}/n${i}"
-    argsArray=(-c -s $CLUSTER_WD_FULL/n${i} -z localhost:${ZK_PORT}/solr_${SAFE_DEST} -p 898${i} -m $MEMORY \
-    -a "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=500${i} \
-    -Dsolr.solrxml.location=zookeeper -Dsolr.log.dir=$CLUSTER_WD_FULL/n${i} $JVM_ARGS")
+    argsArray=(-c -s $CLUSTER_WD_FULL/n${i} -z 127.0.0.1:${ZK_PORT}/solr_${SAFE_DEST} -p 898${i} -m $MEMORY \
+    -a "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=500${i}" \
+    -Dsolr.solrxml.location=zookeeper -Dsolr.log.dir=$CLUSTER_WD_FULL/n${i} "$JVM_ARGS")
     FINAL_COMMAND="${SOLR}/bin/solr ${argsArray[@]}"
     echo ${FINAL_COMMAND}
     ${SOLR}/bin/solr "${argsArray[@]}"
   done
+
+  echo "/solr_${SAFE_DEST}" > ${CLUSTER_WD}/chroot.txt
+
 
   touch ${CLUSTER_WD}  # make this the most recently updated dir for ls -t
 
@@ -343,11 +347,16 @@ start(){
 
 stop() {
   echo "Stopping servers"
-  pushd ${CLUSTER_WD}
-  SOLR=${CLUSTER_WD}/$(find . -maxdepth 1 -name 'solr*' -type d -print0 | xargs -0 ls -1 -td | sed -E 's/\.\/(solr.*)/\1/' | head -n1)
-  popd
 
-  "${SOLR}/bin/solr" stop -all
+  findSolr
+
+  echo "Final NUM_NODES is $NUM_NODES"
+  for i in `seq 1 $NUM_NODES`; do
+    argsArray=(-s $CLUSTER_WD_FULL/n${i} -p "898${i}")
+    FINAL_COMMAND="${SOLR}/bin/solr ${argsArray[@]}"
+    echo ${FINAL_COMMAND}
+    ${SOLR}/bin/solr stop "${argsArray[@]}"
+  done
 }
 
 ########################

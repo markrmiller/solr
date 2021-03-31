@@ -17,6 +17,7 @@
 package org.apache.solr.update.processor;
 
 import org.apache.lucene.util.BytesRef;
+import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.NamedList;
@@ -255,6 +256,11 @@ public class SkipExistingDocumentsProcessorFactory extends UpdateRequestProcesso
       }
 
       super.processAdd(cmd);
+    }
+
+    @Override
+    public void doClose() {
+      super.doClose();
     }
   }
 }

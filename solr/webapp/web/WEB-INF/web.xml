@@ -22,10 +22,17 @@
          metadata-complete="true"
 >
 
-  <!-- Any path (name) registered in solrconfig.xml will be sent to that filter -->
+  <!-- <filter>
+     <filter-name>SolrQosFilter</filter-name>
+     <filter-class>org.apache.solr.servlet.SolrQoSFilter</filter-class>
+     <async-supported>true</async-supported>
+   </filter>  -->
+
+   <!-- Any path (name) registered in solrconfig.xml will be sent to that filter -->
   <filter>
     <filter-name>SolrRequestFilter</filter-name>
     <filter-class>org.apache.solr.servlet.SolrDispatchFilter</filter-class>
+    <async-supported>false</async-supported>
     <!--
     Exclude patterns is a list of directories that would be short circuited by the 
     SolrDispatchFilter. It includes all Admin UI related static content.
@@ -37,9 +44,16 @@
     </init-param>
   </filter>
 
+  <!--  <filter-mapping>
+    <filter-name>SolrQosFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+    <dispatcher>ASYNC</dispatcher>
+    <dispatcher>REQUEST</dispatcher>
+  </filter-mapping> -->
   <filter-mapping>
     <filter-name>SolrRequestFilter</filter-name>
     <url-pattern>/*</url-pattern>
+    <dispatcher>REQUEST</dispatcher>
   </filter-mapping>
 
   <servlet>
@@ -47,25 +61,11 @@
     <servlet-class>org.apache.solr.servlet.LoadAdminUiServlet</servlet-class>
   </servlet>
 
-  <servlet>
-    <servlet-name>SolrRestApi</servlet-name>
-    <servlet-class>org.restlet.ext.servlet.ServerServlet</servlet-class>
-    <init-param>
-      <param-name>org.restlet.application</param-name>
-      <param-value>org.apache.solr.rest.SolrSchemaRestApi</param-value>
-    </init-param>
-  </servlet>
-
   <servlet-mapping>
     <servlet-name>LoadAdminUI</servlet-name>
     <url-pattern>/index.html</url-pattern>
   </servlet-mapping>
 
-  <servlet-mapping>
-    <servlet-name>SolrRestApi</servlet-name>
-    <url-pattern>/schema/*</url-pattern>
-  </servlet-mapping>
-  
   <mime-mapping>
     <extension>.xsl</extension>
     <!-- per http://www.w3.org/TR/2006/PR-xslt20-20061121/ -->

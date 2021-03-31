@@ -17,17 +17,21 @@
 package org.apache.solr.core;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.util.Locale;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.NativeFSLockFactory;
@@ -80,7 +84,7 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
   
   @Override
   public String normalize(String path) throws IOException {
-    String cpath = new File(path).getCanonicalPath();
+    String cpath = new File(path).getAbsolutePath();
     
     return super.normalize(cpath);
   }
@@ -89,7 +93,8 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
   public boolean exists(String path) throws IOException {
     // we go by the persistent storage ... 
     File dirFile = new File(path);
-    return dirFile.canRead() && dirFile.list().length > 0;
+    String[] list = dirFile.list();
+    return dirFile.canRead() && list != null && list.length > 0;
   }
   
   public boolean isPersistent() {
@@ -101,12 +106,7 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
     // back compat
     return new File(path).isAbsolute();
   }
-  
-  @Override
-  protected void removeDirectory(CacheValue cacheValue) throws IOException {
-    File dirFile = new File(cacheValue.path);
-    FileUtils.deleteDirectory(dirFile);
-  }
+
   
   /**
    * Override for more efficient moves.
@@ -161,5 +161,16 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
       super.renameWithOverwrite(dir, fileName, toName);
     }
   }
+
+  // special hack to work with FilterDirectory
+  protected Directory getBaseDir(Directory dir) {
+    Directory baseDir = dir;
+    while (baseDir instanceof FilterDirectory) {
+      baseDir = ((FilterDirectory)baseDir).getDelegate();
+    }
+
+    return baseDir;
+  }
+
 
 }

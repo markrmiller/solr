@@ -337,7 +337,7 @@ public class FacetModule extends SearchComponent {
   // TODO: perhaps factor out some sort of root/parent facet object that doesn't depend
 // on stuff like ResponseBuilder, but contains request parameters,
 // root filter lists (for filter exclusions), etc?
-  class FacetComponentState {
+  static class FacetComponentState {
     ResponseBuilder rb;
     Map<String, Object> facetCommands;
     FacetRequest facetRequest;
@@ -398,7 +398,7 @@ public class FacetModule extends SearchComponent {
       }
 
       if (b != b) { // b is NaN so a is greater
-        return 1 * direction.getMultiplier();  // if sorting asc, make a less so NaN is at end
+        return direction.getMultiplier();  // if sorting asc, make a less so NaN is at end
       }
 
       // consider +-0 to be equal

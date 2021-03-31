@@ -17,20 +17,25 @@
 package org.apache.solr.core;
 
 import com.codahale.metrics.MetricRegistry;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricReporter;
 import org.apache.solr.metrics.reporters.jmx.JmxMetricsReporter;
 import org.apache.solr.metrics.reporters.jmx.JmxObjectNameFactory;
 import org.apache.solr.metrics.reporters.SolrJmxReporter;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.util.TimeOut;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.AttributeNotFoundException;
+import javax.management.InstanceNotFoundException;
 import javax.management.MBeanAttributeInfo;
 import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
@@ -41,6 +46,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test for JMX Integration
@@ -48,6 +54,7 @@ import java.util.TreeSet;
  *
  * @since solr 1.3
  */
+@LuceneTestCase.Nightly
 public class TestJmxIntegration extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -58,7 +65,9 @@ public class TestJmxIntegration extends SolrTestCaseJ4 {
   private static String registryName = null;
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeTestJmxIntegration() throws Exception {
+    System.setProperty("solr.enableMetrics", "true");
+    System.setProperty("solr.disableDefaultJmxReporter", "false");
     // Make sure that at least one MBeanServer is available
     // prior to initializing the core
     //
@@ -68,17 +77,20 @@ public class TestJmxIntegration extends SolrTestCaseJ4 {
 
     initCore("solrconfig.xml", "schema.xml");
 
-    // we should be able to see that the core has JmxIntegration enabled
-    registryName = h.getCore().getCoreMetricManager().getRegistryName();
-    SolrMetricManager manager = h.getCoreContainer().getMetricManager();
-    Map<String,SolrMetricReporter> reporters = manager.getReporters(registryName);
-    assertEquals(1, reporters.size());
-    SolrMetricReporter reporter = reporters.values().iterator().next();
-    assertTrue(reporter instanceof SolrJmxReporter);
-    SolrJmxReporter jmx = (SolrJmxReporter)reporter;
-    assertTrue("JMX not enabled", jmx.isActive());
-    // and we should be able to see that the reporter
-    // refers to the JMX server we started
+    SolrJmxReporter jmx;
+    try (SolrCore core = h.getCore()) {
+      // we should be able to see that the core has JmxIntegration enabled
+      registryName = core.getCoreMetricManager().getRegistryName();
+      SolrMetricManager manager = h.getCoreContainer().getMetricManager();
+      Map<String,SolrMetricReporter> reporters = manager.getReporters(registryName);
+      assertEquals(1, reporters.size());
+      SolrMetricReporter reporter = reporters.values().iterator().next();
+      assertTrue(reporter instanceof SolrJmxReporter);
+      jmx = (SolrJmxReporter) reporter;
+      assertTrue("JMX not enabled", jmx.isActive());
+      // and we should be able to see that the reporter
+      // refers to the JMX server we started
+    }
 
     mbeanServer = jmx.getMBeanServer();
 
@@ -95,12 +107,13 @@ public class TestJmxIntegration extends SolrTestCaseJ4 {
   }
 
   @AfterClass
-  public static void afterClass() throws Exception {
+  public static void afterTestJmxIntegration() throws Exception {
     if (newMbeanServer != null) {
       MBeanServerFactory.releaseMBeanServer(newMbeanServer);
     }
     mbeanServer = null;
     newMbeanServer = null;
+    nameFactory = null;
   }
 
   @Before
@@ -145,53 +158,96 @@ public class TestJmxIntegration extends SolrTestCaseJ4 {
 
   @Test
   public void testJmxUpdate() throws Exception {
+    try (SolrCore core = h.getCore()) {
+      SolrInfoBean bean = null;
+      // wait until searcher is registered
+      for (int i = 0; i < 100; i++) {
+        bean = core.getInfoRegistry().get("searcher");
+        if (bean != null) break;
+        Thread.sleep(250);
+      }
+      if (bean == null) throw new RuntimeException("searcher was never registered");
+      ObjectName searcher = nameFactory.createName("gauge", registryName, "SEARCHER.searcher.*");
 
-    SolrInfoBean bean = null;
-    // wait until searcher is registered
-    for (int i=0; i<100; i++) {
-      bean = h.getCore().getInfoRegistry().get("searcher");
-      if (bean != null) break;
-      Thread.sleep(250);
+      if (log.isInfoEnabled()) {
+        log.info("Mbeans in server: {}", mbeanServer.queryNames(null, null));
+      }
+
+
+      TimeOut timeout = new TimeOut(2000, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
+      while (!timeout.hasTimedOut()) {
+        Set<ObjectInstance> objects = mbeanServer.queryMBeans(searcher, null);
+        if (!objects.isEmpty()) break;
+      }
+      if (timeout.hasTimedOut()) {
+        fail("No mbean found for SolrIndexSearcher");
+      }
+
+      ObjectName name = nameFactory.createName("gauge", registryName, "SEARCHER.searcher.numDocs");
+
+      timeout = new TimeOut(5000, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
+      Integer oldNumDocs = null;
+      while (!timeout.hasTimedOut()) {
+        nameFactory.createName("gauge", registryName, "SEARCHER.searcher.numDocs");
+        try {
+           oldNumDocs = (Integer) mbeanServer.getAttribute(name, "Value");
+           if (oldNumDocs != null) break;
+        } catch (InstanceNotFoundException e) {
+
+        }
+      }
+
+      if (oldNumDocs == null) {
+        oldNumDocs = 0;
+      }
+
+      assertU(adoc("id", "1"));
+      assertU("commit", commit());
+
+      timeout = new TimeOut(5000, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
+      Integer numDocs = null;
+      while (!timeout.hasTimedOut()) {
+        name = nameFactory.createName("gauge", registryName, "SEARCHER.searcher.numDocs");
+        try {
+           numDocs = (Integer) mbeanServer.getAttribute(name, "Value");
+           if (numDocs != null) break;
+
+        } catch (InstanceNotFoundException e) {
+
+        }
+      }
+      assertNotNull("numDocs should not be null after waiting", numDocs);
+      assertTrue("New numDocs is same as old numDocs as reported by JMX", numDocs > oldNumDocs);
     }
-    if (bean==null) throw new RuntimeException("searcher was never registered");
-    ObjectName searcher = nameFactory.createName("gauge", registryName, "SEARCHER.searcher.*");
-
-    if (log.isInfoEnabled()) {
-      log.info("Mbeans in server: {}", mbeanServer.queryNames(null, null));
-    }
-
-    Set<ObjectInstance> objects = mbeanServer.queryMBeans(searcher, null);
-    assertFalse("No mbean found for SolrIndexSearcher", mbeanServer.queryMBeans(searcher, null).isEmpty());
-
-    ObjectName name = nameFactory.createName("gauge", registryName, "SEARCHER.searcher.numDocs");
-    int oldNumDocs =  (Integer)mbeanServer.getAttribute(name, "Value");
-    assertU(adoc("id", "1"));
-    assertU("commit", commit());
-    int numDocs = (Integer)mbeanServer.getAttribute(name, "Value");
-    assertTrue("New numDocs is same as old numDocs as reported by JMX",
-        numDocs > oldNumDocs);
   }
 
   @Test
+  @Ignore // MRM TODO: debug
   public void testJmxOnCoreReload() throws Exception {
     // make sure searcher beans are registered
     assertQ(req("q", "*:*"), "//result[@numFound='0']");
 
-    SolrMetricManager mgr = h.getCoreContainer().getMetricManager();
-    String registryName = h.getCore().getCoreMetricManager().getRegistryName();
-    String coreName = h.getCore().getName();
-    String coreHashCode = Integer.toHexString(h.getCore().hashCode());
-    Map<String, SolrMetricReporter> reporters = mgr.getReporters(registryName);
-    // take first JMX reporter
+    SolrMetricManager mgr;
+    Object tag;
+    Map<String,SolrMetricReporter> reporters;
     SolrJmxReporter reporter = null;
-    for (Map.Entry<String, SolrMetricReporter> e : reporters.entrySet()) {
-      if (e.getKey().endsWith(coreHashCode) && e.getValue() instanceof SolrJmxReporter) {
-        reporter = (SolrJmxReporter)e.getValue();
-        break;
+    String coreHashCode;
+    try (SolrCore core = h.getCore()) {
+      mgr = h.getCoreContainer().getMetricManager();
+      String registryName = core.getCoreMetricManager().getRegistryName();
+      String coreName = core.getName();
+      coreHashCode = Integer.toHexString(core.hashCode());
+      reporters = mgr.getReporters(registryName);
+      // take first JMX reporter
+      for (Map.Entry<String,SolrMetricReporter> e : reporters.entrySet()) {
+        if (e.getKey().endsWith(coreHashCode) && e.getValue() instanceof SolrJmxReporter) {
+          reporter = (SolrJmxReporter) e.getValue();
+          break;
+        }
       }
+      assertNotNull("could not find JMX reporter for " + registryName, reporter);
+      tag = reporter.getInstanceTag();
     }
-    assertNotNull("could not find JMX reporter for " + registryName, reporter);
-    String tag = reporter.getInstanceTag();
 
     Set<ObjectInstance> oldBeans = mbeanServer.queryMBeans(null, null);
     int oldNumberOfObjects = 0;
@@ -212,7 +268,9 @@ public class TestJmxIntegration extends SolrTestCaseJ4 {
     assertQ(req("q", "*:*"), "//result[@numFound='0']");
 
     reporters = mgr.getReporters(registryName);
-    coreHashCode = Integer.toHexString(h.getCore().hashCode());
+    try (SolrCore core = h.getCore()) {
+      coreHashCode = Integer.toHexString(core.hashCode());
+    }
     // take first JMX reporter
     reporter = null;
     for (Map.Entry<String, SolrMetricReporter> e : reporters.entrySet()) {

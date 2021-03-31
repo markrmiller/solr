@@ -25,14 +25,14 @@ import java.lang.annotation.Target;
 
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
+import org.apache.solr.SolrTestCase;
 
 
 /**
  * Marker annotation indicating when SSL Randomization should be used for a test class, and if so what 
  * the typical odds of using SSL should for that test class.
  * @see SSLRandomizer#getSSLRandomizerForClass
- * @see SuppressSSL
+ * @see SolrTestCase.SuppressSSL
  */
 @Documented
 @Inherited
@@ -104,11 +104,13 @@ public @interface RandomizeSSL {
     public SSLTestConfig createSSLTestConfig() {
       // even if we know SSL is disabled, always consume the same amount of randomness
       // that way all other test behavior should be consistent even if a user adds/removes @SuppressSSL
-      
-      final boolean useSSL = TestUtil.nextInt(LuceneTestCase.random(), 0, 999) <
-        (int)(1000 * getEffectiveOdds(ssl, LuceneTestCase.TEST_NIGHTLY, LuceneTestCase.RANDOM_MULTIPLIER));
-      final boolean useClientAuth = TestUtil.nextInt(LuceneTestCase.random(), 0, 999) <
-        (int)(1000 * getEffectiveOdds(clientAuth, LuceneTestCase.TEST_NIGHTLY, LuceneTestCase.RANDOM_MULTIPLIER));
+      final boolean useSSL;
+      final boolean useClientAuth;
+
+      useSSL = TestUtil.nextInt(SolrTestCase.random(), 0, 999) <
+              (int) (1000 * getEffectiveOdds(ssl, LuceneTestCase.TEST_NIGHTLY, LuceneTestCase.RANDOM_MULTIPLIER));
+      useClientAuth = TestUtil.nextInt(SolrTestCase.random(), 0, 999) <
+              (int) (1000 * getEffectiveOdds(clientAuth, LuceneTestCase.TEST_NIGHTLY, LuceneTestCase.RANDOM_MULTIPLIER));
 
       return new SSLTestConfig(useSSL, useClientAuth);
     }
@@ -137,7 +139,8 @@ public @interface RandomizeSSL {
      */
     public static final SSLRandomizer getSSLRandomizerForClass(Class clazz) {
 
-      final SuppressSSL suppression = (SuppressSSL) clazz.getAnnotation(SuppressSSL.class);
+      final SolrTestCase.SuppressSSL suppression = (SolrTestCase.SuppressSSL) clazz.getAnnotation(
+          SolrTestCase.SuppressSSL.class);
       if (null != suppression) {
         // Even if this class has a RandomizeSSL annotation, any usage of SuppressSSL -- even in a
         // super class -- overrules that.

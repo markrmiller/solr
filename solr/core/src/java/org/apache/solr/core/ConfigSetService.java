@@ -29,9 +29,12 @@ import org.apache.solr.cloud.CloudConfigSetService;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.StopWatch;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.IndexSchemaFactory;
+import org.apache.solr.schema.ManagedIndexSchemaFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,27 +66,43 @@ public abstract class ConfigSetService {
    */
   @SuppressWarnings({"rawtypes"})
   public final ConfigSet loadConfigSet(CoreDescriptor dcore) {
-
+    StopWatch timeCreateResourceLoader = StopWatch.getStopWatch(dcore.getName() + "-createResourceLoader");
     SolrResourceLoader coreLoader = createCoreResourceLoader(dcore);
-
+    timeCreateResourceLoader.done();
     try {
-
+      StopWatch timeLoadConfigProps = StopWatch.getStopWatch(dcore.getName() + "-loadConfigProps");
       // ConfigSet properties are loaded from ConfigSetProperties.DEFAULT_FILENAME file.
       NamedList properties = loadConfigSetProperties(dcore, coreLoader);
+      timeLoadConfigProps.done();
       // ConfigSet flags are loaded from the metadata of the ZK node of the configset.
-      NamedList flags = loadConfigSetFlags(dcore, coreLoader);
 
-      boolean trusted =
-          (coreLoader instanceof ZkSolrResourceLoader
-              && flags != null
-              && flags.get("trusted") != null
-              && !flags.getBooleanArg("trusted")
-              ) ? false: true;
+      // there are no flags in non cloud mode, it just returns null
+      StopWatch timeLoadConfigSetFlags = StopWatch.getStopWatch(dcore.getName() + "-loadConfigSetFlags");
+      NamedList flags = null;
+      try {
+        flags = loadConfigSetFlags(dcore, coreLoader);
+      } catch (Exception e) {
+        log.info("Could not find/load configset flags");
+      }
+      timeLoadConfigSetFlags.done();
 
+      boolean trusted = !(coreLoader instanceof ZkSolrResourceLoader) || flags == null || flags.get("trusted") == null || flags.getBooleanArg("trusted");
+
+      if (log.isDebugEnabled()) log.debug("Trusted configset={} {}", trusted, flags);
+      StopWatch timeCreateSolrConfig = StopWatch.getStopWatch(dcore.getName() + "-createSolrConfig");
       SolrConfig solrConfig = createSolrConfig(dcore, coreLoader, trusted);
+      timeCreateSolrConfig.done();
+      StopWatch timeCreateSchema = StopWatch.getStopWatch(dcore.getName() + "-createSchema");
       IndexSchema schema = createIndexSchema(dcore, solrConfig);
-      return new ConfigSet(configSetName(dcore), solrConfig, schema, properties, trusted);
+      timeCreateSchema.done();
+
+      StopWatch timeCreateConfigSet = StopWatch.getStopWatch(dcore.getName() + "-createConfigSet");
+      ConfigSet configSet = new ConfigSet(configSetName(dcore), solrConfig, schema, properties, trusted);
+      timeCreateConfigSet.done();
+
+      return configSet;
     } catch (Exception e) {
+      IOUtils.closeQuietly(coreLoader);
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
           "Could not load conf for core " + dcore.getName() +
               ": " + e.getMessage(), e);
@@ -98,7 +117,7 @@ public abstract class ConfigSetService {
    */
   public ConfigSetService(SolrResourceLoader loader, boolean shareSchema) {
     this.parentLoader = loader;
-    this.schemaCache = shareSchema ? Caffeine.newBuilder().weakValues().build() : null;
+    this.schemaCache = shareSchema ? Caffeine.newBuilder().softValues().build() : null;
   }
 
   /**
@@ -126,7 +145,15 @@ public abstract class ConfigSetService {
     //  we don't know for sure without examining what files exists in the configSet, and we don't
     //  want to pay the overhead of that at this juncture.  If we guess wrong, no schema sharing.
     //  The fix is usually to name your schema managed-schema instead of schema.xml.
-    IndexSchemaFactory indexSchemaFactory = IndexSchemaFactory.newIndexSchemaFactory(solrConfig);
+
+    PluginInfo info = solrConfig.getPluginInfo(IndexSchemaFactory.class.getName());
+    IndexSchemaFactory indexSchemaFactory;
+    if (null != info) {
+      indexSchemaFactory = solrConfig.getResourceLoader().newInstance(info.className, IndexSchemaFactory.class, "schema.");
+      indexSchemaFactory.init(info.initArgs);
+    } else {
+      indexSchemaFactory = solrConfig.getResourceLoader().newInstance(ManagedIndexSchemaFactory.class.getName(), IndexSchemaFactory.class);
+    }
 
     String configSet = cd.getConfigSet();
     if (configSet != null && schemaCache != null) {
@@ -207,7 +234,7 @@ public abstract class ConfigSetService {
     @Override
     public SolrResourceLoader createCoreResourceLoader(CoreDescriptor cd) {
       Path instanceDir = locateInstanceDir(cd);
-      return new SolrResourceLoader(instanceDir, parentLoader.getClassLoader());
+      return new SolrResourceLoader(instanceDir, parentLoader);
     }
 
     @Override

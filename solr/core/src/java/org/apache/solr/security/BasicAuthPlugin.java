@@ -117,7 +117,8 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
 
   private void authenticationFailure(HttpServletResponse response, boolean isAjaxRequest, String message) throws IOException {
     getPromptHeaders(isAjaxRequest).forEach(response::setHeader);
-    response.sendError(401, message);
+    response.setStatus(401);
+    response.getWriter().write(message);
   }
 
   @Override
@@ -268,7 +269,7 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
   }
   
   @Contract(threading = ThreadingBehavior.IMMUTABLE)
-  private class BasicAuthUserPrincipal implements Principal, Serializable {
+  private static class BasicAuthUserPrincipal implements Principal, Serializable {
     private String username;
     private final String password;
 

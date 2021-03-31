@@ -17,6 +17,7 @@
 package org.apache.solr.metrics.reporters;
 
 import javax.management.MBeanServer;
+import javax.management.MBeanServerFactory;
 import javax.management.ObjectInstance;
 import javax.management.Query;
 import javax.management.QueryExp;
@@ -26,8 +27,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
@@ -55,22 +57,29 @@ public class SolrJmxReporterCloudTest extends SolrCloudTestCase {
     // make sure there's an MBeanServer
     mBeanServer = ManagementFactory.getPlatformMBeanServer();
     configureCluster(1)
-        .addConfig("conf", configset("cloud-minimal"))
+        .addConfig("conf", SolrTestUtil.configset("cloud-minimal"))
         .configure();
     CollectionAdminRequest.createCollection(COLLECTION, "conf", 2, 1)
-        .setMaxShardsPerNode(2)
+        .setMaxShardsPerNode(2).waitForFinalState(true)
         .process(cluster.getSolrClient());
   }
   @AfterClass
   public static void releaseMBeanServer() {
-    mBeanServer = null;
+    if (mBeanServer != null) {
+      try {
+        MBeanServerFactory.releaseMBeanServer(mBeanServer);
+      } catch (Exception e) {
+        log.warn("Exception releasing mbeanserver", e);
+      } finally {
+        mBeanServer = null;
+      }
+    }
   }
   
 
   @Test
   public void testJmxReporter() throws Exception {
-    CollectionAdminRequest.reloadCollection(COLLECTION).processAndWait(cluster.getSolrClient(), 60);
-    CloudSolrClient solrClient = cluster.getSolrClient();
+    CloudHttp2SolrClient solrClient = cluster.getSolrClient();
     // index some docs
     for (int i = 0; i < 100; i++) {
       SolrInputDocument doc = new SolrInputDocument();

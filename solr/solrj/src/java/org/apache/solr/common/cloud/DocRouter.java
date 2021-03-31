@@ -57,9 +57,9 @@ public abstract class DocRouter {
 
   public static Map<String, Object> getRouterSpec(ZkNodeProps props) {
     Map<String, Object> map = new LinkedHashMap<>();
-    for (String s : props.keySet()) {
-      if (s.startsWith("router.")) {
-        map.put(s.substring(7), props.get(s));
+    for (Object s : props.keySet()) {
+      if (((String) s).startsWith("router.")) {
+        map.put(((String) s).substring(7), props.get(s));
       }
     }
     if (map.get("name") == null)  {
@@ -86,8 +86,8 @@ public abstract class DocRouter {
   // TODO: ranges may not be all contiguous in the future (either that or we will
   // need an extra class to model a collection of ranges)
   public static class Range implements JSONWriter.Writable, Comparable<Range> {
-    public int min;  // inclusive
-    public int max;  // inclusive
+    public final int min;  // inclusive
+    public final int max;  // inclusive
 
     public Range(int min, int max) {
       assert min <= max;

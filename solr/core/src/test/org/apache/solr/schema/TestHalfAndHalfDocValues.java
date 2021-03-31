@@ -28,15 +28,19 @@ import org.apache.solr.core.SolrCore;
 import org.apache.solr.index.NoMergePolicyFactory;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.util.RefCounted;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Added in SOLR-10047
  */
 public class TestHalfAndHalfDocValues extends SolrTestCaseJ4 {
 
-  @BeforeClass
-  public static void beforeTests() throws Exception {
+  @Before
+  public void beforeTest() throws Exception {
     // we need consistent segments that aren't merged because we want to have
     // segments with and without docvalues
     systemSetPropertySolrTestsMergePolicyFactory(NoMergePolicyFactory.class.getName());
@@ -44,22 +48,22 @@ public class TestHalfAndHalfDocValues extends SolrTestCaseJ4 {
     initCore("solrconfig-basic.xml", "schema-docValues.xml");
 
     // sanity check our schema meets our expectations
-    final IndexSchema schema = h.getCore().getLatestSchema();
-    for (String f : new String[]{"floatdv", "intdv", "doubledv", "longdv", "datedv", "stringdv", "booldv"}) {
-      final SchemaField sf = schema.getField(f);
-      assertFalse(f + " is multiValued, test is useless, who changed the schema?",
-          sf.multiValued());
-      assertFalse(f + " is indexed, test is useless, who changed the schema?",
-          sf.indexed());
-      assertTrue(f + " has no docValues, test is useless, who changed the schema?",
-          sf.hasDocValues());
+    try (SolrCore core = h.getCore()) {
+      final IndexSchema schema = core.getLatestSchema();
+      for (String f : new String[] {"floatdv", "intdv", "doubledv", "longdv", "datedv", "stringdv", "booldv"}) {
+        final SchemaField sf = schema.getField(f);
+        assertFalse(f + " is multiValued, test is useless, who changed the schema?", sf.multiValued());
+        assertFalse(f + " is indexed, test is useless, who changed the schema?", sf.indexed());
+        assertTrue(f + " has no docValues, test is useless, who changed the schema?", sf.hasDocValues());
+      }
     }
   }
 
-  public void setUp() throws Exception {
-    super.setUp();
-    assertU(delQ("*:*"));
+  @After
+  public void afterTest() {
+    deleteCore();
   }
+
 
   public void testHalfAndHalfDocValues() throws Exception {
     // Insert two docs without docvalues
@@ -78,7 +82,10 @@ public class TestHalfAndHalfDocValues extends SolrTestCaseJ4 {
       int newProperties = oldField.getProperties() | SchemaField.DOC_VALUES;
 
       SchemaField sf = new SchemaField(fieldname, oldField.getType(), newProperties, null);
-      schema.getFields().put(fieldname, sf);
+
+      Map<String,SchemaField> fields = new HashMap<>(schema.getFields());
+      fields.put(fieldname, sf);
+      schema.setFields(fields);
 
       // Insert a new doc with docvalues
       assertU(adoc("id", "2", fieldname, "b"));

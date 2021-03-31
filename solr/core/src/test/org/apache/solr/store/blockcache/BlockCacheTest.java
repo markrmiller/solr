@@ -16,33 +16,29 @@
  */
 package org.apache.solr.store.blockcache;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCase;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
-
-import com.github.benmanes.caffeine.cache.*;
-
-import org.apache.lucene.util.QuickPatchThreadsFilter;
-
-import org.apache.solr.SolrIgnoredThreadsFilter;
-import org.apache.solr.SolrTestCase;
-
-import org.junit.Test;
-
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    SolrIgnoredThreadsFilter.class,
-    QuickPatchThreadsFilter.class
-})
-@ThreadLeakLingering(linger = 10000)
+@LuceneTestCase.Nightly // this test will spin up tons of netty threads due to HDFS,
+// should run nightly but should also track down the setting for that
 public class BlockCacheTest extends SolrTestCase {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Test
   public void testBlockCache() {
-    int blocksInTest = 2000000;
+    int blocksInTest = TEST_NIGHTLY ? 2000000 : 20000;
     int blockSize = 1024;
 
     int slabSize = blockSize * 4096;
@@ -56,7 +52,7 @@ public class BlockCacheTest extends SolrTestCase {
     AtomicLong missesInCache = new AtomicLong();
     long storeTime = 0;
     long fetchTime = 0;
-    int passes = 10000;
+    int passes = TEST_NIGHTLY ?  10000 : 10;
 
     BlockCacheKey blockCacheKey = new BlockCacheKey();
 
@@ -85,11 +81,11 @@ public class BlockCacheTest extends SolrTestCase {
         assertTrue("buffer content differs", Arrays.equals(testData, buffer));
       }
     }
-    System.out.println("Cache Hits    = " + hitsInCache.get());
-    System.out.println("Cache Misses  = " + missesInCache.get());
-    System.out.println("Store         = " + (storeTime / (double) passes) / 1000000.0);
-    System.out.println("Fetch         = " + (fetchTime / (double) passes) / 1000000.0);
-    System.out.println("# of Elements = " + blockCache.getSize());
+    //System.out.println("Cache Hits    = " + hitsInCache.get());
+    //System.out.println("Cache Misses  = " + missesInCache.get());
+    //System.out.println("Store         = " + (storeTime / (double) passes) / 1000000.0);
+    //System.out.println("Fetch         = " + (fetchTime / (double) passes) / 1000000.0);
+    //System.out.println("# of Elements = " + blockCache.getSize());
   }
 
   private static byte[] testData(Random random, int size, byte[] buf) {
@@ -111,7 +107,7 @@ public class BlockCacheTest extends SolrTestCase {
   public void testBlockCacheConcurrent() throws Exception {
     Random rnd = random();
 
-    final int blocksInTest = 400;  // pick something bigger than 256, since that would lead to a slab size of 64 blocks and the bitset locks would consist of a single word.
+    final int blocksInTest = TEST_NIGHTLY ? 400 : 40;  // pick something bigger than 256, since that would lead to a slab size of 64 blocks and the bitset locks would consist of a single word.
     final int blockSize = 64;
     final int slabSize = blocksInTest * blockSize / 4;
     final long totalMemory = 2 * slabSize;  // 2 slabs of memory, so only half of what is needed for all blocks
@@ -123,7 +119,7 @@ public class BlockCacheTest extends SolrTestCase {
      final long totalMemory = 2 * slabSize;  // 2 slabs of memory, so only half of what is needed for all blocks
      ***/
 
-    final int nThreads = 64;
+    final int nThreads = TEST_NIGHTLY ? Runtime.getRuntime().availableProcessors() : 5;
     final int nReads = 1000000;
     final int readsPerThread = nReads / nThreads;
     final int readLastBlockOdds = 10; // odds (1 in N) of the next block operation being on the same block as the previous operation... helps flush concurrency issues
@@ -163,7 +159,7 @@ public class BlockCacheTest extends SolrTestCase {
 
           } catch (Throwable e) {
             failed.set(true);
-            e.printStackTrace();
+            log.error("", e);
           }
         }
 
@@ -194,7 +190,7 @@ public class BlockCacheTest extends SolrTestCase {
               if (buffer[i] != getByte(globalPos)) {
                 failed.set(true);
                 if (validateFails.incrementAndGet() <= showErrors)
-                  System.out.println("ERROR: read was " + "block=" + block + " blockOffset=" + blockOffset + " len=" + len + " globalPos=" + globalPos + " localReadOffset=" + i + " got=" + buffer[i] + " expected=" + getByte(globalPos));
+                  //System.out.println("ERROR: read was " + "block=" + block + " blockOffset=" + blockOffset + " len=" + len + " globalPos=" + globalPos + " localReadOffset=" + i + " got=" + buffer[i] + " expected=" + getByte(globalPos));
                 break;
               }
             }
@@ -225,11 +221,11 @@ public class BlockCacheTest extends SolrTestCase {
       thread.join();
     }
 
-    System.out.println("# of Elements = " + blockCache.getSize());
-    System.out.println("Cache Hits = " + hitsInCache.get());
-    System.out.println("Cache Misses = " + missesInCache.get());
-    System.out.println("Cache Store Fails = " + storeFails.get());
-    System.out.println("Blocks with Errors = " + validateFails.get());
+    //System.out.println("# of Elements = " + blockCache.getSize());
+    //System.out.println("Cache Hits = " + hitsInCache.get());
+    //System.out.println("Cache Misses = " + missesInCache.get());
+    //System.out.println("Cache Store Fails = " + storeFails.get());
+    //System.out.println("Blocks with Errors = " + validateFails.get());
 
     assertFalse("cached bytes differ from expected", failed.get());
   }
@@ -301,7 +297,7 @@ public class BlockCacheTest extends SolrTestCase {
             test(readsPerThread);
           } catch (Throwable e) {
             failed.set(true);
-            e.printStackTrace();
+            log.error("", e);
           }
         }
 
@@ -368,7 +364,7 @@ public class BlockCacheTest extends SolrTestCase {
 
     // Thread.sleep(1000); // need to wait if executor is used for listener?
     long cacheSize = cache.estimatedSize();
-    System.out.println("Done! # of Elements = " + cacheSize + " inserts=" + inserts.get() + " removals=" + removals.get() + " hits=" + hits.get() + " maxObservedSize=" + maxObservedSize);
+    //System.out.println("Done! # of Elements = " + cacheSize + " inserts=" + inserts.get() + " removals=" + removals.get() + " hits=" + hits.get() + " maxObservedSize=" + maxObservedSize);
     assertEquals("cache size different from (inserts - removal)", cacheSize,  inserts.get() - removals.get());
     assertFalse(failed.get());
   }

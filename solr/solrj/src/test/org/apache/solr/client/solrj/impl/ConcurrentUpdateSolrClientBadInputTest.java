@@ -25,6 +25,8 @@ import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
+import org.apache.solr.client.solrj.embedded.JettySolrRunner;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -37,13 +39,20 @@ public class ConcurrentUpdateSolrClientBadInputTest extends SolrJettyTestBase {
   private static final int ANY_COMMIT_WITHIN_TIME = -1;
   private static final int ANY_QUEUE_SIZE = 1;
   private static final int ANY_MAX_NUM_THREADS = 1;
+  private static JettySolrRunner jetty;
 
   @BeforeClass
   public static void beforeTest() throws Exception {
     JettyConfig jettyConfig = JettyConfig.builder()
         .withSSLConfig(sslConfig.buildServerSSLConfig())
         .build();
-    createAndStartJetty(legacyExampleCollection1SolrHome(), jettyConfig);
+    jetty = createAndStartJetty(legacyExampleCollection1SolrHome(), jettyConfig);
+  }
+
+  @AfterClass
+  public static void afterTest() throws Exception {
+    jetty.stop();
+    jetty = null;
   }
 
   @Test
@@ -79,8 +88,8 @@ public class ConcurrentUpdateSolrClientBadInputTest extends SolrJettyTestBase {
     }
   }
 
-  private void assertExceptionThrownWithMessageContaining(Class expectedType, List<String> expectedStrings, LuceneTestCase.ThrowingRunnable runnable) {
-    Throwable thrown = expectThrows(expectedType, runnable);
+  private void assertExceptionThrownWithMessageContaining(Class<? extends Exception> expectedType, List<String> expectedStrings, LuceneTestCase.ThrowingRunnable runnable) {
+    Throwable thrown = LuceneTestCase.expectThrows(expectedType, runnable);
 
     if (expectedStrings != null) {
       for (String expectedString : expectedStrings) {

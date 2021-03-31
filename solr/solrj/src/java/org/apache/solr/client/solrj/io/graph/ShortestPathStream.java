@@ -18,6 +18,7 @@
 package org.apache.solr.client.solrj.io.graph;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -26,18 +27,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.ArrayList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import org.apache.solr.client.solrj.io.eq.MultipleFieldEqualitor;
-import org.apache.solr.client.solrj.io.stream.*;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.comp.StreamComparator;
 import org.apache.solr.client.solrj.io.eq.FieldEqualitor;
+import org.apache.solr.client.solrj.io.eq.MultipleFieldEqualitor;
+import org.apache.solr.client.solrj.io.stream.CloudSolrStream;
+import org.apache.solr.client.solrj.io.stream.StreamContext;
+import org.apache.solr.client.solrj.io.stream.TupleStream;
+import org.apache.solr.client.solrj.io.stream.UniqueStream;
 import org.apache.solr.client.solrj.io.stream.expr.Explanation;
+import org.apache.solr.client.solrj.io.stream.expr.Explanation.ExpressionType;
 import org.apache.solr.client.solrj.io.stream.expr.Expressible;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExplanation;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpression;
@@ -45,11 +49,9 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionNamedParamete
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionParameter;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionValue;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
-import org.apache.solr.client.solrj.io.stream.expr.Explanation.ExpressionType;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 
 import static org.apache.solr.common.params.CommonParams.SORT;
 
@@ -298,47 +300,56 @@ public class ShortestPathStream extends TupleStream implements Expressible {
     List<Edge> targets = new ArrayList();
     ExecutorService threadPool = null;
 
-    try {
+    threadPool = ParWork.getRootSharedExecutor();
 
-      threadPool = ExecutorUtil.newMDCAwareFixedThreadPool(threads, new SolrNamedThreadFactory("ShortestPathStream"));
-
-      //Breadth first search
-      TRAVERSE:
-      while (targets.size() == 0 && depth < maxDepth) {
-        Set<String> nodes = visited.keySet();
-        Iterator<String> it = nodes.iterator();
-        nextVisited = new HashMap();
-        int batchCount = 0;
-        List<String> queryNodes = new ArrayList();
-        List<Future> futures = new ArrayList();
-        JOIN:
-        //Queue up all the batches
-        while (it.hasNext()) {
-          String node = it.next();
-          queryNodes.add(node);
-          ++batchCount;
-          if (batchCount == joinBatchSize || !it.hasNext()) {
-            try {
-              JoinRunner joinRunner = new JoinRunner(queryNodes);
-              Future<List<Edge>> future = threadPool.submit(joinRunner);
-              futures.add(future);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-            batchCount = 0;
-            queryNodes = new ArrayList();
+    //Breadth first search
+    TRAVERSE:
+    while (targets.size() == 0 && depth < maxDepth) {
+      Set<String> nodes = visited.keySet();
+      Iterator<String> it = nodes.iterator();
+      nextVisited = new HashMap();
+      int batchCount = 0;
+      List<String> queryNodes = new ArrayList();
+      List<Future> futures = new ArrayList();
+      JOIN:
+      //Queue up all the batches
+      while (it.hasNext()) {
+        String node = it.next();
+        queryNodes.add(node);
+        ++batchCount;
+        if (batchCount == joinBatchSize || !it.hasNext()) {
+          try {
+            JoinRunner joinRunner = new JoinRunner(queryNodes);
+            Future<List<Edge>> future = threadPool.submit(joinRunner);
+            futures.add(future);
+          } catch (Exception e) {
+            ParWork.propagateInterrupt(e);
+            throw new RuntimeException(e);
           }
+          batchCount = 0;
+          queryNodes = new ArrayList();
         }
+      }
 
-        try {
-          //Process the batches as they become available
-          OUTER:
-          for (Future<List<Edge>> future : futures) {
-            List<Edge> edges = future.get();
-            INNER:
-            for (Edge edge : edges) {
-              if (toNode.equals(edge.to)) {
-                targets.add(edge);
+      try {
+        //Process the batches as they become available
+        OUTER:
+        for (Future<List<Edge>> future : futures) {
+          List<Edge> edges = future.get();
+          INNER:
+          for (Edge edge : edges) {
+            if (toNode.equals(edge.to)) {
+              targets.add(edge);
+              if(nextVisited.containsKey(edge.to)) {
+                List<String> parents = nextVisited.get(edge.to);
+                parents.add(edge.from);
+              } else {
+                List<String> parents = new ArrayList();
+                parents.add(edge.from);
+                nextVisited.put(edge.to, parents);
+              }
+            } else {
+              if (!cycle(edge.to, allVisited)) {
                 if(nextVisited.containsKey(edge.to)) {
                   List<String> parents = nextVisited.get(edge.to);
                   parents.add(edge.from);
@@ -347,30 +358,18 @@ public class ShortestPathStream extends TupleStream implements Expressible {
                   parents.add(edge.from);
                   nextVisited.put(edge.to, parents);
                 }
-              } else {
-                if (!cycle(edge.to, allVisited)) {
-                  if(nextVisited.containsKey(edge.to)) {
-                    List<String> parents = nextVisited.get(edge.to);
-                    parents.add(edge.from);
-                  } else {
-                    List<String> parents = new ArrayList();
-                    parents.add(edge.from);
-                    nextVisited.put(edge.to, parents);
-                  }
-                }
               }
             }
           }
-        } catch (Exception e) {
-          throw new RuntimeException(e);
         }
-
-        allVisited.add(nextVisited);
-        visited = nextVisited;
-        ++depth;
+      } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
+        throw new RuntimeException(e);
       }
-    } finally {
-      threadPool.shutdown();
+
+      allVisited.add(nextVisited);
+      visited = nextVisited;
+      ++depth;
     }
 
     Set<String> finalPaths = new HashSet();
@@ -456,6 +455,7 @@ public class ShortestPathStream extends TupleStream implements Expressible {
           edges.add(edge);
         }
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new RuntimeException(e);
       } finally {
         try {

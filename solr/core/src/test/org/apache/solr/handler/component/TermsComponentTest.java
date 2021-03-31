@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.regex.Pattern;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.mutable.MutableValueDouble;
 import org.apache.lucene.util.mutable.MutableValueFloat;
 import org.apache.lucene.util.mutable.MutableValueInt;
@@ -35,6 +36,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 
+@LuceneTestCase.Nightly // slow test
 public class TermsComponentTest extends SolrTestCaseJ4 {
 
   @BeforeClass
@@ -484,7 +486,7 @@ public class TermsComponentTest extends SolrTestCaseJ4 {
 
   @Test
   public void testPointField() throws Exception {
-    int nvals = 10000; int maxval = 1000000;
+    int nvals = TEST_NIGHTLY ? 10000 : 1000; int maxval = TEST_NIGHTLY ? 1000000 : 10000;
     // int nvals = 5; int maxval = 2;
     final int vals[] = new int[nvals];
     for (int i=0; i<nvals; i++) {

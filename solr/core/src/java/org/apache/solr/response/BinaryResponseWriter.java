@@ -259,17 +259,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public Iterator<Entry<String, Object>> iterator() {
       Iterator<Entry<String, Object>> it = _fields.entrySet().iterator();
-      return new Iterator<Entry<String, Object>>() {
-        @Override
-        public boolean hasNext() {
-          return it.hasNext();
-        }
-
-        @Override
-        public Entry<String, Object> next() {
-          return convertCharSeq(it.next());
-        }
-      };
+      return new EntryIterator(it);
     }
 
 
@@ -303,6 +293,24 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public void forEach(Consumer<? super Entry<String, Object>> action) {
       super.forEach(action);
+    }
+
+    private static class EntryIterator implements Iterator<Entry<String, Object>> {
+      private final Iterator<Entry<String,Object>> it;
+
+      public EntryIterator(Iterator<Entry<String,Object>> it) {
+        this.it = it;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return it.hasNext();
+      }
+
+      @Override
+      public Entry<String, Object> next() {
+        return convertCharSeq(it.next());
+      }
     }
   }
 

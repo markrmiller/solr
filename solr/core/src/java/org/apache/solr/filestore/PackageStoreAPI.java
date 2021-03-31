@@ -36,6 +36,7 @@ import org.apache.solr.api.Command;
 import org.apache.solr.api.EndPoint;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.common.MapWriter;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -88,7 +89,7 @@ public class PackageStoreAPI {
    * * @lucene.internal
    */
   public ArrayList<String> shuffledNodes() {
-    Set<String> liveNodes = coreContainer.getZkController().getZkStateReader().getClusterState().getLiveNodes();
+    Set<String> liveNodes = coreContainer.getZkController().getZkStateReader().getLiveNodes();
     ArrayList<String> l = new ArrayList(liveNodes);
     l.remove(coreContainer.getZkController().getNodeName());
     Collections.shuffle(l, BlobRepository.RANDOM);
@@ -115,12 +116,14 @@ public class PackageStoreAPI {
               packageStore.refresh(KEYS_DIR);
               validate(entry.meta.signatures, entry, false);
             } catch (Exception e) {
+              ParWork.propagateInterrupt(e);
               log.error("Error validating package artifact", e);
               errs.accept(e.getMessage());
             }
           }
         }, false);
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         log.error("Error reading file ", e);
         errs.accept("Error reading file " + path + " " + e.getMessage());
       }
@@ -153,8 +156,10 @@ public class PackageStoreAPI {
         }
         validateName(path, true);
         ContentStream stream = streams.iterator().next();
+        InputStream is = null;
         try {
-          ByteBuffer buf = SimplePostTool.inputStreamToByteArray(stream.getStream());
+          is = stream.getStream();
+          ByteBuffer buf = SimplePostTool.inputStreamToByteArray(is);
           List<String> signatures = readSignatures(req, buf);
           MetaData meta = _createJsonMetaData(buf, signatures);
           PackageStore.FileType type = packageStore.getType(path, true);
@@ -165,17 +170,20 @@ public class PackageStoreAPI {
           rsp.add(CommonParams.FILE, path);
         } catch (IOException e) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, e);
+        } finally {
+          Utils.readFully(is);
         }
       } catch (InterruptedException e) {
-        log.error("Unexpected error", e);
+        ParWork.propagateInterrupt(e);
       } catch (KeeperException.NodeExistsException e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "A write is already in process , try later");
       } catch (KeeperException e) {
         log.error("Unexpected error", e);
       } finally {
         try {
-          coreContainer.getZkController().getZkClient().delete(TMP_ZK_NODE, -1, true);
+          coreContainer.getZkController().getZkClient().delete(TMP_ZK_NODE, -1, true, false);
         } catch (Exception e) {
+          ParWork.propagateInterrupt(e);
           log.error("Unexpected error  ", e);
         }
       }
@@ -202,6 +210,7 @@ public class PackageStoreAPI {
       try {
         cryptoKeys = new CryptoKeys(keys);
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
             "Error parsing public keys in Package store");
       }
@@ -236,7 +245,7 @@ public class PackageStoreAPI {
       permission = PermissionNameProvider.Name.FILESTORE_READ_PERM)
   public class FSRead {
     @Command
-    public void read(SolrQueryRequest req, SolrQueryResponse rsp) {
+    public void read(SolrQueryRequest req, SolrQueryResponse rsp) throws IOException {
       String path = req.getPathTemplateValues().get("*");
       String pathCopy = path;
       if (req.getParams().getBool("sync", false)) {
@@ -249,7 +258,7 @@ public class PackageStoreAPI {
       }
       String getFrom = req.getParams().get("getFrom");
       if (getFrom != null) {
-        coreContainer.getUpdateShardHandler().getUpdateExecutor().submit(() -> {
+        ParWork.getRootSharedExecutor().submit(() -> {
           log.debug("Downloading file {}", pathCopy);
           try {
             packageStore.fetch(pathCopy, getFrom);
@@ -340,8 +349,10 @@ public class PackageStoreAPI {
       if (part.charAt(0) == '.') {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "cannot start with period");
       }
-      for (int i = 0; i < part.length(); i++) {
-        for (int j = 0; j < INVALIDCHARS.length(); j++) {
+      final int length = part.length();
+      for (int i = 0; i < length; i++) {
+        final int length1 = INVALIDCHARS.length();
+        for (int j = 0; j < length1; j++) {
           if (part.charAt(i) == INVALIDCHARS.charAt(j))
             throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Unsupported char in file name: " + part);
         }
@@ -380,6 +391,7 @@ public class PackageStoreAPI {
     try {
       cryptoKeys = new CryptoKeys(keys);
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
           "Error parsing public keys in ZooKeeper");
     }

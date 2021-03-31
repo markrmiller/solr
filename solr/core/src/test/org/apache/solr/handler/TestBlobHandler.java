@@ -21,28 +21,29 @@ import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.util.EntityUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
 import org.apache.solr.common.MapWriter;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.util.RTimer;
 import org.apache.solr.util.SimplePostTool;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.noggit.JSONParser;
 import org.slf4j.Logger;
@@ -51,13 +52,15 @@ import org.slf4j.LoggerFactory;
 import static java.util.Arrays.asList;
 import static org.apache.solr.common.util.Utils.fromJSONString;
 
+@LuceneTestCase.Nightly
+@Ignore // MRM TODO: bridge base class
 public class TestBlobHandler extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Test
   public void doBlobHandlerTest() throws Exception {
 
-    try (SolrClient client = createNewSolrClient("", getBaseUrl((HttpSolrClient) clients.get(0)))) {
+    try (SolrClient client = createNewSolrClient("", getBaseUrl((Http2SolrClient) clients.get(0)))) {
       CollectionAdminResponse response1;
       CollectionAdminRequest.Create createCollectionRequest = CollectionAdminRequest.createCollection(".system",1,2);
       response1 = createCollectionRequest.process(client);
@@ -66,7 +69,7 @@ public class TestBlobHandler extends AbstractFullDistribZkTestBase {
       DocCollection sysColl = cloudClient.getZkStateReader().getClusterState().getCollection(".system");
       Replica replica = sysColl.getActiveSlicesMap().values().iterator().next().getLeader();
 
-      String baseUrl = replica.getStr(ZkStateReader.BASE_URL_PROP);
+      String baseUrl = replica.getBaseUrl();
       String url = baseUrl + "/.system/config/requestHandler";
       MapWriter map = TestSolrConfigHandlerConcurrent.getAsMap(url, cloudClient);
       assertNotNull(map);
@@ -89,7 +92,7 @@ public class TestBlobHandler extends AbstractFullDistribZkTestBase {
     }
   }
 
-  static void checkBlobPost(String baseUrl, CloudSolrClient cloudClient) throws Exception {
+  static void checkBlobPost(String baseUrl, CloudHttp2SolrClient cloudClient) throws Exception {
     String url;
     MapWriter map;
     byte[] bytarr = new byte[1024];
@@ -108,7 +111,7 @@ public class TestBlobHandler extends AbstractFullDistribZkTestBase {
     compareInputAndOutput(baseUrl + "/.system/blob/test/1?wt=filestream", bytarr, cloudClient);
   }
 
-  static void checkBlobPostMd5(String baseUrl, CloudSolrClient cloudClient) throws Exception {
+  static void checkBlobPostMd5(String baseUrl, CloudHttp2SolrClient cloudClient) throws Exception {
     String blobName = "md5Test";
     String stringValue = "MHMyugAGUxFzeqbpxVemACGbQ"; // Random string requires padding in md5 hash
     String stringValueMd5 = "02d82dd5aabc47fae54ee3dd236ad83d";
@@ -125,7 +128,7 @@ public class TestBlobHandler extends AbstractFullDistribZkTestBase {
     assertTrue(response1.isSuccess());
   }
 
-  public static void postAndCheck(CloudSolrClient cloudClient, String baseUrl, String blobName, ByteBuffer bytes, int count) throws Exception {
+  public static void postAndCheck(CloudHttp2SolrClient cloudClient, String baseUrl, String blobName, ByteBuffer bytes, int count) throws Exception {
     postData(cloudClient, baseUrl, blobName, bytes);
 
     String url;
@@ -148,9 +151,9 @@ public class TestBlobHandler extends AbstractFullDistribZkTestBase {
         i, count, timer.getTime(), map.toString()));
   }
 
-  static void compareInputAndOutput(String url, byte[] bytarr, CloudSolrClient cloudClient) throws IOException {
+  static void compareInputAndOutput(String url, byte[] bytarr, CloudHttp2SolrClient cloudClient) throws IOException {
 
-    HttpClient httpClient = cloudClient.getLbClient().getHttpClient();
+    HttpClient httpClient = HttpClientUtil.createClient(null);
 
     HttpGet httpGet = new HttpGet(url);
     HttpResponse entity = httpClient.execute(httpGet);
@@ -161,30 +164,32 @@ public class TestBlobHandler extends AbstractFullDistribZkTestBase {
         assertEquals(b.get(i), bytarr[i]);
       }
     } finally {
-      httpGet.releaseConnection();
+     HttpClientUtil.close(httpClient);
     }
 
   }
 
-  public static void postData(CloudSolrClient cloudClient, String baseUrl, String blobName, ByteBuffer bytarr) throws IOException {
-    HttpPost httpPost = null;
-    HttpEntity entity;
+  public static void postData(CloudHttp2SolrClient cloudClient, String baseUrl, String blobName, ByteBuffer bytarr) throws IOException {
     String response = null;
     try {
-      httpPost = new HttpPost(baseUrl + "/.system/blob/" + blobName);
-      httpPost.setHeader("Content-Type", "application/octet-stream");
-      httpPost.setEntity(new ByteArrayEntity(bytarr.array(), bytarr.arrayOffset(), bytarr.limit()));
-      entity = cloudClient.getLbClient().getHttpClient().execute(httpPost).getEntity();
+      Http2SolrClient.SimpleResponse resp = Http2SolrClient.POST(baseUrl + "/.system/blob/" + blobName, cloudClient.getHttpClient(), bytarr, "application/octet-stream"); // MRM TODO:
+
       try {
-        response = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+        response = resp.asString;
         Map m = (Map) fromJSONString(response);
-        assertFalse("Error in posting blob " + m.toString(), m.containsKey("error"));
+        if (m != null) {
+          assertFalse("Error in posting blob " + m.toString(), m.containsKey("error"));
+        }
       } catch (JSONParser.ParseException e) {
         log.error("$ERROR$: {}", response, e);
         fail();
       }
-    } finally {
-      httpPost.releaseConnection();
+    } catch (InterruptedException e) {
+      ParWork.propagateInterrupt(e);
+    } catch (ExecutionException e) {
+      log.error("", e);
+    } catch (TimeoutException e) {
+      log.error("", e);
     }
   }
 }

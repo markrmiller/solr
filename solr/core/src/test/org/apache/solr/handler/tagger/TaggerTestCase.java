@@ -42,12 +42,14 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.DocIterator;
 import org.apache.solr.search.DocList;
 import org.apache.solr.search.SolrIndexSearcher;
+import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
@@ -72,6 +74,11 @@ public abstract class TaggerTestCase extends SolrTestCaseJ4 {
 
   //populated in buildNames; tested in assertTags
   protected static List<String> NAMES;
+
+  @AfterClass
+  public static void afterClass() throws Exception {
+    NAMES = null;
+  }
 
   @Override
   public void setUp() throws Exception {
@@ -178,11 +185,14 @@ public abstract class TaggerTestCase extends SolrTestCaseJ4 {
   /** REMEMBER to close() the result req object. */
   protected SolrQueryRequest reqDoc(String doc, SolrParams moreParams) {
     log.debug("Test doc: {}", doc);
-    SolrParams params = SolrParams.wrapDefaults(moreParams, baseParams);
-    SolrQueryRequestBase req = new SolrQueryRequestBase(h.getCore(), params) {};
-    Iterable<ContentStream> stream = Collections.singleton((ContentStream)new ContentStreamBase.StringStream(doc));
-    req.setContentStreams(stream);
-    return req;
+    try (SolrCore core = h.getCore()) {
+      SolrParams params = SolrParams.wrapDefaults(moreParams, baseParams);
+      SolrQueryRequestBase req = new SolrQueryRequestBase(core, params) {
+      };
+      Iterable<ContentStream> stream = Collections.singleton((ContentStream) new ContentStreamBase.StringStream(doc));
+      req.setContentStreams(stream);
+      return req;
+    }
   }
 
   /** Asserts the sorted arrays are equals, with a helpful error message when not.*/

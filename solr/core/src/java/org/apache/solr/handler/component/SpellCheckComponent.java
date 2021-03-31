@@ -52,6 +52,7 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.SpellingParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrEventListener;
 import org.apache.solr.core.SolrResourceLoader;
@@ -107,6 +108,7 @@ public class SpellCheckComponent extends SearchComponent implements SolrCoreAwar
   protected Map<String, SolrSpellChecker> spellCheckers = new ConcurrentHashMap<>();
 
   protected QueryConverter queryConverter;
+  private volatile  SolrCore core;
 
   @Override
   public void init(@SuppressWarnings({"rawtypes"})NamedList args) {
@@ -752,7 +754,11 @@ public class SpellCheckComponent extends SearchComponent implements SolrCoreAwar
         queryConverter = queryConverters.values().iterator().next();
         IndexSchema schema = core.getLatestSchema();
         String fieldTypeName = (String) initParams.get("queryAnalyzerFieldType");
-        FieldType fieldType = schema.getFieldTypes().get(fieldTypeName);
+
+        FieldType fieldType = null;
+        if (fieldTypeName != null) {
+          fieldType = schema.getFieldTypes().get(fieldTypeName);
+        }
         Analyzer analyzer = fieldType == null ? new WhitespaceAnalyzer()
                 : fieldType.getQueryAnalyzer();
         //TODO: There's got to be a better way!  Where's Spring when you need it?
@@ -769,7 +775,7 @@ public class SpellCheckComponent extends SearchComponent implements SolrCoreAwar
     if (className == null)
       className = IndexBasedSpellChecker.class.getName();
     SolrResourceLoader loader = core.getResourceLoader();
-    SolrSpellChecker checker = loader.newInstance(className, SolrSpellChecker.class);
+    SolrSpellChecker checker = loader.newInstance(className, SolrSpellChecker.class, Utils.getSolrSubPackage(SolrSpellChecker.class.getPackageName()));
     if (checker != null) {
       String dictionary = checker.init(spellchecker, core);
       if (dictionary != null) {
@@ -827,8 +833,8 @@ public class SpellCheckComponent extends SearchComponent implements SolrCoreAwar
       if (currentSearcher == null) {
         // firstSearcher event
         try {
-          if (log.isInfoEnabled()) {
-            log.info("Loading spell index for spellchecker: {}", checker.getDictionaryName());
+          if (log.isDebugEnabled()) {
+            log.debug("Loading spell index for spellchecker: {}", checker.getDictionaryName());
           }
           checker.reload(core, newSearcher);
         } catch (IOException e) {

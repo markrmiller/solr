@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
@@ -42,8 +43,6 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.rest.BaseSolrResource;
 import org.apache.solr.rest.ManagedResource;
 import org.apache.solr.rest.ManagedResourceStorage.StorageIO;
-import org.restlet.data.Status;
-import org.restlet.resource.ResourceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,7 +133,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
       }
 
       boolean ignoreCase = getIgnoreCase(managedInitArgs);
-      synonymMappings = new TreeMap<>();
+      synonymMappings = new ConcurrentSkipListMap<>();
       if (managedData != null) {
         Map<String,Object> storedSyns = (Map<String,Object>)managedData;
         for (Map.Entry<String, Object> entry : storedSyns.entrySet()) {
@@ -175,7 +174,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
       } else if (updates instanceof Map) {
         madeChanges = applyMapUpdates((Map<String,Object>)updates, ignoreCase);
       } else {
-        throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST,
+        throw new SolrException(ErrorCode.BAD_REQUEST,
             "Unsupported data format (" + updates.getClass().getName() + "); expected a JSON object (Map or List)!");
       }
       return madeChanges ? getStoredView() : null;
@@ -244,7 +243,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
           }
 
         } else {
-          throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Unsupported value "+val+
+          throw new SolrException(ErrorCode.BAD_REQUEST, "Unsupported value "+val+
               " for "+term+"; expected single value or a JSON array!");
         }
 
@@ -277,7 +276,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
     }
 
     public boolean getIgnoreCase() {
-      return getIgnoreCase(managedInitArgs);
+      return getIgnoreCase(managedInitArgs.get());
     }
 
     public boolean getIgnoreCase(NamedList<?> initArgs) {
@@ -309,7 +308,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
     }
 
     @Override
-    public synchronized void doDeleteChild(BaseSolrResource endpoint, String childId) {
+    public void doDeleteChild(BaseSolrResource endpoint, String childId) {
       boolean ignoreCase = getIgnoreCase();
       String key = applyCaseSetting(ignoreCase, childId);
 
@@ -346,7 +345,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
    * mappings from the managed JSON in this class during SynonymMap
    * building.
    */
-  private class ManagedSynonymParser extends SynonymMap.Parser {
+  private static class ManagedSynonymParser extends SynonymMap.Parser {
 
     SynonymManager synonymManager;
 
@@ -417,19 +416,7 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
     }
     // create the actual filter factory that pulls the synonym mappings
     // from synonymMappings using a custom parser implementation
-    delegate = new SynonymGraphFilterFactory(filtArgs) {
-      @Override
-      protected SynonymMap loadSynonyms
-          (ResourceLoader loader, String cname, boolean dedup, Analyzer analyzer)
-          throws IOException, ParseException {
-
-        ManagedSynonymParser parser =
-            new ManagedSynonymParser((SynonymManager)res, dedup, analyzer);
-        // null is safe here because there's no actual parsing done against a input Reader
-        parser.parse(null);
-        return parser.build();
-      }
-    };
+    delegate = new MySynonymGraphFilterFactory(filtArgs, res);
     try {
       delegate.inform(res.getResourceLoader());
     } catch (IOException e) {
@@ -444,5 +431,25 @@ public class ManagedSynonymGraphFilterFactory extends BaseManagedTokenFilterFact
           " not initialized correctly! The SynonymFilterFactory delegate was not initialized.");
 
     return delegate.create(input);
+  }
+
+  private static class MySynonymGraphFilterFactory extends SynonymGraphFilterFactory {
+    private final ManagedResource res;
+
+    public MySynonymGraphFilterFactory(Map<String,String> filtArgs, ManagedResource res) {
+      super(filtArgs);
+      this.res = res;
+    }
+
+    @Override
+    protected SynonymMap loadSynonyms
+        (ResourceLoader loader, String cname, boolean dedup, Analyzer analyzer)
+        throws IOException, ParseException {
+
+      ManagedSynonymParser parser = new ManagedSynonymParser((SynonymManager) res, dedup, analyzer);
+      // null is safe here because there's no actual parsing done against a input Reader
+      parser.parse(null);
+      return parser.build();
+    }
   }
 }

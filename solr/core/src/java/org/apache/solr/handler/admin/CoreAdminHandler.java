@@ -25,13 +25,13 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.api.Api;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.ZkController;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -39,20 +39,17 @@ import org.apache.solr.common.params.CommonAdminParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.logging.MDCLoggingContext;
-import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.security.AuthorizationContext;
 import org.apache.solr.security.PermissionNameProvider;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
-import org.apache.solr.util.stats.MetricUtils;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -71,9 +68,6 @@ public class CoreAdminHandler extends RequestHandlerBase implements PermissionNa
   protected final CoreContainer coreContainer;
   protected final Map<String, Map<String, TaskObject>> requestStatusMap;
   private final CoreAdminHandlerApi coreAdminHandlerApi;
-
-  protected ExecutorService parallelExecutor = ExecutorUtil.newMDCAwareFixedThreadPool(50,
-      new SolrNamedThreadFactory("parallelCoreAdminExecutor"));
 
   protected static int MAX_TRACKED_REQUESTS = 100;
   public static String RUNNING = "running";
@@ -123,8 +117,6 @@ public class CoreAdminHandler extends RequestHandlerBase implements PermissionNa
   @Override
   public void initializeMetrics(SolrMetricsContext parentContext, String scope) {
     super.initializeMetrics(parentContext, scope);
-    parallelExecutor = MetricUtils.instrumentedExecutorService(parallelExecutor, this, solrMetricsContext.getMetricRegistry(),
-        SolrMetricManager.mkName("parallelCoreAdminExecutor", getCategory().name(), scope, "threadPool"));
   }
   @Override
   public Boolean registerV2() {
@@ -183,12 +175,15 @@ public class CoreAdminHandler extends RequestHandlerBase implements PermissionNa
         try {
           MDC.put("CoreAdminHandler.asyncId", taskId);
           MDC.put("CoreAdminHandler.action", op.action.toString());
-          parallelExecutor.execute(() -> {
+          ParWork.getRootSharedExecutor().submit(() -> { // ### SUPER DUPER EXPERT USAGE
             boolean exceptionCaught = false;
             try {
-              callInfo.call();
-              taskObject.setRspObject(callInfo.rsp);
+              if (!cores.isShutDown()) {
+                callInfo.call();
+                taskObject.setRspObject(callInfo.rsp);
+              }
             } catch (Exception e) {
+              ParWork.propagateInterrupt(e);
               exceptionCaught = true;
               taskObject.setRspObjectFromException(e);
             } finally {
@@ -198,11 +193,22 @@ public class CoreAdminHandler extends RequestHandlerBase implements PermissionNa
               } else {
                 addTask("completed", taskObject, true);
               }
+
+              // Claim the task so the caller that's waiting for async status knows we're done
+              // TODO: TJP ~ not sure if this the correct place for this ...
+              if (coreContainer.getZkController() != null) {
+                try {
+                  coreContainer.getZkController().claimAsyncId(taskId);
+                } catch (KeeperException e) {
+                  log.error("Failed to claim async task {}", taskId, e);
+                }
+              }
             }
           });
         } finally {
           MDC.remove("CoreAdminHandler.asyncId");
           MDC.remove("CoreAdminHandler.action");
+          MDCLoggingContext.clear();
         }
       }
     } finally {
@@ -233,7 +239,6 @@ public class CoreAdminHandler extends RequestHandlerBase implements PermissionNa
       .put(CoreAdminParams.SHARD, CoreDescriptor.CORE_SHARD)
       .put(CoreAdminParams.COLLECTION, CoreDescriptor.CORE_COLLECTION)
       .put(CoreAdminParams.ROLES, CoreDescriptor.CORE_ROLES)
-      .put(CoreAdminParams.CORE_NODE_NAME, CoreDescriptor.CORE_NODE_NAME)
       .put(ZkStateReader.NUM_SHARDS_PROP, CloudDescriptor.NUM_SHARDS)
       .put(CoreAdminParams.REPLICA_TYPE, CloudDescriptor.REPLICA_TYPE)
       .build();
@@ -373,8 +378,7 @@ public class CoreAdminHandler extends RequestHandlerBase implements PermissionNa
    * Method to ensure shutting down of the ThreadPool Executor.
    */
   public void shutdown() {
-    if (parallelExecutor != null)
-      ExecutorUtil.shutdownAndAwaitTermination(parallelExecutor);
+
   }
 
   private static final Map<String, CoreAdminOperation> opMap = new HashMap<>();

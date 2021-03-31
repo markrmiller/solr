@@ -23,7 +23,6 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.KeywordTokenizerFactory;
 import org.apache.lucene.analysis.util.TokenFilterFactory;
 import org.apache.lucene.analysis.util.CharFilterFactory;
-import org.apache.lucene.util.LuceneTestCase;
 
 import org.apache.solr.analysis.TokenizerChain;
 import org.apache.solr.handler.admin.LukeRequestHandlerTest; // jdoc
@@ -39,7 +38,7 @@ public class CustomAnalyzerStrField extends StrField {
   private final Analyzer queryAnalyzer;
 
   public CustomAnalyzerStrField() {
-    Random r = LuceneTestCase.random();
+    Random r = new Random();
 
     // two arg constructor
     Analyzer a2 = new TokenizerChain

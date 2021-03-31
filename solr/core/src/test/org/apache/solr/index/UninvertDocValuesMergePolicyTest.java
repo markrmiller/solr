@@ -16,6 +16,8 @@
  */
 package org.apache.solr.index;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.function.IntUnaryOperator;
 
@@ -45,22 +47,24 @@ public class UninvertDocValuesMergePolicyTest extends SolrTestCaseJ4 {
   private static String TEST_FIELD = "string_add_dv_later";
 
   @BeforeClass
-  public static void beforeTests() throws Exception {
+  public static void beforeUninvertDocValuesMergePolicyTest() throws Exception {
     System.setProperty(SOLR_TESTS_SKIP_INTEGRITY_CHECK, (random().nextBoolean() ? "true" : "false"));
   }
 
   @AfterClass
-  public static void afterTests() {
+  public static void afterUninvertDocValuesMergePolicyTest() {
     System.clearProperty(SOLR_TESTS_SKIP_INTEGRITY_CHECK);
   }
 
   @After
-  public void after() throws Exception {
+  public void tearDown() throws Exception {
     deleteCore();
+    super.tearDown();
   }
   
   @Before
-  public void before() throws Exception {
+  public void setUp() throws Exception {
+    super.setUp();
     initCore("solrconfig-uninvertdocvaluesmergepolicyfactory.xml", "schema-docValues.xml");
   }
 
@@ -216,7 +220,10 @@ public class UninvertDocValuesMergePolicyTest extends SolrTestCaseJ4 {
           oldSchemaField.getType(),
           propertiesModifier.applyAsInt(oldSchemaField.getProperties()),
           oldSchemaField.getDefaultValue());
-      schema.getFields().put(fieldName, newSchemaField);
+
+      Map<String,SchemaField> fields = new HashMap<>(schema.getFields());
+      fields.put(fieldName, newSchemaField);
+      schema.setFields(fields);
     }
   }
   

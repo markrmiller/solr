@@ -20,7 +20,6 @@ import org.apache.lucene.search.TimeLimitingCollector.TimerThread;
 
 import com.carrotsearch.randomizedtesting.ThreadFilter;
 
-
 /**
  * This ignores those threads in Solr for which there is no way to
  * clean up after a suite.
@@ -42,23 +41,54 @@ public class SolrIgnoredThreadsFilter implements ThreadFilter {
     }
     
     // due to netty - will stop on it's own
-    if (threadName.startsWith("globalEventExecutor")) {
-      return true;
-    }
-    
-    // HttpClient Connection evictor threads can take a moment to wake and shutdown
-    if (threadName.startsWith("Connection evictor")) {
-      return true;
-    }
+//    if (threadName.startsWith("globalEventExecutor")) {
+//      return true;
+//    }
     
     // These is a java pool for the collection stream api
     if (threadName.startsWith("ForkJoinPool.")) {
       return true;
     }
-    
-    if (threadName.startsWith("Image Fetcher")) {
+
+    // the jetty reserved executor
+    if (threadName.startsWith("NIOWorkerThread-")) {
       return true;
     }
+
+
+    // randomizedtesting claims this leaks, but the thread is already TERMINATED state
+    // I think it can be resolved, but for now ...
+    if (threadName.startsWith("executeInOrderTest") || threadName.startsWith("testStress") ||
+        threadName.startsWith("testLockWhenQueueIsFull_test") || threadName.startsWith("testRunInParallel")
+        ||  threadName.startsWith("replayUpdatesExecutor")) {
+      return true;
+    }
+
+//
+//    if (threadName.startsWith("ConnnectionExpirer")) { // org.apache.solr.cloud.TestDistributedMap.classMethod can leak this in TERMINATED state, should go away with apache httpclient
+//      return true;
+//    }
+
+    // HDFS MRM TODO: fix
+//    if (threadName.startsWith("IPC Parameter Sending Thread ")) { // SOLR-5007
+//      return true;
+//    } if (threadName.startsWith("IPC Client")) { // SOLR-5007
+//      return true;
+//    } else if (threadName.startsWith("org.apache.hadoop.hdfs.PeerCache")) { // SOLR-7288
+//      return true;
+//    } else if (threadName.endsWith("StatisticsDataReferenceCleaner")) {
+//      return true;
+//    } else if (threadName.startsWith("LeaseRenewer")) { // SOLR-7287
+//      return true;
+//    } else if (threadName.startsWith("org.apache.hadoop.fs.FileSystem$Statistics")) { // SOLR-11261
+//      return true;
+//    } else if (threadName.startsWith("ForkJoinPool.")) { // JVM built in pool
+//      return true;
+//    } else if (threadName.startsWith("solr-hdfs-threadpool-")) { // SOLR-9515 and HDFS-14251
+//      return true;
+//    } else if (threadName.startsWith("nioEventLoopGroup")) { // Netty threads from hdfs
+//      return true;
+//    }
 
     return false;
   }

@@ -17,94 +17,131 @@
 
 package org.apache.solr.cloud;
 
-import java.lang.invoke.MethodHandles;
+import org.apache.solr.common.AlreadyClosedException;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkCmdExecutor;
-import org.apache.solr.common.cloud.ZkNodeProps;
-import org.apache.solr.common.util.Utils;
-import org.apache.zookeeper.CreateMode;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.common.params.CommonParams.ID;
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.util.HashMap;
+import java.util.Map;
 
-final class OverseerElectionContext extends ElectionContext {
+final class OverseerElectionContext extends ShardLeaderElectionContextBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private final SolrZkClient zkClient;
   private final Overseer overseer;
-  private volatile boolean isClosed = false;
 
-  public OverseerElectionContext(SolrZkClient zkClient, Overseer overseer, final String zkNodeName) {
-    super(zkNodeName, Overseer.OVERSEER_ELECT, Overseer.OVERSEER_ELECT + "/leader", null, zkClient);
+  public OverseerElectionContext(final String zkNodeName, SolrZkClient zkClient, Overseer overseer) {
+    super(zkNodeName, Overseer.OVERSEER_ELECT, Overseer.OVERSEER_ELECT + "/leader", new Replica("overseer:" + overseer.getZkController().getNodeName(), getIDMap(zkNodeName, overseer),
+        "overseer", -1l, "overseer"), null, zkClient);
     this.overseer = overseer;
     this.zkClient = zkClient;
-    try {
-      new ZkCmdExecutor(zkClient.getZkClientTimeout()).ensureExists(Overseer.OVERSEER_ELECT, zkClient);
-    } catch (KeeperException e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    }
+  }
+
+  private static Map<String,Object> getIDMap(String zkNodeName, Overseer overseer) {
+    Map<String,Object> idMap = new HashMap<>(2);
+    idMap.put("id", zkNodeName);
+    idMap.put(ZkStateReader.NODE_NAME_PROP, overseer.getZkController().getNodeName());
+    return idMap;
   }
 
   @Override
-  void runLeaderProcess(boolean weAreReplacement, int pauseBeforeStartMs) throws KeeperException,
-      InterruptedException {
-    if (isClosed) {
-      return;
-    }
-    log.info("I am going to be the leader {}", id);
-    final String id = leaderSeqPath
-        .substring(leaderSeqPath.lastIndexOf("/") + 1);
-    ZkNodeProps myProps = new ZkNodeProps(ID, id);
+  boolean runLeaderProcess(ElectionContext context, boolean weAreReplacement, int pauseBeforeStartMs) throws KeeperException,
+          InterruptedException, IOException {
+    log.info("Running the leader process for Overseer");
 
-    zkClient.makePath(leaderPath, Utils.toJSON(myProps),
-        CreateMode.EPHEMERAL, true);
-    if (pauseBeforeStartMs > 0) {
-      try {
-        Thread.sleep(pauseBeforeStartMs);
-      } catch (InterruptedException e) {
-        Thread.interrupted();
-        log.warn("Wait interrupted ", e);
+    if (overseer.isDone()) {
+      log.info("Already closed, bailing ...");
+      throw new AlreadyClosedException();
+    }
+
+    // TODO: the idea here is that we could clear the Overseer queue
+    // if we knew we are the first Overseer in a cluster startup
+    // needs more testing in real world vs tests
+//    if (!weAreReplacement) {
+//      // kills the queues
+//      ZkDistributedQueue queue = new ZkDistributedQueue(
+//          overseer.getZkController().getZkStateReader().getZkClient(),
+//          "/overseer/queue", new Stats(), 0, new ConnectionManager.IsClosed() {
+//        public boolean isClosed() {
+//          return overseer.isClosed() || overseer.getZkController()
+//              .getCoreContainer().isShutDown();
+//        }
+//      });
+//      clearQueue(queue);
+//      clearQueue(Overseer.getInternalWorkQueue(zkClient, new Stats()));
+//    }
+
+    try {
+      boolean success = super.runLeaderProcess(context, weAreReplacement, pauseBeforeStartMs);
+      if (!success) {
+        cancelElection();
+        return false;
+      }
+    } catch (Exception e) {
+      cancelElection();
+      if (e instanceof  RuntimeException) {
+        throw e;
+      } else {
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       }
     }
-    synchronized (this) {
-      if (!this.isClosed && !overseer.getZkController().getCoreContainer().isShutDown()) {
-        overseer.start(id);
-      }
+
+    if (!overseer.getZkController().getCoreContainer().isShutDown() && !overseer.getZkController().isShutdownCalled()
+        && !overseer.isDone()) {
+      log.info("Starting overseer after winning Overseer election {}", id);
+      overseer.start(id, context, weAreReplacement);
+    } else {
+      log.info("Will not start Overseer because we are closed");
     }
+
+    return true;
+  }
+
+  public Overseer getOverseer() {
+    return  overseer;
   }
 
   @Override
   public void cancelElection() throws InterruptedException, KeeperException {
-    super.cancelElection();
-    overseer.close();
-  }
+    //try (ParWork closer = new ParWork(this, true)) {
 
-  @Override
-  public synchronized void close() {
-    this.isClosed = true;
-    overseer.close();
-  }
+    //    closer.collect("cancelElection", () -> {
+    try {
+      super.cancelElection();
+    } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
+      log.error("Exception closing Overseer", e);
+    }
+    //  });
 
-  @Override
-  public ElectionContext copy() {
-    return new OverseerElectionContext(zkClient, overseer, id);
+    //      closer.collect("overseer", () -> {
+    //        try {
+    //          if (!overseer.isCloseAndDone()) {
+    //            overseer.close();
+    //          }
+    //        } catch (Exception e) {
+    //          ParWork.propagateInterrupt(e);
+    //          log.error("Exception closing Overseer", e);
+    //        }
+    //      });
+    //   }
   }
 
   @Override
   public void joinedElectionFired() {
-    overseer.close();
+
   }
 
   @Override
   public void checkIfIamLeaderFired() {
-    // leader changed - close the overseer
-    overseer.close();
-  }
 
+  }
 }
+

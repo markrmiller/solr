@@ -21,6 +21,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.IOContext;
 
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.util.NamedList;
 
 import org.apache.solr.SolrTestCaseJ4;
@@ -58,7 +59,7 @@ public class TestDirectoryFactory extends SolrTestCaseJ4 {
   }
 
   private void testExistsBehavior(Class<? extends DirectoryFactory> clazz) throws Exception {
-    final String path = createTempDir().toString() + "/" + clazz + "_somedir";
+    final String path = SolrTestUtil.createTempDir().toString() + "/" + clazz + "_somedir";
     DirectoryFactory dirFac = null;
     try {
       dirFac = clazz.getConstructor().newInstance();
@@ -90,7 +91,7 @@ public class TestDirectoryFactory extends SolrTestCaseJ4 {
 
         
       } finally {
-        dirFac.release(dir);
+      //  dirFac.release(dir);
       }
       assertTrue(path + " should still exist even after being released", dirFac.exists(path));
       

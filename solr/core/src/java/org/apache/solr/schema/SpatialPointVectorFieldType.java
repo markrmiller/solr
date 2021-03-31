@@ -16,10 +16,10 @@
  */
 package org.apache.solr.schema;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.legacy.LegacyFieldType;
 import org.apache.solr.legacy.PointVectorStrategy;
 
@@ -35,6 +35,7 @@ public class SpatialPointVectorFieldType extends AbstractSpatialFieldType<PointV
 
   @Override
   protected void init(IndexSchema schema, Map<String, String> args) {
+    CoreContainer.deprecationLog.warn(SpatialPointVectorFieldType.class.getName() + " is deprecated, deprecation= use LatLonPointSpatialField instead");
     super.init(schema, args);
 
     String v = args.remove( "numberType" );
@@ -54,7 +55,7 @@ public class SpatialPointVectorFieldType extends AbstractSpatialFieldType<PointV
    */
   @Override
   public void inform(IndexSchema schema) {
-    FieldType fieldType = schema.getFieldTypeByName(numberFieldName);
+    FieldType fieldType = schema.getFieldTypeByName(numberFieldName, schema.getFieldTypes());
     if( fieldType == null ) {
       throw new RuntimeException( "Can not find number field: "+ numberFieldName);
     }
@@ -70,17 +71,15 @@ public class SpatialPointVectorFieldType extends AbstractSpatialFieldType<PointV
     // In theory we should fix this, but since this class is already deprecated, we'll leave it alone
     // to simplify the risk of back-compat break for existing users.
     final int p = (INDEXED | TOKENIZED | OMIT_NORMS | OMIT_TF_POSITIONS | UNINVERTIBLE);
-    List<SchemaField> newFields = new ArrayList<>();
+    Map<String,SchemaField> newFields = new HashMap<>(schema.getFields());
     for( SchemaField sf : schema.getFields().values() ) {
       if( sf.getType() == this ) {
         String name = sf.getName();
-        newFields.add(new SchemaField(name + PointVectorStrategy.SUFFIX_X, fieldType, p, null));
-        newFields.add(new SchemaField(name + PointVectorStrategy.SUFFIX_Y, fieldType, p, null));
+        newFields.put(name + PointVectorStrategy.SUFFIX_X, new SchemaField(name + PointVectorStrategy.SUFFIX_X, fieldType, p, null));
+        newFields.put(name + PointVectorStrategy.SUFFIX_Y, new SchemaField(name + PointVectorStrategy.SUFFIX_Y, fieldType, p, null));
       }
     }
-    for (SchemaField newField : newFields) {
-      schema.getFields().put(newField.getName(), newField);
-    }
+    schema.setFields(newFields);
   }
 
   @Override

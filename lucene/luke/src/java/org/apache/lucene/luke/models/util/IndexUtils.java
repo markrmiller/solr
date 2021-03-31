@@ -49,6 +49,7 @@ import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
 
 /**
  * Utilities for various raw index operations.
@@ -353,7 +354,9 @@ public final class IndexUtils {
       Terms terms = MultiTerms.getTerms(reader, field);
       if (terms != null) {
         TermsEnum te = terms.iterator();
-        while (te.next() != null) {
+        while (true) {
+          final BytesRef bytesRef = te.next();
+          if (bytesRef == null) break;
           res.put(field, res.get(field) + 1);
         }
       }

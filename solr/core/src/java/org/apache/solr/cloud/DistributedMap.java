@@ -16,17 +16,18 @@
  */
 package org.apache.solr.cloud;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkCmdExecutor;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * A distributed map.
@@ -34,31 +35,38 @@ import org.apache.zookeeper.data.Stat;
  * don't have to be ordered i.e. DistributedQueue.
  */
 public class DistributedMap {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
   protected final String dir;
 
   protected SolrZkClient zookeeper;
 
-  protected static final String PREFIX = "mn-";
+  protected static final String PREFIX = "qnr-";
 
-  public DistributedMap(SolrZkClient zookeeper, String dir) {
+  public DistributedMap(SolrZkClient zookeeper, String dir) throws KeeperException {
+    if (log.isDebugEnabled()) log.debug("create DistributedMap dir={}", dir);
     this.dir = dir;
-
-    ZkCmdExecutor cmdExecutor = new ZkCmdExecutor(zookeeper.getZkClientTimeout());
-    try {
-      cmdExecutor.ensureExists(dir, zookeeper);
-    } catch (KeeperException e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    }
-
     this.zookeeper = zookeeper;
   }
 
+  public void update(String trackingId, byte[] data) throws KeeperException, InterruptedException {
+    String path = dir + "/" + PREFIX + trackingId;
+    if (log.isDebugEnabled()) log.debug("set data in distmap {}", path);
+    if (data == null || data.length == 0) {
+      throw new IllegalArgumentException();
+    }
+    zookeeper.create(path, data, CreateMode.PERSISTENT, (rc2, path2, ctx, name, stat2) -> {
+      if (rc2 != 0) {
+        KeeperException e = KeeperException.create(KeeperException.Code.get(rc2), path2);
+        log.error("Exception on update path=" + path2, e);
+      }
+    });
+  }
 
-  public void put(String trackingId, byte[] data) throws KeeperException, InterruptedException {
-    zookeeper.makePath(dir + "/" + PREFIX + trackingId, data, CreateMode.PERSISTENT, null, false, true);
+  public void put(String trackingId, byte[] data, CreateMode createMode) throws KeeperException, InterruptedException {
+    String path = dir + "/" + PREFIX + trackingId;
+    if (log.isDebugEnabled()) log.debug("put in distmap {}", path);
+    zookeeper.makePath(path, data, createMode, null, false, true);
   }
   
   /**

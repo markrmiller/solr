@@ -18,27 +18,24 @@ package org.apache.solr.cloud.hdfs;
 
 import java.io.IOException;
 
+import com.carrotsearch.randomizedtesting.annotations.Nightly;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.BasicDistributedZkTest;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-
 @Slow
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@Nightly
 public class HdfsNNFailoverTest extends BasicDistributedZkTest {
   private static final String COLLECTION = "collection";
   private static MiniDFSCluster dfsCluster;
   
   @BeforeClass
   public static void setupClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath(), false, true);
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath(), false, true);
   }
   
   @AfterClass
@@ -67,10 +64,8 @@ public class HdfsNNFailoverTest extends BasicDistributedZkTest {
 
   @Test
   public void test() throws Exception {
-    createCollection(COLLECTION, "conf1", 1, 1, 1);
-    
-    waitForRecoveriesToFinish(COLLECTION, false);
-    
+    createCollection(COLLECTION, "_default", 1, 1, 1);
+
     // TODO:  SOLR-7360 Enable HDFS NameNode failover testing. 
 //    dfsCluster.transitionToStandby(0);
 //    dfsCluster.transitionToActive(1);

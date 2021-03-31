@@ -19,6 +19,7 @@ package org.apache.solr.cloud;
 import java.util.List;
 import org.apache.lucene.util.PriorityQueue;
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 
@@ -27,7 +28,7 @@ import org.apache.zookeeper.data.Stat;
  * Oldest znodes (as per modification time) are evicted as newer ones come in.
  *
  * When the map hits the specified maximum size, the oldest <code>maxSize / 10</code> items
- * are evicted on the next {@link #put(String, byte[])} invocation.
+ * are evicted on the next {@link #put(String, byte[], CreateMode)} invocation.
  */
 public class SizeLimitedDistributedMap extends DistributedMap {
 
@@ -38,18 +39,18 @@ public class SizeLimitedDistributedMap extends DistributedMap {
    */
   private final OnOverflowObserver onOverflowObserver;
 
-  public SizeLimitedDistributedMap(SolrZkClient zookeeper, String dir, int maxSize) {
+  public SizeLimitedDistributedMap(SolrZkClient zookeeper, String dir, int maxSize) throws KeeperException {
     this(zookeeper, dir, maxSize, null);
   }
   
-  public SizeLimitedDistributedMap(SolrZkClient zookeeper, String dir, int maxSize, OnOverflowObserver onOverflowObserver) {
+  public SizeLimitedDistributedMap(SolrZkClient zookeeper, String dir, int maxSize, OnOverflowObserver onOverflowObserver) throws KeeperException {
     super(zookeeper, dir);
     this.maxSize = maxSize;
     this.onOverflowObserver = onOverflowObserver;
   }
 
   @Override
-  public void put(String trackingId, byte[] data) throws KeeperException, InterruptedException {
+  public void put(String trackingId, byte[] data, CreateMode createMode) throws KeeperException, InterruptedException {
     if (this.size() >= maxSize) {
       // Bring down the size
       List<String> children = zookeeper.getChildren(dir, null, true);
@@ -64,22 +65,22 @@ public class SizeLimitedDistributedMap extends DistributedMap {
       };
 
       for (String child : children) {
-        Stat stat = zookeeper.exists(dir + "/" + child, null, true);
+        Stat stat = zookeeper.exists(dir + "/" + child, null);
         priorityQueue.insertWithOverflow(stat.getMzxid());
       }
 
       long topElementMzxId = priorityQueue.top();
 
       for (String child : children) {
-        Stat stat = zookeeper.exists(dir + "/" + child, null, true);
+        Stat stat = zookeeper.exists(dir + "/" + child, null);
         if (stat.getMzxid() <= topElementMzxId) {
-          zookeeper.delete(dir + "/" + child, -1, true);
+          zookeeper.delete(dir + "/" + child, -1);
           if (onOverflowObserver != null) onOverflowObserver.onChildDelete(child.substring(PREFIX.length()));
         }
       }
     }
 
-    super.put(trackingId, data);
+    super.put(trackingId, data, createMode);
   }
   
   interface OnOverflowObserver {

@@ -71,9 +71,9 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected volatile List<SearchComponent> components;
-  private ShardHandlerFactory shardHandlerFactory;
-  private PluginInfo shfInfo;
-  private SolrCore core;
+  private volatile ShardHandlerFactory shardHandlerFactory;
+  private volatile PluginInfo shfInfo;
+  private volatile SolrCore core;
 
   protected List<String> getDefaultComponents() {
     ArrayList<String> names = new ArrayList<>(8);
@@ -247,7 +247,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
     }
     
     if (rb.isDistrib) {
-      shardHandler = shardHandlerFactory.getShardHandler();
+      shardHandler = ((HttpShardHandlerFactory)shardHandlerFactory).getShardHandler();
       shardHandler.prepDistributed(rb);
       if (!rb.isDistrib) {
         shardHandler = null; // request is not distributed after all and so the shard handler is not needed
@@ -258,7 +258,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
       String shardsTolerant = req.getParams().get(ShardParams.SHARDS_TOLERANT);
       boolean requireZkConnected = shardsTolerant != null && shardsTolerant.equals(ShardParams.REQUIRE_ZK_CONNECTED);
       ZkController zkController = cc.getZkController();
-      boolean zkConnected = zkController != null && ! zkController.getZkClient().getConnectionManager().isLikelyExpired();
+      boolean zkConnected = zkController.getZkClient().isConnected();
       if (requireZkConnected && false == zkConnected) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "ZooKeeper is not connected");
       } else {

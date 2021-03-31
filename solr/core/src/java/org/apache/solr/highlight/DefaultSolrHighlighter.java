@@ -69,6 +69,7 @@ import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.component.HighlightComponent;
@@ -140,7 +141,8 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
     boundaryScanners.clear();
 
     // Load the fragmenters
-    SolrFragmenter frag = solrCore.initPlugins(info.getChildren("fragmenter") , fragmenters,SolrFragmenter.class,null);
+    SolrFragmenter frag = solrCore.initPlugins(info.getChildren("fragmenter"),
+            fragmenters,SolrFragmenter.class,null, Utils.getSolrSubPackage(SolrFragmenter.class.getPackageName()));
     if (frag == null) {
       frag = new GapFragmenter();
       solrCore.initDefaultPlugin(frag, SolrFragmenter.class);
@@ -149,7 +151,8 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
     fragmenters.put(null, frag);
 
     // Load the formatters
-    SolrFormatter fmt = solrCore.initPlugins(info.getChildren("formatter"), formatters,SolrFormatter.class,null);
+    SolrFormatter fmt = solrCore.initPlugins(info.getChildren("formatter"),
+            formatters,SolrFormatter.class,null, Utils.getSolrSubPackage(SolrFormatter.class.getPackageName()));
     if (fmt == null) {
       fmt = new HtmlFormatter();
       solrCore.initDefaultPlugin(fmt, SolrFormatter.class);
@@ -158,7 +161,8 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
     formatters.put(null, fmt);
 
     // Load the encoders
-    SolrEncoder enc = solrCore.initPlugins(info.getChildren("encoder"), encoders,SolrEncoder.class,null);
+    SolrEncoder enc = solrCore.initPlugins(info.getChildren("encoder"),
+            encoders, SolrEncoder.class,null, Utils.getSolrSubPackage(SolrEncoder.class.getPackageName()));
     if (enc == null) {
       enc = new DefaultEncoder();
       solrCore.initDefaultPlugin(enc, SolrEncoder.class);
@@ -168,7 +172,7 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
 
     // Load the FragListBuilders
     SolrFragListBuilder fragListBuilder = solrCore.initPlugins(info.getChildren("fragListBuilder"),
-        fragListBuilders, SolrFragListBuilder.class, null );
+        fragListBuilders, SolrFragListBuilder.class, null, Utils.getSolrSubPackage(SolrFragListBuilder.class.getPackageName()) );
     if( fragListBuilder == null ) {
       fragListBuilder = new SimpleFragListBuilder();
       solrCore.initDefaultPlugin(fragListBuilder, SolrFragListBuilder.class);
@@ -178,7 +182,7 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
 
     // Load the FragmentsBuilders
     SolrFragmentsBuilder fragsBuilder = solrCore.initPlugins(info.getChildren("fragmentsBuilder"),
-        fragmentsBuilders, SolrFragmentsBuilder.class, null);
+        fragmentsBuilders, SolrFragmentsBuilder.class, null, Utils.getSolrSubPackage(SolrFragmentsBuilder.class.getPackageName()));
     if( fragsBuilder == null ) {
       fragsBuilder = new ScoreOrderFragmentsBuilder();
       solrCore.initDefaultPlugin(fragsBuilder, SolrFragmentsBuilder.class);
@@ -244,13 +248,7 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
    * @param request The SolrQueryRequest
    */
   protected QueryScorer getSpanQueryScorer(Query query, String fieldName, TokenStream tokenStream, SolrQueryRequest request) {
-    QueryScorer scorer = new QueryScorer(query,
-        request.getParams().getFieldBool(fieldName, HighlightParams.FIELD_MATCH, false) ? fieldName : null) {
-      @Override
-      protected WeightedSpanTermExtractor newTermExtractor(String defaultField) {
-        return new CustomSpanTermExtractor(defaultField);
-      }
-    };
+    QueryScorer scorer = new MyQueryScorer(query, request, fieldName);
     scorer.setExpandMultiTermQuery(request.getParams().getBool(HighlightParams.HIGHLIGHT_MULTI_TERM, true));
 
     boolean defaultPayloads = true;//overwritten below
@@ -498,28 +496,7 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
       fieldHighlights = null;
     } else if (useFastVectorHighlighter(params, schemaField)) {
       if (fvhContainer.fieldQuery == null) {
-        FastVectorHighlighter fvh = new FastVectorHighlighter(
-            // FVH cannot process hl.usePhraseHighlighter parameter per-field basis
-            params.getBool(HighlightParams.USE_PHRASE_HIGHLIGHTER, true),
-            // FVH cannot process hl.requireFieldMatch parameter per-field basis
-            params.getBool(HighlightParams.FIELD_MATCH, false)) {
-          @Override
-          public FieldQuery getFieldQuery(Query query, IndexReader reader) throws IOException {
-            return new FieldQuery(query, reader, phraseHighlight, fieldMatch) {
-              @Override
-              protected void flatten(Query sourceQuery, IndexReader reader, Collection<Query> flatQueries, float boost) throws IOException {
-                if (sourceQuery instanceof ToParentBlockJoinQuery) {
-                  Query childQuery = ((ToParentBlockJoinQuery) sourceQuery).getChildQuery();
-                  if (childQuery != null) {
-                    flatten(childQuery, reader, flatQueries, boost);
-                  }
-                } else {
-                  super.flatten(sourceQuery, reader, flatQueries, boost);
-                }
-              }
-            };
-          }
-        };
+        FastVectorHighlighter fvh = new MyFastVectorHighlighter(params);
         fvh.setPhraseLimit(params.getInt(HighlightParams.PHRASE_LIMIT, SolrHighlighter.DEFAULT_PHRASE_LIMIT));
         fvhContainer.fvh = fvh;
         fvhContainer.fieldQuery = fvh.getFieldQuery(query, reader);
@@ -836,6 +813,40 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
     public FvhContainer(FastVectorHighlighter fvh, FieldQuery fieldQuery) {
       this.fvh = fvh;
       this.fieldQuery = fieldQuery;
+    }
+  }
+
+  private static class MyQueryScorer extends QueryScorer {
+    public MyQueryScorer(Query query, SolrQueryRequest request, String fieldName) {
+      super(query, request.getParams().getFieldBool(fieldName, HighlightParams.FIELD_MATCH, false) ? fieldName : null);
+    }
+
+    @Override
+    protected WeightedSpanTermExtractor newTermExtractor(String defaultField) {
+      return new CustomSpanTermExtractor(defaultField);
+    }
+  }
+
+  private static class MyFastVectorHighlighter extends FastVectorHighlighter {
+    public MyFastVectorHighlighter(SolrParams params) {
+      super(params.getBool(HighlightParams.USE_PHRASE_HIGHLIGHTER, true), params.getBool(HighlightParams.FIELD_MATCH, false));
+    }
+
+    @Override
+    public FieldQuery getFieldQuery(Query query, IndexReader reader) throws IOException {
+      return new FieldQuery(query, reader, phraseHighlight, fieldMatch) {
+        @Override
+        protected void flatten(Query sourceQuery, IndexReader reader, Collection<Query> flatQueries, float boost) throws IOException {
+          if (sourceQuery instanceof ToParentBlockJoinQuery) {
+            Query childQuery = ((ToParentBlockJoinQuery) sourceQuery).getChildQuery();
+            if (childQuery != null) {
+              flatten(childQuery, reader, flatQueries, boost);
+            }
+          } else {
+            super.flatten(sourceQuery, reader, flatQueries, boost);
+          }
+        }
+      };
     }
   }
 }

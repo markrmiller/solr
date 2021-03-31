@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -39,7 +40,7 @@ import java.nio.charset.StandardCharsets;
 public class TestDocBuilder2 extends AbstractDataImportHandlerTestCase {
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeTestDocBuilder2() throws Exception {
     initCore("dataimport-solrconfig.xml", "dataimport-schema.xml");
   }
 
@@ -117,7 +118,7 @@ public class TestDocBuilder2 extends AbstractDataImportHandlerTestCase {
             "debug", "on", "clean", "true", "commit", "true",
             "category", "search",
             "dataConfig", REQUEST_PARAM_AS_VARIABLE);
-    h.query("/dataimport", request);
+    query("/dataimport", request);
     assertQ(req("desc:ApacheSolr"), "//*[@numFound='1']");
   }
 
@@ -132,7 +133,7 @@ public class TestDocBuilder2 extends AbstractDataImportHandlerTestCase {
     LocalSolrQueryRequest request = lrf.makeRequest("command", "full-import",
         "debug", "on", "clean", "true", "commit", "true",
         "dataConfig", DATA_CONFIG_WITH_DYNAMIC_FIELD_NAMES);
-    h.query("/dataimport", request);
+    query("/dataimport", request);
     assertQ(req("id:101"), "//*[@numFound='1']", "//*[@name='101_s']");
   }
 
@@ -148,7 +149,7 @@ public class TestDocBuilder2 extends AbstractDataImportHandlerTestCase {
             "debug", "on", "clean", "true", "commit", "true",
             "mypk", "id", "text", "desc",
             "dataConfig", DATA_CONFIG_WITH_TEMPLATIZED_FIELD_NAMES);
-    h.query("/dataimport", request);
+    query("/dataimport", request);
     assertQ(req("id:101"), "//*[@numFound='1']");
   }
 
@@ -278,7 +279,7 @@ public class TestDocBuilder2 extends AbstractDataImportHandlerTestCase {
   @Test
   @Ignore("Fix Me. See SOLR-4103.")
   public void testFileListEntityProcessor_lastIndexTime() throws Exception  {
-    File tmpdir = createTempDir().toFile();
+    File tmpdir = SolrTestUtil.createTempDir().toFile();
 
     @SuppressWarnings({"unchecked"})
     Map<String, String> params = createMap("baseDir", tmpdir.getAbsolutePath());

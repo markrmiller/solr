@@ -16,7 +16,6 @@
  */
 package org.apache.solr.handler;
 
-import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
@@ -30,7 +29,9 @@ import java.util.Set;
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.util.BytesRef;
+import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.request.DocumentAnalysisRequest;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.AnalysisParams;
@@ -45,7 +46,6 @@ import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
-import org.apache.solr.common.EmptyEntityResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,30 +83,6 @@ public class DocumentAnalysisRequestHandler extends AnalysisRequestHandlerBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final XMLErrorLogger xmllog = new XMLErrorLogger(log);
-
-  private XMLInputFactory inputFactory;
-
-  @Override
-  public void init(@SuppressWarnings({"rawtypes"})NamedList args) {
-    super.init(args);
-
-    inputFactory = XMLInputFactory.newInstance();
-    EmptyEntityResolver.configureXMLInputFactory(inputFactory);
-    inputFactory.setXMLReporter(xmllog);
-    try {
-      // The java 1.6 bundled stax parser (sjsxp) does not currently have a thread-safe
-      // XMLInputFactory, as that implementation tries to cache and reuse the
-      // XMLStreamReader.  Setting the parser-specific "reuse-instance" property to false
-      // prevents this.
-      // All other known open-source stax parsers (and the bea ref impl)
-      // have thread-safe factories.
-      inputFactory.setProperty("reuse-instance", Boolean.FALSE);
-    } catch (IllegalArgumentException ex) {
-      // Other implementations will likely throw this exception since "reuse-instance"
-      // is implementation specific.
-      log.debug("Unable to set the 'reuse-instance' property for the input factory: {}", inputFactory);
-    }
-  }
 
   @Override
   @SuppressWarnings({"rawtypes"})
@@ -152,8 +128,7 @@ public class DocumentAnalysisRequestHandler extends AnalysisRequestHandlerBase {
     try {
       is = stream.getStream();
       final String charset = ContentStreamBase.getCharsetFromContentType(stream.getContentType());
-      parser = (charset == null) ?
-        inputFactory.createXMLStreamReader(is) : inputFactory.createXMLStreamReader(is, charset);
+      parser = (charset == null) ? XMLResponseParser.inputFactory.createXMLStreamReader(is) : XMLResponseParser.inputFactory.createXMLStreamReader(is, charset);
 
       while (true) {
         int event = parser.next();
@@ -218,6 +193,7 @@ public class DocumentAnalysisRequestHandler extends AnalysisRequestHandlerBase {
             ? getQueryTokenSet(queryValue, fieldType.getQueryAnalyzer())
             : EMPTY_BYTES_SET;
         } catch (Exception e) {
+          ParWork.propagateInterrupt(e);
           // ignore analysis exceptions since we are applying arbitrary text to all fields
           termsToMatch = EMPTY_BYTES_SET;
         }
@@ -227,6 +203,7 @@ public class DocumentAnalysisRequestHandler extends AnalysisRequestHandlerBase {
             AnalysisContext analysisContext = new AnalysisContext(fieldType, fieldType.getQueryAnalyzer(), EMPTY_BYTES_SET);
             fieldTokens.add("query", analyzeValue(request.getQuery(), analysisContext));
           } catch (Exception e) {
+            ParWork.propagateInterrupt(e);
             // ignore analysis exceptions since we are applying arbitrary text to all fields
           }
         }

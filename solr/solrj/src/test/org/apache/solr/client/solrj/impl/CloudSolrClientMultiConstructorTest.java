@@ -25,6 +25,7 @@ import java.util.Optional;
 
 import org.apache.solr.SolrTestCase;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.client.solrj.SolrClient;
 import org.junit.Test;
 
 public class CloudSolrClientMultiConstructorTest extends SolrTestCase {
@@ -37,7 +38,6 @@ public class CloudSolrClientMultiConstructorTest extends SolrTestCase {
   Collection<String> hosts;
 
   @Test
-  // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
   public void testZkConnectionStringSetterWithValidChroot() throws IOException {
     boolean setOrList = random().nextBoolean();
     int numOfZKServers = TestUtil.nextInt(random(), 1, 5);
@@ -45,7 +45,7 @@ public class CloudSolrClientMultiConstructorTest extends SolrTestCase {
 
     final String chroot = "/mychroot";
 
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(128);
 
     if(setOrList) {
       /*
@@ -76,7 +76,6 @@ public class CloudSolrClientMultiConstructorTest extends SolrTestCase {
   }
   
   @Test
-  // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
   public void testZkConnectionStringConstructorWithValidChroot() throws IOException {
     int numOfZKServers = TestUtil.nextInt(random(), 1, 5);
     boolean withChroot = random().nextBoolean();
@@ -104,10 +103,11 @@ public class CloudSolrClientMultiConstructorTest extends SolrTestCase {
   }
   
   @Test(expected = IllegalArgumentException.class)
-  // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
-  public void testBadChroot() {
+  public void testBadChroot() throws IOException {
     final List<String> zkHosts = new ArrayList<>();
     zkHosts.add("host1:2181");
-    new CloudSolrClient.Builder(zkHosts, Optional.of("foo")).build();
+    try (SolrClient client = new CloudSolrClient.Builder(zkHosts, Optional.of("foo")).build()) {
+
+    }
   }
 }

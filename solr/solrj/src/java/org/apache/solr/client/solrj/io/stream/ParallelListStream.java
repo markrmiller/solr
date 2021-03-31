@@ -32,8 +32,7 @@ import org.apache.solr.client.solrj.io.stream.expr.Expressible;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExplanation;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpression;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
-import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
+import org.apache.solr.common.ParWork;
 
 public class ParallelListStream extends TupleStream implements Expressible {
 
@@ -134,26 +133,23 @@ public class ParallelListStream extends TupleStream implements Expressible {
   }
 
   private void openStreams() throws IOException {
-    ExecutorService service = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrNamedThreadFactory("ParallelListStream"));
-    try {
-      List<Future<StreamIndex>> futures = new ArrayList();
-      int i=0;
-      for (TupleStream tupleStream : streams) {
-        StreamOpener so = new StreamOpener(new StreamIndex(tupleStream, i++));
-        Future<StreamIndex> future = service.submit(so);
-        futures.add(future);
-      }
+    ExecutorService service = ParWork.getRootSharedExecutor();
+    List<Future<StreamIndex>> futures = new ArrayList();
+    int i=0;
+    for (TupleStream tupleStream : streams) {
+      StreamOpener so = new StreamOpener(new StreamIndex(tupleStream, i++));
+      Future<StreamIndex> future = service.submit(so);
+      futures.add(future);
+    }
 
-      try {
-        for (Future<StreamIndex> f : futures) {
-          StreamIndex streamIndex = f.get();
-          this.streams[streamIndex.getIndex()] = streamIndex.getTupleStream();
-        }
-      } catch (Exception e) {
-        throw new IOException(e);
+    try {
+      for (Future<StreamIndex> f : futures) {
+        StreamIndex streamIndex = f.get();
+        this.streams[streamIndex.getIndex()] = streamIndex.getTupleStream();
       }
-    } finally {
-      service.shutdown();
+    } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
+      throw new IOException(e);
     }
   }
 
@@ -171,7 +167,7 @@ public class ParallelListStream extends TupleStream implements Expressible {
     }
   }
 
-  protected class StreamIndex {
+  protected static class StreamIndex {
     private TupleStream tupleStream;
     private int index;
 

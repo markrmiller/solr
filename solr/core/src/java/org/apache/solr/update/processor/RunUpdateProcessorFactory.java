@@ -120,6 +120,15 @@ public class RunUpdateProcessorFactory extends UpdateRequestProcessorFactory {
       }
       super.finish();
     }
+
+    @Override
+    public void doClose() {
+      try {
+        super.doClose();
+      } finally {
+     //   AddUpdateCommand.THREAD_LOCAL_AddUpdateCommand.get().clear();
+      }
+    }
   }
 }
 

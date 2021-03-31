@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -36,6 +38,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@LuceneTestCase.Nightly
 public class TestV2Request extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -44,7 +47,7 @@ public class TestV2Request extends SolrCloudTestCase {
   public void setupCluster() throws Exception {
     configureCluster(4)
         .withJettyConfig(jettyCfg -> jettyCfg.enableV2(true))
-        .addConfig("config", getFile("solrj/solr/collection1/conf").toPath())
+        .addConfig("config", SolrTestUtil.getFile("solrj/solr/collection1/conf").toPath())
         .configure();
   }
 
@@ -153,14 +156,13 @@ public class TestV2Request extends SolrCloudTestCase {
             "}").build());
 
     ClusterState cs = cluster.getSolrClient().getClusterStateProvider().getClusterState();
-    System.out.println("livenodes: " + cs.getLiveNodes());
 
     String[] node = new String[1];
     cs.getCollection("v2forward").forEachReplica((s, replica) -> node[0] = replica.getNodeName());
 
     //find a node that does not have a replica for this collection
     final String[] testNode = new String[1];
-    cs.getLiveNodes().forEach(s -> {
+    cluster.getSolrClient().getZkStateReader().getLiveNodes().forEach(s -> {
       if (!s.equals(node[0])) testNode[0] = s;
     });
 

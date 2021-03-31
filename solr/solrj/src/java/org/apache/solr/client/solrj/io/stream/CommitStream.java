@@ -54,8 +54,9 @@ public class CommitStream extends TupleStream implements Expressible {
   private int commitBatchSize;
   private TupleStream tupleSource;
   
-  private transient SolrClientCache clientCache;
+  private volatile transient SolrClientCache clientCache;
   private long docsSinceCommit;
+  private volatile boolean closeClientCache;
 
   public CommitStream(StreamExpression expression, StreamFactory factory) throws IOException {
     
@@ -106,7 +107,10 @@ public class CommitStream extends TupleStream implements Expressible {
   @Override
   public void open() throws IOException {
     tupleSource.open();
-    clientCache = new SolrClientCache();
+    if (clientCache == null) {
+      clientCache = new SolrClientCache(zkHost);
+      closeClientCache = true;
+    }
     docsSinceCommit = 0;
   }
   
@@ -151,7 +155,7 @@ public class CommitStream extends TupleStream implements Expressible {
   
   @Override
   public void close() throws IOException {
-    clientCache.close();
+    if (closeClientCache) clientCache.close();
     tupleSource.close();
   }
   
@@ -223,8 +227,14 @@ public class CommitStream extends TupleStream implements Expressible {
   
   @Override
   public void setStreamContext(StreamContext context) {
-    if(null != context.getSolrClientCache()){
+    if (null != context.getSolrClientCache()) {
+      try {
+        if (clientCache != null) clientCache.close();
+      } catch (NullPointerException e) {
+        // okay
+      }
       this.clientCache = context.getSolrClientCache();
+      closeClientCache = false;
         // this overrides the one created in open
     }
     
@@ -250,7 +260,7 @@ public class CommitStream extends TupleStream implements Expressible {
   private void sendCommit() throws IOException {
     
     try {
-      clientCache.getCloudSolrClient(zkHost).commit(collection, waitFlush, waitSearcher, softCommit);
+      clientCache.getCloudSolrClient().commit(collection, waitFlush, waitSearcher, softCommit);
     } catch (SolrServerException | IOException e) {
       log.warn(String.format(Locale.ROOT, "Unable to commit documents to collection '%s' due to unexpected error.", collection), e);
       String className = e.getClass().getName();

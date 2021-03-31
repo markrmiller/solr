@@ -38,8 +38,8 @@ import org.apache.solr.util.stats.MetricUtils;
 public class SolrMetricsContext {
   private final String registryName;
   private final SolrMetricManager metricManager;
-  private final String tag;
-  private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
+  final String tag;
+  private final Set<String> metricNames = ConcurrentHashMap.newKeySet(128);
 
   public SolrMetricsContext(SolrMetricManager metricManager, String registryName, String tag) {
     this.registryName = registryName;

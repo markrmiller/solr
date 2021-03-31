@@ -24,14 +24,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Metric;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.join.ScoreMode;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.metrics.MetricsMap;
-import org.apache.solr.metrics.SolrMetricManager;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.response.SolrQueryResponse;
@@ -201,67 +201,72 @@ public class TestScoreJoinQPScore extends SolrTestCaseJ4 {
   public void testCacheHit() throws Exception {
     indexDataForScorring();
 
-    Map<String, Metric> metrics = h.getCoreContainer().getMetricManager().registry(h.getCore().getCoreMetricManager().getRegistryName()).getMetrics();
+    try (SolrCore core = h.getCore()) {
+      Map<String,Metric> metrics = h.getCoreContainer().getMetricManager().registry(core.getCoreMetricManager().getRegistryName()).getMetrics();
 
-    @SuppressWarnings("rawtypes")
-    MetricsMap mm = (MetricsMap)((SolrMetricManager.GaugeWrapper)metrics.get("CACHE.searcher.queryResultCache")).getGauge();
-    {
-      Map<String,Object> statPre = mm.getValue();
-      h.query(req("q", "{!join from=movieId_s to=id score=Avg}title:first", "fl", "id", "omitHeader", "true"));
-      assertHitOrInsert(mm.getValue(), statPre);
-    }
+      @SuppressWarnings("rawtypes") Gauge mm = (Gauge) metrics.get("CACHE.searcher.queryResultCache");
+      {
+        Map<String,Object> statPre = (Map<String,Object>) mm.getValue();
+        try (SolrQueryRequest req = req("q", "{!join from=movieId_s to=id score=Avg}title:first", "fl", "id", "omitHeader", "true")) {
+          h.query(req);
+          assertHitOrInsert((Map<String,Object>) mm.getValue(), statPre);
+        }
+      }
 
-    {
-      Map<String,Object> statPre = mm.getValue();
-      h.query(req("q", "{!join from=movieId_s to=id score=Avg}title:first", "fl", "id", "omitHeader", "true"));
-      assertHit(mm.getValue(), statPre);
-    }
+      {
+        Map<String,Object> statPre = (Map<String,Object>) mm.getValue();
+        try (SolrQueryRequest req = req("q", "{!join from=movieId_s to=id score=Avg}title:first", "fl", "id", "omitHeader", "true")) {
+          h.query(req);
+          assertHit((Map<String,Object>) mm.getValue(), statPre);
+        }
+      }
 
-    {
-      Map<String,Object> statPre = mm.getValue();
+      {
+        Map<String,Object> statPre = (Map<String,Object>) mm.getValue();
 
-      Random r = random();
-      boolean changed = false;
-      boolean x = false;
-      String from = (x = r.nextBoolean()) ? "id" : "movieId_s";
-      changed |= x;
-      String to = (x = r.nextBoolean()) ? "movieId_s" : "id";
-      changed |= x;
-      String score = (x = r.nextBoolean()) ? not(ScoreMode.Avg).name() : "Avg";
-      changed |= x;
+        Random r = random();
+        boolean changed = false;
+        boolean x = false;
+        String from = (x = r.nextBoolean()) ? "id" : "movieId_s";
+        changed |= x;
+        String to = (x = r.nextBoolean()) ? "movieId_s" : "id";
+        changed |= x;
+        String score = (x = r.nextBoolean()) ? not(ScoreMode.Avg).name() : "Avg";
+        changed |= x;
       /* till SOLR-7814
        * String boost = (x = r.nextBoolean()) ? "23" : "1";
       changed |= x; */
-      String q = (!changed) ? (r.nextBoolean() ? "title:first^67" : "title:night") : "title:first";
+        String q = (!changed) ? (r.nextBoolean() ? "title:first^67" : "title:night") : "title:first";
+        final String resp;
+        try (SolrQueryRequest req = req("q", "{!join from=" + from + " to=" + to + " score=" + score +
+            //" b=" + boost +
+            "}" + q, "fl", "id", "omitHeader", "true")) {
+          resp = h.query(req);
+          assertInsert((Map<String,Object>) mm.getValue(), statPre);
+        }
 
-      final String resp = h.query(req("q", "{!join from=" + from + " to=" + to +
-              " score=" + score + 
-              //" b=" + boost + 
-              "}" + q, "fl", "id", "omitHeader", "true")
-      );
-      assertInsert(mm.getValue(), statPre);
+        statPre = (Map<String,Object>) mm.getValue();
+        try (SolrQueryRequest req = req("q", "{!join from=" + from + " to=" + to + " score=" + score.toLowerCase(Locale.ROOT) +
+            //" b=" + boost
+            "}" + q, "fl", "id", "omitHeader", "true")) {
+          final String repeat = h.query(req);
+          assertHit((Map<String,Object>) mm.getValue(), statPre);
 
-      statPre = mm.getValue();
-      final String repeat = h.query(req("q", "{!join from=" + from + " to=" + to + " score=" + score.toLowerCase(Locale.ROOT) +
-          //" b=" + boost
-              "}" + q, "fl", "id", "omitHeader", "true")
-      );
-      assertHit(mm.getValue(), statPre);
-
-      assertEquals("lowercase shouldn't change anything", resp, repeat);
+          assertEquals("lowercase shouldn't change anything", resp, repeat);
+        }
 
         final String aMod = score.substring(0, score.length() - 1);
-        assertQEx("exception on "+aMod, "ScoreMode", 
-            req("q", "{!join from=" + from + " to=" + to + " score=" + aMod +
-                "}" + q, "fl", "id", "omitHeader", "true"), 
-                SolrException.ErrorCode.BAD_REQUEST);
+        try (SolrQueryRequest req = req("q", "{!join from=" + from + " to=" + to + " score=" + aMod + "}" + q, "fl", "id", "omitHeader", "true")) {
+          assertQEx("exception on " + aMod, "ScoreMode", req, SolrException.ErrorCode.BAD_REQUEST);
+        }
+      }
+      // this queries are not overlap, with other in this test case.
+      // however it might be better to extract this method into the separate suite
+      // for a while let's nuke a cache content, in case of repetitions
+      @SuppressWarnings("rawtypes")
+      SolrCache cache = (SolrCache) core.getInfoRegistry().get("queryResultCache");
+      cache.clear();
     }
-    // this queries are not overlap, with other in this test case. 
-    // however it might be better to extract this method into the separate suite
-    // for a while let's nuke a cache content, in case of repetitions
-    @SuppressWarnings("rawtypes")
-    SolrCache cache = (SolrCache)h.getCore().getInfoRegistry().get("queryResultCache");
-    cache.clear();
   }
 
   private ScoreMode not(ScoreMode s) {

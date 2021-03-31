@@ -25,7 +25,10 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.solr.common.MapWriter;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
@@ -53,7 +56,6 @@ public class PackageLoader implements Closeable {
     this.coreContainer = coreContainer;
     packageAPI = new PackageAPI(coreContainer, this);
     refreshPackageConf();
-
   }
 
   public PackageAPI getPackageAPI() {
@@ -69,21 +71,23 @@ public class PackageLoader implements Closeable {
   }
 
   public void refreshPackageConf() {
-    log.info("{} updated to version {}", ZkStateReader.SOLR_PKGS_PATH, packageAPI.pkgs.znodeVersion);
+    if (log.isDebugEnabled()) {
+      log.debug("{} updated to version {}", ZkStateReader.SOLR_PKGS_PATH, packageAPI.pkgs.znodeVersion);
+    }
 
     List<Package> updated = new ArrayList<>();
     Map<String, List<PackageAPI.PkgVersion>> modified = getModified(myCopy, packageAPI.pkgs);
 
-    for (Map.Entry<String, List<PackageAPI.PkgVersion>> e : modified.entrySet()) {
-      if (e.getValue() != null) {
-        Package p = packageClassLoaders.get(e.getKey());
-        if (e.getValue() != null && p == null) {
-          packageClassLoaders.put(e.getKey(), p = new Package(e.getKey()));
+    modified.forEach((key, value) -> {
+      if (value != null) {
+        Package p = packageClassLoaders.get(key);
+        if (value != null && p == null) {
+          packageClassLoaders.put(key, p = new Package(this, key));
         }
-        p.updateVersions(e.getValue());
+        p.updateVersions(value);
         updated.add(p);
       } else {
-        Package p = packageClassLoaders.remove(e.getKey());
+        Package p = packageClassLoaders.remove(key);
         if (p != null) {
           //other classes are holding to a reference to this object
           // they should know that this is removed
@@ -91,7 +95,7 @@ public class PackageLoader implements Closeable {
           closeWhileHandlingException(p);
         }
       }
-    }
+    });
     for (SolrCore core : coreContainer.getCores()) {
       core.getPackageListeners().packagesUpdated(updated);
     }
@@ -100,22 +104,22 @@ public class PackageLoader implements Closeable {
 
   public Map<String, List<PackageAPI.PkgVersion>> getModified(PackageAPI.Packages old, PackageAPI.Packages newPkgs) {
     Map<String, List<PackageAPI.PkgVersion>> changed = new HashMap<>();
-    for (Map.Entry<String, List<PackageAPI.PkgVersion>> e : newPkgs.packages.entrySet()) {
-      List<PackageAPI.PkgVersion> versions = old.packages.get(e.getKey());
+    newPkgs.packages.forEach((key, value) -> {
+      List<PackageAPI.PkgVersion> versions = old.packages.get(key);
       if (versions != null) {
-        if (!Objects.equals(e.getValue(), versions)) {
+        if (!Objects.equals(value, versions)) {
           if (log.isInfoEnabled()) {
-            log.info("Package {} is modified ", e.getKey());
+            log.info("Package {} is modified ", key);
           }
-          changed.put(e.getKey(), e.getValue());
+          changed.put(key, value);
         }
       } else {
         if (log.isInfoEnabled()) {
-          log.info("A new package: {} introduced", e.getKey());
+          log.info("A new package: {} introduced", key);
         }
-        changed.put(e.getKey(), e.getValue());
+        changed.put(key, value);
       }
-    }
+    });
     //some packages are deleted altogether
     for (String s : old.packages.keySet()) {
       if (!newPkgs.packages.keySet().contains(s)) {
@@ -132,8 +136,12 @@ public class PackageLoader implements Closeable {
     Package p = packageClassLoaders.get(pkg);
     if (p != null) {
       List<Package> l = Collections.singletonList(p);
-      for (SolrCore core : coreContainer.getCores()) {
-        core.getPackageListeners().packagesUpdated(l);
+      try (ParWork work = new ParWork(this, false)) {
+        for (SolrCore core : coreContainer.getCores()) {
+          work.collect("packageListeners", () -> {
+            core.getPackageListeners().packagesUpdated(l);
+          });
+        }
       }
     }
   }
@@ -141,16 +149,17 @@ public class PackageLoader implements Closeable {
   /**
    * represents a package definition in the packages.json
    */
-  public class Package implements Closeable {
+  public static class Package implements Closeable {
     final String name;
     final Map<String, Version> myVersions = new ConcurrentHashMap<>();
-    private List<String> sortedVersions = new CopyOnWriteArrayList<>();
-    String latest;
+    private final List<String> sortedVersions = new CopyOnWriteArrayList<>();
+    final AtomicReference<String> latest = new AtomicReference<String>();
     private boolean deleted;
+    private PackageLoader packageLoader;
 
-
-    Package(String name) {
+    Package(PackageLoader packageLoader, String name) {
       this.name = name;
+      this.packageLoader = packageLoader;
     }
 
     public boolean isDeleted() {
@@ -158,14 +167,14 @@ public class PackageLoader implements Closeable {
     }
 
 
-    private synchronized void updateVersions(List<PackageAPI.PkgVersion> modified) {
+    private void updateVersions(List<PackageAPI.PkgVersion> modified) {
       for (PackageAPI.PkgVersion v : modified) {
         Version version = myVersions.get(v.version);
         if (version == null) {
           log.info("A new version: {} added for package: {} with artifacts {}", v.version, this.name, v.files);
           Version ver = null;
           try {
-            ver = new Version(this, v);
+            ver = new Version(name ,packageLoader, v);
           } catch (Exception e) {
             log.error("package could not be loaded {}", ver, e);
             continue;
@@ -193,20 +202,20 @@ public class PackageLoader implements Closeable {
       sortedVersions.sort(String::compareTo);
       if (sortedVersions.size() > 0) {
         String latest = sortedVersions.get(sortedVersions.size() - 1);
-        if (!latest.equals(this.latest)) {
+        String currentLatest = this.latest.get();
+        if (!latest.equals(currentLatest)) {
           log.info("version: {} is the new latest in package: {}", latest, this.name);
         }
-        this.latest = latest;
+        this.latest.set(latest);
       } else {
         log.error("latest version:  null");
-        latest = null;
+        latest.set(null);
       }
-
     }
 
 
     public Version getLatest() {
-      return latest == null ? null : myVersions.get(latest);
+      return latest.get() == null ? null : myVersions.get(latest);
     }
 
     public Version getLatest(String lessThan) {
@@ -225,8 +234,7 @@ public class PackageLoader implements Closeable {
       deleted = true;
       myVersions.clear();
       sortedVersions.clear();
-      latest = null;
-
+      latest.set(null);
     }
 
     @Override
@@ -234,37 +242,39 @@ public class PackageLoader implements Closeable {
       for (Version v : myVersions.values()) v.close();
     }
 
-    public class Version implements MapWriter, Closeable {
-      private final Package parent;
+    public static class Version implements MapWriter, Closeable {
+      private final PackageLoader packageLoader;
+      private final String name;
       private SolrResourceLoader loader;
 
       private final PackageAPI.PkgVersion version;
 
       @Override
       public void writeMap(EntryWriter ew) throws IOException {
-        ew.put("package", parent.name());
+        ew.put("package", name);
         version.writeMap(ew);
       }
 
-      Version(Package parent, PackageAPI.PkgVersion v) {
-        this.parent = parent;
-        this.version = v;
+      Version(String name, PackageLoader packageLoader, PackageAPI.PkgVersion v) {
+        this.packageLoader = packageLoader;
+        version = v;
+        this.name = name;
         List<Path> paths = new ArrayList<>();
 
         List<String> errs = new ArrayList<>();
-        coreContainer.getPackageStoreAPI().validateFiles(version.files, true, s -> errs.add(s));
+        packageLoader.coreContainer.getPackageStoreAPI().validateFiles(version.files, true, s -> errs.add(s));
         if(!errs.isEmpty()) {
           throw new RuntimeException("Cannot load package: " +errs);
         }
         for (String file : version.files) {
-          paths.add(coreContainer.getPackageStoreAPI().getPackageStore().getRealpath(file));
+          paths.add(packageLoader.coreContainer.getPackageStoreAPI().getPackageStore().getRealpath(file));
         }
 
         loader = new PackageResourceLoader(
-            "PACKAGE_LOADER: " + parent.name() + ":" + version,
+            "PACKAGE_LOADER: " + name + ":" + version,
             paths,
-            Paths.get(coreContainer.getSolrHome()),
-            coreContainer.getResourceLoader().getClassLoader());
+            Paths.get(packageLoader.coreContainer.getSolrHome()),
+            packageLoader.coreContainer.getResourceLoader());
       }
 
       public String getVersion() {
@@ -294,7 +304,7 @@ public class PackageLoader implements Closeable {
   }
   static class PackageResourceLoader extends SolrResourceLoader {
 
-    PackageResourceLoader(String name, List<Path> classpath, Path instanceDir, ClassLoader parent) {
+    PackageResourceLoader(String name, List<Path> classpath, Path instanceDir, SolrResourceLoader parent) {
       super(name, classpath, instanceDir, parent);
     }
 

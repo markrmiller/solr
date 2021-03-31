@@ -40,6 +40,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -52,6 +53,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
@@ -61,8 +63,6 @@ import org.apache.solr.core.snapshots.CollectionSnapshotMetaData.CoreSnapshotMet
 import org.apache.solr.util.CLIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
 
 /**
  * This class provides utility functions required for Solr snapshots functionality.
@@ -111,6 +111,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       CLIO.out("Successfully created snapshot with name " + snapshotName + " for collection " + collectionName);
 
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Failed to create a snapshot with name {} for collection {}", snapshotName, collectionName, e);
       CLIO.out("Failed to create a snapshot with name " + snapshotName + " for collection " + collectionName
           +" due to following error : "+e.getLocalizedMessage());
@@ -126,6 +127,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       CLIO.out("Successfully deleted snapshot with name " + snapshotName + " for collection " + collectionName);
 
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Failed to delete a snapshot with name {} for collection {}", snapshotName, collectionName, e);
       CLIO.out("Failed to delete a snapshot with name " + snapshotName + " for collection " + collectionName
           +" due to following error : "+e.getLocalizedMessage());
@@ -146,6 +148,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       }
 
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Failed to list snapshots for collection {}", collectionName, e);
       CLIO.out("Failed to list snapshots for collection " + collectionName
           +" due to following error : "+e.getLocalizedMessage());
@@ -178,6 +181,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
         }
       }
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Failed to fetch snapshot details", e);
       CLIO.out("Failed to fetch snapshot details due to following error : " + e.getLocalizedMessage());
     }
@@ -275,7 +279,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       buildCopyListings(collectionName, snapshotName, localFsPath, pathPrefix);
       CLIO.out("Successfully prepared copylisting for the snapshot export.");
     } catch (Exception e) {
-
+      ParWork.propagateInterrupt(e);
       log.error("Failed to prepare a copylisting for snapshot with name {} for collection {}", snapshotName, collectionName, e);
 
       CLIO.out("Failed to prepare a copylisting for snapshot with name " + snapshotName + " for collection "
@@ -287,6 +291,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       backupCollectionMetaData(collectionName, snapshotName, destPath);
       CLIO.out("Successfully backed up collection meta-data");
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Failed to backup collection meta-data for collection {}", collectionName, e);
       CLIO.out("Failed to backup collection meta-data for collection " + collectionName
           + " due to following error : " + e.getLocalizedMessage());
@@ -307,6 +312,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
       // if asyncId is null, processAsync will block and throw an Exception with any error
       backup.processAsync(asyncReqId.orElse(null), solrClient);
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Failed to backup collection meta-data for collection {}", collectionName, e);
       CLIO.out("Failed to backup collection meta-data for collection " + collectionName
           + " due to following error : " + e.getLocalizedMessage());
@@ -419,7 +425,7 @@ public class SolrSnapshotsTool implements Closeable, CLIO {
 
   private static boolean isReplicaAvailable (Slice s, String coreName) {
     for (Replica r: s.getReplicas()) {
-      if (coreName.equals(r.getCoreName())) {
+      if (coreName.equals(r.getName())) {
         return true;
       }
     }

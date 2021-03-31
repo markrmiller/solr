@@ -38,45 +38,42 @@ public class ClusterStateTest extends SolrTestCaseJ4 {
     Set<String> liveNodes = new HashSet<>();
     liveNodes.add("node1");
     liveNodes.add("node2");
-    
+
     Map<String,Slice> slices = new HashMap<>();
     Map<String,Replica> sliceToProps = new HashMap<>();
     Map<String,Object> props = new HashMap<>();
     props.put("node_name", "node1:10000_solr");
     props.put("core", "core1");
-
+    props.put("id", "1");
     props.put("prop1", "value");
     props.put("prop2", "value2");
-    Replica replica = new Replica("node1", props, "collection1", "shard1");
+    Replica replica = new Replica("node1", props, "collection1", -1l,"shard1");
     sliceToProps.put("node1", replica);
-    Slice slice = new Slice("shard1", sliceToProps, null, "collection1");
+    Slice slice = new Slice("shard1", sliceToProps, null, "collection1",-1l);
     slices.put("shard1", slice);
-    Slice slice2 = new Slice("shard2", sliceToProps, null, "collection1");
+    Slice slice2 = new Slice("shard2", sliceToProps, null, "collection1",-1l);
     slices.put("shard2", slice2);
-    collectionStates.put("collection1", new DocCollection("collection1", slices, null, DocRouter.DEFAULT));
-    collectionStates.put("collection2", new DocCollection("collection2", slices, null, DocRouter.DEFAULT));
 
-    ClusterState clusterState = new ClusterState(-1,liveNodes, collectionStates);
+    Map<String, Object> cprops = new HashMap<>();
+    cprops.put("id", -1l);
+    collectionStates.put("collection1", new DocCollection("collection1", slices, cprops, DocRouter.DEFAULT));
+    collectionStates.put("collection2", new DocCollection("collection2", slices, cprops, DocRouter.DEFAULT));
+
+    ClusterState clusterState = ClusterState.getRefCS(collectionStates, -1);
     byte[] bytes = Utils.toJSON(clusterState);
-    // System.out.println("#################### " + new String(bytes));
-    ClusterState loadedClusterState = ClusterState.load(-1, bytes, liveNodes);
-    
-    assertEquals("Provided liveNodes not used properly", 2, loadedClusterState
-        .getLiveNodes().size());
+    System.out.println("#################### " + new String(bytes));
+    ClusterState loadedClusterState = ClusterState.createFromJson(-1, bytes);
+
     assertEquals("No collections found", 2, loadedClusterState.getCollectionsMap().size());
     assertEquals("Properties not copied properly", replica.getStr("prop1"), loadedClusterState.getCollection("collection1").getSlice("shard1").getReplicasMap().get("node1").getStr("prop1"));
     assertEquals("Properties not copied properly", replica.getStr("prop2"), loadedClusterState.getCollection("collection1").getSlice("shard1").getReplicasMap().get("node1").getStr("prop2"));
 
-    loadedClusterState = ClusterState.load(-1, new byte[0], liveNodes);
-    
-    assertEquals("Provided liveNodes not used properly", 2, loadedClusterState
-        .getLiveNodes().size());
+    loadedClusterState = ClusterState.createFromJson(-1, new byte[0]);
+
     assertEquals("Should not have collections", 0, loadedClusterState.getCollectionsMap().size());
 
-    loadedClusterState = ClusterState.load(-1, (byte[])null, liveNodes);
-    
-    assertEquals("Provided liveNodes not used properly", 2, loadedClusterState
-        .getLiveNodes().size());
+    loadedClusterState = ClusterState.createFromJson(-1, (byte[])null);
+
     assertEquals("Should not have collections", 0, loadedClusterState.getCollectionsMap().size());
   }
 

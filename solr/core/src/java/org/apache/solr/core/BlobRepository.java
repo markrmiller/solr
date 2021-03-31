@@ -16,6 +16,22 @@
  */
 package org.apache.solr.core;
 
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.common.ParWork;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Slice;
+import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.params.CollectionAdminParams;
+import org.apache.solr.common.util.StrUtils;
+import org.apache.zookeeper.server.ByteBufferInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.solr.common.SolrException.ErrorCode.SERVER_ERROR;
+import static org.apache.solr.common.SolrException.ErrorCode.SERVICE_UNAVAILABLE;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.math.BigInteger;
@@ -33,28 +49,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.cloud.ClusterState;
-import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.params.CollectionAdminParams;
-import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.common.util.Utils;
-import org.apache.solr.util.SimplePostTool;
-import org.apache.zookeeper.server.ByteBufferInputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static org.apache.solr.common.SolrException.ErrorCode.SERVER_ERROR;
-import static org.apache.solr.common.SolrException.ErrorCode.SERVICE_UNAVAILABLE;
-import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
 
 /**
  * The purpose of this class is to store the Jars loaded in memory and to keep only one copy of the Jar in a single node.
@@ -140,6 +134,7 @@ public class BlobRepository {
           try {
             aBlob = blobCreator.call();
           } catch (Exception e) {
+            ParWork.propagateInterrupt(e);
             throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Blob loading failed: " + e.getMessage(), e);
           }
         }
@@ -205,35 +200,26 @@ public class BlobRepository {
    */
   ByteBuffer fetchBlob(String key) {
     Replica replica = getSystemCollReplica();
-    String url = replica.getStr(BASE_URL_PROP) + "/" + CollectionAdminParams.SYSTEM_COLL + "/blob/" + key + "?wt=filestream";
+    String url = replica.getBaseUrl() + "/" + CollectionAdminParams.SYSTEM_COLL + "/blob/" + key + "?wt=filestream";
     return fetchFromUrl(key, url);
   }
 
   ByteBuffer fetchFromUrl(String key, String url) {
-    HttpClient httpClient = coreContainer.getUpdateShardHandler().getDefaultHttpClient();
-    HttpGet httpGet = new HttpGet(url);
+    Http2SolrClient httpClient = coreContainer
+        .getUpdateShardHandler().getTheSharedHttpClient();
     ByteBuffer b;
-    HttpResponse response = null;
-    HttpEntity entity = null;
-    try {
-      response = httpClient.execute(httpGet);
-      entity = response.getEntity();
-      int statusCode = response.getStatusLine().getStatusCode();
-      if (statusCode != 200) {
-        throw new SolrException(SolrException.ErrorCode.NOT_FOUND, "no such blob or version available: " + key);
-      }
 
-      try (InputStream is = entity.getContent()) {
-        b = SimplePostTool.inputStreamToByteArray(is, MAX_JAR_SIZE);
-      }
+    try {
+
+      b = ByteBuffer.wrap(Http2SolrClient.GET(url, httpClient).bytes);
+
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       if (e instanceof SolrException) {
         throw (SolrException) e;
       } else {
         throw new SolrException(SolrException.ErrorCode.NOT_FOUND, "could not load : " + key, e);
       }
-    } finally {
-      Utils.consumeFully(entity);
     }
     return b;
   }
@@ -255,13 +241,9 @@ public class BlobRepository {
       Collections.shuffle(replicas, RANDOM);
       for (Replica r : replicas) {
         if (r.getState() == Replica.State.ACTIVE) {
-          if (zkStateReader.getClusterState().getLiveNodes().contains(r.get(ZkStateReader.NODE_NAME_PROP))) {
+          if (zkStateReader.getLiveNodes().contains(r.get(ZkStateReader.NODE_NAME_PROP))) {
             replica = r;
             break;
-          } else {
-            if (log.isInfoEnabled()) {
-              log.info("replica {} says it is active but not a member of live nodes", r.get(ZkStateReader.NODE_NAME_PROP));
-            }
           }
         }
       }

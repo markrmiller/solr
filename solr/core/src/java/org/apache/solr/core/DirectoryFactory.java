@@ -18,7 +18,6 @@ package org.apache.solr.core;
 
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -34,7 +33,9 @@ import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.FlushInfo;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.LockFactory;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CachingDirectoryFactory.CloseListener;
 import org.apache.solr.util.plugin.NamedListInitializedPlugin;
 import org.slf4j.Logger;
@@ -57,6 +58,14 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
   // May be set by sub classes as data root, in which case getDataHome will use it as base.  Absolute.
   protected Path dataHomePath;
 
+  public static long sizeOfDirectory(Directory dir) {
+    return  0;
+  }
+
+  public long size(Directory dir) {
+    return 0;
+  }
+
   // hint about what the directory contains - default is index directory
   public enum DirContext {DEFAULT, META_DATA}
 
@@ -70,16 +79,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
   public final static String LOCK_TYPE_HDFS   = "hdfs";
 
   protected volatile CoreContainer coreContainer;
-  
-  /**
-   * Indicates a Directory will no longer be used, and when its ref count
-   * hits 0, it can be closed. On close all directories will be closed
-   * whether this has been called or not. This is simply to allow early cleanup.
-   * 
-   * @throws IOException If there is a low-level I/O error.
-   */
-  public abstract void doneWithDirectory(Directory directory) throws IOException;
-  
+
   /**
    * Adds a close listener for a Directory.
    */
@@ -118,25 +118,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
    * @throws IOException If there is a low-level I/O error.
    */
   public abstract boolean exists(String path) throws IOException;
-  
-  /**
-   * Removes the Directory's persistent storage.
-   * For example: A file system impl may remove the
-   * on disk directory.
-   * @throws IOException If there is a low-level I/O error.
-   * 
-   */
-  public abstract void remove(Directory dir) throws IOException;
-  
-  /**
-   * Removes the Directory's persistent storage.
-   * For example: A file system impl may remove the
-   * on disk directory.
-   * @throws IOException If there is a low-level I/O error.
-   * 
-   */
-  public abstract void remove(Directory dir, boolean afterCoreClose) throws IOException;
-  
+
   /**
    * This remove is special in that it may be called even after
    * the factory has been closed. Remove only makes sense for
@@ -157,32 +139,9 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
    * @throws IOException If there is a low-level I/O error.
    */
   public abstract void remove(String path) throws IOException;
+
   
-  /**
-   * @param directory to calculate size of
-   * @return size in bytes
-   * @throws IOException on low level IO error
-   */
-  public long size(Directory directory) throws IOException {
-    return sizeOfDirectory(directory);
-  }
-  
-  /**
-   * @param path to calculate size of
-   * @return size in bytes
-   * @throws IOException on low level IO error
-   */
-  public long size(String path) throws IOException {
-    Directory dir = get(path, DirContext.DEFAULT, null);
-    long size;
-    try {
-      size = sizeOfDirectory(dir);
-    } finally {
-      release(dir); 
-    }
-    return size;
-  }
-  
+
   /**
    * Override for more efficient moves.
    * 
@@ -205,6 +164,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
     } catch (FileNotFoundException | NoSuchFileException e) {
 
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       log.error("Exception deleting file", e);
     }
 
@@ -220,15 +180,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
    */
   public abstract Directory get(String path, DirContext dirContext, String rawLockType)
       throws IOException;
-  
-  /**
-   * Increment the number of references to the given Directory. You must call
-   * release for every call to this method.
-   * 
-   */
-  public abstract void incRef(Directory directory);
-  
-  
+
   /**
    * @return true if data is kept after close.
    */
@@ -245,9 +197,9 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
    * Releases the Directory so that it may be closed when it is no longer
    * referenced.
    * 
-   * @throws IOException If there is a low-level I/O error.
+gget   * @throws IOException If there is a low-level I/O error.
    */
-  public abstract void release(Directory directory) throws IOException;
+  public abstract void release(String directory) throws IOException;
   
   /**
    * Normalize a given path.
@@ -269,29 +221,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
     return new File(path).isAbsolute();
   }
   
-  public static long sizeOfDirectory(Directory directory) throws IOException {
-    final String[] files = directory.listAll();
-    long size = 0;
-    
-    for (final String file : files) {
-      size += sizeOf(directory, file);
-      if (size < 0) {
-        break;
-      }
-    }
-    
-    return size;
-  }
-  
-  public static long sizeOf(Directory directory, String file) throws IOException {
-    try {
-      return directory.fileLength(file);
-    } catch (IOException e) {
-      // could be a race, file no longer exists, access denied, is a directory, etc.
-      return 0;
-    }
-  }
-  
+
   /**
    * Delete the files in the Directory
    */
@@ -350,15 +280,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
     }
 
     final File currentIndexDir = new File(currentIndexDirPath);
-    File[] oldIndexDirs = dataDir.listFiles(new FileFilter() {
-      @Override
-      public boolean accept(File file) {
-        String fileName = file.getName();
-        return file.isDirectory() &&
-               !file.equals(currentIndexDir) &&
-               (fileName.equals("index") || fileName.matches(INDEX_W_TIMESTAMP_REGEX));
-      }
-    });
+    File[] oldIndexDirs = dataDir.listFiles(new FileFilter(currentIndexDir));
 
     if (oldIndexDirs == null || oldIndexDirs.length == 0)
       return; // nothing to do (no log message needed)
@@ -400,16 +322,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
       this.dataHomePath = cc.getConfig().getSolrDataHome(); // absolute
     }
   }
-  
-  // special hack to work with FilterDirectory
-  protected Directory getBaseDir(Directory dir) {
-    Directory baseDir = dir;
-    while (baseDir instanceof FilterDirectory) {
-      baseDir = ((FilterDirectory)baseDir).getDelegate();
-    } 
-    
-    return baseDir;
-  }
+
 
   /**
    * Create a new DirectoryFactory instance from the given SolrConfig and tied to the specified core container.
@@ -419,7 +332,7 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
     final DirectoryFactory dirFactory;
     if (info != null) {
       log.debug(info.className);
-      dirFactory = config.getResourceLoader().newInstance(info.className, DirectoryFactory.class);
+      dirFactory = config.getResourceLoader().newInstance(info.className, DirectoryFactory.class, Utils.getSolrSubPackage(DirectoryFactory.class.getPackageName()));
       // allow DirectoryFactory instances to access the CoreContainer
       dirFactory.initCoreContainer(cc);
       dirFactory.init(info.initArgs);
@@ -429,5 +342,21 @@ public abstract class DirectoryFactory implements NamedListInitializedPlugin,
       dirFactory.initCoreContainer(cc);
     }
     return dirFactory;
+  }
+
+  private static class FileFilter implements java.io.FileFilter {
+    private final File currentIndexDir;
+
+    public FileFilter(File currentIndexDir) {
+      this.currentIndexDir = currentIndexDir;
+    }
+
+    @Override
+    public boolean accept(File file) {
+      String fileName = file.getName();
+      return file.isDirectory() &&
+             !file.equals(currentIndexDir) &&
+             (fileName.equals("index") || fileName.matches(INDEX_W_TIMESTAMP_REGEX));
+    }
   }
 }

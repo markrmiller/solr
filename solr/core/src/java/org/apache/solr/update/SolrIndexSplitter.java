@@ -273,8 +273,8 @@ public class SolrIndexSplitter {
             copiedOk = true;
           } finally {
             if (!copiedOk) {
-              subCore.getDirectoryFactory().doneWithDirectory(splitDir);
-              subCore.getDirectoryFactory().remove(splitDir);
+      //        subCore.getDirectoryFactory().doneWithDirectory(splitDir);
+          //    subCore.getDirectoryFactory().remove(splitDir);
             }
           }
           t.pause();
@@ -290,9 +290,8 @@ public class SolrIndexSplitter {
           String path = paths.get(partitionNumber);
           t = timings.sub("createSubIW");
           t.resume();
-          iw = SolrIndexWriter.create(core, partitionName, path,
-              core.getDirectoryFactory(), true, core.getLatestSchema(),
-              core.getSolrConfig().indexConfig, core.getDeletionPolicy(), core.getCodec());
+          iw = SolrIndexWriter.buildIndexWriter(core, partitionName, path, core.getDirectoryFactory(), true, core.getLatestSchema(),
+                  core.getSolrConfig().indexConfig, core.getDeletionPolicy(), core.getCodec(), true);
           t.pause();
         }
       }
@@ -343,7 +342,7 @@ public class SolrIndexSplitter {
           }
           if (splitMethod == SplitMethod.LINK) {
             SolrCore subCore = cores.get(partitionNumber);
-            subCore.getDirectoryFactory().release(iw.getDirectory());
+         //   subCore.getDirectoryFactory().release(iw.getDirectory());
           }
         }
       }
@@ -382,7 +381,7 @@ public class SolrIndexSplitter {
             dir.deleteFile(IndexFetcher.INDEX_PROPERTIES);
           } finally {
             if (dir != null) {
-              subCore.getDirectoryFactory().release(dir);
+          //    subCore.getDirectoryFactory().release(dir);
             }
           }
           // switch back if necessary and remove the hardlinked dir
@@ -390,11 +389,11 @@ public class SolrIndexSplitter {
           try {
             dir = subCore.getDirectoryFactory().get(hardLinkPath, DirectoryFactory.DirContext.DEFAULT,
                 subCore.getSolrConfig().indexConfig.lockType);
-            subCore.getDirectoryFactory().doneWithDirectory(dir);
-            subCore.getDirectoryFactory().remove(dir);
+        //    subCore.getDirectoryFactory().doneWithDirectory(dir);
+       //     subCore.getDirectoryFactory().remove(dir);
           } finally {
             if (dir != null) {
-              subCore.getDirectoryFactory().release(dir);
+      //        subCore.getDirectoryFactory().release(dir);
             }
           }
           subCore.getUpdateHandler().newIndexWriter(false);
@@ -416,11 +415,11 @@ public class SolrIndexSplitter {
           try {
             indexDir = subCore.getDirectoryFactory().get(oldIndexPath,
                 DirectoryFactory.DirContext.DEFAULT, subCore.getSolrConfig().indexConfig.lockType);
-            subCore.getDirectoryFactory().doneWithDirectory(indexDir);
-            subCore.getDirectoryFactory().remove(indexDir);
+          //  subCore.getDirectoryFactory().doneWithDirectory(indexDir);
+         //   subCore.getDirectoryFactory().remove(indexDir);
           } finally {
             if (indexDir != null) {
-              subCore.getDirectoryFactory().release(indexDir);
+      //        subCore.getDirectoryFactory().release(indexDir);
             }
           }
         }

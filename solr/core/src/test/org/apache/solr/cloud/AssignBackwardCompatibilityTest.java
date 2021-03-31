@@ -21,15 +21,16 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.util.NumberUtils;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.data.Stat;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
  * then the counter of collection does not exist in Zk
  * TODO Remove in Solr 9.0
  */
+@LuceneTestCase.Nightly
 public class AssignBackwardCompatibilityTest extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -48,71 +50,48 @@ public class AssignBackwardCompatibilityTest extends SolrCloudTestCase {
   @BeforeClass
   public static void setupCluster() throws Exception {
     configureCluster(4)
-        .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-dynamic").resolve("conf"))
+        .addConfig("conf1", SolrTestUtil.TEST_PATH().resolve("configsets").resolve("cloud-dynamic").resolve("conf"))
         .configure();
     CollectionAdminRequest.createCollection(COLLECTION, 1, 4)
         .setMaxShardsPerNode(1000)
+        .waitForFinalState(true)
         .process(cluster.getSolrClient());
-    cluster.waitForActiveCollection(COLLECTION, 1, 4);
   }
 
   @Test
-  public void test() throws IOException, SolrServerException, KeeperException, InterruptedException {
+  public void test() throws IOException, SolrServerException, KeeperException, InterruptedException, TimeoutException {
     Set<String> coreNames = new HashSet<>();
-    Set<String> coreNodeNames = new HashSet<>();
 
     int numOperations = random().nextInt(15) + 15;
     int numLiveReplicas = 4;
 
-    boolean clearedCounter = false;
+
     for (int i = 0; i < numOperations; i++) {
       if (log.isInfoEnabled()) {
-        log.info("Collection counter={} i={}", getCounter(), i);
+        log.info("Collection i={}", i);
       }
       boolean deleteReplica = random().nextBoolean() && numLiveReplicas > 1;
-      // No need to clear counter more than one time
-      if (random().nextBoolean() && i > 5 && !clearedCounter) {
-        log.info("Clear collection counter");
-        // clear counter
-        cluster.getZkClient().delete("/collections/"+COLLECTION+"/counter", -1, true);
-        clearedCounter = true;
-      }
+
       if (deleteReplica) {
         cluster.waitForActiveCollection(COLLECTION, 1, numLiveReplicas);
         DocCollection dc = getCollectionState(COLLECTION);
-        Replica replica = getRandomReplica(dc.getSlice("shard1"), (r) -> r.getState() == Replica.State.ACTIVE);
-        CollectionAdminRequest.deleteReplica(COLLECTION, "shard1", replica.getName()).process(cluster.getSolrClient());
-        coreNames.remove(replica.getCoreName());
+        Replica replica = getRandomReplica(dc.getSlice("s1"), (r) -> r.getState() == Replica.State.ACTIVE);
+        CollectionAdminRequest.DeleteReplica req = CollectionAdminRequest.deleteReplica(COLLECTION, "s1", replica.getName());
+        req.setWaitForFinalState(true);
+        req.process(cluster.getSolrClient());
+        coreNames.remove(replica.getName());
         numLiveReplicas--;
       } else {
-        CollectionAdminResponse response = CollectionAdminRequest.addReplicaToShard(COLLECTION, "shard1")
-            .process(cluster.getSolrClient());
+        CollectionAdminRequest.AddReplica req = CollectionAdminRequest.addReplicaToShard(COLLECTION, "s1");
+        req.setWaitForFinalState(true);
+        CollectionAdminResponse response = req.process(cluster.getSolrClient());
         assertTrue(response.isSuccess());
-        String coreName = response.getCollectionCoresStatus()
-            .keySet().iterator().next();
+        String coreName = response.getCollectionCoresStatus().keySet().iterator().next();
         assertFalse("Core name is not unique coreName=" + coreName + " " + coreNames, coreNames.contains(coreName));
         coreNames.add(coreName);
         numLiveReplicas++;
         cluster.waitForActiveCollection(COLLECTION, 1, numLiveReplicas);
-
-        Replica newReplica = getCollectionState(COLLECTION).getReplicas().stream()
-            .filter(r -> r.getCoreName().equals(coreName))
-            .findAny().get();
-        String coreNodeName = newReplica.getName();
-        assertFalse("Core node name is not unique", coreNodeNames.contains(coreName));
-        coreNodeNames.add(coreNodeName);
       }
-    }
-  }
-
-  private int getCounter() throws KeeperException, InterruptedException {
-    try {
-      byte[] data = cluster.getZkClient().getData("/collections/"+COLLECTION+"/counter", null, new Stat(), true);
-      int count = NumberUtils.bytesToInt(data);
-      if (count < 0) throw new AssertionError("Found negative collection counter " + count);
-      return count;
-    } catch (KeeperException e) {
-      return -1;
     }
   }
 }

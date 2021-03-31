@@ -31,7 +31,9 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.update.AddUpdateCommand;
 import org.junit.BeforeClass;
@@ -43,6 +45,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Tests for {@link ClassificationUpdateProcessor}
  */
+@LuceneTestCase.Nightly // in low resource envs, this test can take a LONG time (bayesMonoClass_sampleParams_shouldAssignCorrectClass)
 public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
   /* field names are used in accordance with the solrconfig and schema supplied */
   private static final String ID = "id";
@@ -56,7 +59,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
   protected Directory directory;
   protected IndexReader reader;
   protected IndexSearcher searcher;
-  protected Analyzer analyzer = new MockAnalyzer(random(), MockTokenizer.WHITESPACE, false);
+  protected Analyzer analyzer = new MockAnalyzer(LuceneTestCase.random(), MockTokenizer.WHITESPACE, false);
   private ClassificationUpdateProcessor updateProcessorToTest;
 
   @BeforeClass
@@ -110,6 +113,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     updateProcessorToTest.processAdd(update);
 
     assertThat(unseenDocument1.getFieldValue(PREDICTED_CLASS),is("class2"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -130,6 +134,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     updateProcessorToTest.processAdd(update);
 
     assertThat(unseenDocument1.getFieldValue(TRAINING_CLASS),is("class2"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -152,6 +157,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     updateProcessorToTest.processAdd(update);
 
     assertThat(unseenDocument1.getFieldValue(TRAINING_CLASS),is("class2"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -172,6 +178,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     updateProcessorToTest.processAdd(update);
 
     assertThat(unseenDocument1.getFieldValue(TRAINING_CLASS),is("class1"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -194,6 +201,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     updateProcessorToTest.processAdd(update);
 
     assertThat(unseenDocument1.getFieldValue(TRAINING_CLASS),is("class3"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -216,6 +224,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     updateProcessorToTest.processAdd(update);
 
     assertThat(unseenDocument1.getFieldValue(TRAINING_CLASS),is("class2"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -239,6 +248,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     ArrayList<Object> assignedClasses = (ArrayList)unseenDocument1.getFieldValues(TRAINING_CLASS);
     assertThat(assignedClasses.get(0),is("class2"));
     assertThat(assignedClasses.get(1),is("class1"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -263,6 +273,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     assertThat(assignedClasses.size(),is(2));
     assertThat(assignedClasses.get(0),is("class2"));
     assertThat(assignedClasses.get(1),is("class1"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -287,6 +298,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     assertThat(assignedClasses.size(),is(2));
     assertThat(assignedClasses.get(0),is("class2"));
     assertThat(assignedClasses.get(1),is("class1"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -313,6 +325,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     assertThat(assignedClasses.size(),is(2));
     assertThat(assignedClasses.get(0),is("class4"));
     assertThat(assignedClasses.get(1),is("class6"));
+    updateProcessorToTest.close();
   }
 
   @Test
@@ -339,6 +352,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     assertThat(assignedClasses.size(),is(2));
     assertThat(assignedClasses.get(0),is("class4"));
     assertThat(assignedClasses.get(1),is("class6"));
+    updateProcessorToTest.close();
   }
 
   private ClassificationUpdateProcessorParams initParams(ClassificationUpdateProcessorFactory.Algorithm classificationAlgorithm) {
@@ -361,7 +375,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
    * @throws Exception If there is a low-level I/O error
    */
   private void prepareTrainedIndexMonoClass() throws Exception {
-    directory = newDirectory();
+    directory = SolrTestUtil.newDirectory();
     RandomIndexWriter writer = new RandomIndexWriter(random(), directory);
 
     //class1
@@ -430,11 +444,11 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
 
     reader = writer.getReader();
     writer.close();
-    searcher = newSearcher(reader);
+    searcher = SolrTestUtil.newSearcher(reader);
   }
 
   private void prepareTrainedIndexMultiClass() throws Exception {
-    directory = newDirectory();
+    directory = SolrTestUtil.newDirectory();
     RandomIndexWriter writer = new RandomIndexWriter(random(), directory);
 
     //class1
@@ -498,13 +512,13 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
 
     reader = writer.getReader();
     writer.close();
-    searcher = newSearcher(reader);
+    searcher = SolrTestUtil.newSearcher(reader);
   }
 
   public static Document buildLuceneDocument(Object... fieldsAndValues) {
     Document luceneDoc = new Document();
     for (int i=0; i<fieldsAndValues.length; i+=2) {
-      luceneDoc.add(newTextField((String)fieldsAndValues[i], (String)fieldsAndValues[i+1], Field.Store.YES));
+      luceneDoc.add(LuceneTestCase.newTextField((String)fieldsAndValues[i], (String)fieldsAndValues[i+1], Field.Store.YES));
     }
     return luceneDoc;
   }

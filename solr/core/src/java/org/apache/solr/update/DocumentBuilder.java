@@ -32,6 +32,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.schema.CopyField;
 import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.schema.ManagedIndexSchema;
 import org.apache.solr.schema.SchemaField;
 
 /**
@@ -122,6 +123,7 @@ public class DocumentBuilder {
    * @return Built Lucene document
    */
   public static Document toDocument(SolrInputDocument doc, IndexSchema schema, boolean forInPlaceUpdate, boolean ignoreNestedDocs) {
+    if (doc == null) throw new IllegalArgumentException("SolrInputDocument cannot be null");
     if (!ignoreNestedDocs && doc.hasChildDocuments()) {
       throw unexpectedNestedDocException(schema, forInPlaceUpdate);
     }
@@ -223,7 +225,7 @@ public class DocumentBuilder {
       
       // make sure the field was used somehow...
       if( !used && hasField ) {
-        throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,
+        throw new ManagedIndexSchema.UnknownFieldException( SolrException.ErrorCode.BAD_REQUEST,
             "ERROR: "+getID(doc, schema)+"unknown field '" +name + "'");
       }
     }

@@ -18,7 +18,6 @@
 package org.apache.solr.handler.admin;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -27,6 +26,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
@@ -53,8 +54,9 @@ import static org.mockito.Mockito.when;
 public class ZookeeperStatusHandlerTest extends SolrCloudTestCase {
   @BeforeClass
   public static void setupCluster() throws Exception {
+    System.setProperty("solr.suppressDefaultConfigBootstrap", "false");
     configureCluster(1)
-        .addConfig("conf", configset("cloud-minimal"))
+        .addConfig("_default", SolrTestUtil.configset("cloud-minimal"))
         .configure();
   }
 
@@ -76,28 +78,29 @@ public class ZookeeperStatusHandlerTest extends SolrCloudTestCase {
    */
   @Test
   public void monitorZookeeper() throws IOException, SolrServerException, InterruptedException, ExecutionException, TimeoutException {
-    URL baseUrl = cluster.getJettySolrRunner(0).getBaseUrl();
-    HttpSolrClient solr = new HttpSolrClient.Builder(baseUrl.toString()).build();
-    GenericSolrRequest mntrReq = new GenericSolrRequest(SolrRequest.METHOD.GET, "/admin/zookeeper/status", new ModifiableSolrParams());
-    mntrReq.setResponseParser(new DelegationTokenResponse.JsonMapResponseParser());
-    NamedList<Object> nl = solr.httpUriRequest(mntrReq).future.get(10000, TimeUnit.MILLISECONDS);
+    String baseUrl = cluster.getJettySolrRunner(0).getBaseUrl();
+    try (HttpSolrClient solr = new HttpSolrClient.Builder(baseUrl.toString()).build()) {
+      GenericSolrRequest mntrReq = new GenericSolrRequest(SolrRequest.METHOD.GET, "/admin/zookeeper/status", new ModifiableSolrParams());
+      mntrReq.setResponseParser(new DelegationTokenResponse.JsonMapResponseParser());
+      NamedList<Object> nl = solr.httpUriRequest(mntrReq).future.get(10000, TimeUnit.MILLISECONDS);
 
-    assertEquals("zkStatus", nl.getName(1));
-    Map<String,Object> zkStatus = (Map<String,Object>) nl.get("zkStatus");
-    assertEquals("green", zkStatus.get("status"));
-    assertEquals("standalone", zkStatus.get("mode"));
-    assertEquals(1L, zkStatus.get("ensembleSize"));
-    List<Object> detailsList = (List<Object>)zkStatus.get("details");
-    assertEquals(1, detailsList.size());
-    Map<String,Object> details = (Map<String,Object>) detailsList.get(0);
-    assertEquals(true, details.get("ok"));
-    assertTrue(Integer.parseInt((String) details.get("zk_znode_count")) > 50);
-    solr.close();
+      assertEquals("zkStatus", nl.getName(1));
+      Map<String,Object> zkStatus = (Map<String,Object>) nl.get("zkStatus");
+      assertEquals("green", zkStatus.get("status"));
+      assertEquals("standalone", zkStatus.get("mode"));
+      assertEquals(1L, zkStatus.get("ensembleSize"));
+      List<Object> detailsList = (List<Object>) zkStatus.get("details");
+      assertEquals(1, detailsList.size());
+      Map<String,Object> details = (Map<String,Object>) detailsList.get(0);
+      assertEquals(true, details.get("ok"));
+      int nodeCount = Integer.parseInt((String) details.get("zk_znode_count"));
+      assertTrue("nodeCount=" + nodeCount, nodeCount > 10);
+    }
   }
 
   @Test
   public void testEnsembleStatusMock() {
-    assumeWorkingMockito();
+    SolrTestCaseJ4.assumeWorkingMockito();
     ZookeeperStatusHandler zkStatusHandler = mock(ZookeeperStatusHandler.class);
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "ruok")).thenReturn(Arrays.asList("imok"));
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "mntr")).thenReturn(
@@ -160,8 +163,6 @@ public class ZookeeperStatusHandlerTest extends SolrCloudTestCase {
     try (ZookeeperStatusHandler zsh = new ZookeeperStatusHandler(null)) {
      zsh.validateZkRawResponse(Collections.singletonList("mntr is not executed because it is not in the whitelist."),
           "zoo1:2181", "mntr");
-    }  catch (IOException e) {
-      fail("Error closing ZookeeperStatusHandler");
     }
   }
 
@@ -169,14 +170,12 @@ public class ZookeeperStatusHandlerTest extends SolrCloudTestCase {
   public void validateEmptyResponse() {
     try (ZookeeperStatusHandler zsh = new ZookeeperStatusHandler(null)) {
       zsh.validateZkRawResponse(Collections.emptyList(), "zoo1:2181", "mntr");
-    } catch (IOException e) {
-      fail("Error closing ZookeeperStatusHandler");
     }
   }
 
   @Test
   public void testMntrBugZk36Solr14463() {
-    assumeWorkingMockito();
+    SolrTestCaseJ4.assumeWorkingMockito();
     ZookeeperStatusHandler zkStatusHandler = mock(ZookeeperStatusHandler.class);
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "ruok")).thenReturn(Arrays.asList("imok"));
     when(zkStatusHandler.getZkRawResponse("zoo1:2181", "mntr")).thenReturn(

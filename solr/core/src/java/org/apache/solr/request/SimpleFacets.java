@@ -29,12 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.RunnableFuture;
-import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -60,6 +56,7 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.CharsRefBuilder;
 import org.apache.lucene.util.StringHelper;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
@@ -115,8 +112,8 @@ public class SimpleFacets {
   protected final SolrQueryRequest req;
   protected final ResponseBuilder rb;
 
-  protected FacetDebugInfo fdebugParent;
-  protected FacetDebugInfo fdebug;
+  protected volatile FacetDebugInfo fdebugParent;
+  protected volatile FacetDebugInfo fdebug;
 
   // per-facet values
   protected final static class ParsedParams {
@@ -167,11 +164,12 @@ public class SimpleFacets {
     this.docsOrig = docs;
     this.global = params;
     this.rb = rb;
-    this.facetExecutor = req.getCore().getCoreContainer().getUpdateShardHandler().getUpdateExecutor();
   }
 
   public void setFacetDebugInfo(FacetDebugInfo fdebugParent) {
     this.fdebugParent = fdebugParent;
+    fdebug = new FacetDebugInfo();
+    fdebugParent.addChild(fdebug);
   }
 
   protected ParsedParams parseParams(String type, String param) throws SyntaxError, IOException {
@@ -360,12 +358,7 @@ public class SimpleFacets {
 
     final Set<String> excludeTerms = new HashSet<>(StrUtils.splitSmart(exclude, ",", true));
 
-    return new Predicate<BytesRef>() {
-      @Override
-      public boolean test(BytesRef bytesRef) {
-        return !excludeTerms.contains(bytesRef.utf8ToString());
-      }
-    };
+    return new BytesRefPredicate(excludeTerms);
   }
 
   /**
@@ -516,21 +509,37 @@ public class SimpleFacets {
               String warningMessage 
                   = "Raising facet.mincount from " + mincount + " to 1, because field " + field + " is Points-based.";
               log.warn(warningMessage);
-              List<String> warnings = (List<String>)rb.rsp.getResponseHeader().get("warnings");
-              if (null == warnings) {
-                warnings = new ArrayList<>();
-                rb.rsp.getResponseHeader().add("warnings", warnings);
+
+              NamedList<String> headers = rb.rsp.getHeaders();
+              synchronized (headers) {
+                List<String> warnings;
+                Object warns = rb.rsp.getResponseHeader().get("warnings");
+                if (warns != null) {
+
+                  if (warns instanceof String) {
+                    warnings = Collections.synchronizedList(new ArrayList<>());
+                    warnings.add((String) warns);
+                  } else if (warns instanceof List) {
+                    warnings = (List<String>) rb.rsp.getResponseHeader().get("warnings");
+                  } else {
+                    log.warn("Found unexpected object type {}", warns);
+                    warnings = new ArrayList<>();
+                    warnings.add(warns.toString());
+                  }
+                } else {
+                  warnings = Collections.synchronizedList(new ArrayList<>());
+                  rb.rsp.getResponseHeader().add("warnings", warnings);
+                }
+                warnings.add(warningMessage);
               }
-              warnings.add(warningMessage);
 
               mincount = 1;
             }
             counts = NumericFacets.getCounts(searcher, docs, field, offset, limit, mincount, missing, sort);
           } else {
             PerSegmentSingleValuedFaceting ps = new PerSegmentSingleValuedFaceting(searcher, docs, field, offset, limit, mincount, missing, sort, prefix, termFilter);
-            Executor executor = threads == 0 ? directExecutor : facetExecutor;
             ps.setNumThreads(threads);
-            counts = ps.getFacetCounts(executor);
+            counts = ps.getFacetCounts(ParWork.getMyPerThreadExecutor()); // ### expert usage
           }
           break;
         case UIF:
@@ -751,13 +760,7 @@ public class SimpleFacets {
     if (sf != null && !sf.hasDocValues() && !sf.multiValued() && sf.getType().getNumberType() != null) {
       // it's a single-valued numeric field: we must currently create insanity :(
       // there isn't a GroupedFacetCollector that works on numerics right now...
-      return new FilterCollector(collector) {
-        @Override
-        public LeafCollector getLeafCollector(LeafReaderContext context) throws IOException {
-          LeafReader insane = Insanity.wrapInsanity(context.reader(), field);
-          return in.getLeafCollector(insane.getContext());
-        }
-      };
+      return new MyFilterCollector(collector, field);
     } else {
       return collector;
     }
@@ -770,8 +773,6 @@ public class SimpleFacets {
       r.run();
     }
   };
-
-  private final Executor facetExecutor;
   
   /**
    * Returns a list of value constraints and the associated facet counts 
@@ -795,21 +796,17 @@ public class SimpleFacets {
     // Also, a subtlety of directExecutor is that no matter how many times you "submit" a job, it's really
     // just a method call in that it's run by the calling thread.
     int maxThreads = req.getParams().getInt(FacetParams.FACET_THREADS, 0);
-    Executor executor = maxThreads == 0 ? directExecutor : facetExecutor;
-    final Semaphore semaphore = new Semaphore((maxThreads <= 0) ? Integer.MAX_VALUE : maxThreads);
-    List<Future<NamedList>> futures = new ArrayList<>(facetFs.length);
+    // MRM TODO:
+    // Executor executor = maxThreads == 0 ? directExecutor : facetExecutor;
 
-    if (fdebugParent != null) {
-      fdebugParent.putInfoItem("maxThreads", maxThreads);
-    }
-
+//    if (fdebugParent != null) {
+//      fdebugParent.putInfoItem("maxThreads", maxThreads);
+//    }
+    List<Callable<NamedList>> calls = new ArrayList<>(facetFs.length);
     try {
       //Loop over fields; submit to executor, keeping the future
       for (String f : facetFs) {
-        if (fdebugParent != null) {
-          fdebug = new FacetDebugInfo();
-          fdebugParent.addChild(fdebug);
-        }
+
         final ParsedParams parsed = parseParams(FacetParams.FACET_FIELD, f);
         final SolrParams localParams = parsed.localParams;
         final String termList = localParams == null ? null : localParams.get(CommonParams.TERMS);
@@ -832,34 +829,32 @@ public class SimpleFacets {
             throw timeout;
           }
           catch (Exception e) {
+            ParWork.propagateInterrupt(e);
             throw new SolrException(ErrorCode.SERVER_ERROR,
                                     "Exception during facet.field: " + facetValue, e);
-          } finally {
-            semaphore.release();
           }
         };
 
-        RunnableFuture<NamedList> runnableFuture = new FutureTask<>(callable);
-        semaphore.acquire();//may block and/or interrupt
-        executor.execute(runnableFuture);//releases semaphore when done
-        futures.add(runnableFuture);
-      }//facetFs loop
+        calls.add(callable);
 
-      //Loop over futures to get the values. The order is the same as facetFs but shouldn't matter.
+      }//facetFs loop
+      List<Future> futures = new ArrayList<>(calls.size());
+      // expert use of per thread exec
+      for (Callable<NamedList> call : calls) {
+        futures.add(ParWork.getMyPerThreadExecutor().submit(call));
+      }
+
       for (Future<NamedList> future : futures) {
         res.addAll(future.get());
       }
-      assert semaphore.availablePermits() >= maxThreads;
-    } catch (InterruptedException e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Error while processing facet fields: InterruptedException", e);
-    } catch (ExecutionException ee) {
+      // assert semaphore.availablePermits() >= maxThreads;
+    } catch (Exception ee) {
       Throwable e = ee.getCause();//unwrap
       if (e instanceof RuntimeException) {
         throw (RuntimeException) e;
       }
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "Error while processing facet fields: " + e.toString(), e);
+          "Error while processing facet fields: " + ee.toString(), ee);
     }
 
     return res;
@@ -1228,5 +1223,33 @@ public class SimpleFacets {
 
   public ResponseBuilder getResponseBuilder() {
     return rb;
+  }
+
+  private static class BytesRefPredicate implements Predicate<BytesRef> {
+    private final Set<String> excludeTerms;
+
+    public BytesRefPredicate(Set<String> excludeTerms) {
+      this.excludeTerms = excludeTerms;
+    }
+
+    @Override
+    public boolean test(BytesRef bytesRef) {
+      return !excludeTerms.contains(bytesRef.utf8ToString());
+    }
+  }
+
+  private static class MyFilterCollector extends FilterCollector {
+    private final String field;
+
+    public MyFilterCollector(Collector collector, String field) {
+      super(collector);
+      this.field = field;
+    }
+
+    @Override
+    public LeafCollector getLeafCollector(LeafReaderContext context) throws IOException {
+      LeafReader insane = Insanity.wrapInsanity(context.reader(), field);
+      return in.getLeafCollector(insane.getContext());
+    }
   }
 }

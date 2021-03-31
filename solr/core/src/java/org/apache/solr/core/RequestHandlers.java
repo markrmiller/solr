@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core;
 
+import java.io.Closeable;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  */
-public final class RequestHandlers {
+public final class RequestHandlers implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected final SolrCore core;
@@ -49,16 +50,15 @@ public final class RequestHandlers {
   public static String normalize( String p )
   {
     if(p == null) return "";
-    if( p.endsWith( "/" ) && p.length() > 1 )
+    if(!p.isEmpty() && p.charAt(p.length() - 1) == '/' && p.length() > 1)
       return p.substring( 0, p.length()-1 );
     
     return p;
   }
   
   public RequestHandlers(SolrCore core) {
-      this.core = core;
-    // we need a thread safe registry since methods like register are currently documented to be thread safe.
-    handlers =  new PluginBag<>(SolrRequestHandler.class, core, true);
+    this.core = core;
+    handlers =  new PluginBag<>(SolrRequestHandler.class, core);
   }
 
   /**
@@ -77,9 +77,11 @@ public final class RequestHandlers {
    * @return the previous handler at the given path or null
    */
   public SolrRequestHandler register( String handlerName, SolrRequestHandler handler ) {
+    if (log.isDebugEnabled()) log.debug("register request handler {} {}", handlerName, handler);
     String norm = normalize(handlerName);
     if (handler == null) {
-      return handlers.remove(norm);
+      PluginBag.PluginHolder<SolrRequestHandler> returnHandler = handlers.remove(norm);
+      return returnHandler == null ? null : returnHandler.get();
     }
     return handlers.put(norm, handler);
 //    return register(handlerName, new PluginRegistry.PluginHolder<>(null, handler));
@@ -117,7 +119,7 @@ public final class RequestHandlers {
   void initHandlersFromConfig(SolrConfig config) {
     List<PluginInfo> implicits = core.getImplicitHandlers();
     // use link map so we iterate in the same order
-    Map<String, PluginInfo> infoMap= new LinkedHashMap<>();
+    Map<String, PluginInfo> infoMap = new LinkedHashMap<>();
     //deduping implicit and explicit requesthandlers
     for (PluginInfo info : implicits) infoMap.put(info.name,info);
     for (PluginInfo info : config.getPluginInfos(SolrRequestHandler.class.getName())) infoMap.put(info.name, info);

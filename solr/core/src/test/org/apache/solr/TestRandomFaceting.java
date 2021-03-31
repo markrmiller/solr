@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -44,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Slow
+@LuceneTestCase.Nightly // slow
 public class TestRandomFaceting extends SolrTestCaseJ4 {
 
   private static final Pattern trieFields = Pattern.compile(".*_t.");
@@ -151,7 +153,7 @@ public class TestRandomFaceting extends SolrTestCaseJ4 {
   @Test
   public void testRandomFaceting() throws Exception {
     Random rand = random();
-    int iter = atLeast(100);
+    int iter = SolrTestUtil.atLeast(100);
     init();
     addMoreDocs(0);
     
@@ -318,7 +320,7 @@ public class TestRandomFaceting extends SolrTestCaseJ4 {
     if (err != null) {
       log.error("ERROR: mismatch facet response: {}\n expected ={}\n response = {}\n request = {}"
           , err, expected, actual, params);
-      fail(err);
+      fail(err + " method=" + method);
     }
   }
 

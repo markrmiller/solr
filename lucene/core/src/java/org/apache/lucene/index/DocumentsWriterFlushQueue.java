@@ -35,22 +35,29 @@ final class DocumentsWriterFlushQueue {
   private final AtomicInteger ticketCount = new AtomicInteger();
   private final ReentrantLock purgeLock = new ReentrantLock();
 
-  synchronized boolean addDeletes(DocumentsWriterDeleteQueue deleteQueue) throws IOException {
-    incTickets();// first inc the ticket count - freeze opens
-                 // a window for #anyChanges to fail
-    boolean success = false;
+  private final ReentrantLock dwfqLock = new ReentrantLock();
+
+  boolean addDeletes(DocumentsWriterDeleteQueue deleteQueue) throws IOException {
+    dwfqLock.lock();
     try {
-      FrozenBufferedUpdates frozenBufferedUpdates = deleteQueue.maybeFreezeGlobalBuffer();
-      if (frozenBufferedUpdates != null) { // no need to publish anything if we don't have any frozen updates
-        queue.add(new FlushTicket(frozenBufferedUpdates, false));
-        success = true;
+      incTickets();// first inc the ticket count - freeze opens
+      // a window for #anyChanges to fail
+      boolean success = false;
+      try {
+        FrozenBufferedUpdates frozenBufferedUpdates = deleteQueue.maybeFreezeGlobalBuffer();
+        if (frozenBufferedUpdates != null) { // no need to publish anything if we don't have any frozen updates
+          queue.add(new FlushTicket(frozenBufferedUpdates, false));
+          success = true;
+        }
+      } finally {
+        if (!success) {
+          decTickets();
+        }
       }
+      return success;
     } finally {
-      if (!success) {
-        decTickets();
-      }
+      dwfqLock.unlock();
     }
-    return success;
   }
   
   private void incTickets() {
@@ -63,35 +70,50 @@ final class DocumentsWriterFlushQueue {
     assert numTickets >= 0;
   }
 
-  synchronized FlushTicket addFlushTicket(DocumentsWriterPerThread dwpt) throws IOException {
-    // Each flush is assigned a ticket in the order they acquire the ticketQueue
-    // lock
-    incTickets();
-    boolean success = false;
+  FlushTicket addFlushTicket(DocumentsWriterPerThread dwpt) throws IOException {
+    dwfqLock.lock();
     try {
-      // prepare flush freezes the global deletes - do in synced block!
-      final FlushTicket ticket = new FlushTicket(dwpt.prepareFlush(), true);
-      queue.add(ticket);
-      success = true;
-      return ticket;
-    } finally {
-      if (!success) {
-        decTickets();
+      // Each flush is assigned a ticket in the order they acquire the ticketQueue
+      // lock
+      incTickets();
+      boolean success = false;
+      try {
+        // prepare flush freezes the global deletes - do in synced block!
+        final FlushTicket ticket = new FlushTicket(dwpt.prepareFlush(), true);
+        queue.add(ticket);
+        success = true;
+        return ticket;
+      } finally {
+        if (!success) {
+          decTickets();
+        }
       }
+    } finally {
+      dwfqLock.unlock();
     }
   }
-  
-  synchronized void addSegment(FlushTicket ticket, FlushedSegment segment) {
-    assert ticket.hasSegment;
-    // the actual flush is done asynchronously and once done the FlushedSegment
-    // is passed to the flush ticket
-    ticket.setSegment(segment);
+
+  void addSegment(FlushTicket ticket, FlushedSegment segment) {
+    dwfqLock.lock();
+    try {
+      assert ticket.hasSegment;
+      // the actual flush is done asynchronously and once done the FlushedSegment
+      // is passed to the flush ticket
+      ticket.setSegment(segment);
+    } finally {
+      dwfqLock.unlock();
+    }
   }
 
-  synchronized void markTicketFailed(FlushTicket ticket) {
-    assert ticket.hasSegment;
-    // to free the queue we mark tickets as failed just to clean up the queue.
-    ticket.setFailed();
+  void markTicketFailed(FlushTicket ticket) {
+    dwfqLock.lock();
+    try {
+      assert ticket.hasSegment;
+      // to free the queue we mark tickets as failed just to clean up the queue.
+      ticket.setFailed();
+    } finally {
+      dwfqLock.unlock();
+    }
   }
 
   boolean hasTickets() {
@@ -104,9 +126,12 @@ final class DocumentsWriterFlushQueue {
     while (true) {
       final FlushTicket head;
       final boolean canPublish;
-      synchronized (this) {
+      dwfqLock.lock();
+      try {
         head = queue.peek();
         canPublish = head != null && head.canPublish(); // do this synced 
+      } finally {
+        dwfqLock.unlock();
       }
       if (canPublish) {
         try {
@@ -119,12 +144,15 @@ final class DocumentsWriterFlushQueue {
           consumer.accept(head);
 
         } finally {
-          synchronized (this) {
+          dwfqLock.lock();
+          try {
             // finally remove the published ticket from the queue
             final FlushTicket poll = queue.poll();
             decTickets();
             // we hold the purgeLock so no other thread should have polled:
             assert poll == head;
+          } finally {
+            dwfqLock.unlock();
           }
         }
       } else {
@@ -163,7 +191,7 @@ final class DocumentsWriterFlushQueue {
     private final boolean hasSegment;
     private FlushedSegment segment;
     private boolean failed = false;
-    private boolean published = false;
+    private volatile boolean published = false;
 
     FlushTicket(FrozenBufferedUpdates frozenUpdates, boolean hasSegment) {
       this.frozenUpdates = frozenUpdates;
@@ -174,8 +202,8 @@ final class DocumentsWriterFlushQueue {
       return hasSegment == false || segment != null || failed;
     }
 
-    synchronized void markPublished() {
-      assert published == false: "ticket was already published - can not publish twice";
+    void markPublished() {
+      assert published == false : "ticket was already published - can not publish twice";
       published = true;
     }
 

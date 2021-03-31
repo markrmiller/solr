@@ -28,20 +28,38 @@ import java.util.Properties;
  * the DOM (they came from DomUtils) and it's really confusing to see them in something labeled DOM
  */
 public class PropertiesUtil {
+
+  // MRM TODO: experiment
+  public final static ThreadLocal<StringBuilder> THREAD_LOCAL_StringBuilder = ThreadLocal.withInitial(() -> new StringBuilder(256));
+  public final static ThreadLocal<ArrayList> THREAD_LOCAL_fragments = new ThreadLocal<>(){
+    protected ArrayList initialValue() {
+      return new ArrayList();
+    }
+  };
+  public final static ThreadLocal<ArrayList> THREAD_LOCAL_propertyRefs = new ThreadLocal<>(){
+    protected ArrayList initialValue() {
+      return new ArrayList();
+    }
+  };
+
   /*
   * This method borrowed from Ant's PropertyHelper.replaceProperties:
   *   http://svn.apache.org/repos/asf/ant/core/trunk/src/main/org/apache/tools/ant/PropertyHelper.java
   */
-  public static String substituteProperty(String value, Properties coreProperties) {
+  public static String substituteProperty(String value, Properties coreProperties, Properties systemProperties) {
     if (value == null || value.indexOf('$') == -1) {
       return value;
     }
 
-    List<String> fragments = new ArrayList<>();
-    List<String> propertyRefs = new ArrayList<>();
+    List<String> fragments = THREAD_LOCAL_fragments.get();
+    List<String> propertyRefs = THREAD_LOCAL_propertyRefs.get();
+    fragments.clear();
+    propertyRefs.clear();
     parsePropertyString(value, fragments, propertyRefs);
 
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = THREAD_LOCAL_StringBuilder.get();
+    sb.setLength(0);
+
     Iterator<String> i = fragments.iterator();
     Iterator<String> j = propertyRefs.iterator();
 
@@ -59,7 +77,10 @@ public class PropertiesUtil {
           fragment = coreProperties.getProperty(propertyName);
         }
         if (fragment == null) {
-          fragment = System.getProperty(propertyName, defaultValue);
+          fragment = systemProperties.getProperty(propertyName);
+          if (fragment == null) {
+            fragment = defaultValue;
+          }
         }
         if (fragment == null) {
           throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "No system property or default value specified for " + propertyName + " value:" + value);
@@ -67,7 +88,12 @@ public class PropertiesUtil {
       }
       sb.append(fragment);
     }
-    return sb.toString();
+    String returnString = sb.toString();
+
+    sb.setLength(0);
+    fragments.clear();
+    propertyRefs.clear();
+    return  returnString;
   }
 
   /*
@@ -136,6 +162,9 @@ public class PropertiesUtil {
    * @return an integer version of the passed in value
    */
   public static Integer toInteger(String value, Integer defValue) {
+    if (value == null || value.trim().length() == 0) {
+      return defValue;
+    }
     try {
       return Integer.parseInt(value);
     }

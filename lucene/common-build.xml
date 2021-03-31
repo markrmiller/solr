@@ -17,7 +17,7 @@
     limitations under the License.
  -->
 
-<project name="common" xmlns:artifact="antlib:org.apache.maven.artifact.ant" 
+<project name="common" xmlns:artifact="antlib:org.apache.maven.artifact.ant"
                        xmlns:ivy="antlib:org.apache.ivy.ant"
                        xmlns:junit4="antlib:com.carrotsearch.junit4"
                        xmlns:jacoco="antlib:org.jacoco.ant"
@@ -28,7 +28,7 @@
   </description>
 
   <dirname file="${ant.file.common}" property="common.dir"/>
-  
+
   <!-- Give user a chance to override without editing this file
       (and without typing -D each time it compiles it -->
   <property file="${user.home}/lucene.build.properties"/>
@@ -50,10 +50,10 @@
 
   <property name="Name" value="Lucene"/>
   <property name="name" value="${ant.project.name}"/>
-  
+
   <!-- include version number from property file (includes "version.*" properties) -->
   <loadproperties srcFile="${common.dir}/version.properties"/>
-  
+
   <fail message="'version.base' property must be 'x.y.z' (major, minor, bugfix) or 'x.y.z.1/2' (+ prerelease) and numeric only: ${version.base}">
     <condition>
       <not><matches pattern="^\d+\.\d+\.\d+(|\.1|\.2)$" casesensitive="true" string="${version.base}"/></not>
@@ -65,7 +65,7 @@
       <not><matches pattern="^\Q${version.base}\E(|\-.*)$" casesensitive="true" string="${version}"/></not>
     </condition>
   </fail>
-  
+
   <fail message="Your ~/.ant/lib folder or the main classpath of Ant contains some version of ASM. Please remove it, otherwise this build can't run correctly.">
     <condition>
       <available classname="org.objectweb.asm.ClassReader"/>
@@ -73,7 +73,7 @@
   </fail>
 
   <property name="year" value="2000-${current.year}"/>
-  
+
   <!-- Lucene modules unfortunately don't have the "lucene-" prefix, so we add it if no prefix is given in $name: -->
   <condition property="final.name" value="${name}-${version}" else="lucene-${name}-${version}">
     <matches pattern="^(lucene|solr)\b" string="${name}"/>
@@ -152,7 +152,7 @@
       <isfalse value="${tests.asserts.hashmap}" />
     </and>
   </condition>
-  
+
   <condition property="tests.asserts.args" value="-ea -esa ${tests.asserts.bug.jdk8205399}" else="">
     <istrue value="${tests.asserts}"/>
   </condition>
@@ -160,7 +160,7 @@
   <condition property="tests.heapsize" value="1024M" else="512M">
     <isset property="run.clover"/>
   </condition>
-  
+
   <condition property="tests.clover.args" value="-XX:ReservedCodeCacheSize=192m -Dclover.pertest.coverage=off" else="">
     <isset property="run.clover"/>
   </condition>
@@ -197,7 +197,7 @@
   <property name="javadoc.charset" value="utf-8"/>
   <property name="javadoc.dir" location="${common.dir}/build/docs"/>
   <property name="javadoc.maxmemory" value="512m" />
-  
+
   <!-- We must have the index disabled for releases, as Java 11 includes a javascript search engine with GPL license: -->
   <property name="javadoc.noindex" value="true"/>
 
@@ -211,7 +211,7 @@
       <equals arg1="${java.specification.version}" arg2="12"/>
     </or>
   </condition>
-  
+
   <!-- Javadoc classpath -->
   <path id="javadoc.classpath">
     <path refid="classpath"/>
@@ -221,7 +221,7 @@
       <include name="**/lib/*.jar"/>
     </fileset>
   </path>
-  
+
   <property name="changes.src.dir" location="${common.dir}/site/changes"/>
   <property name="changes.target.dir" location="${common.dir}/build/docs/changes"/>
 
@@ -272,7 +272,7 @@
 
   <!-- a reasonable default exclusion set, can be overridden for special cases -->
   <property name="rat.excludes" value="**/TODO,**/*.txt,**/*.iml,**/*.gradle"/>
-  
+
   <!-- These patterns can be defined to add additional files for checks, relative to module's home dir -->
   <property name="rat.additional-includes" value=""/>
   <property name="rat.additional-excludes" value=""/>
@@ -291,7 +291,7 @@
   />
 
   <!-- Default exclude sources and javadoc jars from Ivy fetch to save time and bandwidth -->
-  <condition property="ivy.exclude.types" 
+  <condition property="ivy.exclude.types"
       value=""
       else="source|javadoc">
     <isset property="fetch.sources.javadocs"/>
@@ -368,15 +368,15 @@
   <target name="init" depends="git-autoclean,resolve">
     <!-- currently empty -->
   </target>
-  
+
   <!-- Keep track of GIT branch and do "ant clean" on root folder when changed, to prevent bad builds... -->
-  
+
   <property name="gitHeadFile" location="${common.dir}/../.git/HEAD"/>
   <property name="gitHeadLocal" location="${common.dir}/build/git-HEAD"/>
   <available file="${gitHeadFile}" property="isGitCheckout"/>
 
   <target name="git-autoclean" depends="-check-git-state,-git-cleanroot,-copy-git-state"/>
-  
+
   <target name="-check-git-state" if="isGitCheckout" unless="git-autoclean.disabled">
     <condition property="gitHeadChanged">
       <and>
@@ -392,7 +392,7 @@
       <propertyset refid="uptodate.and.compiled.properties"/>
     </ant>
   </target>
-  
+
   <target name="-copy-git-state" if="isGitCheckout" unless="git-autoclean.disabled">
     <mkdir dir="${common.dir}/build"/>
     <copy file="${gitHeadFile}" tofile="${gitHeadLocal}"/>
@@ -460,24 +460,24 @@
    <echo>
      This build requires Ivy and Ivy could not be found in your ant classpath.
 
-     (Due to classpath issues and the recursive nature of the Lucene/Solr 
-     build system, a local copy of Ivy can not be used an loaded dynamically 
+     (Due to classpath issues and the recursive nature of the Lucene/Solr
+     build system, a local copy of Ivy can not be used an loaded dynamically
      by the build.xml)
 
      You can either manually install a copy of Ivy ${ivy.bootstrap.version} in your ant classpath:
        http://ant.apache.org/manual/install.html#optionalTasks
 
      Or this build file can do it for you by running the Ivy Bootstrap target:
-       ant ivy-bootstrap     
-     
+       ant ivy-bootstrap
+
      Either way you will only have to install Ivy one time.
 
      'ant ivy-bootstrap' will install a copy of Ivy into your Ant User Library:
        ${user.home}/.ant/lib
-     
-     If you would prefer, you can have it installed into an alternative 
-     directory using the "-Divy_install_path=/some/path/you/choose" option, 
-     but you will have to specify this path every time you build Lucene/Solr 
+
+     If you would prefer, you can have it installed into an alternative
+     directory using the "-Divy_install_path=/some/path/you/choose" option,
+     but you will have to specify this path every time you build Lucene/Solr
      in the future...
        ant ivy-bootstrap -Divy_install_path=/some/path/you/choose
        ...
@@ -485,7 +485,7 @@
        ...
        ant -lib /some/path/you/choose clean compile
 
-     If you have already run ivy-bootstrap, and still get this message, please 
+     If you have already run ivy-bootstrap, and still get this message, please
      try using the "--noconfig" option when running ant, or editing your global
      ant config to allow the user lib to be loaded.  See the wiki for more details:
        http://wiki.apache.org/lucene-java/DeveloperTips#Problems_with_Ivy.3F
@@ -493,14 +493,14 @@
     <fail>Ivy is not available</fail>
   </target>
 
-  <target name="ivy-bootstrap" description="Download and install Ivy in the users ant lib dir" 
+  <target name="ivy-bootstrap" description="Download and install Ivy in the users ant lib dir"
           depends="-ivy-bootstrap1,-ivy-bootstrap2,-ivy-checksum,-ivy-remove-old-versions"/>
 
   <!-- try to download from repo1.maven.org -->
   <target name="-ivy-bootstrap1">
     <ivy-download src="${ivy_bootstrap_url1}" dest="${ivy_install_path}"/>
     <available file="${ivy_install_path}/ivy-${ivy.bootstrap.version}.jar" property="ivy.bootstrap1.success" />
-  </target> 
+  </target>
 
   <target name="-ivy-bootstrap2" unless="ivy.bootstrap1.success">
     <ivy-download src="${ivy_bootstrap_url2}" dest="${ivy_install_path}"/>
@@ -517,7 +517,7 @@
       </condition>
     </fail>
   </target>
-  
+
   <target name="-ivy-remove-old-versions">
     <delete verbose="true" failonerror="true">
       <fileset dir="${ivy_install_path}">
@@ -525,7 +525,7 @@
       </fileset>
     </delete>
   </target>
-   
+
   <macrodef name="ivy-download">
       <attribute name="src"/>
       <attribute name="dest"/>
@@ -676,7 +676,7 @@
       <local name="-checkoutid"/>
       <local name="-giterr"/>
       <local name="checkoutid"/>
-      
+
       <!-- If possible, include the GIT hash into manifest: -->
       <exec dir="." executable="${git.exe}" outputproperty="-checkoutid" errorproperty="-giterr" failifexecutionfails="false">
         <arg value="log"/>
@@ -728,7 +728,7 @@
       </manifest>
     </sequential>
   </macrodef>
-  
+
   <macrodef name="jarify" description="Builds a JAR file">
     <attribute name="basedir" default="${build.dir}/classes/java"/>
     <attribute name="destfile" default="${build.dir}/${final.name}.jar"/>
@@ -747,7 +747,7 @@
           <jarify-additional-manifest-attributes />
         </additional-manifest-attributes>
       </build-manifest>
-      
+
       <jar destfile="@{destfile}"
            basedir="@{basedir}"
            manifest="@{manifest.file}"
@@ -782,7 +782,7 @@
     </ant>
     <property name="lucene-core.uptodate" value="true"/>
   </target>
-  
+
   <target name="compile-lucene-core" unless="core.compiled">
     <ant dir="${common.dir}/core" target="compile-core" inheritAll="false">
       <propertyset refid="uptodate.and.compiled.properties"/>
@@ -830,15 +830,15 @@
     <property name="lucene.test.framework.compiled" value="true"/>
   </target>
 
-  <target name="check-lucene-test-framework-javadocs-uptodate" 
+  <target name="check-lucene-test-framework-javadocs-uptodate"
           unless="lucene.test.framework-javadocs.uptodate">
-    <uptodate property="lucene.test.framework-javadocs.uptodate" 
+    <uptodate property="lucene.test.framework-javadocs.uptodate"
          targetfile="${common.dir}/build/test-framework/lucene-test-framework-${version}-javadoc.jar">
        <srcfiles dir="${common.dir}/test-framework/src/java" includes="**/*.java"/>
     </uptodate>
   </target>
 
-  <target name="javadocs-test-framework" 
+  <target name="javadocs-test-framework"
           depends="check-lucene-test-framework-javadocs-uptodate"
           unless="lucene.test.framework-javadocs.uptodate">
     <ant dir="${common.dir}/test-framework" target="javadocs" inheritAll="false">
@@ -862,7 +862,7 @@
     <attribute name="javac.release" default="${javac.release}"/>
     <sequential>
       <compile
-        srcdir="@{srcdir}" 
+        srcdir="@{srcdir}"
         destdir="@{destdir}"
         javac.release="@{javac.release}">
         <classpath refid="@{test.classpath}"/>
@@ -926,7 +926,7 @@
     <attribute name="additional.vm.args" default=""/>
     <!-- note this enables keeping junit4 files only (not test temp files) -->
     <attribute name="runner.leaveTemporary" default="false"/>
-      
+
     <sequential>
         <!-- Warn if somebody uses removed properties. -->
         <fail message="This property has been removed: tests.iter, use -Dtests.iters=N.">
@@ -953,13 +953,13 @@
         <property name="tests.dynamicAssignmentRatio" value="0.50" /> <!-- 50% of suites -->
         <property name="tests.haltonfailure" value="true" />
         <property name="tests.leaveTemporary" value="false" />
-        <!-- 
+        <!--
            keep junit4 runner files or not (independent of keeping test output files)
          -->
         <condition property="junit4.leaveTemporary">
           <or>
-            <istrue value="${tests.leaveTemporary}"/> 
-            <istrue value="@{runner.leaveTemporary}"/> 
+            <istrue value="${tests.leaveTemporary}"/>
+            <istrue value="@{runner.leaveTemporary}"/>
           </or>
         </condition>
         <property name="tests.iters" value="" />
@@ -972,7 +972,7 @@
         <condition property="java.security.manager" value="org.apache.lucene.util.TestSecurityManager">
           <istrue value="${tests.useSecurityManager}"/>
         </condition>
-        
+
         <!-- additional arguments -->
         <property name="tests.runtimespecific.args" value="--illegal-access=deny"/>
 
@@ -1032,7 +1032,7 @@
             parallelism="@{threadNum}"
 
             printSummary="true"
-            haltonfailure="${tests.haltonfailure}" 
+            haltonfailure="${tests.haltonfailure}"
             failureProperty="tests.failed"
 
             dynamicAssignmentRatio="${tests.dynamicAssignmentRatio}"
@@ -1043,7 +1043,7 @@
 
             heartbeat="${tests.heartbeat}"
             uniqueSuiteNames="false"
-            
+
             debugstream="false"
         >
             <!-- Classpaths. -->
@@ -1057,6 +1057,8 @@
             <jvmarg line="@{additional.vm.args}"/>
             <jvmarg line="${tests.asserts.args}"/>
             <jvmarg line="${tests.runtimespecific.args}"/>
+            <jvmarg line=" -XX:+UseParallelGC"/>
+
 
             <!-- set the number of times tests should run -->
             <sysproperty key="tests.iters" value="${tests.iters}"/>
@@ -1092,13 +1094,15 @@
             <sysproperty key="tests.monster" value="@{tests.monster}"/>
               <!-- set whether or not slow tests should run -->
             <sysproperty key="tests.slow" value="@{tests.slow}"/>
-              
+
+            <sysproperty key="org.apache.xml.dtm.DTMManager" value="org.apache.xml.dtm.ref.DTMManagerDefault"/>
+
             <!-- set whether tests framework should not require java assertions enabled -->
             <sysproperty key="tests.asserts" value="${tests.asserts}"/>
 
             <!-- TODO: create propertyset for test properties, so each project can have its own set -->
             <sysproperty key="tests.multiplier" value="@{tests.multiplier}"/>
-            
+
             <!-- Temporary directory a subdir of the cwd. -->
             <sysproperty key="tempDir" value="./temp" />
             <sysproperty key="java.io.tmpdir" value="./temp" />
@@ -1116,7 +1120,7 @@
             <sysproperty key="jetty.testMode" value="1"/>
             <sysproperty key="jetty.insecurerandom" value="1"/>
             <sysproperty key="solr.directoryFactory" value="org.apache.solr.core.MockDirectoryFactory"/>
-            
+
             <!-- disable AWT while running tests -->
             <sysproperty key="java.awt.headless" value="true"/>
 
@@ -1156,15 +1160,15 @@
                 <junit4:execution-times>
                     <fileset dir="${tests.caches}"  includes="**/*.txt" />
                 </junit4:execution-times>
-            </balancers>            
+            </balancers>
 
             <!-- Reporting listeners. -->
             <listeners>
                 <!-- A simplified console output (maven-like). -->
                 <junit4:report-text
-                    showThrowable="true" 
-                    showStackTraces="true" 
-                    showOutput="${tests.showOutput}" 
+                    showThrowable="true"
+                    showStackTraces="true"
+                    showOutput="${tests.showOutput}"
 
                     showStatusOk="${tests.showSuccess}"
                     showStatusError="${tests.showError}"
@@ -1175,7 +1179,7 @@
 
                     useSimpleNames="${tests.useSimpleNames}"
                     maxClassNameColumns="${tests.maxClassNameColumns}"
-                    
+
                     timestamps="${tests.timestamps}"
                     showNumFailures="${tests.showNumFailures}">
 
@@ -1194,14 +1198,14 @@
                     <containsstring contains=".." /> 
                     <containsregex pattern="^(\s+at )(org\.junit\.)" /> 
                     -->
-                  </junit4:filtertrace>                    
+                  </junit4:filtertrace>
                 </junit4:report-text>
 
                 <!-- Emits full status for all tests, their relative order on forked JVMs. -->
                 <junit4:report-text
                     file="@{junit.output.dir}/tests-report.txt"
-                    showThrowable="true" 
-                    showStackTraces="true" 
+                    showThrowable="true"
+                    showStackTraces="true"
                     showOutput="always"
 
                     showStatusOk="true"
@@ -1216,9 +1220,9 @@
                 <!-- Emits status on errors and failures only. -->
                 <junit4:report-text
                     file="@{junit.output.dir}/tests-failures.txt"
-                    showThrowable="true" 
-                    showStackTraces="true" 
-                    showOutput="onerror" 
+                    showThrowable="true"
+                    showStackTraces="true"
+                    showOutput="onerror"
 
                     showStatusOk="false"
                     showStatusError="true"
@@ -1253,7 +1257,7 @@
 
         <!-- Append the number of non-ignored (actually executed) tests. -->
         <echo file="${tests.totals.tmpfile}" append="true" encoding="UTF-8"># module: ${ant.project.name}&#x000a;${junit4.stats.nonIgnored}&#x000a;</echo>
-        
+
         <fail message="Beasting executed no tests (a typo in the filter pattern maybe?)">
           <condition>
             <and>
@@ -1413,7 +1417,7 @@ ant -Dtests.haltonfailure=false test
 # Run more verbose output (slave JVM parameters, etc.).
 ant -verbose test
 
-# Include additional information like what is printed to 
+# Include additional information like what is printed to
 # sysout/syserr, even if the test passes.
 # Enabled automatically when running for a single test case.
 ant -Dtests.showSuccess=true test
@@ -1482,7 +1486,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
     <!-- hack: ant task computes absolute path, but we need a relative path, so its per-testrunner -->
     <jacoco:agent property="agentvmparam.raw"/>
     <property name="agentvmparam" value="${agentvmparam.raw}destfile=jacoco.db,append=false"/>
-  
+
     <!-- create output dir if needed -->
     <mkdir dir="${junit.output.dir}"/>
 
@@ -1572,7 +1576,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
    See http://issues.apache.org/jira/browse/LUCENE-721
    -->
   <target name="clover" depends="-clover.disable,-clover.load,-clover.classpath,-clover.setup"/>
-  
+
   <target name="-clover.load" depends="ivy-availability-check,ivy-configure" if="run.clover" unless="clover.loaded">
     <fail>TODO: Code coverage with OpenClover does not yet work with Java 11 - see https://issues.apache.org/jira/browse/LUCENE-8763</fail>
     <echo>Code coverage with OpenClover enabled.</echo>
@@ -1585,7 +1589,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
      and reloaded by "-clover.classpath" task (see below): -->
     <pathconvert property="clover.loaded" refid="clover.classpath"/>
   </target>
-  
+
   <target name="-clover.classpath" if="run.clover">
     <!-- redefine the clover classpath refid for tests by using the hack above: -->
     <path id="clover.classpath" path="${clover.loaded}"/>
@@ -1656,8 +1660,8 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
     <property name="maven-tasks.uptodate" value="true"/>
     <ivy:cachepath organisation="org.apache.maven" module="maven-ant-tasks" revision="2.1.3"
              inline="true" conf="master" type="jar" pathid="maven-ant-tasks.classpath"/>
-    <taskdef resource="org/apache/maven/artifact/ant/antlib.xml" 
-             uri="antlib:org.apache.maven.artifact.ant" 
+    <taskdef resource="org/apache/maven/artifact/ant/antlib.xml"
+             uri="antlib:org.apache.maven.artifact.ant"
              classpathref="maven-ant-tasks.classpath"/>
   </target>
 
@@ -1744,7 +1748,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
       </m2-deploy>
     </sequential>
   </target>
-  
+
   <target name="-validate-maven-dependencies.init">
     <!-- find the correct pom.xml path and assigns it to property pom.xml -->
     <property name="top.level.dir" location="${common.dir}/.."/>
@@ -1757,7 +1761,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
       </mapper>
       <path location="${ant.file}"/>
     </pathconvert>
-    
+
     <!-- convert ${version} to be a glob pattern, so snapshot versions are allowed: -->
     <loadresource property="maven.version.glob">
       <propertyresource name="version"/>
@@ -1769,7 +1773,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
       </filterchain>
     </loadresource>
   </target>
-  
+
   <target name="-validate-maven-dependencies" depends="-validate-maven-dependencies.init">
     <m2-validate-dependencies pom.xml="${maven.pom.xml}" licenseDirectory="${license.dir}">
       <additional-filters>
@@ -1782,7 +1786,7 @@ ${tests-output}/junit4-*.suites     - per-JVM executed suites
       </excludes>
     </m2-validate-dependencies>
   </target>
-  
+
   <property name="module.dependencies.properties.file" location="${common.build.dir}/module.dependencies.properties"/>
 
   <target name="-append-module-dependencies-properties">
@@ -1894,7 +1898,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
               prefix="rat"
               destdir="${java.io.tmpdir}"/>
     <!-- run rat, going to the file -->
-    <rat:report xmlns:rat="antlib:org.apache.rat.anttasks" 
+    <rat:report xmlns:rat="antlib:org.apache.rat.anttasks"
                 reportFile="${rat.sources.logfile}" addDefaultLicenseMatchers="true">
       <fileset dir="." includes="*.xml ${rat.additional-includes}" excludes="${rat.additional-excludes}"/>
       <fileset dir="${src.dir}" excludes="${rat.excludes}" erroronmissingdir="false"/>
@@ -1902,7 +1906,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
 
       <!-- TODO: Check all resource files. Currently not all stopword and similar files have no header! -->
       <fileset dir="${resources.dir}" includes="META-INF/**" erroronmissingdir="false"/>
-      
+
       <!-- BSD 4-clause stuff (is disallowed below) -->
       <rat:substringMatcher licenseFamilyCategory="BSD4 "
              licenseFamilyName="Original BSD License (with advertising clause)">
@@ -2011,7 +2015,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
   </macrodef>
 
   <!-- ECJ Javadoc linting: -->
-  
+
   <condition property="ecj-javadoc-lint.supported">
     <or>
       <equals arg1="${java.specification.version}" arg2="11"/>
@@ -2049,7 +2053,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
       <classpath refid="test.classpath"/>
     </ecj-macro>
   </target>
-  
+
   <target name="-ecj-resolve" unless="ecj.loaded" depends="ivy-availability-check,ivy-configure" if="ecj-javadoc-lint.supported">
     <ivy:cachepath organisation="org.eclipse.jdt" module="ecj" revision="3.19.0"
      inline="true" conf="master" type="jar" pathid="ecj.classpath" />
@@ -2124,7 +2128,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
           windowtitle="${Name} ${version} API"
           doctitle="@{title}"
           maxmemory="${javadoc.maxmemory}">
-        <tag name="lucene.experimental" 
+        <tag name="lucene.experimental"
           description="WARNING: This API is experimental and might change in incompatible ways in the next release."/>
         <tag name="lucene.internal"
         description="NOTE: This API is for internal purposes only and might change in incompatible ways in the next release."/>
@@ -2135,9 +2139,9 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
         <bottom><![CDATA[
           <i>Copyright &copy; ${year} Apache Software Foundation.  All Rights Reserved.</i>
         ]]></bottom>
-        
+
         <sources />
-                
+
         <classpath refid="javadoc.classpath"/>
         <arg line="${javadoc.nomodule.args} --release ${javac.release}"/>
         <arg line="${javadoc.doclint.args}"/>
@@ -2145,7 +2149,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
         <arg line="-J-Duser.language=en -J-Duser.country=US"/>
       </javadoc>
       <record name="@{destdir}/log_javadoc.txt" action="stop"/>
-      
+
       <!-- append some special table css -->
       <concat destfile="@{destdir}/stylesheet.css" append="true" fixlastline="true" encoding="UTF-8">
         <filelist dir="${common.dir}/tools/javadoc" files="table_padding.css"/>
@@ -2269,7 +2273,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
 
       <delete dir="${jar-checksum.temp.dir}"/>
 
-      <fixcrlf 
+      <fixcrlf
         srcdir="@{dstdir}"
         includes="**/*.jar.sha1"
         eol="lf" fixlast="true" encoding="US-ASCII" />
@@ -2335,18 +2339,18 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
       classpathref="groovy.classpath"/>
     <property name="groovy.loaded" value="true"/>
   </target>
-  
+
   <!-- Forbidden API Task -->
   <property name="forbidden-base-excludes" value=""/>
   <property name="forbidden-tests-excludes" value=""/>
   <property name="forbidden-sysout-excludes" value=""/>
-  
+
   <target name="-install-forbidden-apis" unless="forbidden-apis.loaded" depends="ivy-availability-check,ivy-configure">
     <ivy:cachepath organisation="de.thetaphi" module="forbiddenapis" revision="3.0.1"
       inline="true" conf="default" transitive="true" pathid="forbidden-apis.classpath"/>
     <taskdef name="forbidden-apis" classname="de.thetaphi.forbiddenapis.ant.AntTask" classpathref="forbidden-apis.classpath"/>
     <property name="forbidden-apis.loaded" value="true"/>
-  </target>  
+  </target>
 
   <target name="-init-forbidden-apis" depends="-install-forbidden-apis">
     <path id="forbidden-apis.allclasses.classpath">
@@ -2357,7 +2361,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
       <pathelement path="${build.dir}/classes/java"/>
       <pathelement path="${build.dir}/classes/test"/>
     </path>
-  </target>  
+  </target>
 
   <condition property="forbidden-isLucene">
     <not>
@@ -2369,7 +2373,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
   </condition>
 
   <target name="check-forbidden-apis" depends="-check-forbidden-all,-check-forbidden-core,-check-forbidden-tests" description="Check forbidden API calls in compiled class files"/>
-  
+
   <!-- applies to both source and test code -->
   <target name="-check-forbidden-all" depends="-init-forbidden-apis,compile-core,compile-test">
     <forbidden-apis suppressAnnotation="**.SuppressForbidden" classpathref="forbidden-apis.allclasses.classpath" targetVersion="${javac.release}">
@@ -2390,11 +2394,11 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
 
   <!-- applies to only test code -->
   <target name="-check-forbidden-tests" depends="-init-forbidden-apis,compile-test">
-    <forbidden-apis signaturesFile="${common.dir}/tools/forbiddenApis/tests.txt" suppressAnnotation="**.SuppressForbidden" classpathref="forbidden-apis.allclasses.classpath" targetVersion="${javac.release}"> 
+    <forbidden-apis signaturesFile="${common.dir}/tools/forbiddenApis/tests.txt" suppressAnnotation="**.SuppressForbidden" classpathref="forbidden-apis.allclasses.classpath" targetVersion="${javac.release}">
       <fileset dir="${build.dir}/classes/test" excludes="${forbidden-tests-excludes}"/>
     </forbidden-apis>
   </target>
- 
+
   <!-- applies to only source code -->
   <target name="-check-forbidden-core" depends="-init-forbidden-apis,compile-core,-check-forbidden-sysout" />
 
@@ -2414,9 +2418,9 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
     <groovy classpathref="markdown.classpath" src="${common.dir}/tools/src/groovy/install-markdown-filter.groovy"/>
     <property name="markdown.loaded" value="true"/>
   </target>
-  
+
   <!-- markdown macro: Before using depend on the target "resolve-markdown" -->
-  
+
   <macrodef name="markdown">
     <attribute name="todir"/>
     <attribute name="flatten" default="false"/>
@@ -2439,7 +2443,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
   </macrodef>
 
   <target name="regenerate"/>
-  
+
   <macrodef name="check-broken-links">
        <attribute name="dir"/>
      <sequential>
@@ -2527,7 +2531,7 @@ The following arguments can be provided to ant to alter its behaviour and target
 -Dpitest.distance (@{pitest.distance}) - How far away from the test class should be mutated
    0 being immeditate callees only
 
--Dpitest.threads (@{pitest.threads}) - How many threads to use in PiTest 
+-Dpitest.threads (@{pitest.threads}) - How many threads to use in PiTest
    (note this is independent of junit threads)
 
 -Dpitest.testCases (@{pitest.testCases}) - Glob of testcases to run

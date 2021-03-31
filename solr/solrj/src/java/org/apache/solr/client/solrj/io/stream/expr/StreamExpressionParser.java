@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import org.apache.solr.common.ParWork;
+
 /**
  * Takes a prefix notation expression and returns a tokenized expression
  */
@@ -57,6 +59,7 @@ public class StreamExpressionParser {
         }
       }
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       throw new RuntimeException(e);
     }
 

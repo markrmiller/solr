@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.commons.io.FileExistsException;
+import org.apache.solr.common.ParWork;
 
 /**
  *
@@ -80,7 +81,8 @@ public class FileUtils {
           // Pause 5 msec
           Thread.sleep(5);
         } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
+          ParWork.propagateInterrupt(ie);
+          break;
         }
       }
     }
@@ -104,7 +106,7 @@ public class FileUtils {
     if (Files.exists(path) && Files.isSymbolicLink(path)) {
       Path real = path.toRealPath();
       if (Files.isDirectory(real)) return real;
-      throw new FileExistsException("Tried to create a directory at to an existing non-directory symlink: " + path.toString());
+      throw new FileExistsException("Tried to create a directory to an existing non-directory symlink: " + path.toString());
     }
     return Files.createDirectories(path);
   }

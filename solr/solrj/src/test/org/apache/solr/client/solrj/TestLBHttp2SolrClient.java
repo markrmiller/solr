@@ -31,14 +31,15 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.QuickPatchThreadsFilter;
 import org.apache.solr.SolrIgnoredThreadsFilter;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.response.SolrResponseBase;
@@ -60,20 +61,22 @@ import org.slf4j.LoggerFactory;
     SolrIgnoredThreadsFilter.class,
     QuickPatchThreadsFilter.class
 })
+@LuceneTestCase.Nightly
 public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   SolrInstance[] solr = new SolrInstance[3];
-  Http2SolrClient httpClient;
+  static Http2SolrClient httpClient;
 
   // TODO: fix this test to not require FSDirectory
   static String savedFactory;
 
   @BeforeClass
-  public static void beforeClass() {
+  public static void beforeTestLBHttp2SolrClient() throws Exception {
     savedFactory = System.getProperty("solr.DirectoryFactory");
-    System.setProperty("solr.directoryFactory", "org.apache.solr.core.MockFSDirectoryFactory");
+    //System.setProperty("solr.directoryFactory", "org.apache.solr.core.MockFSDirectoryFactory");
+    useFactory(null);
     System.setProperty("tests.shardhandler.randomSeed", Long.toString(random().nextLong()));
   }
 
@@ -93,7 +96,7 @@ public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
     httpClient = new Http2SolrClient.Builder().connectionTimeout(1000).idleTimeout(2000).build();
 
     for (int i = 0; i < solr.length; i++) {
-      solr[i] = new SolrInstance("solr/collection1" + i, createTempDir("instance-" + i).toFile(), 0);
+      solr[i] = new SolrInstance("solr/collection1" + i, SolrTestUtil.createTempDir("instance-" + i).toFile(), 0);
       solr[i].setUp();
       solr[i].startJetty();
       addDocs(solr[i]);
@@ -109,7 +112,7 @@ public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
       docs.add(doc);
     }
     SolrResponseBase resp;
-    try (HttpSolrClient client = getHttpSolrClient(solrInstance.getUrl())) {
+    try (Http2SolrClient client = getHttpSolrClient(solrInstance.getUrl())) {
       resp = client.add(docs);
       assertEquals(0, resp.getStatus());
       resp = client.commit();
@@ -192,7 +195,6 @@ public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
       solr[1].jetty.stop();
       solr[1].jetty = null;
       solr[0].startJetty();
-      Thread.sleep(1200);
       try {
         resp = client.query(solrQuery);
       } catch(SolrServerException e) {
@@ -244,7 +246,7 @@ public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
       if (name.equals(serverName))
         return;
       
-      Thread.sleep(500);
+      Thread.sleep(50);
     }
   }
   
@@ -299,12 +301,12 @@ public class TestLBHttp2SolrClient extends SolrTestCaseJ4 {
       dataDir.mkdirs();
       confDir.mkdirs();
 
-      FileUtils.copyFile(SolrTestCaseJ4.getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
+      FileUtils.copyFile(SolrTestUtil.getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
 
       File f = new File(confDir, "solrconfig.xml");
-      FileUtils.copyFile(SolrTestCaseJ4.getFile(getSolrConfigFile()), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(getSolrConfigFile()), f);
       f = new File(confDir, "schema.xml");
-      FileUtils.copyFile(SolrTestCaseJ4.getFile(getSchemaFile()), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(getSchemaFile()), f);
       Files.createFile(homeDir.toPath().resolve("collection1/core.properties"));
     }
 

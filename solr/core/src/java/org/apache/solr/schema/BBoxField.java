@@ -18,6 +18,7 @@ package org.apache.solr.schema;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,8 +78,8 @@ public class BBoxField extends AbstractSpatialFieldType<BBoxStrategy> implements
   @Override
   public void inform(IndexSchema schema) {
     this.schema = schema;
-    FieldType numberType = schema.getFieldTypeByName(numberTypeName);
-    FieldType booleanType = schema.getFieldTypeByName(booleanTypeName);
+    FieldType numberType = schema.getFieldTypeByName(numberTypeName, schema.getFieldTypes());
+    FieldType booleanType = schema.getFieldTypeByName(booleanTypeName, schema.getFieldTypes());
 
     if (numberType == null) {
       throw new RuntimeException("Cannot find number fieldType: " + numberTypeName);
@@ -122,14 +123,16 @@ public class BBoxField extends AbstractSpatialFieldType<BBoxStrategy> implements
       props &= ~STORED;
     }
     SchemaField sf = new SchemaField(name, fieldType, props, null);
-    schema.getFields().put(sf.getName(), sf);
+    Map<String,SchemaField> fields = new HashMap<>(schema.getFields());
+    fields.put(sf.getName(), sf);
+    schema.setFields(fields);
   }
 
   @Override
   protected BBoxStrategy newSpatialStrategy(String fieldName) {
     //if it's a dynamic field, we register the sub-fields now.
-    FieldType numberType = schema.getFieldTypeByName(numberTypeName);
-    FieldType booleanType = schema.getFieldTypeByName(booleanTypeName);
+    FieldType numberType = schema.getFieldTypeByName(numberTypeName, schema.getFieldTypes());
+    FieldType booleanType = schema.getFieldTypeByName(booleanTypeName, schema.getFieldTypes());
     if (schema.isDynamicField(fieldName)) {
       registerSubFields(schema, fieldName, numberType, booleanType);
     }

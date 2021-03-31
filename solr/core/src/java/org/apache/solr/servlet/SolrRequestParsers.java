@@ -44,6 +44,7 @@ import java.util.Map;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.api.V2HttpCall;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
@@ -107,9 +108,9 @@ public class SolrRequestParsers {
     final int multipartUploadLimitKB, formUploadLimitKB;
     if( globalConfig == null ) {
       multipartUploadLimitKB = formUploadLimitKB = Integer.MAX_VALUE; 
-      enableRemoteStreams = false;
+      enableRemoteStreams = true;
       enableStreamBody = false;
-      handleSelect = false;
+      handleSelect = true;
       addHttpRequestToContext = false;
     } else {
       multipartUploadLimitKB = globalConfig.getMultipartUploadLimitKB();
@@ -132,7 +133,7 @@ public class SolrRequestParsers {
     enableStreamBody = false;
     handleSelect = false;
     addHttpRequestToContext = false;
-    init(Integer.MAX_VALUE, Integer.MAX_VALUE);
+    init(2048, 2048);
   }
 
   private void init( int multipartUploadLimitKB, int formUploadLimitKB) {       
@@ -241,40 +242,14 @@ public class SolrRequestParsers {
     }
 
     final HttpSolrCall httpSolrCall = req == null ? null : (HttpSolrCall) req.getAttribute(HttpSolrCall.class.getName());
-    SolrQueryRequestBase q = new SolrQueryRequestBase(core, params, requestTimer) {
-      @Override
-      public Principal getUserPrincipal() {
-        return req == null ? null : req.getUserPrincipal();
-      }
-
-      @Override
-      public List<CommandOperation> getCommands(boolean validateInput) {
-        if (httpSolrCall != null) {
-          return httpSolrCall.getCommands(validateInput);
-        }
-        return super.getCommands(validateInput);
-      }
-
-      @Override
-      public Map<String, String> getPathTemplateValues() {
-        if (httpSolrCall != null && httpSolrCall instanceof V2HttpCall) {
-          return ((V2HttpCall) httpSolrCall).getUrlParts();
-        }
-        return super.getPathTemplateValues();
-      }
-
-      @Override
-      public HttpSolrCall getHttpSolrCall() {
-        return httpSolrCall;
-      }
-    };
+    SolrQueryRequestBase q = new SQPSolrQueryRequestBase(core, params, requestTimer, req, httpSolrCall);
     if( streams != null && streams.size() > 0 ) {
       q.setContentStreams( streams );
     }
     return q;
   }
 
-  private static HttpSolrCall getHttpSolrCall(HttpServletRequest req) {
+  private static SolrCall getHttpSolrCall(HttpServletRequest req) {
     return req == null ? null : (HttpSolrCall) req.getAttribute(HttpSolrCall.class.getName());
   }
   /**
@@ -364,9 +339,9 @@ public class SolrRequestParsers {
             } else if (charsetDecoder == null) {
               // we have no charset decoder until now, buffer the keys / values for later processing:
               buffer.add(keyBytes);
-              buffer.add(Long.valueOf(keyPos));
+              buffer.add(keyPos);
               buffer.add(valueBytes);
-              buffer.add(Long.valueOf(valuePos));
+              buffer.add(valuePos);
             } else {
               // we already have a charsetDecoder, so we can directly decode without buffering:
               final String key = decodeChars(keyBytes, keyPos, charsetDecoder),
@@ -444,8 +419,8 @@ public class SolrRequestParsers {
       it.remove();
       final Long valuePos = (Long) it.next();
       it.remove();
-      MultiMapSolrParams.addParam(decodeChars(keyBytes, keyPos.longValue(), charsetDecoder).trim(),
-          decodeChars(valueBytes, valuePos.longValue(), charsetDecoder), map);
+      MultiMapSolrParams.addParam(decodeChars(keyBytes, keyPos, charsetDecoder).trim(),
+          decodeChars(valueBytes, valuePos, charsetDecoder), map);
     }
   }
   
@@ -487,8 +462,7 @@ public class SolrRequestParsers {
   // I guess we don't really even need the interface, but i'll keep it here just for kicks
   interface SolrRequestParser 
   {
-    public SolrParams parseParamsAndFillStreams(
-      final HttpServletRequest req, ArrayList<ContentStream> streams ) throws Exception;
+    SolrParams parseParamsAndFillStreams(final HttpServletRequest req, ArrayList<ContentStream> streams) throws Exception;
   }
 
 
@@ -502,8 +476,7 @@ public class SolrRequestParsers {
   {
     @Override
     public SolrParams parseParamsAndFillStreams( 
-        final HttpServletRequest req, ArrayList<ContentStream> streams ) throws Exception
-    {
+        final HttpServletRequest req, ArrayList<ContentStream> streams ) {
       return parseQueryString(req.getQueryString());
     }
   }
@@ -545,8 +518,7 @@ public class SolrRequestParsers {
   {
     @Override
     public SolrParams parseParamsAndFillStreams( 
-        final HttpServletRequest req, ArrayList<ContentStream> streams ) throws Exception
-    {
+        final HttpServletRequest req, ArrayList<ContentStream> streams ) {
       streams.add( new HttpRequestContentStream( req ) );
       return parseQueryString( req.getQueryString() );
     }
@@ -562,8 +534,8 @@ public class SolrRequestParsers {
       multipartConfigElement = new MultipartConfigElement(
           null, // temp dir (null=default)
           -1, // maxFileSize  (-1=none)
-          uploadLimitKB * 1024, // maxRequestSize
-          100 * 1024 ); // fileSizeThreshold after which will go to disk
+          (long) uploadLimitKB << 10, // maxRequestSize
+          2097152 ); // fileSizeThreshold after which will go to disk
     }
     
     @Override
@@ -635,12 +607,16 @@ public class SolrRequestParsers {
       log.warn("Errors deleting multipart tmp files", e);
       return;
     }
+    try (ParWork work = new ParWork("", true)) {
+      for (Part part : parts) {
+        work.collect("", () -> {
+          try {
+            part.delete();
+          } catch (IOException e) {
+            log.warn("Errors deleting multipart tmp files", e);
+          }
+        });
 
-    for (Part part : parts) {
-      try {
-        part.delete();
-      } catch (IOException e) {
-        log.warn("Errors deleting multipart tmp files", e);
       }
     }
   }
@@ -670,21 +646,20 @@ public class SolrRequestParsers {
 
       // may be -1, so we check again later. But if it's already greater we can stop processing!
       final long totalLength = req.getContentLength();
-      final long maxLength = ((long) uploadLimitKB) * 1024L;
+      final long maxLength = ((long) uploadLimitKB) << 10;
       if (totalLength > maxLength) {
-        throw new SolrException(ErrorCode.BAD_REQUEST, "application/x-www-form-urlencoded content length (" +
-            totalLength + " bytes) exceeds upload limit of " + uploadLimitKB + " KB");
+        throw new SolrException(ErrorCode.BAD_REQUEST,
+            "application/x-www-form-urlencoded content length (" + totalLength + " bytes) exceeds upload limit of " + uploadLimitKB + " KB");
       }
 
       // get query String from request body, using the charset given in content-type:
       final String cs = ContentStreamBase.getCharsetFromContentType(req.getContentType());
       final Charset charset = (cs == null) ? StandardCharsets.UTF_8 : Charset.forName(cs);
-
+      FastInputStream fin = null;
       try {
-        // Protect container owned streams from being closed by us, see SOLR-8933
-        in = FastInputStream.wrap( in == null ? new CloseShieldInputStream(req.getInputStream()) : in );
+        fin = FastInputStream.wrap(in == null ? new CloseShieldInputStream(req.getInputStream()) : in);
 
-        final long bytesRead = parseFormDataContent(in, maxLength, charset, map, false);
+        final long bytesRead = parseFormDataContent(fin, maxLength, charset, map, false);
         if (bytesRead == 0L && totalLength > 0L) {
           throw getParameterIncompatibilityException();
         }
@@ -693,7 +668,13 @@ public class SolrRequestParsers {
       } catch (IllegalStateException ise) {
         throw (SolrException) getParameterIncompatibilityException().initCause(ise);
       } finally {
-        IOUtils.closeWhileHandlingException(in);
+        if (fin != null) {
+          while (true) {
+            final int read = fin.read();
+            if (!(read != -1)) break;
+          }
+        }
+        IOUtils.closeWhileHandlingException(fin);
       }
 
       return new MultiMapSolrParams(map);
@@ -770,8 +751,7 @@ public class SolrRequestParsers {
 
       // According to previous StandardRequestParser logic (this is a re-written version),
       // POST was handled normally, but other methods (PUT/DELETE)
-      // were handled by restlet if the URI contained /schema or /config
-      // "handled by restlet" means that we don't attempt to handle any request body here.
+      // were handled by the RestManager classes if the URI contained /schema or /config
       if (!isPost) {
         if (isV2) {
           return raw.parseParamsAndFillStreams(req, streams);
@@ -782,14 +762,14 @@ public class SolrRequestParsers {
 
         // OK, we have a BODY at this point
 
-        boolean restletPath = false;
+        boolean schemaRestPath = false;
         int idx = uri.indexOf("/schema");
         if (idx >= 0 && uri.endsWith("/schema") || uri.contains("/schema/")) {
-          restletPath = true;
+          schemaRestPath = true;
         }
 
-        if (restletPath) {
-          return parseQueryString(req.getQueryString());
+        if (schemaRestPath) {
+          return raw.parseParamsAndFillStreams(req, streams);
         }
 
         if ("PUT".equals(method) || "DELETE".equals(method)) {
@@ -906,6 +886,40 @@ public class SolrRequestParsers {
     }
   }
 
+  private static class SQPSolrQueryRequestBase extends SolrQueryRequestBase {
+    private final HttpServletRequest req;
+    private final SolrCall httpSolrCall;
 
+    public SQPSolrQueryRequestBase(SolrCore core, SolrParams params, RTimerTree requestTimer, HttpServletRequest req, HttpSolrCall httpSolrCall) {
+      super(core, params, requestTimer);
+      this.req = req;
+      this.httpSolrCall = httpSolrCall;
+    }
 
+    @Override
+    public Principal getUserPrincipal() {
+      return req == null ? null : req.getUserPrincipal();
+    }
+
+    @Override
+    public List<CommandOperation> getCommands(boolean validateInput) {
+      if (httpSolrCall != null) {
+        return httpSolrCall.getCommands(getHttpSolrCall().getSolrReq(), validateInput);
+      }
+      return super.getCommands(validateInput);
+    }
+
+    @Override
+    public Map<String, String> getPathTemplateValues() {
+      if (httpSolrCall != null && httpSolrCall instanceof V2HttpCall) {
+        return ((V2HttpCall) httpSolrCall).getUrlParts();
+      }
+      return super.getPathTemplateValues();
+    }
+
+    @Override
+    public SolrCall getHttpSolrCall() {
+      return httpSolrCall;
+    }
+  }
 }

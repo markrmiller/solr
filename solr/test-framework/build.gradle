@@ -25,9 +25,13 @@ dependencies {
   api project(':lucene:test-framework')
   api project(':lucene:analysis:common')
 
+  api 'org.openjdk.jmh:jmh-core'
+
   api 'org.apache.logging.log4j:log4j-core'
   api 'io.opentracing:opentracing-mock'
 
   implementation 'io.dropwizard.metrics:metrics-jetty9'
   implementation 'com.lmax:disruptor'
+  api 'org.awaitility:awaitility'
 }
+

@@ -16,14 +16,6 @@
  */
 package org.apache.solr.cloud.overseer;
 
-import java.lang.invoke.MethodHandles;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
@@ -32,7 +24,6 @@ import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.ImplicitDocRouter;
-import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -40,6 +31,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.common.params.CommonParams.NAME;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class ClusterStateMutator {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -52,13 +50,13 @@ public class ClusterStateMutator {
     this.stateManager = dataProvider.getDistribStateManager();
   }
 
-  public ZkWriteCommand createCollection(ClusterState clusterState, ZkNodeProps message) {
+  public ClusterState createCollection(ClusterState clusterState, ZkNodeProps message) {
     String cName = message.getStr(NAME);
-    log.debug("building a new cName: {}", cName);
-    if (clusterState.hasCollection(cName)) {
-      log.warn("Collection {} already exists. exit", cName);
-      return ZkStateWriter.NO_OP;
-    }
+    if (log.isDebugEnabled()) log.debug("building a new cName: " + cName);
+//    if (clusterState.hasCollection(cName)) {
+//      log.warn("Collection {} already exists. exit", cName);
+//      return ZkStateWriter.NO_OP;
+//    }
 
     Map<String, Object> routerSpec = DocRouter.getRouterSpec(message);
     String routerName = routerSpec.get(NAME) == null ? DocRouter.DEFAULT_NAME : (String) routerSpec.get(NAME);
@@ -68,7 +66,7 @@ public class ClusterStateMutator {
 
     Map<String, Slice> slices;
     if (messageShardsObj instanceof Map) { // we are being explicitly told the slice data (e.g. coll restore)
-      slices = Slice.loadAllFromMap(cName, (Map<String, Object>)messageShardsObj);
+      slices = Slice.loadAllFromMap(cName,-1l,  (Map<String, Object>)messageShardsObj);
     } else {
       List<String> shardNames = new ArrayList<>();
 
@@ -86,10 +84,10 @@ public class ClusterStateMutator {
       for (int i = 0; i < shardNames.size(); i++) {
         String sliceName = shardNames.get(i);
 
-        Map<String, Object> sliceProps = new LinkedHashMap<>(1);
+        Map<String, Object> sliceProps = new LinkedHashMap<>(2);
         sliceProps.put(Slice.RANGE, ranges == null ? null : ranges.get(i));
 
-        slices.put(sliceName, new Slice(sliceName, null, sliceProps,cName));
+        slices.put(sliceName, new Slice(sliceName, null, sliceProps,cName, -1l));
       }
     }
 
@@ -104,27 +102,25 @@ public class ClusterStateMutator {
     }
     collectionProps.put(DocCollection.DOC_ROUTER, routerSpec);
 
+    // MRM TODO: - lost this
     if (message.getStr("fromApi") == null) {
       collectionProps.put("autoCreated", "true");
     }
-
-    //TODO default to 2; but need to debug why BasicDistributedZk2Test fails early on
-    String znode = message.getInt(DocCollection.STATE_FORMAT, 1) == 1 ? null
-        : ZkStateReader.getCollectionPath(cName);
-
+    collectionProps.put("id", 1l);
     DocCollection newCollection = new DocCollection(cName,
-        slices, collectionProps, router, -1, znode);
+            slices, collectionProps, router, 0);
 
-    return new ZkWriteCommand(cName, newCollection);
+    return clusterState.copyWith(cName, newCollection);
   }
 
-  public ZkWriteCommand deleteCollection(ClusterState clusterState, ZkNodeProps message) {
-    final String collection = message.getStr(NAME);
-    if (!CollectionMutator.checkKeyExistence(message, NAME)) return ZkStateWriter.NO_OP;
-    DocCollection coll = clusterState.getCollectionOrNull(collection);
-    if (coll == null) return ZkStateWriter.NO_OP;
+  public ClusterState deleteCollection(ClusterState clusterState, String collectionName) {
+    return clusterState.copyWith(collectionName, null);
+  }
 
-    return new ZkWriteCommand(coll.getName(), null);
+  public ClusterState deleteCollection(ClusterState clusterState, ZkNodeProps message) {
+    final String collection = message.getStr(NAME);
+
+    return clusterState.copyWith(collection, null);
   }
 
   public static ClusterState newState(ClusterState state, String name, DocCollection collection) {
@@ -141,7 +137,7 @@ public class ClusterStateMutator {
     if (numShards == null)
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "numShards" + " is a required param");
     for (int i = 0; i < numShards; i++) {
-      final String sliceName = "shard" + (i + 1);
+      final String sliceName = "s" + (i + 1);
       shardNames.add(sliceName);
     }
 
@@ -159,8 +155,8 @@ public class ClusterStateMutator {
   }
 
   /*
-       * Return an already assigned id or null if not assigned
-       */
+   * Return an already assigned id or null if not assigned
+   */
   public static String getAssignedId(final DocCollection collection, final String nodeName) {
     Collection<Slice> slices = collection != null ? collection.getSlices() : null;
     if (slices != null) {
@@ -173,32 +169,5 @@ public class ClusterStateMutator {
     return null;
   }
 
-  public static String getAssignedCoreNodeName(DocCollection collection, String forNodeName, String forCoreName) {
-    Collection<Slice> slices = collection != null ? collection.getSlices() : null;
-    if (slices != null) {
-      for (Slice slice : slices) {
-        for (Replica replica : slice.getReplicas()) {
-          String nodeName = replica.getStr(ZkStateReader.NODE_NAME_PROP);
-          String core = replica.getStr(ZkStateReader.CORE_NAME_PROP);
-
-          if (nodeName.equals(forNodeName) && core.equals(forCoreName)) {
-            return replica.getName();
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  public ZkWriteCommand migrateStateFormat(ClusterState clusterState, ZkNodeProps message) {
-    final String collection = message.getStr(ZkStateReader.COLLECTION_PROP);
-    if (!CollectionMutator.checkKeyExistence(message, ZkStateReader.COLLECTION_PROP)) return ZkStateWriter.NO_OP;
-    DocCollection coll = clusterState.getCollectionOrNull(collection);
-    if (coll == null || coll.getStateFormat() == 2) return ZkStateWriter.NO_OP;
-
-    return new ZkWriteCommand(coll.getName(),
-        new DocCollection(coll.getName(), coll.getSlicesMap(), coll.getProperties(), coll.getRouter(), 0,
-            ZkStateReader.getCollectionPath(collection)));
-  }
 }
 

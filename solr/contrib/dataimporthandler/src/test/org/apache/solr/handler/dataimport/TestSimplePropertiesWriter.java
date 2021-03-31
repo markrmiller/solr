@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@LuceneTestCase.Nightly
 public class TestSimplePropertiesWriter extends AbstractDIHJdbcTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -44,7 +47,7 @@ public class TestSimplePropertiesWriter extends AbstractDIHJdbcTestCase {
   
   @Before
   public void spwBefore() throws Exception {
-    fileLocation = createTempDir().toFile().getAbsolutePath();
+    fileLocation = SolrTestUtil.createTempDir().toFile().getAbsolutePath();
     fileName = "the.properties";
   }
 

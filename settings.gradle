@@ -15,6 +15,9 @@
  * limitations under the License.
  */
 
+rootProject.name = "lucene-solr"
+
+includeBuild("dev-tools/missing-doclet")
 
 include "lucene:analysis:common"
 include "lucene:analysis:icu"
@@ -69,3 +72,21 @@ include "solr:solr-ref-guide"
 include "solr:example"
 
 include "solr:packaging"
+include "solr:docker"
+
+include "solr:benchmark"
+
+
+include "solr:benchmark"
+
+
+include "solr:benchmark"
+
+
+include "solr:benchmark"
+
+
+include "solr:benchmark"
+
+
+include "solr:benchmark"

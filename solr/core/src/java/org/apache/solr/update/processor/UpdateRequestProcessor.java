@@ -48,6 +48,7 @@ public abstract class UpdateRequestProcessor implements Closeable {
   protected final UpdateRequestProcessor next;
 
   public UpdateRequestProcessor( UpdateRequestProcessor next) {
+    //assert ObjectReleaseTracker.track(this);
     this.next = next;
   }
 
@@ -98,6 +99,8 @@ public abstract class UpdateRequestProcessor implements Closeable {
    * Override to implement resource release logic that *must* be called at the
    * end of a request.
    */
-  protected void doClose() {}
+  protected void doClose() {
+    //assert ObjectReleaseTracker.release(this);
+  }
 }
 

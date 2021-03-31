@@ -20,10 +20,12 @@ package org.apache.solr.search;
 import java.io.IOException;
 
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseUtil;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.BaseHttpSolrClient;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
@@ -34,11 +36,11 @@ import org.junit.Test;
 @LuceneTestCase.Slow
 public class FuzzySearchTest extends SolrCloudTestCase {
   private final static String COLLECTION = "c1";
-  private CloudSolrClient client;
+  private CloudHttp2SolrClient client;
 
   @BeforeClass
   public static void setupCluster() throws Exception {
-    configureCluster(1).addConfig(COLLECTION, configset("cloud-minimal")).configure();
+    configureCluster(1).addConfig(COLLECTION, SolrTestUtil.configset("cloud-minimal")).configure();
   }
 
   @Before
@@ -46,8 +48,7 @@ public class FuzzySearchTest extends SolrCloudTestCase {
     client = cluster.getSolrClient();
     client.setDefaultCollection(COLLECTION);
 
-    CollectionAdminRequest.createCollection(COLLECTION, 1, 1).process(client);
-    cluster.waitForActiveCollection(COLLECTION, 1, 1);
+    CollectionAdminRequest.createCollection(COLLECTION, 1, 1).waitForFinalState(true).process(client);
   }
 
   @Test
@@ -61,7 +62,7 @@ public class FuzzySearchTest extends SolrCloudTestCase {
 
     SolrQuery query = new SolrQuery("text:headquarters\\(在日米海軍横須賀基地司令部庁舎\\/旧横須賀鎮守府会議所・横須賀海軍艦船部\\)~");
 
-    BaseHttpSolrClient.RemoteSolrException e = expectThrows(BaseHttpSolrClient.RemoteSolrException.class, () -> client.query(query));
+    BaseHttpSolrClient.RemoteSolrException e = SolrTestCaseUtil.expectThrows(BaseHttpSolrClient.RemoteSolrException.class, () -> client.query(query));
     assertTrue("Should be client error, not server error", e.code() >= 400 && e.code() < 500);
   }
 }

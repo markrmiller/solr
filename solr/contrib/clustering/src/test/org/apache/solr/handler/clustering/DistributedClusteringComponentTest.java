@@ -17,22 +17,24 @@
 package org.apache.solr.handler.clustering;
 
 import org.apache.solr.BaseDistributedSearchTestCase;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
+import org.apache.solr.SolrTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.params.CommonParams;
+import org.junit.Ignore;
 import org.junit.Test;
 
-@SuppressSSL
+@SolrTestCase.SuppressSSL
+@Ignore // MRM TODO: debug
 public class DistributedClusteringComponentTest extends
     BaseDistributedSearchTestCase {
 
   @Override
   public String getSolrHome() {
-    return getFile("clustering/solr/collection1").getParent();
+    return SolrTestUtil.getFile("clustering/solr/collection1").getParent();
   }
 
   @Test
   public void test() throws Exception {
-    del("*:*");
     int numberOfDocs = 0;
     for (String[] doc : AbstractClusteringTestCase.DOCUMENTS) {
       index(id, Integer.toString(numberOfDocs++), "url", doc[0], "title", doc[1], "snippet", doc[2]);

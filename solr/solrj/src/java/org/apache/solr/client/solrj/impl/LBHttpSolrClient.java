@@ -18,7 +18,10 @@ package org.apache.solr.client.solrj.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.http.client.HttpClient;
@@ -26,7 +29,11 @@ import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.params.QoSParams;
+import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 
 /**
  * LBHttpSolrClient or "LoadBalanced HttpSolrClient" is a load balancing wrapper around
@@ -69,11 +76,14 @@ public class LBHttpSolrClient extends LBSolrClient {
 
   private final HttpClient httpClient;
   private final boolean clientIsInternal;
-  private final ConcurrentHashMap<String, HttpSolrClient> urlToClient = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, SolrClient> urlToClient = new ConcurrentHashMap<>(32);
   private final HttpSolrClient.Builder httpSolrClientBuilder;
+  private final Http2SolrClient.Builder http2SolrClientBuilder;
+  private final Http2SolrClient solrClient;
 
   private Integer connectionTimeout;
   private volatile Integer soTimeout;
+  private final Map<String, String> headers;
 
   /**
    * @deprecated use {@link LBSolrClient.Req} instead
@@ -124,14 +134,43 @@ public class LBHttpSolrClient extends LBSolrClient {
         .withHttpClient(httpClient));
   }
 
+  // MRM TODO:
+  public LBHttpSolrClient(Http2SolrClient solrClient) {
+    super(Collections.emptyList());
+    assert ObjectReleaseTracker.track(this);
+    this.solrClient = solrClient;
+    this.httpSolrClientBuilder = null;
+    this.http2SolrClientBuilder = null;
+    httpClient = null;
+    clientIsInternal = false;
+    headers = Collections.emptyMap();
+  }
+
   protected LBHttpSolrClient(Builder builder) {
     super(builder.baseSolrUrls);
-    this.clientIsInternal = builder.httpClient == null;
+    assert ObjectReleaseTracker.track(this);
+    this.solrClient = null;
+
     this.httpSolrClientBuilder = builder.httpSolrClientBuilder;
-    this.httpClient = builder.httpClient == null ? constructClient(builder.baseSolrUrls.toArray(new String[builder.baseSolrUrls.size()])) : builder.httpClient;
+    this.http2SolrClientBuilder = builder.http2SolrClientBuilder;
+
+
+    if (http2SolrClientBuilder == null && httpSolrClientBuilder == null) {
+      this.httpClient = builder.httpClient == null ? constructClient(builder.baseSolrUrls.toArray(new String[builder.baseSolrUrls.size()])) : builder.httpClient;
+    } else {
+      httpClient = null;
+    }
+
+    if (httpSolrClientBuilder == null && httpSolrClientBuilder  == null && builder.httpClient == null) {
+      this.clientIsInternal = true;
+    } else {
+      this.clientIsInternal = false;
+    }
+
     this.connectionTimeout = builder.connectionTimeoutMillis;
     this.soTimeout = builder.socketTimeoutMillis;    
     this.parser = builder.responseParser;
+    this.headers = builder.headers;
     for (String baseUrl: builder.baseSolrUrls) {
       urlToClient.put(baseUrl, makeSolrClient(baseUrl));
     }
@@ -139,22 +178,37 @@ public class LBHttpSolrClient extends LBSolrClient {
 
   private HttpClient constructClient(String[] solrServerUrl) {
     ModifiableSolrParams params = new ModifiableSolrParams();
-    if (solrServerUrl != null && solrServerUrl.length > 1) {
-      // we prefer retrying another server
-      params.set(HttpClientUtil.PROP_USE_RETRY, false);
-    } else {
-      params.set(HttpClientUtil.PROP_USE_RETRY, true);
-    }
     return HttpClientUtil.createClient(params);
   }
 
-  protected HttpSolrClient makeSolrClient(String server) {
-    HttpSolrClient client;
-    if (httpSolrClientBuilder != null) {
+  protected SolrClient makeSolrClient(String server) {
+    SolrClient client;
+    if (http2SolrClientBuilder != null) {
+      synchronized (this) {
+        // MRM TODO: - should only be internal for us
+        http2SolrClientBuilder
+                .withBaseUrl(server)
+                .markInternalRequest()
+                .withHeaders(headers);
+        if (connectionTimeout != null) {
+          http2SolrClientBuilder.connectionTimeout(connectionTimeout);
+        }
+        if (soTimeout != null) {
+          http2SolrClientBuilder.idleTimeout(soTimeout);
+        }
+        client = http2SolrClientBuilder.build();
+        SolrClient oldClient = urlToClient.put(server, client);
+        if (oldClient != null) {
+          IOUtils.closeQuietly(oldClient);
+        }
+      }
+    } else if (httpSolrClientBuilder != null) {
       synchronized (this) {
         httpSolrClientBuilder
             .withBaseSolrUrl(server)
-            .withHttpClient(httpClient);
+            .withResponseParser(new BinaryResponseParser())
+            .markInternalRequest()
+            .withHeaders(headers);
         if (connectionTimeout != null) {
           httpSolrClientBuilder.withConnectionTimeout(connectionTimeout);
         }
@@ -162,11 +216,17 @@ public class LBHttpSolrClient extends LBSolrClient {
           httpSolrClientBuilder.withSocketTimeout(soTimeout);
         }
         client = httpSolrClientBuilder.build();
+        SolrClient oldClient = urlToClient.put(server, client);
+        if (oldClient != null) {
+          IOUtils.closeQuietly(oldClient);
+        }
       }
     } else {
       final HttpSolrClient.Builder clientBuilder = new HttpSolrClient.Builder(server)
           .withHttpClient(httpClient)
-          .withResponseParser(parser);
+          .markInternalRequest()
+          .withResponseParser(parser)
+          .withHeaders(headers);
       if (connectionTimeout != null) {
         clientBuilder.withConnectionTimeout(connectionTimeout);
       }
@@ -174,13 +234,20 @@ public class LBHttpSolrClient extends LBSolrClient {
         clientBuilder.withSocketTimeout(soTimeout);
       }
       client = clientBuilder.build();
+      SolrClient oldClient = urlToClient.put(server, client);
+      IOUtils.closeQuietly(oldClient);
     }
     if (requestWriter != null) {
-      client.setRequestWriter(requestWriter);
+      ((HttpSolrClient)client).setRequestWriter(requestWriter);
     }
     if (queryParams != null) {
-      client.setQueryParams(queryParams);
+      if (client instanceof  Http2SolrClient) {
+        ((Http2SolrClient) client).setQueryParams(queryParams);
+      }else if (client instanceof  HttpSolrClient) {
+        ((HttpSolrClient) client).setQueryParams(queryParams);
+      }
     }
+
     return client;
   }
 
@@ -190,7 +257,7 @@ public class LBHttpSolrClient extends LBSolrClient {
   @Deprecated
   public void setConnectionTimeout(int timeout) {
     this.connectionTimeout = timeout;
-    this.urlToClient.values().forEach(client -> client.setConnectionTimeout(timeout));
+    this.urlToClient.values().forEach(client -> ((HttpSolrClient)client).setConnectionTimeout(timeout));
   }
 
   /**
@@ -202,7 +269,7 @@ public class LBHttpSolrClient extends LBSolrClient {
   @Deprecated
   public void setSoTimeout(int timeout) {
     this.soTimeout = timeout;
-    this.urlToClient.values().forEach(client -> client.setSoTimeout(timeout));
+    this.urlToClient.values().forEach(client -> ((HttpSolrClient)client).setSoTimeout(timeout));
   }
 
   /**
@@ -220,11 +287,15 @@ public class LBHttpSolrClient extends LBSolrClient {
 
   @Override
   protected SolrClient getClient(String baseUrl) {
-    HttpSolrClient client = urlToClient.get(baseUrl);
-    if (client == null) {
-      return makeSolrClient(baseUrl);
+    if (solrClient != null) {
+      return solrClient;
     } else {
-      return client;
+      SolrClient client = urlToClient.get(baseUrl);
+      if (client == null) {
+        return makeSolrClient(baseUrl);
+      } else {
+        return client;
+      }
     }
   }
 
@@ -239,7 +310,13 @@ public class LBHttpSolrClient extends LBSolrClient {
     super.close();
     if(clientIsInternal) {
       HttpClientUtil.close(httpClient);
+      try (ParWork closer = new ParWork(this)) {
+        closer.collect(urlToClient.values());
+      }
     }
+
+    urlToClient.clear();
+    assert ObjectReleaseTracker.release(this);
   }
 
   /**
@@ -255,10 +332,28 @@ public class LBHttpSolrClient extends LBSolrClient {
   public static class Builder extends SolrClientBuilder<Builder> {
     protected final List<String> baseSolrUrls;
     protected HttpSolrClient.Builder httpSolrClientBuilder;
+    protected Map<String,String> headers = new HashMap<>();
+    private Http2SolrClient.Builder http2SolrClientBuilder;
 
     public Builder() {
       this.baseSolrUrls = new ArrayList<>();
       this.responseParser = new BinaryResponseParser();
+    }
+
+    //do not set this from an external client
+    public Builder markInternalRequest() {
+      this.headers.put(QoSParams.REQUEST_SOURCE, QoSParams.INTERNAL);
+      return this;
+    }
+
+    public Builder withHeaders(Map<String, String> headers) {
+      this.headers.putAll(headers);
+      return this;
+    }
+
+    public Builder withHeader(String header, String value) {
+      this.headers.put(header, value);
+      return this;
     }
 
     public HttpSolrClient.Builder getHttpSolrClientBuilder() {
@@ -289,7 +384,9 @@ public class LBHttpSolrClient extends LBSolrClient {
      * requires that the core is specified on all requests.
      */
     public Builder withBaseSolrUrl(String baseSolrUrl) {
-      this.baseSolrUrls.add(baseSolrUrl);
+      if (baseSolrUrl != null) {
+        this.baseSolrUrls.add(baseSolrUrl);
+      }
       return this;
     }
  
@@ -328,6 +425,11 @@ public class LBHttpSolrClient extends LBSolrClient {
      */
     public Builder withHttpSolrClientBuilder(HttpSolrClient.Builder builder) {
       this.httpSolrClientBuilder = builder;
+      return this;
+    }
+
+    public Builder withHttp2SolrClientBuilder(Http2SolrClient.Builder builder) {
+      this.http2SolrClientBuilder = builder;
       return this;
     }
 

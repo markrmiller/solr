@@ -19,8 +19,8 @@ package org.apache.solr.handler;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -48,6 +48,7 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.routing.RequestReplicaListTransformerGenerator;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.MapWriter;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
@@ -94,9 +95,9 @@ public class StreamHandler extends RequestHandlerBase implements SolrCoreAware, 
   private SolrDefaultStreamFactory streamFactory = new SolrDefaultStreamFactory();
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private String coreName;
-  private SolrClientCache solrClientCache;
+  private volatile SolrClientCache solrClientCache;
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private Map<String, DaemonStream> daemons = Collections.synchronizedMap(new HashMap());
+  private final Map<String, DaemonStream> daemons = new ConcurrentHashMap<>();
 
   @Override
   public PermissionNameProvider.Name getPermissionName(AuthorizationContext request) {
@@ -130,7 +131,7 @@ public class StreamHandler extends RequestHandlerBase implements SolrCoreAware, 
 
   @SuppressWarnings({"unchecked"})
   public static void addExpressiblePlugins(StreamFactory streamFactory, SolrCore core) {
-    List<PluginInfo> pluginInfos = core.getSolrConfig().getPluginInfos(Expressible.class.getName());
+    Collection<PluginInfo> pluginInfos = core.getSolrConfig().getPluginInfos(Expressible.class.getName());
     for (PluginInfo pluginInfo : pluginInfos) {
       if (pluginInfo.pkgName != null) {
         @SuppressWarnings("resource")
@@ -138,7 +139,7 @@ public class StreamHandler extends RequestHandlerBase implements SolrCoreAware, 
         streamFactory.withFunctionName(pluginInfo.name,
             () -> holder.getClazz());
       } else {
-        Class<? extends Expressible> clazz = core.getMemClassLoader().findClass(pluginInfo.className, Expressible.class);
+        Class<? extends Expressible> clazz = core.getResourceLoader().findClass(pluginInfo.className, Expressible.class);
         streamFactory.withFunctionName(pluginInfo.name, clazz);
       }
     }
@@ -186,6 +187,7 @@ public class StreamHandler extends RequestHandlerBase implements SolrCoreAware, 
         tupleStream = this.streamFactory.constructStream(streamExpression);
       }
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       // Catch exceptions that occur while the stream is being created. This will include streaming expression parse
       // rules.
       SolrException.log(log, e);
@@ -508,9 +510,7 @@ public class StreamHandler extends RequestHandlerBase implements SolrCoreAware, 
         String[] shards = shardString.split(",");
         @SuppressWarnings({"rawtypes"})
         List<String> shardList = new ArrayList<>();
-        for (String shard : shards) {
-          shardList.add(shard);
-        }
+        shardList.addAll(Arrays.asList(shards));
         collectionShards.put(collection, shardList);
       }
     }

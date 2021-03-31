@@ -16,6 +16,10 @@
  */
 package org.apache.solr.servlet;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -26,22 +30,21 @@ import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.solr.SolrJettyTestBase;
+import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.junit.Test;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-
 public abstract class CacheHeaderTestBase extends SolrJettyTestBase {
 
-  protected HttpRequestBase getSelectMethod(String method, String... params) throws URISyntaxException {
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
+  protected static JettySolrRunner jetty;
+
+
+  protected HttpRequestBase getSelectMethod(String method, String... params) throws Exception {
+    HttpSolrClient client = (HttpSolrClient) getSolrClient(jetty);
     HttpRequestBase m = null;
-    
+
     ArrayList<BasicNameValuePair> qparams = new ArrayList<>();
-    if(params.length==0) {
+    if (params.length == 0) {
       qparams.add(new BasicNameValuePair("q", "solr"));
       qparams.add(new BasicNameValuePair("qt", "standard"));
     }
@@ -49,9 +52,8 @@ public abstract class CacheHeaderTestBase extends SolrJettyTestBase {
       qparams.add(new BasicNameValuePair(params[i * 2], params[i * 2 + 1]));
     }
 
-    URI uri = URI.create(client.getBaseURL() + "/select?" +
-                         URLEncodedUtils.format(qparams, StandardCharsets.UTF_8));
-   
+    URI uri = URI.create(client.getBaseURL() + "/select?" + URLEncodedUtils.format(qparams, StandardCharsets.UTF_8));
+
     if ("GET".equals(method)) {
       m = new HttpGet(uri);
     } else if ("HEAD".equals(method)) {
@@ -59,35 +61,34 @@ public abstract class CacheHeaderTestBase extends SolrJettyTestBase {
     } else if ("POST".equals(method)) {
       m = new HttpPost(uri);
     }
-    
+
     return m;
   }
 
-  protected HttpRequestBase getUpdateMethod(String method, String... params) throws URISyntaxException {
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
+  protected HttpRequestBase getUpdateMethod(String method, String... params) throws Exception {
+    HttpSolrClient client = (HttpSolrClient) getSolrClient(jetty);
     HttpRequestBase m = null;
-    
+
     ArrayList<BasicNameValuePair> qparams = new ArrayList<>();
-    for(int i=0;i<params.length/2;i++) {
-      qparams.add(new BasicNameValuePair(params[i*2], params[i*2+1]));
+    for (int i = 0; i < params.length / 2; i++) {
+      qparams.add(new BasicNameValuePair(params[i * 2], params[i * 2 + 1]));
     }
 
-    URI uri = URI.create(client.getBaseURL() + "/update?" +
-                         URLEncodedUtils.format(qparams, StandardCharsets.UTF_8));
-    
+    URI uri = URI.create(client.getBaseURL() + "/update?" + URLEncodedUtils.format(qparams, StandardCharsets.UTF_8));
+
     if ("GET".equals(method)) {
-      m=new HttpGet(uri);
+      m = new HttpGet(uri);
     } else if ("POST".equals(method)) {
-      m=new HttpPost(uri);
+      m = new HttpPost(uri);
     } else if ("HEAD".equals(method)) {
-      m=new HttpHead(uri);
+      m = new HttpHead(uri);
     }
 
     return m;
   }
   
   protected HttpClient getClient() {
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
+    HttpSolrClient client = (HttpSolrClient) getSolrClient(jetty);
     return client.getHttpClient();
   }
 

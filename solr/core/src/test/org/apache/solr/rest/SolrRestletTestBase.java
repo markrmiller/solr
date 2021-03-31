@@ -15,10 +15,12 @@
  * limitations under the License.
  */
 package org.apache.solr.rest;
+import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.util.RestTestBase;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.junit.BeforeClass;
-import org.restlet.ext.servlet.ServerServlet;
+import org.junit.After;
+import org.junit.Before;
 
 import java.nio.file.Path;
 import java.util.Properties;
@@ -26,9 +28,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * Base class for Solr Restlet-based tests. Creates jetty and test harness
- * with solrconfig.xml and schema-rest.xml, including "extra" servlets for
- * all Solr Restlet Application subclasses.
+ * Base class for Solr Rest-oriented API tests. Creates jetty and test harness
+ * with solrconfig.xml and schema-rest.xml.
  *
  * Use RestTestBase instead if you need to specialize the solrconfig,
  * the schema, or jetty/test harness creation; otherwise you'll get
@@ -41,19 +42,18 @@ abstract public class SolrRestletTestBase extends RestTestBase {
    * Creates test harness, including "extra" servlets for all
    * Solr Restlet Application subclasses.
    */
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void setUp() throws Exception {
 
-    Path tempDir = createTempDir();
+    SolrTestCaseJ4.randomizeNumericTypesProperties();
+
+    Path tempDir = SolrTestUtil.createTempDir();
     Path coresDir = tempDir.resolve("cores");
 
     System.setProperty("coreRootDirectory", coresDir.toString());
-    System.setProperty("configSetBaseDir", TEST_HOME());
+    System.setProperty("configSetBaseDir", SolrTestUtil.TEST_HOME());
 
     final SortedMap<ServletHolder,String> extraServlets = new TreeMap<>();
-    final ServletHolder solrSchemaRestApi = new ServletHolder("SolrSchemaRestApi", ServerServlet.class);
-    solrSchemaRestApi.setInitParameter("org.restlet.application", "org.apache.solr.rest.SolrSchemaRestApi");
-    extraServlets.put(solrSchemaRestApi, "/schema/*");  // '/schema/*' matches '/schema', '/schema/', and '/schema/whatever...'
 
     Properties props = new Properties();
     props.setProperty("name", DEFAULT_TEST_CORENAME);
@@ -62,6 +62,15 @@ abstract public class SolrRestletTestBase extends RestTestBase {
     props.setProperty("configSet", "collection1");
 
     writeCoreProperties(coresDir.resolve("core"), props, "SolrRestletTestBase");
-    createJettyAndHarness(TEST_HOME(), "solrconfig.xml", "schema-rest.xml", "/solr", true, extraServlets);
+    jetty = createJettyAndHarness(SolrTestUtil.TEST_HOME(), "solrconfig.xml", "schema-rest.xml", "/solr", true, extraServlets);
+
+    super.setUp();
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    if (jetty != null) jetty.stop();
+    jetty = null;
+    super.tearDown();
   }
 }

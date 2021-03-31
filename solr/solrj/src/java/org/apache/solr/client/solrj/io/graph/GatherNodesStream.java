@@ -48,9 +48,8 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionNamedParamete
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionValue;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.io.stream.metrics.Metric;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 
 import static org.apache.solr.common.params.CommonParams.SORT;
 
@@ -458,7 +457,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
       joinSParams.set("qt", "/export");
       joinSParams.set(SORT, gather + " asc,"+traverseTo +" asc");
 
-      StringBuffer nodeQuery = new StringBuffer();
+      StringBuilder nodeQuery = new StringBuilder(64);
 
       boolean comma = false;
       for(String node : nodes) {
@@ -491,6 +490,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
           edges.add(tuple);
         }
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new RuntimeException(e);
       } finally {
         try {
@@ -517,7 +517,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
 
       ExecutorService threadPool = null;
       try {
-        threadPool = ExecutorUtil.newMDCAwareFixedThreadPool(4, new SolrNamedThreadFactory("GatherNodesStream"));
+        threadPool = ParWork.getRootSharedExecutor();
 
         Map<String, Node> roots = new HashMap();
 
@@ -541,7 +541,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
             if(!roots.containsKey(key)) {
               Node node = new Node(value, trackTraversal);
               if (metrics != null) {
-                List<Metric> _metrics = new ArrayList();
+                List<Metric> _metrics = new ArrayList(metrics.size());
                 for (Metric metric : metrics) {
                   _metrics.add(metric.newInstance());
                 }
@@ -604,9 +604,8 @@ public class GatherNodesStream extends TupleStream implements Expressible {
         traversal.addLevel(level, collection, gather);
         out = traversal.iterator();
       } catch(Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new RuntimeException(e);
-      } finally {
-        threadPool.shutdown();
       }
     }
 

@@ -27,11 +27,16 @@ import org.apache.http.NoHttpResponseException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ConnectTimeoutException;
 import org.apache.solr.client.solrj.request.UpdateRequest;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocRouter;
+import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 
 /**
  * SolrJ client class to communicate with SolrCloud.
@@ -49,10 +54,8 @@ public class CloudSolrClient extends BaseCloudSolrClient {
   private final ClusterStateProvider stateProvider;
   private final LBHttpSolrClient lbClient;
   private final boolean shutdownLBHttpSolrServer;
-  private HttpClient myClient;
+  private final HttpClient myClient;
   private final boolean clientIsInternal;
-
-  public static final String STATE_VERSION = BaseCloudSolrClient.STATE_VERSION;
 
   /**
    * @deprecated since 7.0  Use {@link Builder} methods instead. 
@@ -71,21 +74,33 @@ public class CloudSolrClient extends BaseCloudSolrClient {
    * @param builder a {@link CloudSolrClient.Builder} with the options used to create the client.
    */
   protected CloudSolrClient(Builder builder) {
-    super(builder.shardLeadersOnly, builder.parallelUpdates, builder.directUpdatesToLeadersOnly);
+    super(builder.shardLeadersOnly, builder.parallelUpdates, builder.directUpdatesToLeadersOnly, true);
+
     if (builder.stateProvider == null) {
-      if (builder.zkHosts != null && builder.solrUrls != null) {
+      if (builder.zkHosts != null && builder.zkHosts.size() > 0 && builder.solrUrls != null && builder.solrUrls.size() > 0) {
+        cleanupAfterInitError();
         throw new IllegalArgumentException("Both zkHost(s) & solrUrl(s) have been specified. Only specify one.");
       }
-      if (builder.zkHosts != null) {
-        this.stateProvider = new ZkClientClusterStateProvider(builder.zkHosts, builder.zkChroot);
+      if (builder.zkHosts != null && builder.zkHosts.size() > 0) {
+        final String zkHostString;
+        try {
+          zkHostString = ZkClientClusterStateProvider.buildZkHostString(builder.zkHosts, builder.zkChroot);
+        } catch (IllegalArgumentException iae) {
+          cleanupAfterInitError();
+          throw iae;
+        }
+        this.stateProvider = new ZkClientClusterStateProvider(zkHostString, 40000, 15000);
       } else if (builder.solrUrls != null && !builder.solrUrls.isEmpty()) {
         try {
           this.stateProvider = new HttpClusterStateProvider(builder.solrUrls, builder.httpClient);
         } catch (Exception e) {
+          cleanupAfterInitError();
+          ParWork.propagateInterrupt(e);
           throw new RuntimeException("Couldn't initialize a HttpClusterStateProvider (is/are the "
               + "Solr server(s), "  + builder.solrUrls + ", down?)", e);
         }
       } else {
+        cleanupAfterInitError();
         throw new IllegalArgumentException("Both zkHosts and solrUrl cannot be null.");
       }
     } else {
@@ -93,16 +108,27 @@ public class CloudSolrClient extends BaseCloudSolrClient {
     }
     this.clientIsInternal = builder.httpClient == null;
     this.shutdownLBHttpSolrServer = builder.loadBalancedSolrClient == null;
-    if(builder.lbClientBuilder != null) {
+    if (builder.lbClientBuilder != null) {
       propagateLBClientConfigOptions(builder);
       builder.loadBalancedSolrClient = builder.lbClientBuilder.build();
     }
-    if(builder.loadBalancedSolrClient != null) builder.httpClient = builder.loadBalancedSolrClient.getHttpClient();
+    if (builder.loadBalancedSolrClient != null) builder.httpClient = builder.loadBalancedSolrClient.getHttpClient();
     this.myClient = (builder.httpClient == null) ? HttpClientUtil.createClient(null) : builder.httpClient;
     if (builder.loadBalancedSolrClient == null) builder.loadBalancedSolrClient = createLBHttpSolrClient(builder, myClient);
     this.lbClient = builder.loadBalancedSolrClient;
+    assert ObjectReleaseTracker.track(this);
   }
-  
+
+  // called to clean-up objects created by super if there are errors during initialization
+  private void cleanupAfterInitError() {
+    try {
+      super.close(); // super created a ThreadPool ^
+    } catch (IOException ignore) {
+      // no-op: not much we can do here
+    }
+    IOUtils.closeQuietly(stateProvider);
+  }
+
   private void propagateLBClientConfigOptions(Builder builder) {
     final LBHttpSolrClient.Builder lbBuilder = builder.lbClientBuilder;
     
@@ -160,17 +186,17 @@ public class CloudSolrClient extends BaseCloudSolrClient {
 
   @Override
   public void close() throws IOException {
-    stateProvider.close();
-    
+
     if (shutdownLBHttpSolrServer) {
-      lbClient.close();
+      IOUtils.closeQuietly(lbClient);
     }
-    
-    if (clientIsInternal && myClient!=null) {
+    IOUtils.closeQuietly(stateProvider);
+    if (clientIsInternal) {
       HttpClientUtil.close(myClient);
     }
 
     super.close();
+    assert ObjectReleaseTracker.release(this);
   }
 
   public LBHttpSolrClient getLbClient() {
@@ -286,6 +312,19 @@ public class CloudSolrClient extends BaseCloudSolrClient {
     public Builder(List<String> zkHosts, Optional<String> zkChroot) {
       this.zkHosts = zkHosts;
       if (zkChroot.isPresent()) this.zkChroot = zkChroot.get();
+    }
+
+    public Builder(SolrZkClient zkClient) {
+      ZkStateReader zkStateReader = new ZkStateReader(zkClient);
+
+      zkStateReader.createClusterStateWatchersAndUpdate();
+      ZkClientClusterStateProvider stateProvider = new ZkClientClusterStateProvider(zkStateReader, true);
+      this.stateProvider = stateProvider;
+    }
+
+    public Builder(ZkStateReader zkStateReader) {
+      ZkClientClusterStateProvider stateProvider = new ZkClientClusterStateProvider(zkStateReader, false);
+      this.stateProvider = stateProvider;
     }
 
     /**
@@ -455,22 +494,9 @@ public class CloudSolrClient extends BaseCloudSolrClient {
      * Create a {@link CloudSolrClient} based on the provided configuration.
      */
     public CloudSolrClient build() {
-      if (stateProvider == null) {
-        if (!zkHosts.isEmpty()) {
-          stateProvider = new ZkClientClusterStateProvider(zkHosts, zkChroot);
-        }
-        else if (!this.solrUrls.isEmpty()) {
-          try {
-            stateProvider = new HttpClusterStateProvider(solrUrls, httpClient);
-          } catch (Exception e) {
-            throw new RuntimeException("Couldn't initialize a HttpClusterStateProvider (is/are the "
-                + "Solr server(s), "  + solrUrls + ", down?)", e);
-          }
-        } else {
-          throw new IllegalArgumentException("Both zkHosts and solrUrl cannot be null.");
-        }
-      }
-      return new CloudSolrClient(this);
+      CloudSolrClient cloudClient = new CloudSolrClient(this);
+
+      return cloudClient;
     }
 
     @Override

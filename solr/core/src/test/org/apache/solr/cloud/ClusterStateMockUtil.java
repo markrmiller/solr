@@ -118,6 +118,7 @@ public class ClusterStateMockUtil {
     Map<String,Object> collectionProps = new HashMap<>();
     collectionProps.put(ZkStateReader.MAX_SHARDS_PER_NODE, Integer.toString(maxShardsPerNode));
     collectionProps.put(ZkStateReader.REPLICATION_FACTOR, Integer.toString(replicationFactor));
+    collectionProps.put("id",  -1l);
     Map<String,DocCollection> collectionStates = new HashMap<>();
     DocCollection docCollection = null;
     String collName = null;
@@ -137,7 +138,7 @@ public class ClusterStateMockUtil {
         case "s":
           replicas = new HashMap<>();
           if(collName == null) collName = "collection" + (collectionStates.size() + 1);
-          slice = new Slice(sliceName = "slice" + (slices.size() + 1), replicas, null,  collName);
+          slice = new Slice(sliceName = "slice" + (slices.size() + 1), replicas, null,  collName, -1l);
           slices.put(slice.getName(), slice);
 
           // hack alert: the DocCollection constructor copies over active slices to its active slice map in the constructor
@@ -171,11 +172,12 @@ public class ClusterStateMockUtil {
           if (!leaderFound && !m.group(1).equals("p")) {
             replicaPropMap.put(Slice.LEADER, "true");
           }
-          replica = new Replica(replicaName, replicaPropMap, collName, sliceName);
+          replicaPropMap.put("id", "1");
+          replica = new Replica(replicaName, replicaPropMap, collName, -1l, sliceName);
           replicas.put(replica.getName(), replica);
 
           // hack alert: re-create slice with existing data and new replicas map so that it updates its internal leader attribute
-          slice = new Slice(slice.getName(), replicas, null, collName);
+          slice = new Slice(slice.getName(), replicas, null, collName,-1l);
           slices.put(slice.getName(), slice);
           // we don't need to update doc collection again because we aren't adding a new slice or changing its state
           break;
@@ -184,8 +186,8 @@ public class ClusterStateMockUtil {
       }
     }
 
-    ClusterState clusterState = new ClusterState(1, new HashSet<>(Arrays.asList(liveNodes)), collectionStates);
-    MockZkStateReader reader = new MockZkStateReader(clusterState, collectionStates.keySet());
+    ClusterState clusterState = ClusterState.getRefCS(collectionStates, -1);
+    MockZkStateReader reader = new MockZkStateReader(clusterState, new HashSet(Arrays.asList(liveNodes)));
 
     String json;
     json = new String(Utils.toJSON(clusterState), StandardCharsets.UTF_8);
@@ -232,7 +234,6 @@ public class ClusterStateMockUtil {
 
     Map<String,Object> replicaPropMap = new HashMap<>();
     replicaPropMap.put(ZkStateReader.NODE_NAME_PROP, "baseUrl" + node + "_");
-    replicaPropMap.put(ZkStateReader.BASE_URL_PROP, "http://baseUrl" + node);
     replicaPropMap.put(ZkStateReader.STATE_PROP, state.toString());
     replicaPropMap.put(ZkStateReader.CORE_NAME_PROP, sliceName + "_" + replicaName);
     replicaPropMap.put(ZkStateReader.REPLICA_TYPE, replicaType.name());

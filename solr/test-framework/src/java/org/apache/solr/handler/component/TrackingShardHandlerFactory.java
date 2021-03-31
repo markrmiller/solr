@@ -16,7 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -25,21 +24,14 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.http.client.HttpClient;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.CoreContainer;
 
@@ -51,6 +43,10 @@ import org.apache.solr.core.CoreContainer;
  * This is a test helper only and should *not* be used for production.
  */
 public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
+
+  public TrackingShardHandlerFactory() {
+    super();
+  }
 
   private Queue<ShardRequestAndParams> queue;
 
@@ -90,14 +86,9 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
 
   @Override
   public ShardHandler getShardHandler() {
-    return super.getShardHandler();
-  }
-
-  @Override
-  public ShardHandler getShardHandler(Http2SolrClient client) {
     final ShardHandlerFactory factory = this;
-    final ShardHandler wrapped = super.getShardHandler(client);
-    return new HttpShardHandler(this, client) {
+    final ShardHandler wrapped = super.getShardHandler();
+    return new HttpShardHandler((HttpShardHandlerFactory) factory) {
       @Override
       public void prepDistributed(ResponseBuilder rb) {
         wrapped.prepDistributed(rb);
@@ -136,10 +127,10 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
   }
 
   @Override
-  public ShardHandler getShardHandler(HttpClient httpClient) {
+  public ShardHandler getShardHandler(LBHttp2SolrClient lbClient) {
     final ShardHandlerFactory factory = this;
-    final ShardHandler wrapped = super.getShardHandler(httpClient);
-    return new HttpShardHandler(this, null) {
+    final ShardHandler wrapped = super.getShardHandler(lbClient);
+    return new HttpShardHandler((HttpShardHandlerFactory) factory) {
       @Override
       public void prepDistributed(ResponseBuilder rb) {
         wrapped.prepDistributed(rb);
@@ -153,13 +144,6 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
           }
         }
         wrapped.submit(sreq, shard, params);
-      }
-
-      @Override
-      protected NamedList<Object> request(String url, @SuppressWarnings({"rawtypes"})SolrRequest req) throws IOException, SolrServerException {
-        try (SolrClient client = new HttpSolrClient.Builder(url).withHttpClient(httpClient).build()) {
-          return client.request(req);
-        }
       }
 
       @Override
@@ -214,14 +198,10 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
   public static void setTrackingQueue(List<JettySolrRunner> runners, Queue<ShardRequestAndParams> queue) {
     for (JettySolrRunner runner : runners) {
       CoreContainer container = runner.getCoreContainer();
-      if (container != null) {
-        ShardHandlerFactory factory = container.getShardHandlerFactory();
-        assert factory instanceof TrackingShardHandlerFactory : "not a TrackingShardHandlerFactory: "
-            + factory.getClass();
-        @SuppressWarnings("resource")
-        TrackingShardHandlerFactory trackingShardHandlerFactory = (TrackingShardHandlerFactory) factory;
-        trackingShardHandlerFactory.setTrackingQueue(queue);
-      }
+      ShardHandlerFactory factory = container.getShardHandlerFactory();
+      assert factory instanceof TrackingShardHandlerFactory : "not a TrackingShardHandlerFactory: " + factory.getClass();
+      TrackingShardHandlerFactory trackingShardHandlerFactory = (TrackingShardHandlerFactory) factory;
+      trackingShardHandlerFactory.setTrackingQueue(queue);
     }
   }
 
@@ -314,7 +294,7 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
         // multiple shard addresses may be present separated by '|'
         List<String> list = StrUtils.splitSmart(entry.getKey(), '|');
         for (Map.Entry<String, Replica> replica : slice.getReplicasMap().entrySet()) {
-          String coreUrl = new ZkCoreNodeProps(replica.getValue()).getCoreUrl();
+          String coreUrl = replica.getValue().getCoreUrl();
           if (list.contains(coreUrl)) {
             return new ArrayList<>(entry.getValue());
           }

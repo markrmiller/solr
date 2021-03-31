@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.common.params.SolrParams;
@@ -40,10 +41,10 @@ import org.junit.Test;
  * <code>facet.pivot</code> so the assertions in this test vary from that test.
  * </p>
  */
+@LuceneTestCase.Nightly // can be slow
 public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistributedSearchTestCase {
 
-  private static List<String> ALL_STATS = Arrays.asList("min", "max", "sum", "stddev", "avg", "sumsq", "unique",
-      "missing", "countvals", "percentile", "variance", "hll");
+  private static List<String> ALL_STATS;
                                                         
   private final String STAT_FIELD;
   private String ALL_STATS_JSON = "";
@@ -53,11 +54,20 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) System.setProperty(NUMERIC_DOCVALUES_SYSPROP,"true");
 
     STAT_FIELD = random().nextBoolean() ? "stat_is" : "stat_i";
+    ALL_STATS = Arrays.asList("min", "max", "sum", "stddev", "avg", "sumsq", "unique",
+        "missing", "countvals", "percentile", "variance", "hll");
 
     for (String stat : ALL_STATS) {
       String val = stat.equals("percentile")? STAT_FIELD+",90": STAT_FIELD;
       ALL_STATS_JSON += stat + ":'" + stat + "(" + val + ")',";
     }
+  }
+
+  @Override
+  public void distribTearDown() throws Exception {
+    super.distribTearDown();
+    ALL_STATS = null;
+    ALL_STATS_JSON = "";
   }
   
   @Test
@@ -122,7 +132,7 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     }
 
     // really long tail uncommon foo_s terms on shard2
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < (TEST_NIGHTLY ? 30 : 10); i++) {
       // NOTE: using "Z" here so these sort before bbb0 when they tie for '1' instance each on shard2
       shard2.add(sdoc("id", docNum.incrementAndGet(), "foo_s", "ZZZ"+i));
     }

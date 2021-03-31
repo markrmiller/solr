@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -36,7 +37,6 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.RoutingRule;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
@@ -64,15 +64,17 @@ public class ColStatus {
   public static final String RAW_SIZE_DETAILS_PROP = SegmentsInfoRequestHandler.RAW_SIZE_DETAILS_PARAM;
   public static final String RAW_SIZE_SAMPLING_PERCENT_PROP = SegmentsInfoRequestHandler.RAW_SIZE_SAMPLING_PERCENT_PARAM;
   public static final String SEGMENTS_PROP = "segments";
+  private final ZkStateReader zkStateReader;
 
-  public ColStatus(SolrClientCache solrClientCache, ClusterState clusterState, ZkNodeProps props) {
+  public ColStatus(SolrClientCache solrClientCache, ZkStateReader zkStateReader, ClusterState clusterState, ZkNodeProps props) {
     this.props = props;
     this.solrClientCache = solrClientCache;
     this.clusterState = clusterState;
+    this.zkStateReader = zkStateReader;
   }
 
   @SuppressWarnings({"unchecked"})
-  public void getColStatus(NamedList<Object> results) {
+  public void getColStatus(NamedList<Object> results) throws TimeoutException, InterruptedException {
     Collection<String> collections;
     String col = props.getStr(ZkStateReader.COLLECTION_PROP);
     if (col == null) {
@@ -101,9 +103,8 @@ public class ColStatus {
         continue;
       }
       SimpleOrderedMap<Object> colMap = new SimpleOrderedMap<>();
-      colMap.add("stateFormat", coll.getStateFormat());
       colMap.add("znodeVersion", coll.getZNodeVersion());
-      Map<String, Object> props = new TreeMap<>(coll.getProperties());
+      Map<String, Object> props = new TreeMap<>(coll);
       props.remove("shards");
       colMap.add("properties", props);
       colMap.add("activeShards", coll.getActiveSlices().size());
@@ -124,7 +125,7 @@ public class ColStatus {
         int recoveryFailedReplicas = 0;
         for (Replica r : s.getReplicas()) {
           // replica may still be marked as ACTIVE even though its node is no longer live
-          if (! r.isActive(clusterState.getLiveNodes())) {
+          if (! r.isActive(zkStateReader.getLiveNodes())) {
             downReplicas++;
             continue;
           }
@@ -138,6 +139,9 @@ public class ColStatus {
             case RECOVERING:
               recoveringReplicas++;
               break;
+            case BUFFERING:
+              recoveringReplicas++;
+              break;
             case RECOVERY_FAILED:
               recoveryFailedReplicas++;
               break;
@@ -149,7 +153,7 @@ public class ColStatus {
         replicaMap.add("recovering", recoveringReplicas);
         replicaMap.add("recovery_failed", recoveryFailedReplicas);
         sliceMap.add("state", s.getState().toString());
-        sliceMap.add("range", s.getRange().toString());
+        sliceMap.add("range", String.valueOf(s.getRange()));
         Map<String, RoutingRule> rules = s.getRoutingRules();
         if (rules != null && !rules.isEmpty()) {
           sliceMap.add("routingRules", rules);
@@ -165,12 +169,13 @@ public class ColStatus {
         SimpleOrderedMap<Object> leaderMap = new SimpleOrderedMap<>();
         sliceMap.add("leader", leaderMap);
         leaderMap.add("coreNode", leader.getName());
-        leaderMap.addAll(leader.getProperties());
-        if (!leader.isActive(clusterState.getLiveNodes())) {
+        leaderMap.addAll(leader);
+        if (!leader.isActive(zkStateReader.getLiveNodes())) {
           continue;
         }
-        String url = ZkCoreNodeProps.getCoreUrl(leader);
-        try (SolrClient client = solrClientCache.getHttpSolrClient(url)) {
+        String url = leader.getCoreUrl();
+        SolrClient client = solrClientCache.getHttpSolrClient(url);
+        try {
           ModifiableSolrParams params = new ModifiableSolrParams();
           params.add(CommonParams.QT, "/admin/segments");
           params.add(FIELD_INFO_PROP, "true");
@@ -186,20 +191,20 @@ public class ColStatus {
           NamedList<Object> rsp = client.request(req);
           rsp.remove("responseHeader");
           leaderMap.add("segInfos", rsp);
-          NamedList<Object> segs = (NamedList<Object>)rsp.get("segments");
+          NamedList<Object> segs = (NamedList<Object>) rsp.get("segments");
           if (segs != null) {
-            for (Map.Entry<String, Object> entry : segs) {
-              NamedList<Object> fields = (NamedList<Object>)((NamedList<Object>)entry.getValue()).get("fields");
+            for (Map.Entry<String,Object> entry : segs) {
+              NamedList<Object> fields = (NamedList<Object>) ((NamedList<Object>) entry.getValue()).get("fields");
               if (fields != null) {
-                for (Map.Entry<String, Object> fEntry : fields) {
-                  Object nc = ((NamedList<Object>)fEntry.getValue()).get("nonCompliant");
+                for (Map.Entry<String,Object> fEntry : fields) {
+                  Object nc = ((NamedList<Object>) fEntry.getValue()).get("nonCompliant");
                   if (nc != null) {
                     nonCompliant.add(fEntry.getKey());
                   }
                 }
               }
               if (!withFieldInfo) {
-                ((NamedList<Object>)entry.getValue()).remove("fields");
+                ((NamedList<Object>) entry.getValue()).remove("fields");
               }
             }
           }

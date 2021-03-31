@@ -17,6 +17,7 @@
 package org.apache.solr.store.hdfs;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.HashSet;
 import java.util.Random;
@@ -30,22 +31,24 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestCaseUtil;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.hdfs.HdfsTestUtil;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@LuceneTestCase.Nightly // can be a slow test, > 20 seconds
 public class HdfsDirectoryTest extends SolrTestCaseJ4 {
-  
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
   private static final int MAX_NUMBER_OF_WRITES = 10000;
   private static final int MIN_FILE_SIZE = 100;
   private static final int MAX_FILE_SIZE = 100000;
@@ -60,7 +63,7 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
 
   @BeforeClass
   public static void beforeClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
   
   @AfterClass
@@ -79,7 +82,7 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
     directoryConf = HdfsTestUtil.getClientConfiguration(dfsCluster);
     directoryConf.set("dfs.permissions.enabled", "false");
     
-    directoryPath = new Path(dfsCluster.getURI().toString() + createTempDir().toFile().getAbsolutePath() + "/hdfs");
+    directoryPath = new Path(dfsCluster.getURI().toString() + SolrTestUtil.createTempDir().toFile().getAbsolutePath() + "/hdfs");
     directory = new HdfsDirectory(directoryPath, directoryConf);
     
     random = random();
@@ -120,10 +123,10 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
     assertEquals(12345, input1.readInt());
     input1.close();
 
-    assertFalse(slowFileExists(directory, "testing.test.other"));
-    assertTrue(slowFileExists(directory, "testing.test"));
+    assertFalse(LuceneTestCase.slowFileExists(directory, "testing.test.other"));
+    assertTrue(LuceneTestCase.slowFileExists(directory, "testing.test"));
     directory.deleteFile("testing.test");
-    assertFalse(slowFileExists(directory, "testing.test"));
+    assertFalse(LuceneTestCase.slowFileExists(directory, "testing.test"));
   }
   
   public void testRename() throws IOException {
@@ -136,14 +139,14 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
     output.writeInt(12345);
     output.close();
     directory.rename("testing.test", "testing.test.renamed");
-    assertFalse(slowFileExists(directory, "testing.test"));
-    assertTrue(slowFileExists(directory, "testing.test.renamed"));
+    assertFalse(LuceneTestCase.slowFileExists(directory, "testing.test"));
+    assertTrue(LuceneTestCase.slowFileExists(directory, "testing.test.renamed"));
     IndexInput input = directory.openInput("testing.test.renamed", new IOContext());
     assertEquals(12345, input.readInt());
     assertEquals(input.getFilePointer(), input.length());
     input.close();
     directory.deleteFile("testing.test.renamed");
-    assertFalse(slowFileExists(directory, "testing.test.renamed"));
+    assertFalse(LuceneTestCase.slowFileExists(directory, "testing.test.renamed"));
   }
   
   @Test
@@ -161,7 +164,7 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
   private void testEof(String name, Directory directory, long length) throws IOException {
     IndexInput input = directory.openInput(name, new IOContext());
     input.seek(length);
-    expectThrows(Exception.class, input::readByte);
+    SolrTestCaseUtil.expectThrows(Exception.class, input::readByte);
   }
 
   @Test
@@ -169,23 +172,23 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
     int i = 0;
     try {
       Set<String> names = new HashSet<>();
-      for (; i< 10; i++) {
+      for (; i< (TEST_NIGHTLY ? 10 : 1); i++) {
         Directory fsDir = new ByteBuffersDirectory();
         String name = getName();
-        System.out.println("Working on pass [" + i  +"] contains [" + names.contains(name) + "]");
+        //System.out.println("Working on pass [" + i  +"] contains [" + names.contains(name) + "]");
         names.add(name);
         createFile(name,fsDir,directory);
         assertInputsEquals(name,fsDir,directory);
         fsDir.close();
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      log.error("", e);
       fail("Test failed on pass [" + i + "]");
     }
   }
 
   private void assertInputsEquals(String name, Directory fsDir, HdfsDirectory hdfs) throws IOException {
-    int reads = random.nextInt(MAX_NUMBER_OF_READS);
+    int reads = random.nextInt(TEST_NIGHTLY ? MAX_NUMBER_OF_READS : 5000);
     IndexInput fsInput = fsDir.openInput(name,new IOContext());
     IndexInput hdfsInput = hdfs.openInput(name,new IOContext());
     assertEquals(fsInput.length(), hdfsInput.length());
@@ -239,8 +242,7 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
     try (IndexOutput out = directory.createOutput("foo", IOContext.DEFAULT)) {
       out.writeByte((byte) 42);
     }
-    expectThrows(FileAlreadyExistsException.class,
-        () -> directory.createOutput("foo", IOContext.DEFAULT));
+    SolrTestCaseUtil.expectThrows(FileAlreadyExistsException.class, () -> directory.createOutput("foo", IOContext.DEFAULT));
   }
 
   public void testCreateTempFiles() throws IOException {

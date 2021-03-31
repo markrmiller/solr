@@ -30,6 +30,7 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.util.Bits;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.analytics.ExpressionFactory;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.util.RefCounted;
@@ -60,7 +61,7 @@ public class AbstractAnalyticsFieldTest extends SolrTestCaseJ4 {
   private static List<String> missingDocuments;
 
   @BeforeClass
-  public static void createSchemaAndFields() throws Exception {
+  public static void beforeAbstractAnalyticsFieldTest() throws Exception {
     initCore("solrconfig-analytics.xml","schema-analytics.xml");
 
     singleInts = new HashMap<>();
@@ -209,11 +210,12 @@ public class AbstractAnalyticsFieldTest extends SolrTestCaseJ4 {
       multiBooleans.put(""+i, booleans);
     }
     assertU(commit());
+    try (SolrCore core = h.getCore()) {
+      ref = core.getSearcher();
+      searcher = ref.get();
 
-    ref = h.getCore().getSearcher();
-    searcher = ref.get();
-
-    indexSchema = h.getCore().getLatestSchema();
+      indexSchema = core.getLatestSchema();
+    }
   }
 
   protected ExpressionFactory getExpressionFactory() {
@@ -223,7 +225,7 @@ public class AbstractAnalyticsFieldTest extends SolrTestCaseJ4 {
   }
 
   @AfterClass
-  public static void closeSearcher() throws IOException {
+  public static void afterAbstractAnalyticsFieldTest() throws IOException {
     if (null != ref) {
       ref.decref();
       ref = null;
@@ -231,6 +233,24 @@ public class AbstractAnalyticsFieldTest extends SolrTestCaseJ4 {
     indexSchema = null;
     searcher = null;
     ref = null;
+
+    singleInts = null;
+    multiInts = null;
+    singleLongs = null;
+    multiLongs = null;
+    singleFloats = null;
+    multiFloats = null;
+    singleDoubles = null;
+    multiDoubles = null;
+    singleDates = null;
+    multiDates = null;
+    singleStrings = null;
+    multiStrings = null;
+    singleBooleans = null;
+    multiBooleans = null;
+
+    missingDocuments = null;
+
   }
 
   protected <T> void checkSingleFieldValues(Map<String,T> expected, Map<String,T> found, Set<String> missing) {

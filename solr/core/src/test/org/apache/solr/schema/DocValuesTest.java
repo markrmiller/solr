@@ -32,6 +32,7 @@ import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.queries.function.FunctionValues;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.NumericUtils;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.core.SolrCore;
@@ -51,15 +52,14 @@ public class DocValuesTest extends SolrTestCaseJ4 {
     initCore("solrconfig-basic.xml", "schema-docValues.xml");
 
     // sanity check our schema meets our expectations
-    final IndexSchema schema = h.getCore().getLatestSchema();
-    for (String f : new String[] {"floatdv", "intdv", "doubledv", "longdv", "datedv", "stringdv", "booldv"}) {
-      final SchemaField sf = schema.getField(f);
-      assertFalse(f + " is multiValued, test is useless, who changed the schema?",
-                  sf.multiValued());
-      assertFalse(f + " is indexed, test is useless, who changed the schema?",
-                  sf.indexed());
-      assertTrue(f + " has no docValues, test is useless, who changed the schema?",
-                 sf.hasDocValues());
+    try (SolrCore core = h.getCore()) {
+      final IndexSchema schema = core.getLatestSchema();
+      for (String f : new String[] {"floatdv", "intdv", "doubledv", "longdv", "datedv", "stringdv", "booldv"}) {
+        final SchemaField sf = schema.getField(f);
+        assertFalse(f + " is multiValued, test is useless, who changed the schema?", sf.multiValued());
+        assertFalse(f + " is indexed, test is useless, who changed the schema?", sf.indexed());
+        assertTrue(f + " has no docValues, test is useless, who changed the schema?", sf.hasDocValues());
+      }
     }
   }
 
@@ -228,7 +228,7 @@ public class DocValuesTest extends SolrTestCaseJ4 {
       assertU(adoc("id", "" + i));
     }
     for (int i = 0; i < 50; ++i) {
-      if (rarely()) {
+      if (LuceneTestCase.rarely()) {
         assertU(commit()); // to have several segments
       }
       switch (i % 3) {
@@ -298,7 +298,7 @@ public class DocValuesTest extends SolrTestCaseJ4 {
   public void testDocValuesStats() {
     for (int i = 0; i < 50; ++i) {
       assertU(adoc("id", "1000" + i, "floatdv", "" + i%2, "intdv", "" + i%3, "doubledv", "" + i%4, "longdv", "" + i%5, "datedv", (1900+i%6) + "-12-31T23:59:59.999Z", "stringdv", "abc" + i%7));
-      if (rarely()) {
+      if (LuceneTestCase.rarely()) {
         assertU(commit()); // to have several segments
       }
     }
@@ -550,7 +550,7 @@ public class DocValuesTest extends SolrTestCaseJ4 {
           largestValue[i], positiveInfinity[i], zero[i]};
 
       List<Number> values = new ArrayList<>();
-      int numDocs = 1 + random().nextInt(10);
+      int numDocs = 1 + random().nextInt(TEST_NIGHTLY ? 10 : 5);
       for (int j=0; j<numDocs; j++) {
         
         if (random().nextInt(100) < 5) { // Add a boundary value with 5% probability
@@ -572,7 +572,7 @@ public class DocValuesTest extends SolrTestCaseJ4 {
 
       log.info("Indexed values: {}", values);
       // Querying
-      int numQueries = 10000;
+      int numQueries = TEST_NIGHTLY ? 10000 : 100;
       for (int j=0; j<numQueries; j++) {
         boolean minInclusive = random().nextBoolean();
         boolean maxInclusive = random().nextBoolean();

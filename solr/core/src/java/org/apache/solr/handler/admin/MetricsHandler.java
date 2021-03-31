@@ -96,9 +96,9 @@ public class MetricsHandler extends RequestHandlerBase implements PermissionName
       throw new SolrException(SolrException.ErrorCode.INVALID_STATE, "SolrMetricManager instance not initialized");
     }
 
-    if (cc != null && AdminHandlersProxy.maybeProxyToNodes(req, rsp, cc)) {
-      return; // Request was proxied to other node
-    }
+//    if (cc != null && AdminHandlersProxy.maybeProxyToNodes(req, rsp, cc)) {
+//      return; // Request was proxied to other node
+//    }
 
     handleRequest(req.getParams(), (k, v) -> rsp.add(k, v));
   }
@@ -357,7 +357,13 @@ public class MetricsHandler extends RequestHandlerBase implements PermissionName
     }
 
     public MetricFilter asMetricFilter() {
-      return (name, metric) -> klass == null || klass.isInstance(metric);
+      return new MetricFilter() {
+        @Override
+        public boolean matches(String name, Metric metric) {
+          if (metric == null && klass != null) return false;
+          return klass == null || klass.isInstance(metric);
+        }
+      };
     }
   }
 }

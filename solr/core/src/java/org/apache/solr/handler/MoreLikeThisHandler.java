@@ -39,12 +39,13 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.CharsRefBuilder;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.FacetParams;
-import org.apache.solr.common.params.MoreLikeThisParams.TermStyle;
 import org.apache.solr.common.params.MoreLikeThisParams;
+import org.apache.solr.common.params.MoreLikeThisParams.TermStyle;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.NamedList;
@@ -275,6 +276,7 @@ public class MoreLikeThisHandler extends RequestHandlerBase
               rsp.add("debug", dbgInfo);
             }
           } catch (Exception e) {
+            ParWork.propagateInterrupt(e);
             SolrException.log(log, "Exception during debug", e);
             rsp.add("exception_during_debug", SolrException.toStr(e));
           }
