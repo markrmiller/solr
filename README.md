@@ -1,2 +1,5 @@
+![dragon](https://user-images.githubusercontent.com/448788/114213458-9c99d180-9928-11eb-8d26-bcf795724db5.gif)
 
-![wall2](https://user-images.githubusercontent.com/448788/112782965-d65b0600-9013-11eb-9e78-d7dcc783cc25.png)
+# Changes
+
+## Outline: [Reference Branch](https://github.com/markrmiller/solr/projects/1) 
