@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.Utils;
@@ -30,6 +31,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+@LuceneTestCase.Nightly
 public class TestOriginalScoreFeature extends TestRerankBase {
 
   @Before
@@ -75,7 +77,7 @@ public class TestOriginalScoreFeature extends TestRerankBase {
     implTestOriginalScoreResponseDocsCheck("origScore", "origScore", "c2", "2.0");
   }
 
-  public static void implTestOriginalScoreResponseDocsCheck(String modelName,
+  public void implTestOriginalScoreResponseDocsCheck(String modelName,
       String origScoreFeatureName,
       String nonScoringFeatureName, String nonScoringFeatureValue) throws Exception {
 
@@ -133,7 +135,7 @@ public class TestOriginalScoreFeature extends TestRerankBase {
         nonScoringFeatureName, nonScoringFeatureValue, debugQuery);
   }
 
-  private static void implTestOriginalScoreResponseDocsCheck(String modelName,
+  private void implTestOriginalScoreResponseDocsCheck(String modelName,
       SolrQuery query, int docIdx, int docId,
       String origScoreFeatureName, String origScoreFeatureValue,
       String nonScoringFeatureName, String nonScoringFeatureValue,

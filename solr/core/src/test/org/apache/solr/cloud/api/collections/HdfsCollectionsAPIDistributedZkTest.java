@@ -16,29 +16,23 @@
  */
 package org.apache.solr.cloud.api.collections;
 
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-import com.carrotsearch.randomizedtesting.annotations.TimeoutSuite;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
-import org.apache.lucene.util.TimeUnits;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.hdfs.HdfsTestUtil;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 @Slow
-@Nightly
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
-@TimeoutSuite(millis = TimeUnits.HOUR)
+@LuceneTestCase.Nightly
 public class HdfsCollectionsAPIDistributedZkTest extends CollectionsAPIDistributedZkTest {
   private static MiniDFSCluster dfsCluster;
 
   @BeforeClass
   public static void setupClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    configSet = getConfigSet();
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
 
   @AfterClass
@@ -50,8 +44,7 @@ public class HdfsCollectionsAPIDistributedZkTest extends CollectionsAPIDistribut
     }
   }
 
-  @Override
-  protected String getConfigSet() {
+  protected static String getConfigSet() {
     return "cloud-hdfs";
   }
 }

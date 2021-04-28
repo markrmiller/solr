@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.Term;
@@ -44,8 +45,10 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.LocalSolrQueryRequest;
@@ -110,52 +113,43 @@ public class BlobHandler extends RequestHandlerBase implements PluginInfoInitial
 
       for (ContentStream stream : req.getContentStreams()) {
         ByteBuffer payload;
-        try (InputStream is = stream.getStream()) {
+        InputStream is = new CloseShieldInputStream(stream.getStream());
+        try {
           payload = SimplePostTool.inputStreamToByteArray(is, maxSize);
-        }
-        MessageDigest m = MessageDigest.getInstance("MD5");
-        m.update(payload.array(), payload.position(), payload.limit());
-        String md5 = new String(Hex.encodeHex(m.digest()));
 
-        int duplicateCount = req.getSearcher().count(new TermQuery(new Term("md5", md5)));
-        if (duplicateCount > 0) {
-          rsp.add("error", "duplicate entry");
-          forward(req, null,
-              new MapSolrParams((Map) makeMap(
-                  "q", "md5:" + md5,
-                  "fl", "id,size,version,timestamp,blobName")),
-              rsp);
-          log.warn("duplicate entry for blob : {}", blobName);
-          return;
-        }
+          MessageDigest m = MessageDigest.getInstance("MD5");
+          m.update(payload.array(), payload.position(), payload.limit());
+          String md5 = new String(Hex.encodeHex(m.digest()));
 
-        TopFieldDocs docs = req.getSearcher().search(new TermQuery(new Term("blobName", blobName)),
-            1, new Sort(new SortField("version", SortField.Type.LONG, true)));
+          int duplicateCount = req.getSearcher().count(new TermQuery(new Term("md5", md5)));
+          if (duplicateCount > 0) {
+            rsp.add("error", "duplicate entry");
+            forward(req, null, new MapSolrParams((Map) makeMap("q", "md5:" + md5, "fl", "id,size,version,timestamp,blobName")), rsp);
+            log.warn("duplicate entry for blob : {}", blobName);
+            return;
+          }
 
-        long version = 0;
-        if (docs.totalHits.value > 0) {
-          Document doc = req.getSearcher().doc(docs.scoreDocs[0].doc);
-          Number n = doc.getField("version").numericValue();
-          version = n.longValue();
-        }
-        version++;
-        String id = blobName + "/" + version;
-        Map<String, Object> doc = makeMap(
-            ID, id,
-            CommonParams.TYPE, "blob",
-            "md5", md5,
-            "blobName", blobName,
-            VERSION, version,
-            "timestamp", new Date(),
-            "size", payload.limit(),
-            "blob", payload);
-        verifyWithRealtimeGet(blobName, version, req, doc);
-        if (log.isInfoEnabled()) {
-          log.info(StrUtils.formatString("inserting new blob {0} ,size {1}, md5 {2}", doc.get(ID), String.valueOf(payload.limit()), md5));
-        }
-        indexMap(req, rsp, doc);
-        if (log.isInfoEnabled()) {
-          log.info(" Successfully Added and committed a blob with id {} and size {} ", id, payload.limit());
+          TopFieldDocs docs = req.getSearcher().search(new TermQuery(new Term("blobName", blobName)), 1, new Sort(new SortField("version", SortField.Type.LONG, true)));
+
+          long version = 0;
+          if (docs.totalHits.value > 0) {
+            Document doc = req.getSearcher().doc(docs.scoreDocs[0].doc);
+            Number n = doc.getField("version").numericValue();
+            version = n.longValue();
+          }
+          version++;
+          String id = blobName + "/" + version;
+          Map<String,Object> doc = makeMap(ID, id, CommonParams.TYPE, "blob", "md5", md5, "blobName", blobName, VERSION, version, "timestamp", new Date(), "size", payload.limit(), "blob", payload);
+          verifyWithRealtimeGet(blobName, version, req, doc);
+          if (log.isInfoEnabled()) {
+            log.info(StrUtils.formatString("inserting new blob {0} ,size {1}, md5 {2}", doc.get(ID), String.valueOf(payload.limit()), md5));
+          }
+          indexMap(req, rsp, doc);
+          if (log.isInfoEnabled()) {
+            log.info(" Successfully Added and committed a blob with id {} and size {} ", id, payload.limit());
+          }
+        } finally {
+          Utils.readFully(is);
         }
 
         break;
@@ -181,22 +175,7 @@ public class BlobHandler extends RequestHandlerBase implements PluginInfoInitial
           QParser qparser = QParser.getParser(StrUtils.formatString(q, blobName, version), req);
           final TopDocs docs = req.getSearcher().search(qparser.parse(), 1, new Sort(new SortField("version", SortField.Type.LONG, true)));
           if (docs.totalHits.value > 0) {
-            rsp.add(ReplicationHandler.FILE_STREAM, new SolrCore.RawWriter() {
-
-              @Override
-              public void write(OutputStream os) throws IOException {
-                Document doc = req.getSearcher().doc(docs.scoreDocs[0].doc);
-                IndexableField sf = doc.getField("blob");
-                FieldType fieldType = req.getSchema().getField("blob").getType();
-                ByteBuffer buf = (ByteBuffer) fieldType.toObject(sf);
-                if (buf == null) {
-                  //should never happen unless a user wrote this document directly
-                  throw new SolrException(SolrException.ErrorCode.NOT_FOUND, "Invalid document . No field called blob");
-                } else {
-                  os.write(buf.array(), 0, buf.limit());
-                }
-              }
-            });
+            rsp.add(ReplicationHandler.FILE_STREAM, new MyRawWriter(req, docs));
 
           } else {
             throw new SolrException(SolrException.ErrorCode.NOT_FOUND,
@@ -247,7 +226,9 @@ public class BlobHandler extends RequestHandlerBase implements PluginInfoInitial
     for (Map.Entry<String, Object> e : doc.entrySet()) solrDoc.addField(e.getKey(), e.getValue());
     UpdateRequestProcessorChain processorChain = req.getCore().getUpdateProcessorChain(req.getParams());
     try (UpdateRequestProcessor processor = processorChain.createProcessor(req, rsp)) {
-      AddUpdateCommand cmd = new AddUpdateCommand(req);
+      AddUpdateCommand cmd  = AddUpdateCommand.THREAD_LOCAL_AddUpdateCommand.get();
+      cmd.clear();
+      cmd.setReq(req);
       cmd.solrDoc = solrDoc;
       log.info("Adding doc: {}", doc);
       processor.processAdd(cmd);
@@ -318,5 +299,30 @@ public class BlobHandler extends RequestHandlerBase implements PluginInfoInitial
         return null;
     }
 
+  }
+
+  private static class MyRawWriter implements SolrCore.RawWriter {
+
+    private final SolrQueryRequest req;
+    private final TopDocs docs;
+
+    public MyRawWriter(SolrQueryRequest req, TopDocs docs) {
+      this.req = req;
+      this.docs = docs;
+    }
+
+    @Override
+    public void write(OutputStream os) throws IOException {
+      Document doc = req.getSearcher().doc(docs.scoreDocs[0].doc);
+      IndexableField sf = doc.getField("blob");
+      FieldType fieldType = req.getSchema().getField("blob").getType();
+      ByteBuffer buf = (ByteBuffer) fieldType.toObject(sf);
+      if (buf == null) {
+        //should never happen unless a user wrote this document directly
+        throw new SolrException(SolrException.ErrorCode.NOT_FOUND, "Invalid document . No field called blob");
+      } else {
+        os.write(buf.array(), 0, buf.limit());
+      }
+    }
   }
 }

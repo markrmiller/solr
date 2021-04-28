@@ -19,6 +19,8 @@ package org.apache.solr.util;
 import org.apache.lucene.index.ForceMergePolicy;
 import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
+import org.apache.solr.cloud.SolrCloudTestCase;
 
 /**
  * A {@link MergePolicy} with a no-arg constructor that proxies to a
@@ -31,7 +33,7 @@ import org.apache.lucene.util.LuceneTestCase;
 public final class RandomForceMergePolicy extends RandomMergePolicy {
 
   public RandomForceMergePolicy() {
-    super(new ForceMergePolicy(LuceneTestCase.newMergePolicy()));
+    super(new ForceMergePolicy(SolrTestUtil.newMergePolicy()));
   }
 
 }

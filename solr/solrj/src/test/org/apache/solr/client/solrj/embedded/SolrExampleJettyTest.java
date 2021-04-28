@@ -16,9 +16,27 @@
  */
 package org.apache.solr.client.solrj.embedded;
 
-import java.io.ByteArrayInputStream;
+import org.apache.commons.io.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCase;
+import org.apache.solr.client.solrj.SolrExampleTests;
+import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.BinaryResponseParser;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.util.NamedList;
+import org.junit.Ignore;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.solr.common.util.Utils.fromJSONString;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,67 +44,38 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
-import org.apache.solr.client.solrj.SolrExampleTests;
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.BinaryResponseParser;
-import org.apache.solr.client.solrj.impl.HttpClientUtil;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.util.NamedList;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
-
-import static org.apache.solr.common.util.Utils.fromJSONString;
-
 /**
  * TODO? perhaps use:
  *  http://docs.codehaus.org/display/JETTY/ServletTester
  * rather then open a real connection?
  * 
  */
-@SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
+@SolrTestCase.SuppressSSL(bugUrl = "https://issues.apache.org/jira/browse/SOLR-5776")
 public class SolrExampleJettyTest extends SolrExampleTests {
-
-  @BeforeClass
-  public static void beforeTest() throws Exception {
-    createAndStartJetty(legacyExampleCollection1SolrHome());
-  }
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Test
+  @Ignore // MRM TODO: ~ debug
   public void testBadSetup() {
     // setup the server...
     String url = "http" + (isSSLMode() ? "s" : "") +  "://127.0.0.1/?core=xxx";
-    expectThrows(Exception.class, () -> getHttpSolrClient(url));
+    LuceneTestCase.expectThrows(Exception.class, () -> getHttpSolrClient(url));
   }
 
   @Test
   public void testArbitraryJsonIndexing() throws Exception  {
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
+    Http2SolrClient client = (Http2SolrClient) getSolrClient(jetty);
     client.deleteByQuery("*:*");
     client.commit();
     assertNumFound("*:*", 0); // make sure it got in
 
     // two docs, one with uniqueKey, another without it
     String json = "{\"id\":\"abc1\", \"name\": \"name1\"} {\"name\" : \"name2\"}";
-    HttpClient httpClient = client.getHttpClient();
-    HttpPost post = new HttpPost(getUri(client));
-    post.setHeader("Content-Type", "application/json");
-    post.setEntity(new InputStreamEntity(
-        new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), -1));
-    HttpResponse response = httpClient.execute(post, HttpClientUtil.createNewHttpClientRequestContext());
-    assertEquals(200, response.getStatusLine().getStatusCode());
+
+    Http2SolrClient.SimpleResponse resp = Http2SolrClient.POST(getUri(client), client, json.getBytes(StandardCharsets.UTF_8), "application/json");
+    assertEquals(200, resp.status);
     client.commit();
-    QueryResponse rsp = getSolrClient().query(new SolrQuery("*:*"));
+    QueryResponse rsp = getSolrClient(jetty).query(new SolrQuery("*:*"));
     assertEquals(2,rsp.getResults().getNumFound());
 
     SolrDocument doc = rsp.getResults().get(0);
@@ -102,7 +91,7 @@ public class SolrExampleJettyTest extends SolrExampleTests {
 
   }
 
-  private String getUri(HttpSolrClient client) {
+  private String getUri(Http2SolrClient client) {
     String baseURL = client.getBaseURL();
     return random().nextBoolean() ?
         baseURL.replace("/collection1", "/____v2/cores/collection1/update") :
@@ -116,7 +105,7 @@ public class SolrExampleJettyTest extends SolrExampleTests {
     doc.addField("id", "1");
     doc.addField("b_is", IntStream.range(0, 30000).boxed().collect(Collectors.toList()));
 
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
+    Http2SolrClient client = (Http2SolrClient) getSolrClient(jetty);
     client.add(doc);
     client.commit();
     long start = System.nanoTime();
@@ -126,9 +115,10 @@ public class SolrExampleJettyTest extends SolrExampleTests {
 
   }
 
-  @Ignore
+  @LuceneTestCase.Nightly
+  @Test
   public void testUtf8QueryPerf() throws Exception {
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
+    Http2SolrClient client = (Http2SolrClient)getSolrClient(jetty);
     client.deleteByQuery("*:*");
     client.commit();
     List<SolrInputDocument> docs = new ArrayList<>();
@@ -148,17 +138,7 @@ public class SolrExampleJettyTest extends SolrExampleTests {
     assertEquals(10, rsp.getResults().getNumFound());
 
 
-    client.setParser(new BinaryResponseParser() {
-      @Override
-      public NamedList<Object> processResponse(InputStream body, String encoding) {
-        try {
-          IOUtils.skip(body, 1024 * 1000);
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-        return rsp.getResponse();
-      }
-    });
+    client.setParser(new MyBinaryResponseParser(rsp));
 
 
     runQueries(client, 1000, true);
@@ -171,7 +151,7 @@ public class SolrExampleJettyTest extends SolrExampleTests {
   }
 
 
-  private void runQueries(HttpSolrClient client, int count, boolean warmup) throws SolrServerException, IOException {
+  private void runQueries(Http2SolrClient client, int count, boolean warmup) throws SolrServerException, IOException {
     long start = System.nanoTime();
     for (int i = 0; i < count; i++) {
       client.query(new SolrQuery("*:*"));
@@ -180,4 +160,21 @@ public class SolrExampleJettyTest extends SolrExampleTests {
     System.out.println("time taken : " + ((System.nanoTime() - start)) / (1000 * 1000));
   }
 
+  private static class MyBinaryResponseParser extends BinaryResponseParser {
+    private final QueryResponse rsp;
+
+    public MyBinaryResponseParser(QueryResponse rsp) {
+      this.rsp = rsp;
+    }
+
+    @Override
+    public NamedList<Object> processResponse(InputStream body, String encoding) {
+      try {
+        IOUtils.skip(body, 1024 * 1000);
+      } catch (IOException e) {
+        log.error("", e);
+      }
+      return rsp.getResponse();
+    }
+  }
 }

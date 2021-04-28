@@ -48,7 +48,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.solr.cloud.Overseer.QUEUE_OPERATION;
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.CORE_NAME_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.CORE_NODE_NAME_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.ELECTION_NODE_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.LEADER_PROP;
 import static org.apache.solr.common.cloud.ZkStateReader.MAX_AT_ONCE_PROP;
@@ -176,7 +175,6 @@ class RebalanceLeaders {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
           String.format(Locale.ROOT, "The " + COLLECTION_PROP + " is required for the Rebalance Leaders command."));
     }
-    coreContainer.getZkController().getZkStateReader().forceUpdateCollection(collectionName);
     ClusterState clusterState = coreContainer.getZkController().getClusterState();
 
     DocCollection dc = clusterState.getCollection(collectionName);
@@ -191,7 +189,7 @@ class RebalanceLeaders {
   private void checkLeaderStatus() throws InterruptedException, KeeperException {
     for (int idx = 0; pendingOps.size() > 0 && idx < 600; ++idx) {
       ClusterState clusterState = coreContainer.getZkController().getClusterState();
-      Set<String> liveNodes = clusterState.getLiveNodes();
+      Set<String> liveNodes = coreContainer.getZkController().getZkStateReader().getLiveNodes();
       DocCollection dc = clusterState.getCollection(collectionName);
       for (Slice slice : dc.getSlices()) {
         for (Replica replica : slice.getReplicas()) {
@@ -208,7 +206,6 @@ class RebalanceLeaders {
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);
-      coreContainer.getZkController().getZkStateReader().forciblyRefreshAllClusterStateSlow();
     }
     addAnyFailures();
   }
@@ -234,7 +231,7 @@ class RebalanceLeaders {
       }
       ZkStateReader zkStateReader = coreContainer.getZkController().getZkStateReader();
       // We're the preferred leader, but someone else is leader. Only become leader if we're active.
-      if (replica.isActive(zkStateReader.getClusterState().getLiveNodes()) == false) {
+      if (replica.isActive(zkStateReader.getLiveNodes()) == false) {
         addInactiveToResults(slice, replica);
         return; // Don't try to become the leader if we're not active!
       }
@@ -393,7 +390,6 @@ class RebalanceLeaders {
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);
-      zkStateReader.forciblyRefreshAllClusterStateSlow();
     }
     return -1;
   }
@@ -408,8 +404,7 @@ class RebalanceLeaders {
     propMap.put(SHARD_ID_PROP, slice.getName());
     propMap.put(QUEUE_OPERATION, REBALANCELEADERS.toLower());
     propMap.put(CORE_NAME_PROP, core);
-    propMap.put(CORE_NODE_NAME_PROP, replica.getName());
-    propMap.put(ZkStateReader.BASE_URL_PROP, replica.getProperties().get(ZkStateReader.BASE_URL_PROP));
+    propMap.put(ZkStateReader.NODE_NAME_PROP, replica.getNodeName());
     propMap.put(REJOIN_AT_HEAD_PROP, Boolean.toString(rejoinAtHead)); // Get ourselves to be first in line.
     propMap.put(ELECTION_NODE_PROP, electionNode);
     String asyncId = REBALANCELEADERS.toLower() + "_" + core + "_" + Math.abs(System.nanoTime());

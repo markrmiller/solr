@@ -30,13 +30,14 @@ import org.apache.solr.common.cloud.DocRouter;
 import org.apache.solr.common.cloud.DocRouter.Range;
 import org.apache.solr.common.cloud.PlainIdRouter;
 import org.apache.solr.common.cloud.Slice;
+import org.apache.solr.common.cloud.StateUpdates;
 import org.apache.solr.common.util.Hash;
 import org.apache.solr.common.util.StrUtils;
 
 public class TestHashPartitioner extends SolrTestCaseJ4 {
   
   public void testMapHashes() throws Exception {
-    DocRouter hp = DocRouter.DEFAULT;
+    DocRouter hp = CompositeIdRouter.DEFAULT;
     List<Range> ranges;
 
     // make sure the partitioner uses the "natural" boundaries and doesn't suffer from an off-by-one
@@ -55,7 +56,7 @@ public class TestHashPartitioner extends SolrTestCaseJ4 {
 
     int defaultLowerBits = 0x0000ffff;
 
-    for (int i = 1; i <= 30000; i++) {
+    for (int i = 1; i <= (TEST_NIGHTLY ? 15000 : 3000); i++) {
       // start skipping at higher numbers
       if (i > 100) i+=13;
       else if (i > 1000) i+=31;
@@ -159,7 +160,7 @@ public class TestHashPartitioner extends SolrTestCaseJ4 {
   public void testCompositeHashCodes() throws Exception {
     DocRouter router = DocRouter.getDocRouter(CompositeIdRouter.NAME);
     assertTrue(router instanceof CompositeIdRouter);
-    router = DocRouter.DEFAULT;
+    router = CompositeIdRouter.DEFAULT;
     assertTrue(router instanceof CompositeIdRouter);
 
     DocCollection coll = createCollection(4, router);
@@ -253,7 +254,7 @@ public class TestHashPartitioner extends SolrTestCaseJ4 {
      // shard3: 00
      // shard4: 01
   
-     String[] highBitsToShard = {"shard3","shard4","shard1","shard2"};
+     String[] highBitsToShard = {"shard3","shard4","s1","s2"};
   
   
      for (int i = 0; i<26; i++) {
@@ -273,11 +274,12 @@ public class TestHashPartitioner extends SolrTestCaseJ4 {
     Map<String,Slice> slices = new HashMap<>();
     for (int i=0; i<ranges.size(); i++) {
       Range range = ranges.get(i);
-      Slice slice = new Slice("shard"+(i+1), null, map("range",range), "collections1");
+      Slice slice = new Slice("shard"+(i+1), null, map("range",range), "collections1", -1);
       slices.put(slice.getName(), slice);
     }
-
-    DocCollection coll = new DocCollection("collection1", slices, null, router);
+    Map<String, Object> collectionProps = new HashMap<>();
+    collectionProps.put("id", -1l);
+    DocCollection coll = new DocCollection("collection1", slices, collectionProps, router);
     return coll;
   }
 

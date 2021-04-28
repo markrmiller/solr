@@ -18,19 +18,22 @@
 package org.apache.solr.util;
 
 import java.util.Arrays;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntConsumer;
 
 import com.carrotsearch.hppc.IntIntHashMap;
 import com.carrotsearch.hppc.cursors.IntCursor;
 import com.carrotsearch.hppc.procedures.IntIntProcedure;
 import org.apache.lucene.util.ArrayUtil;
+import org.apache.solr.search.CollapsingQParserPlugin;
 
 public class IntIntDynamicMap implements DynamicMap {
   private int maxSize;
   private IntIntHashMap hashMap;
   private int[] keyValues;
-  private int emptyValue;
-  private int threshold;
+  private final int emptyValue;
+  private final int threshold;
 
   /**
    * Create map with expected max value of key.

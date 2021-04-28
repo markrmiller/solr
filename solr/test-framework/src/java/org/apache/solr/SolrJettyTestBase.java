@@ -19,44 +19,84 @@ package org.apache.solr;
 import java.io.File;
 import java.io.OutputStreamWriter;
 import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
+import java.util.Set;
 import java.util.SortedMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.common.ParWork;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.util.ExternalPaths;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.nio.charset.StandardCharsets;
 
 abstract public class SolrJettyTestBase extends SolrTestCaseJ4
 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @BeforeClass
-  public static void beforeSolrJettyTestBase() throws Exception {
 
+  public static Set<JettySolrRunner> jettys = ConcurrentHashMap.newKeySet();
+  public static Set<SolrClient> clients = ConcurrentHashMap.newKeySet();
+
+  protected static volatile SolrClient client;
+  protected static volatile JettySolrRunner jetty;
+
+  public static int port;
+  public static String context;
+
+  @Before
+  public void setUp() throws Exception {
+    super.setUp();
+
+    if (jetty == null && jettys.size() > 0) {
+      jetty = jettys.iterator().next();
+    }
+
+    if (client == null && jetty != null) {
+      client = createNewSolrClient(jetty);
+    }
   }
 
-  public static JettySolrRunner jetty;
-  public static int port;
-  public static SolrClient client = null;
-  public static String context;
+  @AfterClass
+  public static void afterSolrJettyTestBase() throws Exception {
+    clients.forEach(solrClient -> IOUtils.closeQuietly(solrClient));
+    clients.clear();
+    IOUtils.closeQuietly(client);
+
+    jettys.forEach(jettySolrRunner -> {
+      try {
+        jettySolrRunner.stop();
+      } catch (Exception e) {
+        log.warn("", e);
+      }
+    });
+    jettys.clear();
+
+    jetty = null;
+    client = null;
+    port = 0;
+    context = null;
+  }
 
   public static JettySolrRunner createAndStartJetty(String solrHome, String configFile, String schemaFile, String context,
                                             boolean stopAtShutdown, SortedMap<ServletHolder,String> extraServlets)
       throws Exception {
     // creates the data dir
+
+
 
     context = context==null ? "/solr" : context;
     SolrJettyTestBase.context = context;
@@ -74,7 +114,7 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
     if (schemaFile != null)
       nodeProps.setProperty("schema", schemaFile);
     if (System.getProperty("solr.data.dir") == null && System.getProperty("solr.hdfs.home") == null) {
-      nodeProps.setProperty("solr.data.dir", createTempDir().toFile().getCanonicalPath());
+      nodeProps.setProperty("solr.data.dir", SolrTestUtil.createTempDir().toFile().getCanonicalPath());
     }
 
     return createAndStartJetty(solrHome, nodeProps, jettyConfig);
@@ -93,10 +133,9 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
   }
 
   public static JettySolrRunner createAndStartJetty(String solrHome, Properties nodeProperties, JettyConfig jettyConfig) throws Exception {
+  //  initCore(null, null, solrHome);
 
-    initCore(null, null, solrHome);
-
-    Path coresDir = createTempDir().resolve("cores");
+    Path coresDir = Paths.get(solrHome,"cores");
 
     Properties props = new Properties();
     props.setProperty("name", DEFAULT_TEST_CORENAME);
@@ -110,32 +149,24 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
     nodeProps.setProperty("coreRootDirectory", coresDir.toString());
     nodeProps.setProperty("configSetBaseDir", solrHome);
 
-    jetty = new JettySolrRunner(solrHome, nodeProps, jettyConfig);
+    JettySolrRunner jetty = new JettySolrRunner(solrHome, nodeProps,
+        jettyConfig);
     jetty.start();
     port = jetty.getLocalPort();
     log.info("Jetty Assigned Port#{}", port);
+
+    jettys.add(jetty);
+
     return jetty;
   }
 
   @After
-  public synchronized void afterClass() throws Exception {
-    if (client != null) client.close();
-    client = null;
+  public void tearDown() throws Exception {
+    super.tearDown();
   }
 
-  @AfterClass
-  public static void afterSolrJettyTestBase() throws Exception {
-    if (jetty != null) {
-      jetty.stop();
-      jetty = null;
-    }
-  }
-
-  public synchronized SolrClient getSolrClient() {
-    if (client == null) {
-      client = createNewSolrClient();
-    }
-    return client;
+  public SolrClient getSolrClient(JettySolrRunner jetty) {
+   return client;
   }
 
   /**
@@ -144,12 +175,11 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
    * otherwise an embedded implementation will be created.
    * Subclasses should override for other options.
    */
-  public SolrClient createNewSolrClient() {
+  public SolrClient createNewSolrClient(JettySolrRunner jetty) {
     try {
       // setup the client...
-      final String url = jetty.getBaseUrl().toString() + "/" + "collection1";
-      final HttpSolrClient client = getHttpSolrClient(url, DEFAULT_CONNECTION_TIMEOUT);
-      return client;
+      final String url = jetty.getBaseUrl() + "/" + "collection1";
+      return getHttpSolrClient(url, DEFAULT_CONNECTION_TIMEOUT);
     } catch (final Exception ex) {
       throw new RuntimeException(ex);
     }
@@ -192,7 +222,9 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
         if (writer != null) {
           try {
             writer.close();
-          } catch (Exception ignore){}
+          } catch (Exception ignore){
+            ParWork.propagateInterrupt(ignore);
+          }
         }
       }
       legacyExampleSolrHome = tempSolrHome.getAbsolutePath();

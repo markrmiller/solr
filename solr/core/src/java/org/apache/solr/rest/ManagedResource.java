@@ -25,15 +25,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.rest.ManagedResourceStorage.StorageIO;
-import org.restlet.data.Status;
-import org.restlet.representation.Representation;
-import org.restlet.resource.ResourceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +48,7 @@ public abstract class ManagedResource {
    * Marker interface to indicate a ManagedResource implementation class also supports
    * managing child resources at path: /&lt;resource&gt;/{child}
    */
-  public static interface ChildResourceSupport {}
+  public interface ChildResourceSupport {}
  
   public static final String INIT_ARGS_JSON_FIELD = "initArgs";
   public static final String MANAGED_JSON_LIST_FIELD = "managedList";
@@ -60,9 +59,9 @@ public abstract class ManagedResource {
   private final String resourceId;
   protected final SolrResourceLoader solrResourceLoader;
   protected final ManagedResourceStorage storage;
-  protected NamedList<Object> managedInitArgs;
-  protected Date initializedOn;
-  protected Date lastUpdateSinceInitialization;
+  protected volatile NamedList<Object> managedInitArgs;
+  protected volatile Date initializedOn;
+  protected volatile Date lastUpdateSinceInitialization;
 
   /**
    * Initializes this managed resource, including setting up JSON-based storage using
@@ -154,7 +153,7 @@ public abstract class ManagedResource {
   }
 
   /**
-   * Called from {@link #doPut(BaseSolrResource,Representation,Object)}
+   * Called from {@link #doPut(BaseSolrResource,Object)}
    * to update this resource's init args using the given updatedArgs
    */
   @SuppressWarnings("unchecked")
@@ -180,9 +179,9 @@ public abstract class ManagedResource {
     try {
       data = storage.load(resourceId);
     } catch (FileNotFoundException fnf) {
-      log.warn("No stored data found for {}", resourceId);
+      log.debug("No stored data found for {}", resourceId);
     } catch (IOException ioExc) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, 
+      throw new SolrException(ErrorCode.SERVER_ERROR,
           "Failed to load stored data for "+resourceId+" due to: "+ioExc, ioExc);
     }
 
@@ -247,7 +246,7 @@ public abstract class ManagedResource {
   /**
    * Persists managed data to the configured storage IO as a JSON object. 
    */
-  public synchronized void storeManagedData(Object managedData) {
+  public void storeManagedData(Object managedData) {
     
     Map<String,Object> toStore = buildMapToStore(managedData);    
     String resourceId = getResourceId();
@@ -275,7 +274,7 @@ public abstract class ManagedResource {
           "Failed to store data for %s due to: %s",
           resourceId, storeErr.toString());
       log.error(errMsg, storeErr);
-      throw new ResourceException(Status.SERVER_ERROR_INTERNAL, errMsg, storeErr);
+      throw new SolrException(ErrorCode.SERVER_ERROR, errMsg, storeErr);
     }
   }
 
@@ -350,18 +349,18 @@ public abstract class ManagedResource {
   }
   
   /**
-   * Just calls {@link #doPut(BaseSolrResource,Representation,Object)};
+   * Just calls {@link #doPut(BaseSolrResource,Object)};
    * override to change the behavior of POST handling.
    */
-  public void doPost(BaseSolrResource endpoint, Representation entity, Object json) {
-    doPut(endpoint, entity, json);
+  public void doPost(BaseSolrResource endpoint, Object json) {
+    doPut(endpoint, json);
   }
   
   /**
    * Applies changes to initArgs or managed data.
    */
   @SuppressWarnings("unchecked")
-  public synchronized void doPut(BaseSolrResource endpoint, Representation entity, Object json) {
+  public void doPut(BaseSolrResource endpoint, Object json) {
 
     if (log.isInfoEnabled()) {
       log.info("Processing update to {}: {} is a {}", getResourceId(), json, json.getClass().getName());
@@ -390,7 +389,7 @@ public abstract class ManagedResource {
     } else if (json instanceof List) {
       managedData = json;
     } else {
-      throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, 
+      throw new SolrException(ErrorCode.BAD_REQUEST,
           "Unsupported update format "+json.getClass().getName());
     }
         
@@ -423,15 +422,13 @@ public abstract class ManagedResource {
   protected abstract Object applyUpdatesToManagedData(Object updates);
 
   /**
-   * Called by {@link RestManager.ManagedEndpoint#delete()}
-   * to delete a named part (the given childId) of the
+   * Called to delete a named part (the given childId) of the
    * resource at the given endpoint
    */
   public abstract void doDeleteChild(BaseSolrResource endpoint, String childId);
 
   /**
-   * Called by {@link RestManager.ManagedEndpoint#get()}
-   * to retrieve a named part (the given childId) of the
+   * Called to retrieve a named part (the given childId) of the
    * resource at the given endpoint
    */
   public abstract void doGet(BaseSolrResource endpoint, String childId);

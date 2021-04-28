@@ -43,7 +43,7 @@ public class CreateAliasCmd extends AliasCmd {
 
 
   private static boolean anyRoutingParams(ZkNodeProps message) {
-    return message.keySet().stream().anyMatch(k -> k.startsWith(CollectionAdminParams.ROUTER_PREFIX));
+    return message.keySet().stream().anyMatch(k -> ((String) k).startsWith(CollectionAdminParams.ROUTER_PREFIX));
   }
 
   @SuppressWarnings("WeakerAccess")
@@ -52,7 +52,7 @@ public class CreateAliasCmd extends AliasCmd {
   }
 
   @Override
-  public void call(ClusterState state, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results)
+  public AddReplicaCmd.Response call(ClusterState state, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results)
       throws Exception {
     final String aliasName = message.getStr(CommonParams.NAME);
     ZkStateReader zkStateReader = ocmh.zkStateReader;
@@ -79,7 +79,12 @@ public class CreateAliasCmd extends AliasCmd {
     // We could levy this requirement on the client but they would probably always add an obligatory sleep, which is
     // just kicking the can down the road.  Perhaps ideally at this juncture here we could somehow wait until all
     // Solr nodes in the cluster have the latest aliases?
-    Thread.sleep(100);
+    // Thread.sleep(100);
+    AddReplicaCmd.Response response = new AddReplicaCmd.Response();
+
+    response.clusterState = null;
+
+    return response;
   }
 
   private void callCreatePlainAlias(ZkNodeProps message, String aliasName, ZkStateReader zkStateReader) {
@@ -110,14 +115,14 @@ public class CreateAliasCmd extends AliasCmd {
   @SuppressWarnings("unchecked")
   private void callCreateRoutedAlias(ZkNodeProps message, String aliasName, ZkStateReader zkStateReader, ClusterState state) throws Exception {
     // Validate we got a basic minimum
-    if (!message.getProperties().keySet().containsAll(RoutedAlias.MINIMAL_REQUIRED_PARAMS)) {
+    if (!message.keySet().containsAll(RoutedAlias.MINIMAL_REQUIRED_PARAMS)) {
       throw new SolrException(BAD_REQUEST, "A routed alias requires these params: " + RoutedAlias.MINIMAL_REQUIRED_PARAMS
       + " plus some create-collection prefixed ones.");
     }
 
     // convert values to strings
     Map<String, String> props = new LinkedHashMap<>();
-    message.getProperties().forEach((key, value) -> props.put(key, String.valueOf(value)));
+    message.getProperties().forEach((key, value) -> props.put((String) key, String.valueOf(value)));
 
     // Further validation happens here
     RoutedAlias routedAlias = RoutedAlias.fromProps(aliasName, props);

@@ -25,13 +25,15 @@ import java.util.concurrent.Callable;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.lucene.analysis.util.ResourceLoaderAware;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.BaseHttpSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.client.solrj.request.RequestWriter;
@@ -64,12 +66,15 @@ import org.apache.solr.util.plugin.SolrCoreAware;
 import org.apache.zookeeper.data.Stat;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
+import static org.apache.solr.SolrTestCaseJ4.randomizeNumericTypesProperties;
 import static org.apache.solr.common.cloud.ZkStateReader.SOLR_PKGS_PATH;
 import static org.apache.solr.common.params.CommonParams.JAVABIN;
 import static org.apache.solr.common.params.CommonParams.WT;
-import static org.apache.solr.core.TestDynamicLoading.getFileContent;
+import static org.apache.solr.core.TestSolrConfigHandler.getFileContent;
 import static org.apache.solr.filestore.TestDistribPackageStore.readFile;
 import static org.apache.solr.filestore.TestDistribPackageStore.uploadKey;
 import static org.apache.solr.filestore.TestDistribPackageStore.waitForAllNodesHaveFile;
@@ -77,7 +82,15 @@ import static org.hamcrest.CoreMatchers.containsString;
 
 @LogLevel("org.apache.solr.pkg.PackageLoader=DEBUG;org.apache.solr.pkg.PackageAPI=DEBUG")
 //@org.apache.lucene.util.LuceneTestCase.AwaitsFix(bugUrl="https://issues.apache.org/jira/browse/SOLR-13822") // leaks files
+@LuceneTestCase.Nightly
+@Ignore // MRM-Test TODO: debug, can be slow but was working in isloation
 public class TestPackages extends SolrCloudTestCase {
+
+  @BeforeClass
+  public static void beforeTestPackages() throws Exception {
+    useFactory(null);
+    randomizeNumericTypesProperties();
+  }
 
   @Before
   public void setup() {
@@ -100,7 +113,7 @@ public class TestPackages extends SolrCloudTestCase {
     MiniSolrCloudCluster cluster =
         configureCluster(4)
             .withJettyConfig(jetty -> jetty.enableV2(true))
-            .addConfig("conf", configset("cloud-minimal"))
+            .addConfig("conf", SolrTestUtil.configset("cloud-minimal"))
             .configure();
     try {
       String FILE1 = "/mypkg/runtimelibs.jar";
@@ -138,7 +151,6 @@ public class TestPackages extends SolrCloudTestCase {
           .createCollection(COLLECTION_NAME, "conf", 2, 2)
           .setMaxShardsPerNode(100)
           .process(cluster.getSolrClient());
-      cluster.waitForActiveCollection(COLLECTION_NAME, 2, 4);
 
       TestDistribPackageStore.assertResponseValues(10,
           () -> new V2Request.Builder("/cluster/package").
@@ -428,11 +440,11 @@ public class TestPackages extends SolrCloudTestCase {
       //we create a new node. This node does not have the packages. But it should download it from another node
       JettySolrRunner jetty = cluster.startJettySolrRunner();
       //create a new replica for this collection. it should end up
-      CollectionAdminRequest.addReplicaToShard(COLLECTION_NAME, "shard1")
+      CollectionAdminRequest.addReplicaToShard(COLLECTION_NAME, "s1")
           .setNrtReplicas(1)
           .setNode(jetty.getNodeName())
           .process(cluster.getSolrClient());
-      cluster.waitForActiveCollection(COLLECTION_NAME, 2, 5);
+
       waitForAllNodesHaveFile(cluster,FILE3,
           Utils.makeMap(":files:" + FILE3 + ":name", "runtimelibs_v3.jar"),
           false);
@@ -444,10 +456,10 @@ public class TestPackages extends SolrCloudTestCase {
   }
 
   private void executeReq(String uri, JettySolrRunner jetty, Utils.InputStreamConsumer parser, Map expected) throws Exception {
-    try(HttpSolrClient client = (HttpSolrClient) jetty.newClient()){
+    try(Http2SolrClient client = (Http2SolrClient) jetty.newHttp2Client()){
       TestDistribPackageStore.assertResponseValues(10,
           () -> {
-            Object o = Utils.executeGET(client.getHttpClient(),
+            Object o = Utils.executeGET(client,
                 jetty.getBaseUrl() + uri, parser);
             if(o instanceof NavigableObject) return (NavigableObject) o;
             if(o instanceof Map) return new MapWriterMap((Map) o);
@@ -480,7 +492,7 @@ public class TestPackages extends SolrCloudTestCase {
     MiniSolrCloudCluster cluster =
         configureCluster(4)
             .withJettyConfig(jetty -> jetty.enableV2(true))
-            .addConfig("conf", configset("cloud-minimal"))
+            .addConfig("conf", SolrTestUtil.configset("cloud-minimal"))
             .configure();
     try {
       String errPath = "/error/details[0]/errorMessages[0]";
@@ -530,7 +542,7 @@ public class TestPackages extends SolrCloudTestCase {
       //Now verify the data in ZK
       TestDistribPackageStore.assertResponseValues(1,
           () -> new MapWriterMap((Map) Utils.fromJSON(cluster.getZkClient().getData(SOLR_PKGS_PATH,
-              null, new Stat(), true))),
+              null, new Stat()))),
           Utils.makeMap(
               ":packages:test_pkg[0]:version", "0.12",
               ":packages:test_pkg[0]:files[0]", FILE1
@@ -551,7 +563,7 @@ public class TestPackages extends SolrCloudTestCase {
       //no verify the data (/packages.json) in ZK
       TestDistribPackageStore.assertResponseValues(1,
           () -> new MapWriterMap((Map) Utils.fromJSON(cluster.getZkClient().getData(SOLR_PKGS_PATH,
-              null, new Stat(), true))),
+              null, new Stat()))),
           Utils.makeMap(
               ":packages:test_pkg[1]:version", "0.13",
               ":packages:test_pkg[1]:files[0]", FILE3
@@ -575,7 +587,7 @@ public class TestPackages extends SolrCloudTestCase {
       //Verify with ZK that the data is correcy
       TestDistribPackageStore.assertResponseValues(1,
           () -> new MapWriterMap((Map) Utils.fromJSON(cluster.getZkClient().getData(SOLR_PKGS_PATH,
-              null, new Stat(), true))),
+              null, new Stat()))),
           Utils.makeMap(
               ":packages:test_pkg[0]:version", "0.13",
               ":packages:test_pkg[0]:files[0]", FILE2
@@ -589,8 +601,8 @@ public class TestPackages extends SolrCloudTestCase {
         TestDistribPackageStore.assertResponseValues(10, new Callable<NavigableObject>() {
           @Override
           public NavigableObject call() throws Exception {
-            try (HttpSolrClient solrClient = (HttpSolrClient) jetty.newClient()) {
-              return (NavigableObject) Utils.executeGET(solrClient.getHttpClient(), path, Utils.JAVABINCONSUMER);
+            try (Http2SolrClient solrClient = (Http2SolrClient) jetty.newHttp2Client()) {
+              return (NavigableObject) Utils.executeGET(solrClient, path, Utils.JAVABINCONSUMER);
             }
           }
         }, Utils.makeMap(

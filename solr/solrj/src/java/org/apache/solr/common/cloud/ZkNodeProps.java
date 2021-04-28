@@ -17,6 +17,7 @@
 package org.apache.solr.common.cloud;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -55,6 +56,11 @@ public class ZkNodeProps implements JSONWriter.Writable {
     return new ZkNodeProps(copy);
   }
 
+  public ZkNodeProps minus(String... minusKeys) {
+    ZkNodeProps props = new ZkNodeProps(propMap);
+    props.keySet().removeAll(Arrays.asList(minusKeys));
+    return props;
+  }
 
   /**
    * Constructor that populates the from array of Strings in form key1, value1,
@@ -168,5 +174,9 @@ public class ZkNodeProps implements JSONWriter.Writable {
   @Override
   public boolean equals(Object that) {
     return that instanceof ZkNodeProps && ((ZkNodeProps)that).propMap.equals(this.propMap);
+  }
+
+  public int size() {
+    return propMap.size();
   }
 }

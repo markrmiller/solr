@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.Map;
 
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
 import org.apache.solr.client.solrj.io.SolrClientCache;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.comp.StreamComparator;
@@ -140,13 +140,14 @@ public abstract class TupleStream implements Closeable, Serializable, MapWriter 
       shards = shardsMap.get(collection);
     } else {
       //SolrCloud Sharding
-      CloudSolrClient cloudSolrClient =
-          Optional.ofNullable(streamContext.getSolrClientCache()).orElseGet(SolrClientCache::new).getCloudSolrClient(zkHost);
+      SolrClientCache clientCache = streamContext.getSolrClientCache();
+      if (clientCache == null) {
+        clientCache = new SolrClientCache(zkHost);
+      }
+      CloudHttp2SolrClient cloudSolrClient = clientCache.getCloudSolrClient();
       ZkStateReader zkStateReader = cloudSolrClient.getZkStateReader();
-      ClusterState clusterState = zkStateReader.getClusterState();
       Slice[] slices = CloudSolrStream.getSlices(collection, zkStateReader, true);
-      Set<String> liveNodes = clusterState.getLiveNodes();
-
+      Set<String> liveNodes = zkStateReader.getLiveNodes();
 
       ModifiableSolrParams solrParams = new ModifiableSolrParams(streamContext.getRequestParams());
       solrParams.add(requestParams);

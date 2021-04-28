@@ -35,7 +35,7 @@ public class Utf8CharSequenceTest extends SolrTestCaseJ4 {
     ByteArrayUtf8CharSequence utf8 = new ByteArrayUtf8CharSequence(sb.toString());
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     byte[] buf = new byte[256];
-    try (FastOutputStream fos = new FastOutputStream(baos, buf, 0)) {
+    try (FastOutputStream fos = new FastOutputStream(baos)) {
       fos.writeUtf8CharSeq(utf8);
       fos.flush();
     }

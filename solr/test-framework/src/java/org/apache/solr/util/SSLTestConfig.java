@@ -17,6 +17,7 @@
 package org.apache.solr.util;
 
 import javax.net.ssl.SSLContext;
+import java.lang.invoke.MethodHandles;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -26,7 +27,8 @@ import java.security.SecureRandomSpi;
 import java.security.UnrecoverableKeyException;
 import java.util.Random;
 import java.util.regex.Pattern;
-  
+
+import com.carrotsearch.randomizedtesting.RandomizedTest;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
@@ -40,11 +42,12 @@ import org.apache.lucene.util.Constants;
 import org.apache.solr.client.solrj.embedded.SSLConfig;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.impl.HttpClientUtil.SocketFactoryRegistryProvider;
+import org.apache.solr.common.ParWork;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.security.CertificateUtils;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-
-import com.carrotsearch.randomizedtesting.RandomizedTest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An SSLConfig that provides {@link SSLConfig} and {@link SocketFactoryRegistryProvider} for both clients and servers
@@ -52,6 +55,8 @@ import com.carrotsearch.randomizedtesting.RandomizedTest;
  * Solr test-framework classes
  */
 public class SSLTestConfig {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
   private static final String TEST_KEYSTORE_BOGUSHOST_RESOURCE = "SSLTestConfig.hostname-and-ip-missmatch.keystore";
   private static final String TEST_KEYSTORE_LOCALHOST_RESOURCE = "SSLTestConfig.testing.keystore";
   private static final String TEST_PASSWORD = "secret";
@@ -64,7 +69,12 @@ public class SSLTestConfig {
   
   /** Creates an SSLTestConfig that does not use SSL or client authentication */
   public SSLTestConfig() {
-    this(false, false);
+    this.useSsl = false;
+    this.clientAuth = false;
+    this.checkPeerName = false;
+    keyStore = null;
+    trustStore = null;
+    log.info("New SSLTestConfig useSsl={} clientAuth={} checkPeername={}", useSsl, clientAuth, checkPeerName);
   }
   
   /**
@@ -108,6 +118,7 @@ public class SSLTestConfig {
 
     if (useSsl) {
       assumeSslIsSafeToTest();
+     // System.setProperty("solr.jetty.ssl.verifyClientHostName", null);
     }
     
     final String resourceName = checkPeerName
@@ -117,6 +128,7 @@ public class SSLTestConfig {
       throw new IllegalStateException("Unable to locate keystore resource file in classpath: "
                                       + resourceName);
     }
+    log.info("New SSLTestConfig useSsl={} clientAuth={} checkPeername={}", this.useSsl, this.clientAuth, this.checkPeerName);
   }
 
   /** If true, then servers hostname/ip should be validated against the SSL Cert metadata */
@@ -142,10 +154,12 @@ public class SSLTestConfig {
    */
   public SocketFactoryRegistryProvider buildClientSocketFactoryRegistryProvider() {
     if (isSSLMode()) {
+      log.info("using ssl connection factory");
       SSLConnectionSocketFactory sslConnectionFactory = buildClientSSLConnectionSocketFactory();
       assert null != sslConnectionFactory;
       return new SSLSocketFactoryRegistryProvider(sslConnectionFactory);
     } else {
+      log.info("using http connection factory");
       return HTTP_ONLY_SCHEMA_PROVIDER;
     }
   }
@@ -186,6 +200,8 @@ public class SSLTestConfig {
       @Override
       public SslContextFactory.Client createClientContextFactory() {
         SslContextFactory.Client factory = new SslContextFactory.Client(!checkPeerName);
+        factory.setEndpointIdentificationAlgorithm(System.getProperty("solr.jetty.ssl.verifyClientHostName", null));
+
         try {
           factory.setSslContext(buildClientSSLContext());
         } catch (KeyManagementException | UnrecoverableKeyException | NoSuchAlgorithmException | KeyStoreException e) {
@@ -226,6 +242,7 @@ public class SSLTestConfig {
           }
           factory.setSslContext(builder.build());
         } catch (Exception e) {
+          ParWork.propagateInterrupt(e);
           throw new RuntimeException("ssl context init failure: " + e.getMessage(), e);
         }
         factory.setNeedClientAuth(isClientAuthMode());
@@ -241,6 +258,7 @@ public class SSLTestConfig {
     try {
       return CertificateUtils.getKeyStore(resource, "JKS", null, password);
     } catch (Exception ex) {
+      ParWork.propagateInterrupt(ex);
       throw new IllegalStateException("Unable to build KeyStore from resource: " + resource.getName(), ex);
     }
   }

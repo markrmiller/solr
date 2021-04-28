@@ -25,7 +25,7 @@ import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.hamcrest.core.StringContains.containsString;
@@ -36,12 +36,13 @@ public class LBHttpSolrClientBadInputTest extends SolrJettyTestBase {
   private static final String ANY_COLLECTION = "ANY_COLLECTION";
   private static final int ANY_COMMIT_WITHIN_TIME = -1;
 
-  @BeforeClass
-  public static void beforeTest() throws Exception {
+  @Before
+  public void SetUp() throws Exception {
     JettyConfig jettyConfig = JettyConfig.builder()
         .withSSLConfig(sslConfig.buildServerSSLConfig())
         .build();
-    createAndStartJetty(legacyExampleCollection1SolrHome(), jettyConfig);
+    jetty = createAndStartJetty(legacyExampleCollection1SolrHome(), jettyConfig);
+    super.setUp();
   }
 
   @Test
@@ -77,8 +78,8 @@ public class LBHttpSolrClientBadInputTest extends SolrJettyTestBase {
     }
   }
 
-  private void assertExceptionThrownWithMessageContaining(Class expectedType, List<String> expectedStrings, LuceneTestCase.ThrowingRunnable runnable) {
-    Throwable thrown = expectThrows(expectedType, runnable);
+  private void assertExceptionThrownWithMessageContaining(Class<? extends Exception> expectedType, List<String> expectedStrings, LuceneTestCase.ThrowingRunnable runnable) {
+    Throwable thrown = LuceneTestCase.expectThrows(expectedType, runnable);
 
     if (expectedStrings != null) {
       for (String expectedString : expectedStrings) {

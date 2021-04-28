@@ -17,11 +17,13 @@
 package org.apache.solr.analytics.legacy.expression;
 
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.analytics.legacy.LegacyAbstractAnalyticsTest;
 import org.apache.solr.analytics.legacy.facet.LegacyAbstractAnalyticsFacetTest;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Nightly
 public class LegacyFunctionTest extends LegacyAbstractAnalyticsTest {
   static String fileName = "functions.txt";
 
@@ -34,7 +36,7 @@ public class LegacyFunctionTest extends LegacyAbstractAnalyticsTest {
   static public final int NUM_LOOPS = 100;
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeLegacyFunctionTest() throws Exception {
     initCore("solrconfig-analytics.xml","schema-analytics.xml");
     h.update("<delete><query>*:*</query></delete>");
 
@@ -71,7 +73,7 @@ public class LegacyFunctionTest extends LegacyAbstractAnalyticsTest {
             "concat_first_sd", concat_first, "concat_second_sd", concat_second, "miss_dd", ""+d0 )));
 
 
-      if (usually()) {
+      if (LuceneTestCase.usually()) {
         assertU(commit()); // to have several segments
       }
     }
@@ -79,6 +81,7 @@ public class LegacyFunctionTest extends LegacyAbstractAnalyticsTest {
     assertU(commit());
 
     setResponse(h.query(request(fileToStringArr(LegacyFunctionTest.class, fileName))));
+
   }
 
   @Test

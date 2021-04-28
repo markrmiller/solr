@@ -23,8 +23,11 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.ExpandableDirectByteBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.ContentStreamBase;
-import org.apache.solr.common.util.FastWriter;
 import org.apache.solr.request.SolrQueryRequest;
 
 /**
@@ -40,37 +43,42 @@ public final class QueryResponseWriterUtil {
    * @see BinaryQueryResponseWriter#write(OutputStream,SolrQueryRequest,SolrQueryResponse)
    * @see BinaryQueryResponseWriter#write(Writer,SolrQueryRequest,SolrQueryResponse)
    */
-  public static void writeQueryResponse(OutputStream outputStream,
-      QueryResponseWriter responseWriter, SolrQueryRequest solrRequest,
+  public static ExpandableDirectBufferOutputStream writeQueryResponse(QueryResponseWriter responseWriter, SolrQueryRequest solrRequest,
       SolrQueryResponse solrResponse, String contentType) throws IOException {
-    
+    MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(8192);
+    ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer);
     if (responseWriter instanceof BinaryQueryResponseWriter) {
       BinaryQueryResponseWriter binWriter = (BinaryQueryResponseWriter) responseWriter;
-      binWriter.write(outputStream, solrRequest, solrResponse);
+      binWriter.write(outStream, solrRequest, solrResponse);
+
     } else {
-      OutputStream out = new OutputStream() {
-        @Override
-        public void write(int b) throws IOException {
-          outputStream.write(b);
-        }
-        @Override
-        public void flush() throws IOException {
-          // We don't flush here, which allows us to flush below
-          // and only flush internal buffers, not the response.
-          // If we flush the response early, we trigger chunked encoding.
-          // See SOLR-8669.
-        }
-      };
+      Writer writer = buildWriter(outStream, ContentStreamBase.getCharsetFromContentType(contentType));
+      responseWriter.write(writer, solrRequest, solrResponse);
+      writer.close();
+    }
+
+    return outStream;
+  }
+
+  public static OutputStream writeQueryResponse(OutputStream out, QueryResponseWriter responseWriter, SolrQueryRequest solrRequest,
+      SolrQueryResponse solrResponse, String contentType) throws IOException {
+
+    if (responseWriter instanceof BinaryQueryResponseWriter) {
+      BinaryQueryResponseWriter binWriter = (BinaryQueryResponseWriter) responseWriter;
+      binWriter.write(out, solrRequest, solrResponse);
+
+    } else {
       Writer writer = buildWriter(out, ContentStreamBase.getCharsetFromContentType(contentType));
       responseWriter.write(writer, solrRequest, solrResponse);
-      writer.flush();
+      writer.close();
     }
+
+    return out;
   }
   
   private static Writer buildWriter(OutputStream outputStream, String charset) throws UnsupportedEncodingException {
-    Writer writer = (charset == null) ? new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)
+
+    return (charset == null) ? new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)
         : new OutputStreamWriter(outputStream, charset);
-    
-    return new FastWriter(writer);
   }
 }

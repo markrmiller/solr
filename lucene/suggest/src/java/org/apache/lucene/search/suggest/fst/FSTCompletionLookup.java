@@ -97,15 +97,15 @@ public class FSTCompletionLookup extends Lookup implements Accountable {
   /**
    * Automaton used for completions with higher weights reordering.
    */
-  private FSTCompletion higherWeightsCompletion;
+  private volatile FSTCompletion higherWeightsCompletion;
 
   /**
    * Automaton used for normal completions.
    */
-  private FSTCompletion normalCompletion;
+  private volatile FSTCompletion normalCompletion;
 
   /** Number of entries the lookup was built with */
-  private long count = 0;
+  private volatile long count = 0;
 
   /**
    * This constructor should only be used to read a previously saved suggester.
@@ -163,7 +163,7 @@ public class FSTCompletionLookup extends Lookup implements Accountable {
   }
 
   @Override
-  public void build(InputIterator iterator) throws IOException {
+  public synchronized void build(InputIterator iterator) throws IOException {
     if (iterator.hasPayloads()) {
       throw new IllegalArgumentException("this suggester doesn't support payloads");
     }
@@ -266,13 +266,23 @@ public class FSTCompletionLookup extends Lookup implements Accountable {
     if (contexts != null) {
       throw new IllegalArgumentException("this suggester doesn't support contexts");
     }
-    final List<Completion> completions;
+    List<Completion> completions = null;
     if (higherWeightsFirst) {
-      completions = higherWeightsCompletion.lookup(key, num);
+      FSTCompletion hwc = higherWeightsCompletion;
+      if (hwc != null) {
+        completions = hwc.lookup(key, num);
+      }
     } else {
-      completions = normalCompletion.lookup(key, num);
+      FSTCompletion nc = normalCompletion;
+      if (nc != null) {
+        completions = nc.lookup(key, num);
+      }
     }
-    
+
+    if (completions == null) {
+      completions = Collections.emptyList();
+    }
+
     final ArrayList<LookupResult> results = new ArrayList<>(completions.size());
     CharsRefBuilder spare = new CharsRefBuilder();
     for (Completion c : completions) {

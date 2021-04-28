@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.solr.common.cloud.CompositeIdRouter.*;
 import static org.apache.solr.common.cloud.DocCollection.DOC_ROUTER;
 
 /**
@@ -38,8 +39,7 @@ import static org.apache.solr.common.cloud.DocCollection.DOC_ROUTER;
  * @lucene.experimental
  */
 public abstract class DocRouter {
-  public static final String DEFAULT_NAME = CompositeIdRouter.NAME;
-  public static final DocRouter DEFAULT = new CompositeIdRouter();
+
 
 
   public static DocRouter getDocRouter(String routerName) {
@@ -57,9 +57,9 @@ public abstract class DocRouter {
 
   public static Map<String, Object> getRouterSpec(ZkNodeProps props) {
     Map<String, Object> map = new LinkedHashMap<>();
-    for (String s : props.keySet()) {
-      if (s.startsWith("router.")) {
-        map.put(s.substring(7), props.get(s));
+    for (Object s : props.keySet()) {
+      if (((String) s).startsWith("router.")) {
+        map.put(((String) s).substring(7), props.get((String) s));
       }
     }
     if (map.get("name") == null)  {
@@ -68,26 +68,15 @@ public abstract class DocRouter {
     return map;
   }
 
-  // currently just an implementation detail...
-  private final static Map<String, DocRouter> routerMap;
-  static {
-    routerMap = new HashMap<>();
-    PlainIdRouter plain = new PlainIdRouter();
-    // instead of doing back compat this way, we could always convert the clusterstate on first read to "plain" if it doesn't have any properties.
-    routerMap.put(null, plain);     // back compat with 4.0
-    routerMap.put(PlainIdRouter.NAME, plain);
-    routerMap.put(CompositeIdRouter.NAME, DEFAULT_NAME.equals(CompositeIdRouter.NAME) ? DEFAULT : new CompositeIdRouter());
-    routerMap.put(ImplicitDocRouter.NAME, new ImplicitDocRouter());
-    // NOTE: careful that the map keys (the static .NAME members) are filled in by making them final
-  }
+
 
 
   // Hash ranges can't currently "wrap" - i.e. max must be greater or equal to min.
   // TODO: ranges may not be all contiguous in the future (either that or we will
   // need an extra class to model a collection of ranges)
   public static class Range implements JSONWriter.Writable, Comparable<Range> {
-    public int min;  // inclusive
-    public int max;  // inclusive
+    public final int min;  // inclusive
+    public final int max;  // inclusive
 
     public Range(int min, int max) {
       assert min <= max;

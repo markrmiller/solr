@@ -56,7 +56,9 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     codec = new StreamCodec(stream);
     codec.start();
     EntryImpl entry = codec.beginRead(rootEntry);
-    listener.entry(entry);
+    if (listener != null) {
+      listener.entry(entry);
+    }
     if (entry.tag.type.isContainer && entry.entryListener != null) {
       entry.tag.stream(entry, codec);
     }
@@ -74,6 +76,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
 
     public void skip(int sz) throws IOException {
+      ByteBuffer brr = getByteArr(0);
+      byte[] bytes = brr.array();
       while (sz > 0) {
         int read = dis.read(bytes, 0, Math.min(bytes.length, sz));
         sz -= read;

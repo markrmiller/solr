@@ -16,15 +16,19 @@
  */
 package org.apache.solr.common.cloud;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.solr.common.util.Utils;
 
 public class Replica extends ZkNodeProps {
-  
+
+
   /**
    * The replica's state. In general, if the node the replica is hosted on is
    * not under {@code /live_nodes} in ZK, the replica's state should be
@@ -39,10 +43,12 @@ public class Replica extends ZkNodeProps {
      * replica's state may remain ACTIVE in ZK. To determine if the replica is
      * truly active, you must also verify that its {@link Replica#getNodeName()
      * node} is under {@code /live_nodes} in ZK (or use
-     * {@link ClusterState#liveNodesContain(String)}).
+     * {@link ZkStateReader#isNodeLive(String)} (String)}).
      * </p>
      */
     ACTIVE,
+
+    LEADER,
     
     /**
      * The first state before {@link State#RECOVERING}. A node in this state
@@ -60,6 +66,8 @@ public class Replica extends ZkNodeProps {
      * full replication or finding out things are already in sync.
      */
     RECOVERING,
+
+    BUFFERING,
     
     /**
      * Recovery attempts have not worked, something is not right.
@@ -75,7 +83,71 @@ public class Replica extends ZkNodeProps {
     public String toString() {
       return super.toString().toLowerCase(Locale.ROOT);
     }
-    
+
+    public static Integer getShortState(State state) {
+      switch (state) {
+        case LEADER:
+          return 1;
+        case ACTIVE:
+          return 2;
+        case RECOVERING:
+          return 4;
+        case BUFFERING:
+          return 3;
+        case RECOVERY_FAILED:
+          return 6;
+        case DOWN:
+          return 5;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+
+    public static State shortStateToState(Integer shortState) {
+      return shortStateToState(shortState, false);
+    }
+
+    public static State shortStateToState(Integer shortState, boolean published) {
+      if (shortState.equals(1)) {
+        if (published) {
+          return State.ACTIVE;
+        } else {
+          return State.LEADER;
+        }
+      } if (shortState.equals(2)) {
+        return State.ACTIVE;
+      } if (shortState.equals(4)) {
+        return State.RECOVERING;
+      } else if (shortState.equals(3)) {
+        return State.BUFFERING;
+      } else if (shortState.equals(5)) {
+        return State.DOWN;
+      } else if (shortState.equals(6)) {
+        return State.RECOVERY_FAILED;
+      }
+      throw new IllegalStateException("Unknown state: " + shortState);
+    }
+
+    public static Character shortStateToLetterState(Integer shortState) {
+      if (shortState.equals(2)) {
+        return 'A';
+      } if (shortState.equals(1)) {
+        return 'L';
+      } else if (shortState.equals(4)) {
+        return 'R';
+      } else if (shortState.equals(3)) {
+        return 'B';
+      } else if (shortState.equals(5)) {
+        return 'D';
+      } else if (shortState.equals(6)) {
+        return 'R';
+      } else if (shortState.equals(0)) {
+        return 'U';
+      }
+      throw new IllegalStateException("Unknown state: " + shortState);
+    }
+
+
     /** Converts the state string to a State instance. */
     public static State getState(String stateStr) {
       return stateStr == null ? null : State.valueOf(stateStr.toUpperCase(Locale.ROOT));
@@ -107,51 +179,105 @@ public class Replica extends ZkNodeProps {
     }
   }
 
+  public interface NodeNameToBaseUrl {
+    String getBaseUrlForNodeName(final String nodeName);
+  }
+
   private final String name;
   private final String nodeName;
-  private final String core;
-  private final State state;
-  private final Type type;
-  public final String slice, collection;
+  private volatile AtomicInteger state;
 
-  public Replica(String name, Map<String,Object> propMap, String collection, String slice) {
+  private final Type type;
+  public volatile Slice slice;
+  public final String collection;
+  private final String sliceName;
+
+  public Replica(String name, Map newProps, String collection, Integer collectionId, String sliceName) {
+    this(name, newProps , collection, collectionId, sliceName,null);
+  }
+
+
+  public Replica(String name, Map<String,Object> propMap, String collection, Integer collectionId, String sliceName, Slice slice) {
     super(propMap);
     this.collection = collection;
     this.slice = slice;
+    this.sliceName = sliceName;
     this.name = name;
+
+    propMap.remove(ZkStateReader.STATE_PROP);
+
     this.nodeName = (String) propMap.get(ZkStateReader.NODE_NAME_PROP);
-    this.core = (String) propMap.get(ZkStateReader.CORE_NAME_PROP);
+
+    Object rawId = propMap.get("id");
+    if (rawId instanceof Integer) {
+      this.id = (Integer) rawId;
+    } else {
+      this.id = ((Long) rawId).intValue();
+    }
+
+
+    this.collectionId = collectionId;
+    if (this.collectionId == null) {
+      Object collId = propMap.get("collId");
+      if (collId != null) {
+        this.collectionId = Integer.parseInt((String) collId);
+      }
+    } else {
+      propMap.put("collId", collectionId);
+    }
+
     type = Type.get((String) propMap.get(ZkStateReader.REPLICA_TYPE));
     Objects.requireNonNull(this.collection, "'collection' must not be null");
-    Objects.requireNonNull(this.slice, "'slice' must not be null");
     Objects.requireNonNull(this.name, "'name' must not be null");
     Objects.requireNonNull(this.nodeName, "'node_name' must not be null");
-    Objects.requireNonNull(this.core, "'core' must not be null");
     Objects.requireNonNull(this.type, "'type' must not be null");
-    if (propMap.get(ZkStateReader.STATE_PROP) != null) {
-      this.state = State.getState((String) propMap.get(ZkStateReader.STATE_PROP));
-    } else {
-      this.state = State.ACTIVE;                         //Default to ACTIVE
-      propMap.put(ZkStateReader.STATE_PROP, state.toString());
-    }
+    Objects.requireNonNull(this.collectionId, "'collectionId' must not be null");
+
+
+    hashcode = Objects.hash(name, id, collectionId);
   }
 
-  public String getCollection(){
-    return collection;
-  }
-  public String getSlice(){
-    return slice;
-  }
+  Integer id;
+  Integer collectionId;
+
+  private final int hashcode;
 
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    if (!super.equals(o)) return false;
-
     Replica replica = (Replica) o;
+    if (replica == null) return false;
+    return name.equals(replica.name) && id.equals(replica.id) && collectionId.equals(replica.collectionId);
+  }
 
-    return name.equals(replica.name);
+  @Override
+  public int hashCode() {
+    return hashcode;
+  }
+
+  public String getId() {
+    return collectionId + "-" + (id == null ? null : id.toString());
+  }
+
+  public Integer getInternalId() {
+    return id;
+  }
+
+  public Integer getCollectionId() {
+    return collectionId;
+  }
+
+
+  public String getCollection() {
+    return collection;
+  }
+
+  public String getSlice() {
+    return sliceName;
+  }
+
+  public Slice getSliceOwner(){
+    return slice;
   }
 
   /** Also known as coreNodeName. */
@@ -160,15 +286,11 @@ public class Replica extends ZkNodeProps {
   }
 
   public String getCoreUrl() {
-    return ZkCoreNodeProps.getCoreUrl(getStr(ZkStateReader.BASE_URL_PROP), core);
-  }
-  public String getBaseUrl(){
-    return getStr(ZkStateReader.BASE_URL_PROP);
+    return getCoreUrl(getBaseUrl(), name);
   }
 
-  /** SolrCore name. */
-  public String getCoreName() {
-    return core;
+  public String getBaseUrl() {
+    return Utils.getBaseUrlForNodeName(nodeName, "http"); // MRM TODO: https
   }
 
   /** The name of the node this replica resides on */
@@ -178,11 +300,49 @@ public class Replica extends ZkNodeProps {
   
   /** Returns the {@link State} of this replica. */
   public State getState() {
-    return state;
+//    if (state == null) {
+//      return State.DOWN;
+//    }
+    return Replica.State.shortStateToState(state.get(), true);
+  }
+
+  public State getRawState() {
+    Integer rawState = state == null ? null : state.get();
+    if (rawState == null) {
+      return State.DOWN;
+    }
+    return Replica.State.shortStateToState(rawState, false);
+  }
+
+  public void removeStateUpdates() {
+    AtomicInteger currentState = state;
+    if (currentState != null) {
+      currentState.set(5);
+    }
+  }
+
+  public void setState(AtomicInteger replicaState) {
+    if (replicaState != null) {
+      this.state = replicaState;
+    }
+  }
+
+  void setSlice(Slice slice) {
+    this.slice = slice;
+    if (state != null && state.get() == State.getShortState(State.LEADER)) {
+      slice.setLeader(this);
+    }
   }
 
   public boolean isActive(Set<String> liveNodes) {
-    return this.nodeName != null && liveNodes.contains(this.nodeName) && this.state == State.ACTIVE;
+    State currentState = State.shortStateToState(state.get(), true);
+    return this.nodeName != null && liveNodes.contains(this.nodeName) && (currentState == State.ACTIVE);
+  }
+
+  public boolean isActive() {
+
+    State currentState = State.shortStateToState(state.get(), true);
+    return currentState == State.ACTIVE;
   }
   
   public Type getType() {
@@ -200,8 +360,31 @@ public class Replica extends ZkNodeProps {
     return propertyValue;
   }
 
+  public static String getCoreUrl(String baseUrl, String coreName) {
+    StringBuilder sb = new StringBuilder(baseUrl.length() + coreName.length() + 1);
+    sb.append(baseUrl);
+    if (!(!baseUrl.isEmpty() && baseUrl.charAt(baseUrl.length() - 1) == '/')) sb.append("/");
+    sb.append(coreName);
+    return sb.toString();
+  }
+
+
+  public Replica copyWithProps(Map props) {
+    Map newProps = new HashMap(propMap);
+    newProps.putAll(props);
+    Replica r = new Replica(getName(), newProps, collection, getCollectionId(), sliceName, slice);
+    return r;
+  }
+
+  public Replica copyWithProps(Slice slice, Map props) {
+    Map newProps = new HashMap(propMap);
+    newProps.putAll(props);
+    Replica r = new Replica(getName(), newProps, collection, getCollectionId(), sliceName, slice);
+    return r;
+  }
+
   @Override
   public String toString() {
-    return name + ':' + Utils.toJSONString(propMap); // small enough, keep it on one line (i.e. no indent)
+    return name + "(" + getId() + ")" + ':' + Utils.toJSONString(this); // small enough, keep it on one line (i.e. no indent)
   }
 }

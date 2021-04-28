@@ -16,6 +16,9 @@
  */
 package org.apache.solr.store.blockcache;
 
+import org.jctools.maps.NonBlockingHashMap;
+
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +42,7 @@ public class BufferStore implements Store {
     }
   };
 
-  private final static ConcurrentMap<Integer, BufferStore> bufferStores = new ConcurrentHashMap<>(8192, 0.75f, 512);
+  private final static Map<Integer, BufferStore> bufferStores = new NonBlockingHashMap<>(8192);
 
   private final BlockingQueue<byte[]> buffers;
 
@@ -55,10 +58,6 @@ public class BufferStore implements Store {
    */
   static void clearBufferStores() {
     bufferStores.clear();
-  }
-  
-  public synchronized static void initNewBuffer(int bufferSize, long totalAmount) {
-    initNewBuffer(bufferSize, totalAmount, null);
   }
 
   public synchronized static void initNewBuffer(int bufferSize, long totalAmount, Metrics metrics) {

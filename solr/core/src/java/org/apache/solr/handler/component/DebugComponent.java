@@ -247,14 +247,17 @@ public class DebugComponent extends SearchComponent
           }
           @SuppressWarnings({"rawtypes"})
           NamedList sdebug = (NamedList)srsp.getSolrResponse().getResponse().get("debug");
+          if (sdebug != null) {
+            info = (NamedList) merge(sdebug, info, EXCLUDE_SET);
+            if ((sreq.purpose & ShardRequest.PURPOSE_GET_DEBUG) != 0) {
+              hasGetDebugResponses = true;
+              if (rb.isDebugResults()) {
+                @SuppressWarnings({"rawtypes"}) NamedList sexplain = (NamedList) sdebug.get("explain");
 
-          info = (NamedList)merge(sdebug, info, EXCLUDE_SET);
-          if ((sreq.purpose & ShardRequest.PURPOSE_GET_DEBUG) != 0) {
-            hasGetDebugResponses = true;
-            if (rb.isDebugResults()) {
-              @SuppressWarnings({"rawtypes"})
-              NamedList sexplain = (NamedList)sdebug.get("explain");
-              SolrPluginUtils.copyNamedListIntoArrayByDocPosInResponse(sexplain, rb.resultIds, arr);
+                if (sexplain != null) {
+                  SolrPluginUtils.copyNamedListIntoArrayByDocPosInResponse(sexplain, rb.resultIds, arr);
+                }
+              }
             }
           }
         }

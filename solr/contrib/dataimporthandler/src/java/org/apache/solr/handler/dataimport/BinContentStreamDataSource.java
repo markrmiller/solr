@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.solr.common.util.ContentStream;
 import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
 
@@ -49,7 +50,7 @@ public class BinContentStreamDataSource extends DataSource<InputStream> {
     if (contentStream == null)
       throw new DataImportHandlerException(SEVERE, "No stream available. The request has no body");
     try {
-      return in = contentStream.getStream();
+      return in = new CloseShieldInputStream(contentStream.getStream());
     } catch (IOException e) {
       DataImportHandlerException.wrapAndThrow(SEVERE, e);
       return null;

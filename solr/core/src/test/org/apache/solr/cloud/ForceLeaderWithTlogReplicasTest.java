@@ -17,7 +17,13 @@
 
 package org.apache.solr.cloud;
 
+import org.junit.Ignore;
+
+@Ignore // MRM TODO:
 public class ForceLeaderWithTlogReplicasTest extends ForceLeaderTest {
+
+  public ForceLeaderWithTlogReplicasTest() throws Exception {
+  }
 
   @Override
   protected boolean useTlogReplicas() {

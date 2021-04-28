@@ -17,9 +17,13 @@
 package org.apache.solr.schema;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.legacy.LegacyFieldType;
 import org.apache.solr.legacy.PointVectorStrategy;
 
@@ -35,6 +39,7 @@ public class SpatialPointVectorFieldType extends AbstractSpatialFieldType<PointV
 
   @Override
   protected void init(IndexSchema schema, Map<String, String> args) {
+    CoreContainer.deprecationLog.warn(SpatialPointVectorFieldType.class.getName() + " is deprecated, deprecation= use LatLonPointSpatialField instead");
     super.init(schema, args);
 
     String v = args.remove( "numberType" );
@@ -70,17 +75,18 @@ public class SpatialPointVectorFieldType extends AbstractSpatialFieldType<PointV
     // In theory we should fix this, but since this class is already deprecated, we'll leave it alone
     // to simplify the risk of back-compat break for existing users.
     final int p = (INDEXED | TOKENIZED | OMIT_NORMS | OMIT_TF_POSITIONS | UNINVERTIBLE);
-    List<SchemaField> newFields = new ArrayList<>();
-    for( SchemaField sf : schema.getFields().values() ) {
-      if( sf.getType() == this ) {
-        String name = sf.getName();
-        newFields.add(new SchemaField(name + PointVectorStrategy.SUFFIX_X, fieldType, p, null));
-        newFields.add(new SchemaField(name + PointVectorStrategy.SUFFIX_Y, fieldType, p, null));
-      }
-    }
-    for (SchemaField newField : newFields) {
-      schema.getFields().put(newField.getName(), newField);
-    }
+    // MRM: ILLEGAL
+//    List<SchemaField> newFields = new ArrayList<>();
+//    for( SchemaField sf : schema.getFields().values() ) {
+//      if( sf.getType() == this ) {
+//        String name = sf.getName();
+//        newFields.add(new SchemaField(name + PointVectorStrategy.SUFFIX_X, fieldType, p, null));
+//        newFields.add(new SchemaField(name + PointVectorStrategy.SUFFIX_Y, fieldType, p, null));
+//      }
+//    }
+//    for (SchemaField newField : newFields) {
+//      schema.getFields().put(newField.getName(), newField);
+//    }
   }
 
   @Override

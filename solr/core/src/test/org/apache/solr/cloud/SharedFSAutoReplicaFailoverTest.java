@@ -16,27 +16,11 @@
  */
 package org.apache.solr.cloud;
 
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
+import org.apache.solr.SolrTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -54,11 +38,8 @@ import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.CoreDescriptor;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.apache.solr.util.LogLevel;
 import org.apache.solr.util.TestInjection;
 import org.apache.solr.util.TimeOut;
@@ -66,28 +47,33 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Nightly
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+@LuceneTestCase.Nightly
 @Slow
-@SuppressSSL
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
-@LogLevel("org.apache.solr.cloud.autoscaling=DEBUG;org.apache.solr.cloud.*=DEBUG")
+@SolrTestCase.SuppressSSL
+@LogLevel("org.apache.solr.cloud.*=DEBUG")
 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Jul-2018
 public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final boolean DEBUG = true;
   private static MiniDFSCluster dfsCluster;
-
-  ThreadPoolExecutor executor = new ExecutorUtil.MDCAwareThreadPoolExecutor(0,
-      Integer.MAX_VALUE, 5, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
-      new SolrNamedThreadFactory("testExecutor"));
   
   CompletionService<Object> completionService;
   Set<Future<Object>> pending;
@@ -96,7 +82,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
   @BeforeClass
   public static void hdfsFailoverBeforeClass() throws Exception {
     System.setProperty("solr.hdfs.blockcache.blocksperbank", "512");
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
     System.setProperty("solr.hdfs.blockcache.global", "true"); // always use global cache, this test can create a lot of directories
     schemaString = "schema15.xml"; 
   }
@@ -116,11 +102,6 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
   public void setUp() throws Exception {
     super.setUp();
     collectionUlogDirMap.clear();
-    if (random().nextBoolean()) {
-      CollectionAdminRequest.setClusterProperty("legacyCloud", "false").process(cloudClient);
-    } else {
-      CollectionAdminRequest.setClusterProperty("legacyCloud", "true").process(cloudClient);
-    }
   }
   
   @Override
@@ -135,7 +116,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
 
   
   public SharedFSAutoReplicaFailoverTest() {
-    completionService = new ExecutorCompletionService<>(executor);
+    completionService = new ExecutorCompletionService<>(getTestExecutor());
     pending = new HashSet<>();
   }
 
@@ -161,51 +142,40 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
   private void testBasics() throws Exception {
     String collection1 = "solrj_collection";
     Create createCollectionRequest = CollectionAdminRequest.createCollection(collection1,"conf1",2,2)
-            .setMaxShardsPerNode(2)
-            .setRouterField("myOwnField")
-            .setAutoAddReplicas(true);
+            .setMaxShardsPerNode(3)
+            .setRouterField("myOwnField");
     CollectionAdminResponse response = createCollectionRequest.process(cloudClient);
 
     assertEquals(0, response.getStatus());
     assertTrue(response.isSuccess());
-    waitForRecoveriesToFinish(collection1, false);
     
     String collection2 = "solrj_collection2";
     createCollectionRequest = CollectionAdminRequest.createCollection(collection2,"conf1",2,2)
-            .setMaxShardsPerNode(2)
-            .setRouterField("myOwnField")
-            .setAutoAddReplicas(false);
+            .setMaxShardsPerNode(3)
+            .setRouterField("myOwnField");
     CollectionAdminResponse response2 = createCollectionRequest.process(getCommonCloudSolrClient());
 
     assertEquals(0, response2.getStatus());
     assertTrue(response2.isSuccess());
     
-    waitForRecoveriesToFinish(collection2, false);
-    
     String collection3 = "solrj_collection3";
     createCollectionRequest = CollectionAdminRequest.createCollection(collection3,"conf1",5,1)
-            .setMaxShardsPerNode(1)
-            .setRouterField("myOwnField")
-            .setAutoAddReplicas(true);
+            .setMaxShardsPerNode(3)
+            .setRouterField("myOwnField");
     CollectionAdminResponse response3 = createCollectionRequest.process(getCommonCloudSolrClient());
 
     assertEquals(0, response3.getStatus());
     assertTrue(response3.isSuccess());
-    
-    waitForRecoveriesToFinish(collection3, false);
 
     // a collection has only 1 replica per a shard
     String collection4 = "solrj_collection4";
     createCollectionRequest = CollectionAdminRequest.createCollection(collection4,"conf1",5,1)
         .setMaxShardsPerNode(5)
-        .setRouterField("text")
-        .setAutoAddReplicas(true);
+        .setRouterField("text");
     CollectionAdminResponse response4 = createCollectionRequest.process(getCommonCloudSolrClient());
 
     assertEquals(0, response4.getStatus());
     assertTrue(response4.isSuccess());
-
-    waitForRecoveriesToFinish(collection4, false);
 
     // all collections
     String[] collections = {collection1, collection2, collection3, collection4};
@@ -326,7 +296,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
       for (Slice slice : slices) {
         for (Replica replica : slice.getReplicas()) {
           Map<String, Object> properties = replica.getProperties();
-          String coreName = replica.getCoreName();
+          String coreName = replica.getName();
           String curUlogDir = (String) properties.get(CoreDescriptor.CORE_ULOGDIR);
           String prevUlogDir = collectionUlogDirMap.get(coreName);
           if (curUlogDir != null) {
@@ -354,10 +324,11 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
         .filter(jetty -> jetty.getCoreContainer() != null)
         .map(JettySolrRunner::getNodeName)
         .collect(Collectors.toSet());
-    long timeout = System.nanoTime()
+    final long nanoTime = System.nanoTime();
+    long timeout = nanoTime
         + TimeUnit.NANOSECONDS.convert(timeoutInMs, TimeUnit.MILLISECONDS);
     boolean success = false;
-    while (!success && System.nanoTime() < timeout) {
+    while (!success && nanoTime < timeout) {
       success = true;
       ClusterState clusterState = zkStateReader.getClusterState();
       if (clusterState != null) {
@@ -371,7 +342,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
               Collection<Replica> replicas = slice.getReplicas();
               for (Replica replica : replicas) {
                 if (nodeNames.contains(replica.getNodeName())) {
-                  boolean live = clusterState.liveNodesContain(replica
+                  boolean live = zkStateReader.isNodeLive(replica
                       .getNodeName());
                   if (live) {
                     success = false;
@@ -397,7 +368,9 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
 
   private void assertSliceAndReplicaCount(String collection, int numSlices, int numReplicas, int timeOutInMs) throws InterruptedException {
     TimeOut timeOut = new TimeOut(timeOutInMs, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
-    while (!timeOut.hasTimedOut()) {
+    while (true) {
+      final boolean hasTimedOut = timeOut.hasTimedOut();
+      if (!!hasTimedOut) break;
       ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
       Collection<Slice> slices = clusterState.getCollection(collection).getActiveSlices();
       if (slices.size() == numSlices) {
@@ -405,7 +378,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
         for (Slice slice : slices) {
           int count = 0;
           for (Replica replica : slice.getReplicas()) {
-            if (replica.getState() == Replica.State.ACTIVE && clusterState.liveNodesContain(replica.getNodeName())) {
+            if (replica.getState() == Replica.State.ACTIVE && cloudClient.getZkStateReader().isNodeLive(replica.getNodeName())) {
               count++;
             }
           }
@@ -417,7 +390,7 @@ public class SharedFSAutoReplicaFailoverTest extends AbstractFullDistribZkTestBa
       }
       Thread.sleep(200);
     }
-    fail("Expected numSlices=" + numSlices + " numReplicas=" + numReplicas + " but found " + cloudClient.getZkStateReader().getClusterState().getCollection(collection) + " with /live_nodes: " + cloudClient.getZkStateReader().getClusterState().getLiveNodes());
+    fail("Expected numSlices=" + numSlices + " numReplicas=" + numReplicas + " but found " + cloudClient.getZkStateReader().getClusterState().getCollection(collection) + " with /live_nodes: " + cloudClient.getZkStateReader().getLiveNodes());
   }
 
 }

@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.InputStreamResponseParser;
 import org.apache.solr.client.solrj.io.SolrClientCache;
 import org.apache.solr.client.solrj.io.Tuple;
@@ -39,10 +40,13 @@ import org.apache.solr.client.solrj.io.stream.expr.Explanation.ExpressionType;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExplanation;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.request.QueryRequest;
+import org.apache.solr.common.ParWork;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.StreamParams;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 
 /**
@@ -54,15 +58,15 @@ public class SolrStream extends TupleStream {
 
   private static final long serialVersionUID = 1;
 
-  private String baseUrl;
+  private final String baseUrl;
   private SolrParams params;
   private int numWorkers;
   private int workerID;
   private boolean trace;
   private Map<String, String> fieldMappings;
   private transient TupleStreamParser tupleStreamParser;
-  private transient HttpSolrClient client;
-  private transient SolrClientCache cache;
+  private transient volatile Http2SolrClient client;
+  private transient volatile SolrClientCache cache;
   private String slice;
   private long checkpoint = -1;
   private CloseableHttpResponse closeableHttpResponse;
@@ -109,8 +113,12 @@ public class SolrStream extends TupleStream {
   **/
 
   public void open() throws IOException {
-    if(cache == null) {
-      client = new HttpSolrClient.Builder(baseUrl).build();
+    if (cache == null) {
+      synchronized (this) {
+        if (cache == null) {
+          client = new Http2SolrClient.Builder(baseUrl).markInternalRequest().build();
+        }
+      }
     } else {
       client = cache.getHttpSolrClient(baseUrl);
     }
@@ -120,8 +128,10 @@ public class SolrStream extends TupleStream {
       if (!distrib) {
         ((ModifiableSolrParams) requestParams).add("distrib","false");
       }
+      assert tupleStreamParser == null;
       tupleStreamParser = constructParser(client, requestParams);
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       throw new IOException("params " + params, e);
     }
   }
@@ -187,7 +197,10 @@ public class SolrStream extends TupleStream {
     if (closeableHttpResponse != null) {
       closeableHttpResponse.close();
     }
-    if(cache == null) {
+    IOUtils.closeQuietly(tupleStreamParser);
+
+    // if the cache is null, then we opened the client
+    if (cache == null && client != null) {
       client.close();
     }
   }
@@ -226,6 +239,7 @@ public class SolrStream extends TupleStream {
     } catch (HandledException e) {
       throw new IOException("--> "+this.baseUrl+":"+e.getMessage());
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       //The Stream source did not provide an exception in a format that the SolrStream could propagate.
       throw new IOException("--> "+this.baseUrl+": An exception has occurred on the server, refer to server log for details.", e);
     }
@@ -275,7 +289,7 @@ public class SolrStream extends TupleStream {
       modifiableSolrParams.set("indent", modifiableSolrParams.get("indent", "off"));
     }
 
-    String wt = requestParams.get(CommonParams.WT, "json");
+    String wt = requestParams.get(CommonParams.WT, CommonParams.JAVABIN);
     QueryRequest query = new QueryRequest(requestParams);
     query.setPath(p);
     query.setResponseParser(new InputStreamResponseParser(wt));
@@ -284,15 +298,20 @@ public class SolrStream extends TupleStream {
     if(user != null && password != null) {
       query.setBasicAuthCredentials(user, password);
     }
+    InputStream stream = null;
+    try {
+      NamedList<Object> genericResponse = server.request(query);
+       stream = (InputStream) genericResponse.get("stream");
 
-    NamedList<Object> genericResponse = server.request(query);
-    InputStream stream = (InputStream) genericResponse.get("stream");
-    this.closeableHttpResponse = (CloseableHttpResponse)genericResponse.get("closeableResponse");
-    if (CommonParams.JAVABIN.equals(wt)) {
-      return new JavabinTupleStreamParser(stream, true);
-    } else {
-      InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8);
-      return new JSONTupleStream(reader);
+      this.closeableHttpResponse = (CloseableHttpResponse) genericResponse.get("closeableResponse");
+      if (CommonParams.JAVABIN.equals(wt)) {
+        return new JavabinTupleStreamParser(stream, true);
+      } else {
+        return new JSONTupleStream(stream);
+      }
+    }catch (Exception e) {
+      while (stream.read() != -1) {}
+      throw new SolrException(SolrException.ErrorCode.UNKNOWN, "", e);
     }
   }
 }

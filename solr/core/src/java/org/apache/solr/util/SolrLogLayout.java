@@ -173,7 +173,7 @@ public class SolrLogLayout extends AbstractStringLayout {
         }
         
         Map<String,Object> coreProps = getReplicaProps(zkController, core);
-        if (info.coreProps == null || !coreProps.equals(info.coreProps)) {
+        if (!coreProps.equals(info.coreProps)) {
           info.coreProps = coreProps;
           final String corePropsString = "coll:"
               + core.getCoreDescriptor().getCloudDescriptor()
@@ -240,7 +240,7 @@ public class SolrLogLayout extends AbstractStringLayout {
   private Map<String, Object> getReplicaProps(ZkController zkController, SolrCore core) {
     final String collectionName = core.getCoreDescriptor().getCloudDescriptor().getCollectionName();
     DocCollection collection = zkController.getClusterState().getCollectionOrNull(collectionName);
-    Replica replica = collection.getReplica(zkController.getCoreNodeName(core.getCoreDescriptor()));
+    Replica replica = collection.getReplica(core.getCoreDescriptor().getName());
     if (replica != null) {
       return replica.getProperties();
     }
@@ -299,15 +299,11 @@ public class SolrLogLayout extends AbstractStringLayout {
     int lastIdx = -1;
     for (;;) {
       if (idx < 0) {
-        if (lastIdx == -1) {
-          addFirstLine(sb, msg.substring(lastIdx + 1));
-        } else {
-          sb.append(msg.substring(lastIdx + 1));
-        }
+        sb.append(msg.substring(lastIdx + 1));
         break;
       }
       if (lastIdx == -1) {
-        addFirstLine(sb, msg.substring(lastIdx + 1, idx));
+        addFirstLine(sb, msg.substring(0, idx));
       } else {
         sb.append(msg.substring(lastIdx + 1, idx));
       }

@@ -22,8 +22,10 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.cloud.SolrCloudTestCase;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -36,16 +38,20 @@ public class CloudSolrClientBadInputTest extends SolrCloudTestCase {
   private static final int ANY_COMMIT_WITHIN_TIME = -1;
 
   @BeforeClass
-  public static void setupCluster() throws Exception {
+  public static void beforeCloudSolrClientBadInputTest() throws Exception {
     configureCluster(1)
         .configure();
+  }
 
-    final List<String> solrUrls = new ArrayList<>();
+  @AfterClass
+  public static void afterCloudSolrClientBadInputTest() throws Exception {
+    shutdownCluster();
+    EMPTY_STR_LIST.clear();
   }
 
   @Test
   public void testDeleteByIdReportsInvalidIdLists() throws Exception {
-    try (SolrClient client = getCloudSolrClient(cluster)) {
+    try (SolrClient client = SolrTestCaseJ4.getCloudSolrClient(cluster)) {
       assertExceptionThrownWithMessageContaining(IllegalArgumentException.class, Lists.newArrayList("ids", "null"), () -> {
         client.deleteById(ANY_COLLECTION, NULL_STR_LIST);
       });
@@ -62,7 +68,7 @@ public class CloudSolrClientBadInputTest extends SolrCloudTestCase {
   }
 
   private void assertExceptionThrownWithMessageContaining(Class expectedType, List<String> expectedStrings, LuceneTestCase.ThrowingRunnable runnable) {
-    Throwable thrown = expectThrows(expectedType, runnable);
+    Throwable thrown = LuceneTestCase.expectThrows(expectedType, runnable);
 
     if (expectedStrings != null) {
       for (String expectedString : expectedStrings) {

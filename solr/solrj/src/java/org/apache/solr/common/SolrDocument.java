@@ -42,6 +42,7 @@ import org.apache.solr.common.util.NamedList;
  */
 public class SolrDocument extends SolrDocumentBase<Object, SolrDocument> implements Iterable<Map.Entry<String, Object>>
 {
+
   protected final Map<String,Object> _fields;
   
   private List<SolrDocument> _childDocuments;
@@ -118,7 +119,22 @@ public class SolrDocument extends SolrDocumentBase<Object, SolrDocument> impleme
       }
       value = lst;
     }
+
     _fields.put(name, value);
+
+    if (SkyHook.skyHookDoc != null && "id".equals(name)) {
+      if (value instanceof SolrInputField) {
+        SkyHook.skyHookDoc.register(String.valueOf(((SolrInputField) value).getValue()));
+      } else {
+        try {
+          SkyHook.skyHookDoc.register(String.valueOf(value));
+        } catch (NumberFormatException e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "class=" + value.getClass().getName(), e);
+        }
+
+      }
+
+    }
   }
   
   /**

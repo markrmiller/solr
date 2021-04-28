@@ -32,17 +32,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
@@ -58,14 +60,16 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.StreamingResponseCallback;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.StreamingBinaryResponseParser;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CursorMarkParams;
 import org.apache.solr.common.params.MapSolrParams;
@@ -73,7 +77,6 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.StrUtils;
 import org.noggit.CharArr;
 import org.noggit.JSONWriter;
@@ -104,10 +107,9 @@ public class ExportTool extends SolrCLI.ToolBase {
     String fields;
     long limit = 100;
     AtomicLong docsWritten = new AtomicLong(0);
-    int bufferSize = 1024 * 1024;
+    int bufferSize = 1024 << 10;
     PrintStream output;
     String uniqueKey;
-    CloudSolrClient solrClient;
     DocsSink sink;
 
 
@@ -151,11 +153,11 @@ public class ExportTool extends SolrCLI.ToolBase {
 
     abstract void exportDocs() throws Exception;
 
-    void fetchUniqueKey() throws SolrServerException, IOException {
-      solrClient = new CloudSolrClient.Builder(Collections.singletonList(baseurl)).build();
+    CloudSolrClient fetchUniqueKey(CloudSolrClient solrClient) throws SolrServerException, IOException {
       NamedList<Object> response = solrClient.request(new GenericSolrRequest(SolrRequest.METHOD.GET, "/schema/uniquekey",
           new MapSolrParams(Collections.singletonMap("collection", coll))));
       uniqueKey = (String) response.get("uniqueKey");
+      return solrClient;
     }
 
     public static StreamingResponseCallback getStreamer(Consumer<SolrDocument> sink) {
@@ -165,6 +167,7 @@ public class ExportTool extends SolrCLI.ToolBase {
           try {
             sink.accept(doc);
           } catch (Exception e) {
+            ParWork.propagateInterrupt(e);
             throw new RuntimeException(e);
           }
         }
@@ -181,9 +184,9 @@ public class ExportTool extends SolrCLI.ToolBase {
   static Set<String> formats = ImmutableSet.of(JAVABIN, "jsonl");
 
   @Override
-  protected void runImpl(CommandLine cli) throws Exception {
+  protected void runImpl(CommandLine cli, Http2SolrClient httpClient) throws Exception {
     String url = cli.getOptionValue("url");
-    Info info = new MultiThreadedRunner(url);
+    Info info = new MultiThreadedRunner(null, url);
     info.query = cli.getOptionValue("query", "*:*");
     info.setOutFormat(cli.getOptionValue("out"), cli.getOptionValue("format"));
     info.fields = cli.getOptionValue("fields");
@@ -247,9 +250,11 @@ public class ExportTool extends SolrCLI.ToolBase {
   };
 
   static class JsonSink extends DocsSink {
-    private CharArr charArr = new CharArr(1024 * 2);
+    private CharArr charArr = new CharArr(1024 << 1);
     JSONWriter jsonWriter = new JSONWriter(charArr, -1);
-    private Writer writer;
+    private volatile Writer writer;
+
+    private final ReentrantLock acceptLock = new ReentrantLock(false);
 
     public JsonSink(Info info) {
       this.info = info;
@@ -268,37 +273,46 @@ public class ExportTool extends SolrCLI.ToolBase {
 
     @Override
     public void end() throws IOException {
-      writer.flush();
-      fos.flush();
-      fos.close();
+      if (writer != null) {
+        writer.flush();
+      }
+      if (fos != null) {
+        fos.flush();
+        fos.close();
+      }
     }
 
     @Override
-    public synchronized void accept(SolrDocument doc) throws IOException {
-      charArr.reset();
-      Map m = new LinkedHashMap(doc.size());
-      doc.forEach((s, field) -> {
-        if (s.equals("_version_") || s.equals("_roor_")) return;
-        if (field instanceof List) {
-          if (((List) field).size() == 1) {
-            field = ((List) field).get(0);
+    public void accept(SolrDocument doc) throws IOException {
+      acceptLock.lock();
+      try {
+        charArr.reset();
+        Map m = new LinkedHashMap(doc.size());
+        doc.forEach((s, field) -> {
+          if (s.equals("_version_") || s.equals("_roor_")) return;
+          if (field instanceof List) {
+            if (((List) field).size() == 1) {
+              field = ((List) field).get(0);
+            }
           }
-        }
-        field = constructDateStr(field);
-        if (field instanceof List) {
-          List list = (List) field;
-          if (hasdate(list)) {
-            ArrayList<Object> listCopy = new ArrayList<>(list.size());
-            for (Object o : list) listCopy.add(constructDateStr(o));
-            field = listCopy;
+          field = constructDateStr(field);
+          if (field instanceof List) {
+            List list = (List) field;
+            if (hasdate(list)) {
+              ArrayList<Object> listCopy = new ArrayList<>(list.size());
+              for (Object o : list) listCopy.add(constructDateStr(o));
+              field = listCopy;
+            }
           }
-        }
-        m.put(s, field);
-      });
-      jsonWriter.write(m);
-      writer.write(charArr.getArray(), charArr.getStart(), charArr.getEnd());
-      writer.append('\n');
-      super.accept(doc);
+          m.put(s, field);
+        });
+        jsonWriter.write(m);
+        writer.write(charArr.getArray(), charArr.getStart(), charArr.getEnd());
+        writer.append('\n');
+        super.accept(doc);
+      } finally {
+        acceptLock.unlock();
+      }
     }
 
     private boolean hasdate(List list) {
@@ -321,7 +335,8 @@ public class ExportTool extends SolrCLI.ToolBase {
   }
 
   static class JavabinSink extends DocsSink {
-    JavaBinCodec codec;
+    private final AtomicReference<JavaBinCodec> codec = new AtomicReference<JavaBinCodec>();
+    private final ReentrantLock acceptLock = new ReentrantLock(false);
 
     public JavabinSink(Info info) {
       this.info = info;
@@ -334,19 +349,19 @@ public class ExportTool extends SolrCLI.ToolBase {
       if (info.bufferSize > 0) {
         fos = new BufferedOutputStream(fos, info.bufferSize);
       }
-      codec = new JavaBinCodec(fos, null);
-      codec.writeTag(JavaBinCodec.NAMED_LST, 2);
-      codec.writeStr("params");
-      codec.writeNamedList(new NamedList<>());
-      codec.writeStr("docs");
-      codec.writeTag(JavaBinCodec.ITERATOR);
+      codec.set(new JavaBinCodec(fos, null));
+      codec.get().writeTag(JavaBinCodec.NAMED_LST, 2);
+      codec.get().writeStr("params");
+      codec.get().writeNamedList(new NamedList<>());
+      codec.get().writeStr("docs");
+      codec.get().writeTag(JavaBinCodec.ITERATOR);
 
     }
 
     @Override
     public void end() throws IOException {
-      codec.writeTag(JavaBinCodec.END);
-      codec.close();
+      codec.get().writeTag(JavaBinCodec.END);
+      codec.get().close();
       fos.flush();
       fos.close();
 
@@ -356,8 +371,8 @@ public class ExportTool extends SolrCLI.ToolBase {
       public void accept(String s, Object o) {
         try {
           if (s.equals("_version_") || s.equals("_root_")) return;
-          codec.writeExternString(s);
-          codec.writeVal(o);
+          codec.get().writeExternString(s);
+          codec.get().writeVal(o);
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -365,28 +380,35 @@ public class ExportTool extends SolrCLI.ToolBase {
     };
 
     @Override
-    public synchronized void accept(SolrDocument doc) throws IOException {
-      int sz = doc.size();
-      if(doc.containsKey("_version_")) sz--;
-      if(doc.containsKey("_root_")) sz--;
-      codec.writeTag(SOLRINPUTDOC, sz);
-      codec.writeFloat(1f); // document boost
-      doc.forEach(bic);
-      super.accept(doc);
+    public void accept(SolrDocument doc) throws IOException {
+      acceptLock.lock();
+      try {
+        int sz = doc.size();
+        if (doc.containsKey("_version_")) sz--;
+        if (doc.containsKey("_root_")) sz--;
+        codec.get().writeTag(SOLRINPUTDOC, sz);
+        codec.get().writeFloat(1f); // document boost
+        doc.forEach(bic);
+        super.accept(doc);
+      } finally {
+        acceptLock.unlock();
+      }
     }
   }
 
   static class MultiThreadedRunner extends Info {
+    private final ZkStateReader zkStateReader;
     ExecutorService producerThreadpool, consumerThreadpool;
     ArrayBlockingQueue<SolrDocument> queue = new ArrayBlockingQueue(1000);
     SolrDocument EOFDOC = new SolrDocument();
     volatile boolean failed = false;
-    Map<String, CoreHandler> corehandlers = new HashMap();
-    private long startTime ;
+    Map<String, CoreHandler> corehandlers = new ConcurrentHashMap<>();
+    private final long startTime ;
 
     @SuppressForbidden(reason = "Need to print out time")
-    public MultiThreadedRunner(String url) {
+    public MultiThreadedRunner(ZkStateReader zkStateReader, String url) {
       super(url);
+      this.zkStateReader = zkStateReader;
       startTime= System.currentTimeMillis();
     }
 
@@ -394,42 +416,59 @@ public class ExportTool extends SolrCLI.ToolBase {
     @Override
     @SuppressForbidden(reason = "Need to print out time")
     void exportDocs() throws Exception {
-      sink = getSink();
-      fetchUniqueKey();
-      ClusterStateProvider stateProvider = solrClient.getClusterStateProvider();
-      DocCollection coll = stateProvider.getCollection(this.coll);
-      Map<String, Slice> m = coll.getSlicesMap();
-      producerThreadpool = ExecutorUtil.newMDCAwareFixedThreadPool(m.size(),
-          new SolrNamedThreadFactory("solrcli-exporter-producers"));
-      consumerThreadpool = ExecutorUtil.newMDCAwareFixedThreadPool(1,
-          new SolrNamedThreadFactory("solrcli-exporter-consumer"));
-      sink.start();
-      CountDownLatch consumerlatch = new CountDownLatch(1);
+      CloudSolrClient solrClient = new CloudSolrClient.Builder(Collections.singletonList(baseurl)).build();
       try {
-        addConsumer(consumerlatch);
-        addProducers(m);
-        if (output != null) {
-          output.println("NO: of shards : " + corehandlers.size());
-        }
-        CountDownLatch producerLatch = new CountDownLatch(corehandlers.size());
-        corehandlers.forEach((s, coreHandler) -> producerThreadpool.submit(() -> {
-          try {
-            coreHandler.exportDocsFromCore();
-          } catch (Exception e) {
-            if(output != null) output.println("Error exporting docs from : "+s);
+      sink = getSink();
+      fetchUniqueKey(solrClient);
 
+        ClusterStateProvider stateProvider = solrClient.getClusterStateProvider();
+        DocCollection coll = stateProvider.getCollection(this.coll);
+        Map<String, Slice> m = coll.getSlicesMap();
+        producerThreadpool = ParWork.getExecutorService("solrcli-exporter-producers", m.size(), true);
+        consumerThreadpool = ParWork.getExecutorService("solrcli-exporter-consumer", 1, true);
+        sink.start();
+        CountDownLatch consumerlatch = new CountDownLatch(1);
+
+          addConsumer(consumerlatch);
+          addProducers(m);
+          if (output != null) {
+            output.println("NO: of shards : " + corehandlers.size());
           }
-          producerLatch.countDown();
-        }));
+          CountDownLatch producerLatch = new CountDownLatch(corehandlers.size());
+          corehandlers.forEach((s, coreHandler) -> producerThreadpool.submit(() -> {
+            try {
+              coreHandler.exportDocsFromCore();
+            } catch (Exception e) {
+              ParWork.propagateInterrupt(e);
+              if (output != null) output.println("Error exporting docs from : " + s);
 
-        producerLatch.await();
-        queue.offer(EOFDOC, 10, TimeUnit.SECONDS);
-        consumerlatch.await();
-      } finally {
-        sink.end();
+            }
+            producerLatch.countDown();
+          }));
+
+          producerLatch.await();
+          queue.offer(EOFDOC, 10, TimeUnit.SECONDS);
+          consumerlatch.await();
+        } finally {
         solrClient.close();
-        producerThreadpool.shutdownNow();
-        consumerThreadpool.shutdownNow();
+        sink.end();
+
+        if (producerThreadpool != null) {
+          producerThreadpool.shutdown();
+          producerThreadpool.shutdownNow();
+        }
+        if (consumerThreadpool != null) {
+          consumerThreadpool.shutdown();
+          consumerThreadpool.shutdownNow();
+        }
+
+        if (producerThreadpool != null) {
+          ExecutorUtil.awaitTermination(producerThreadpool);
+        }
+        if (consumerThreadpool != null) {
+          ExecutorUtil.awaitTermination(consumerThreadpool);
+        }
+
         if (failed) {
           try {
             Files.delete(new File(out).toPath());
@@ -437,19 +476,18 @@ public class ExportTool extends SolrCLI.ToolBase {
             //ignore
           }
         }
-        System.out.println("\nTotal Docs exported: "+ (docsWritten.get() -1)+
-            ". Time taken: "+( (System.currentTimeMillis() - startTime)/1000) + "secs");
+        System.out.println("\nTotal Docs exported: " + (docsWritten.get() - 1) + ". Time taken: " + ((System.currentTimeMillis() - startTime) / 1000) + "secs");
       }
+
     }
 
     private void addProducers(Map<String, Slice> m) {
-      for (Map.Entry<String, Slice> entry : m.entrySet()) {
-        Slice slice = entry.getValue();
-        Replica replica = slice.getLeader();
+      m.forEach((key, slice) -> {
+        Replica replica = slice.getLeader(zkStateReader.getLiveNodes());
         if (replica == null) replica = slice.getReplicas().iterator().next();// get a random replica
-        CoreHandler coreHandler = new CoreHandler(replica);
-        corehandlers.put(replica.getCoreName(), coreHandler);
-      }
+        CoreHandler coreHandler = new CoreHandler(replica, zkStateReader);
+        corehandlers.put(replica.getName(), coreHandler);
+      });
     }
 
     private void addConsumer(CountDownLatch consumerlatch) {
@@ -459,6 +497,7 @@ public class ExportTool extends SolrCLI.ToolBase {
           try {
             doc = queue.poll(30, TimeUnit.SECONDS);
           } catch (InterruptedException e) {
+            ParWork.propagateInterrupt(e);
             if (output != null) output.println("Consumer interrupted");
             failed = true;
             break;
@@ -468,6 +507,7 @@ public class ExportTool extends SolrCLI.ToolBase {
             if (docsWritten.get() > limit) continue;
             sink.accept(doc);
           } catch (Exception e) {
+            ParWork.propagateInterrupt(e);
             if (output != null) output.println("Failed to write to file " + e.getMessage());
             failed = true;
           }
@@ -479,18 +519,20 @@ public class ExportTool extends SolrCLI.ToolBase {
 
     class CoreHandler {
       final Replica replica;
+      private final ZkStateReader zkStateReader;
       long expectedDocs;
       AtomicLong receivedDocs = new AtomicLong();
 
-      CoreHandler(Replica replica) {
+      CoreHandler(Replica replica, ZkStateReader zkStateReader) {
+        this.zkStateReader = zkStateReader;
         this.replica = replica;
       }
 
       boolean exportDocsFromCore()
           throws IOException, SolrServerException {
-        HttpSolrClient client = new HttpSolrClient.Builder(baseurl).build();
+        Http2SolrClient client = new Http2SolrClient.Builder(baseurl).markInternalRequest().build();
         try {
-          expectedDocs = getDocCount(replica.getCoreName(), client);
+          expectedDocs = getDocCount(replica.getName(), client);
           GenericSolrRequest request;
           ModifiableSolrParams params = new ModifiableSolrParams();
           params.add(Q, query);
@@ -504,6 +546,7 @@ public class ExportTool extends SolrCLI.ToolBase {
               queue.offer(doc, 10, TimeUnit.SECONDS);
               receivedDocs.incrementAndGet();
             } catch (InterruptedException e) {
+              ParWork.propagateInterrupt(e);
               failed = true;
               if (output != null) output.println("Failed to write docs from" + e.getMessage());
             }
@@ -514,18 +557,18 @@ public class ExportTool extends SolrCLI.ToolBase {
             if (docsWritten.get() > limit) return true;
             params.set(CursorMarkParams.CURSOR_MARK_PARAM, cursorMark);
             request = new GenericSolrRequest(SolrRequest.METHOD.GET,
-                "/" + replica.getCoreName() + "/select", params);
+                "/" + replica.getName() + "/select", params);
             request.setResponseParser(responseParser);
             try {
               NamedList<Object> rsp = client.request(request);
               String nextCursorMark = (String) rsp.get(CursorMarkParams.CURSOR_MARK_NEXT);
               if (nextCursorMark == null || Objects.equals(cursorMark, nextCursorMark)) {
                 if (output != null)
-                  output.println(StrUtils.formatString("\nExport complete for : {0}, docs : {1}", replica.getCoreName(), receivedDocs.get()));
+                  output.println(StrUtils.formatString("\nExport complete for : {0}, docs : {1}", replica.getName(), receivedDocs.get()));
                 if (expectedDocs != receivedDocs.get()) {
                   if (output != null) {
                     output.println(StrUtils.formatString("Could not download all docs for core {0} , expected: {1} , actual",
-                        replica.getCoreName(), expectedDocs, receivedDocs));
+                        replica.getName(), expectedDocs, receivedDocs));
                     return false;
                   }
                 }
@@ -534,7 +577,7 @@ public class ExportTool extends SolrCLI.ToolBase {
               cursorMark = nextCursorMark;
               if (output != null) output.print(".");
             } catch (SolrServerException e) {
-              if(output != null) output.println("Error reading from server "+ replica.getBaseUrl()+"/"+ replica.getCoreName());
+              if(output != null) output.println("Error reading from server "+ replica.getBaseUrl()+"/"+ replica.getName());
               failed = true;
               return false;
             }
@@ -547,7 +590,7 @@ public class ExportTool extends SolrCLI.ToolBase {
   }
 
 
-  static long getDocCount(String coreName, HttpSolrClient client) throws SolrServerException, IOException {
+  static long getDocCount(String coreName, Http2SolrClient client) throws SolrServerException, IOException {
     SolrQuery q = new SolrQuery("*:*");
     q.setRows(0);
     q.add("distrib", "false");

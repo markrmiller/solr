@@ -23,13 +23,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import net.sf.saxon.om.NodeInfo;
 import net.thisptr.jackson.jq.JsonQuery;
 import net.thisptr.jackson.jq.exception.JsonQueryException;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.util.DOMUtil;
-import org.w3c.dom.Node;
 
 public class MetricsQuery {
 
@@ -88,11 +88,11 @@ public class MetricsQuery {
     return jsonQueries;
   }
 
-  public static List<MetricsQuery> from(Node node) throws JsonQueryException {
+  public static List<MetricsQuery> from(NodeInfo node) throws JsonQueryException {
     List<MetricsQuery> metricsQueries = new ArrayList<>();
 
     NamedList config = DOMUtil.childNodesToNamedList(node);
-    List<NamedList> requests = config.getAll("request");
+    List<NamedList> requests = (List<NamedList>) config.getAll("request");
 
     for (NamedList request : requests) {
       NamedList query = (NamedList) request.get("query");

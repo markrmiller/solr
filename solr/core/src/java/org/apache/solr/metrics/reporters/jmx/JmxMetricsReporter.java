@@ -519,20 +519,24 @@ public class JmxMetricsReporter implements Reporter, Closeable {
 
     private void registerMBean(Object mBean, ObjectName objectName) throws InstanceAlreadyExistsException, JMException {
       // remove previous bean if exists
-      if (mBeanServer.isRegistered(objectName)) {
-        if (log.isDebugEnabled()) {
-          Set<ObjectInstance> objects = mBeanServer.queryMBeans(objectName, null);
-          if (log.isDebugEnabled()) {
-            log.debug("## removing existing {} bean(s) for {}, current tag={}:", objects.size(), objectName.getCanonicalName(), tag);
-          }
-          for (ObjectInstance inst : objects) {
-            if (log.isDebugEnabled()) {
-              log.debug("## - tag={}{}", mBeanServer.getAttribute(inst.getObjectName(), INSTANCE_TAG));
-            }
-          }
-        }
-        mBeanServer.unregisterMBean(objectName);
-      }
+//      if (mBeanServer.isRegistered(objectName)) {
+//        if (log.isDebugEnabled()) {
+//          Set<ObjectInstance> objects = mBeanServer.queryMBeans(objectName, null);
+//          if (log.isDebugEnabled()) {
+//            log.debug("## removing existing {} bean(s) for {}, current tag={}:", objects.size(), objectName.getCanonicalName(), tag);
+//          }
+//          for (ObjectInstance inst : objects) {
+//            if (log.isDebugEnabled()) {
+//              log.debug("## - tag={}{}", mBeanServer.getAttribute(inst.getObjectName(), INSTANCE_TAG));
+//            }
+//          }
+//        }
+//        try {
+//          mBeanServer.unregisterMBean(objectName);
+//        } catch (InstanceNotFoundException e) {
+//          log.warn("JMX object not found name=" + objectName, e);
+//        }
+//      }
       ObjectInstance objectInstance = mBeanServer.registerMBean(mBean, objectName);
       if (objectInstance != null) {
         // the websphere mbeanserver rewrites the objectname to include

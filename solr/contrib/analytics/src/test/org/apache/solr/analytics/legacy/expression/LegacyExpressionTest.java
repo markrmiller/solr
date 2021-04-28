@@ -19,11 +19,14 @@ package org.apache.solr.analytics.legacy.expression;
 import java.time.Instant;
 import java.util.Date;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.analytics.legacy.LegacyAbstractAnalyticsTest;
 import org.apache.solr.util.DateMathParser;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Nightly
 public class LegacyExpressionTest extends LegacyAbstractAnalyticsTest {
   private static final String fileName = "expressions.txt";
 
@@ -37,7 +40,7 @@ public class LegacyExpressionTest extends LegacyAbstractAnalyticsTest {
 
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeLegacyExpressionTest() throws Exception {
     initCore("solrconfig-analytics.xml", "schema-analytics.xml");
     h.update("<delete><query>*:*</query></delete>");
 
@@ -51,7 +54,7 @@ public class LegacyExpressionTest extends LegacyAbstractAnalyticsTest {
       assertU(adoc("id", "1000" + j, "int_id", "" + i, "long_ld", "" + l, "float_fd", "" + f,
           "double_dd", "" + d, "date_dtd", dt, "string_sd", s));
 
-      if (usually()) {
+      if (LuceneTestCase.usually()) {
         assertU(commit()); // to have several segments
       }
     }
@@ -59,6 +62,11 @@ public class LegacyExpressionTest extends LegacyAbstractAnalyticsTest {
     assertU(commit());
 
     setResponse(h.query(request(fileToStringArr(LegacyExpressionTest.class, fileName))));
+  }
+
+  @AfterClass
+  public static void afterTestICUCollationFieldDocValues() throws Exception {
+    deleteCore();
   }
 
   @Test

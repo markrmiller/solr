@@ -16,6 +16,7 @@
  */
 package org.apache.solr;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
@@ -50,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+@LuceneTestCase.Nightly // slow test
 public class TestGroupingSearch extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -75,7 +77,7 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
 
   @AfterClass
   public static void afterTests() {
-    systemClearPropertySolrTestsMergePolicyFactory();
+    deleteCore();
   }
 
   @Before
@@ -125,7 +127,7 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
         , "//arr[@name='groups']/lst[2]/result/doc/*[@name='id'][.='5']"
     );
 
-    SolrException exception = expectThrows(SolrException.class, () -> {
+    SolrException exception = SolrTestCaseUtil.expectThrows(SolrException.class, () -> {
       h.query(req("q", "title:title", "group", "true", "group.field", "group_i", "group.offset", "-1"));
     });
     assertEquals(SolrException.ErrorCode.BAD_REQUEST.code, exception.code());
@@ -750,12 +752,12 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
      assertJQ(req("q","id:"+doc.id), "/response/numFound==1");
     **/
 
-    int indexIter=atLeast(10);  // make >0 to enable test
-    int queryIter=atLeast(50);
+    int indexIter= SolrTestUtil.atLeast(10);  // make >0 to enable test
+    int queryIter= SolrTestUtil.atLeast(50);
 
     while (--indexIter >= 0) {
 
-      int indexSize = random().nextInt(25 * RANDOM_MULTIPLIER);
+      int indexSize = random().nextInt(25 * LuceneTestCase.RANDOM_MULTIPLIER);
 //indexSize=2;
       List<FldType> types = new ArrayList<>();
       types.add(new FldType("id",ONE_ONE, new SVal('A','Z',4,4)));

@@ -286,7 +286,7 @@ public class TermFilteredPresearcher extends Presearcher {
   /**
    * Implements a {@link BytesRefIterator} over a {@link BytesRefHash}
    */
-  protected class BytesRefHashIterator implements BytesRefIterator {
+  protected static class BytesRefHashIterator implements BytesRefIterator {
 
     final BytesRef scratch = new BytesRef();
     final BytesRefHash terms;

@@ -20,12 +20,15 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
@@ -36,11 +39,14 @@ import org.apache.solr.util.TestInjection;
 import org.apache.solr.util.TimeOut;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Slow
+@LuceneTestCase.Nightly
+@Ignore // MRM TODO: base class to bridge
 public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistribZkTestBase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
@@ -62,7 +68,7 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
   }
 
   @BeforeClass
-  public static void beforeSuperClass() {
+  public static void beforeSuperClass() throws Exception {
     schemaString = "schema15.xml";      // we need a string id
     if (usually()) {
       System.setProperty("solr.autoCommit.maxTime", "15000");
@@ -70,6 +76,7 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
     System.clearProperty("solr.httpclient.retries");
     System.clearProperty("solr.retries.on.forward");
     System.clearProperty("solr.retries.to.followers");
+    useFactory(null);
     setErrorHook();
   }
   
@@ -144,16 +151,19 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
     } else {
       maxUpdates = 15000;
     }
-    
+
+    ArrayList<Future> futures = new ArrayList<>();
     for (int i = 0; i < threadCount; i++) {
       StoppableIndexingThread indexThread = new StoppableIndexingThread(controlClient, cloudClient, Integer.toString(i), true, maxUpdates, batchSize, pauseBetweenUpdates); // random().nextInt(999) + 1
       threads.add(indexThread);
-      indexThread.start();
+      Future<?> future = ParWork.submit("StoppableSearchThread", indexThread);
+      futures.add(future);
     }
     
     StoppableCommitThread commitThread = new StoppableCommitThread(cloudClient, 1000, false);
     threads.add(commitThread);
-    commitThread.start();
+    Future<?> future = ParWork.submit("StoppableCommitThread", commitThread);
+    futures.add(future);
     
     chaosMonkey.startTheMonkey(false, 500);
     try {
@@ -181,8 +191,8 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
     }
     
     // wait for stop...
-    for (StoppableThread thread : threads) {
-      thread.join();
+    for (Future thread : futures) {
+      thread.get();
     }
     
     for (StoppableThread thread : threads) {
@@ -190,19 +200,6 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
         assertEquals(0, ((StoppableIndexingThread)thread).getFailCount());
       }
     }
-    
-    // try and wait for any replications and what not to finish...
-
-    Thread.sleep(2000);
-
-    waitForThingsToLevelOut(3, TimeUnit.MINUTES);
-    
-    // even if things were leveled out, a jetty may have just been stopped or something
-    // we wait again and wait to level out again to make sure the system is not still in flux
-    
-    Thread.sleep(3000);
-
-    waitForThingsToLevelOut(3, TimeUnit.MINUTES);
 
     if (log.isInfoEnabled()) {
       log.info("control docs:{}\n\n", controlClient.query(new SolrQuery("*:*")).getResults().getNumFound());
@@ -223,8 +220,8 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
       zkServer.run(false);
     }
 
-    try (CloudSolrClient client = createCloudClient("collection1")) {
-        createCollection(null, "testcollection", 1, 1, 100, client, null, "conf1");
+    try (CloudHttp2SolrClient client = createCloudClient("collection1")) {
+        createCollection(null, "testcollection", 1, 1, 100, client, null, "_default");
 
     }
     List<Integer> numShardsNumReplicas = new ArrayList<>(2);
@@ -242,7 +239,7 @@ public class ChaosMonkeySafeLeaderWithPullReplicasTest extends AbstractFullDistr
         break;
       } catch (SolrServerException | SolrException e) {
         // cluster may not be up yet
-        e.printStackTrace();
+        log.error("", e);
       }
       Thread.sleep(100);
     }

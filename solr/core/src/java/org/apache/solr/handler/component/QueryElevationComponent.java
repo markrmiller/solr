@@ -16,34 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Queue;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.WeakHashMap;
-import java.util.function.Consumer;
-
 import com.carrotsearch.hppc.IntIntHashMap;
 import com.carrotsearch.hppc.cursors.IntIntCursor;
 import com.google.common.annotations.VisibleForTesting;
@@ -54,6 +26,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.ObjectArrays;
 import com.google.common.collect.Sets;
+import net.sf.saxon.om.NodeInfo;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
@@ -79,8 +52,8 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.core.XmlConfigFile;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.core.XmlConfigFile;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.transform.ElevatedMarkerFactory;
 import org.apache.solr.response.transform.ExcludedMarkerFactory;
@@ -96,10 +69,36 @@ import org.apache.solr.util.VersionedFile;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Queue;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.WeakHashMap;
+import java.util.function.Consumer;
 
 /**
  * A component to elevate some documents to the top of the result set.
@@ -133,15 +132,15 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
   private static final String DEFAULT_EXCLUDE_MARKER_FIELD_NAME = "excluded";
   private static final String DEFAULT_EDITORIAL_MARKER_FIELD_NAME = "elevated";
 
-  protected SolrParams initArgs;
-  protected Analyzer queryAnalyzer;
-  protected SchemaField uniqueKeyField;
+  private volatile SolrParams initArgs;
+  protected volatile Analyzer queryAnalyzer;
+  protected volatile SchemaField uniqueKeyField;
   /** @see QueryElevationParams#FORCE_ELEVATION */
-  protected boolean forceElevation;
+  protected volatile boolean forceElevation;
   /** @see QueryElevationParams#USE_CONFIGURED_ELEVATED_ORDER */
-  protected boolean useConfiguredElevatedOrder;
+  protected volatile boolean useConfiguredElevatedOrder;
 
-  protected boolean initialized;
+  protected volatile boolean initialized;
 
   /**
    * For each IndexReader, keep an ElevationProvider when the configuration is loaded from the data directory.
@@ -218,6 +217,9 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
    * @return The number of elevation rules parsed.
    */
   protected int loadElevationConfiguration(SolrCore core) throws Exception {
+    ElevationProvider noOplevationProvider = NO_OP_ELEVATION_PROVIDER;
+
+    ElevationProvider elevationProvider = noOplevationProvider;
     synchronized (elevationProviderCache) {
       elevationProviderCache.clear();
       String configFileName = initArgs.get(CONFIG_FILE);
@@ -227,7 +229,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
         throw new InitializationException("Missing component parameter " + CONFIG_FILE + " - it has to define the path to the elevation configuration file", InitializationExceptionCause.NO_CONFIG_FILE_DEFINED);
       }
       boolean configFileExists = false;
-      ElevationProvider elevationProvider = NO_OP_ELEVATION_PROVIDER;
+
 
       // check if using ZooKeeper
       ZkController zkController = core.getCoreContainer().getZkController();
@@ -250,7 +252,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
             if (log.isInfoEnabled()) {
               log.info("Loading QueryElevation from: {}", fC.getAbsolutePath());
             }
-            XmlConfigFile cfg = new XmlConfigFile(core.getResourceLoader(), configFileName);
+            XmlConfigFile cfg = new XmlConfigFile(core.getResourceLoader(), configFileName, null, null, null);
             elevationProvider = loadElevationProvider(cfg);
           }
           elevationProviderCache.put(null, elevationProvider);
@@ -263,7 +265,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
         try {
           searchHolder = core.getNewestSearcher(false);
           if (searchHolder == null) {
-            elevationProvider = NO_OP_ELEVATION_PROVIDER;
+            elevationProvider = noOplevationProvider;
           } else {
             IndexReader reader = searchHolder.get().getIndexReader();
             elevationProvider = getElevationProvider(reader, core);
@@ -318,6 +320,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
    */
   @VisibleForTesting
   ElevationProvider getElevationProvider(IndexReader reader, SolrCore core) throws Exception {
+    ElevationProvider noOplevationProvider = NO_OP_ELEVATION_PROVIDER;
     synchronized (elevationProviderCache) {
       ElevationProvider elevationProvider;
       elevationProvider = elevationProviderCache.get(null);
@@ -339,7 +342,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
         if (loadingException != null) {
           elevationProvider = handleConfigLoadingException(loadingException, resourceAccessIssue);
           if (elevationProvider == null) {
-            elevationProvider = NO_OP_ELEVATION_PROVIDER;
+            elevationProvider = noOplevationProvider;
             shouldCache = false;
           }
         }
@@ -362,7 +365,9 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
    * @throws RuntimeException             If the configuration resource is not an XML content of the expected format
    *                                      (either {@link RuntimeException} or {@link org.apache.solr.common.SolrException}).
    */
-  private ElevationProvider loadElevationProvider(SolrCore core) throws IOException, SAXException, ParserConfigurationException {
+  private ElevationProvider loadElevationProvider(SolrCore core)
+      throws IOException, SAXException, ParserConfigurationException,
+      XMLStreamException {
     String configFileName = initArgs.get(CONFIG_FILE);
     if (configFileName == null) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
@@ -373,10 +378,10 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
     XmlConfigFile cfg;
     ZkController zkController = core.getCoreContainer().getZkController();
     if (zkController != null) {
-      cfg = new XmlConfigFile(core.getResourceLoader(), configFileName, null, null);
+      cfg = new XmlConfigFile(core.getResourceLoader(), configFileName, null, null, null);
     } else {
       InputStream is = VersionedFile.getLatestFile(core.getDataDir(), configFileName);
-      cfg = new XmlConfigFile(core.getResourceLoader(), configFileName, new InputSource(is), null);
+      cfg = new XmlConfigFile(core.getResourceLoader(), configFileName, new InputSource(is), null, null);
     }
     ElevationProvider elevationProvider = loadElevationProvider(cfg);
     assert elevationProvider != null;
@@ -391,28 +396,28 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
    */
   protected ElevationProvider loadElevationProvider(XmlConfigFile config) {
     Map<ElevatingQuery, ElevationBuilder> elevationBuilderMap = new LinkedHashMap<>();
-    XPath xpath = XPathFactory.newInstance().newXPath();
-    NodeList nodes = (NodeList) config.evaluate("elevate/query", XPathConstants.NODESET);
-    for (int i = 0; i < nodes.getLength(); i++) {
-      Node node = nodes.item(i);
+    XPath xpath = config.getResourceLoader().getXPath();
+    ArrayList<NodeInfo> nodes = (ArrayList) config.evaluate(config.getTree(), "elevate/query", XPathConstants.NODESET);
+    for (int i = 0; i < nodes.size(); i++) {
+      NodeInfo node = nodes.get(i);
       String queryString = DOMUtil.getAttr(node, "text", "missing query 'text'");
       String matchString = DOMUtil.getAttr(node, "match");
       ElevatingQuery elevatingQuery = new ElevatingQuery(queryString, isSubsetMatchPolicy(matchString));
 
-      NodeList children;
+      ArrayList<NodeInfo> children;
       try {
-        children = (NodeList) xpath.evaluate("doc", node, XPathConstants.NODESET);
+        children = (ArrayList) xpath.evaluate("doc", node, XPathConstants.NODESET);
       } catch (XPathExpressionException e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
             "query requires '<doc .../>' child");
       }
 
-      if (children.getLength() == 0) { // weird
+      if (children.size() == 0) { // weird
         continue;
       }
       ElevationBuilder elevationBuilder = new ElevationBuilder();
-      for (int j = 0; j < children.getLength(); j++) {
-        Node child = children.item(j);
+      for (int j = 0; j < children.size(); j++) {
+        NodeInfo child = children.get(j);
         String id = DOMUtil.getAttr(child, "id", "missing 'id'");
         String e = DOMUtil.getAttr(child, EXCLUDE, null);
         if (e != null) {
@@ -667,7 +672,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
       assert priority == 1; // the last priority (lowest)
     }
 
-    if (context != null) {
+    if (context != null && boostDocs != null) {
       //noinspection unchecked
       context.put(BOOSTED_DOCIDS, boostDocs);
     }
@@ -1128,7 +1133,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
   }
 
   /** Elevates certain docs to the top. */
-  private class ElevationComparatorSource extends FieldComparatorSource {
+  private static class ElevationComparatorSource extends FieldComparatorSource {
 
     private final IntIntHashMap elevatedWithPriority;
     private final boolean useConfiguredElevatedOrder;

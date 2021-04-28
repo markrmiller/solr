@@ -16,6 +16,28 @@
  */
 package org.apache.solr.analytics.legacy.facet;
 
+import com.google.common.collect.ObjectArrays;
+import org.apache.lucene.util.IOUtils;
+import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.analytics.util.AnalyticsResponseHeadings;
+import org.apache.solr.analytics.util.MedianCalculator;
+import org.apache.solr.analytics.util.OrdinalCalculator;
+import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.rest.schema.FieldTypeXmlAdapter;
+import org.apache.solr.util.TestHarness;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -29,56 +51,30 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 
-import org.apache.lucene.util.IOUtils;
-import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.analytics.util.AnalyticsResponseHeadings;
-import org.apache.solr.analytics.util.MedianCalculator;
-import org.apache.solr.analytics.util.OrdinalCalculator;
-import org.apache.solr.request.SolrQueryRequest;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-
-import com.google.common.collect.ObjectArrays;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
-
 public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
-  protected static final HashMap<String,Object> defaults = new HashMap<>();
+  protected static HashMap<String,Object> defaults;
+  public static final String[] EMPTY_TS = new String[0];
 
   protected String latestType = "";
 
   private static Document doc;
-  private static XPathFactory xPathFact;
+
   private static String rawResponse;
 
   @BeforeClass
   public static void beforeClassAbstractAnalysis() {
-    xPathFact = XPathFactory.newInstance();
+    defaults = new HashMap<>();
   }
 
   @AfterClass
   public static void afterClassAbstractAnalysis() {
-    xPathFact = null;
     doc = null;
     rawResponse = null;
-    defaults.clear();
+    defaults = null;
   }
 
   protected static void setResponse(String response) throws ParserConfigurationException, IOException, SAXException {
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    factory.setNamespaceAware(true); // never forget this!
-    DocumentBuilder builder = factory.newDocumentBuilder();
+    DocumentBuilder builder = FieldTypeXmlAdapter.getDocumentBuilder();
     doc = builder.parse(new InputSource(new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8))));
     rawResponse = response;
   }
@@ -88,7 +84,7 @@ public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
   }
 
   protected Node getNode(String xPath) throws XPathExpressionException {
-    return (Node)xPathFact.newXPath().compile(xPath).evaluate(doc, XPathConstants.NODE);
+    return (Node) h.getXpath().compile(xPath).evaluate(doc, XPathConstants.NODE);
   }
   private NodeList getNodes(String n1, String n2, String n3, String element, String n4) throws XPathExpressionException {
     // Construct the XPath expression. The form better not change or all these will fail.
@@ -97,7 +93,7 @@ public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
     sb.append("/lst[@name='").append(n3).append("']");
     sb.append("/lst[@name!='(MISSING)']");
     sb.append("//").append(element).append("[@name='").append(n4).append("']");
-    return (NodeList)xPathFact.newXPath().compile(sb.toString()).evaluate(doc, XPathConstants.NODESET);
+    return (NodeList) h.getXpath().compile(sb.toString()).evaluate(doc, XPathConstants.NODESET);
 
   }
   protected ArrayList<String> getStringList(String n1, String n2, String n3, String element, String n4)
@@ -166,7 +162,7 @@ public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
       l.add(args[i]);
       l.add(args[i+1]);
     }
-    return l.toArray(new String[0]);
+    return l.toArray(EMPTY_TS);
   }
 
   protected void setLatestType(String latestType) {
@@ -291,7 +287,9 @@ public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
   }
 
   public static SolrQueryRequest request(String...args){
-    return SolrTestCaseJ4.req( ObjectArrays.concat(BASEPARMS, args,String.class) );
+    SolrQueryRequest req = SolrTestCaseJ4.req(ObjectArrays.concat(BASEPARMS, args, String.class));
+    req.close();
+    return req;
   }
 
   public static final String[] BASEPARMS = new String[]{ "q", "*:*", "indent", "true", "olap", "true", "rows", "0" };
@@ -319,7 +317,7 @@ public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
         strList.add(param[0]);
         strList.add(param[1]);
       }
-      return strList.toArray(new String[0]);
+      return strList.toArray(EMPTY_TS);
     } finally {
       IOUtils.closeWhileHandlingException(file, in);
     }
@@ -336,7 +334,7 @@ public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
 
   protected NodeList getNodes(String xPath) throws XPathExpressionException {
     StringBuilder sb = new StringBuilder(xPath);
-    return (NodeList) xPathFact.newXPath().compile(sb.toString()).evaluate(doc, XPathConstants.NODESET);
+    return (NodeList) h.getXpath().compile(sb.toString()).evaluate(doc, XPathConstants.NODESET);
   }
 
 }

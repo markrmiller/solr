@@ -80,7 +80,8 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
   @Override
   public void writeMap(EntryWriter ew) throws IOException {
-    for (int i = 0; i < nvPairs.size(); i+=2) {
+    final int size = nvPairs.size();
+    for (int i = 0; i < size; i+=2) {
       ew.put((CharSequence) nvPairs.get(i), nvPairs.get(i + 1));
     }
   }
@@ -120,10 +121,10 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
       nvPairs = new ArrayList<>();
     } else {
       nvPairs = new ArrayList<>(nameValueMap.size() << 1);
-      for (Map.Entry<String,? extends T> ent : nameValueMap.entrySet()) {
-        nvPairs.add(ent.getKey());
-        nvPairs.add(ent.getValue());
-      }
+      nameValueMap.forEach((key, value) -> {
+        nvPairs.add(key);
+        nvPairs.add(value);
+      });
     }
   }
 
@@ -182,7 +183,13 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * @return null if no name exists
    */
   public String getName(int idx) {
-    return (String)nvPairs.get(idx << 1);
+    Object name = null;
+    try {
+      name = nvPairs.get(idx << 1);
+      return (String) name;
+    } catch (ClassCastException e) {
+      return String.valueOf(name);
+    }
   }
 
   /**
@@ -360,7 +367,8 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
   public Object findRecursive(String... args) {
     NamedList<?> currentList = null;
     Object value = null;
-    for (int i = 0; i < args.length; i++) {
+    int sz = args.length;
+    for (int i = 0; i < sz; i++) {
       String key = args[i];
       /*
        * The first time through the loop, the current list is null, so we assign
@@ -399,7 +407,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(64);
     sb.append('{');
     int sz = size();
     for (int i=0; i<sz; i++) {
@@ -422,101 +430,13 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
     return asShallowMap(false);
   }
   public Map<String,T> asShallowMap(boolean allowDps) {
-    return new Map<String, T>() {
-      @Override
-      public int size() {
-        return NamedList.this.size();
-      }
-
-      @Override
-      public boolean isEmpty() {
-        return size() == 0;
-      }
-
-      public boolean containsKey(Object  key) {
-        return NamedList.this.get((String) key) != null ;
-      }
-
-      @Override
-      public boolean containsValue(Object value) {
-        return false;
-      }
-
-      @Override
-      public T get(Object key) {
-        return  NamedList.this.get((String) key);
-      }
-
-      @Override
-      public T put(String  key, T value) {
-        if (allowDps) {
-          NamedList.this.add(key, value);
-          return null;
-        }
-        int idx = NamedList.this.indexOf(key, 0);
-        if (idx == -1) {
-          NamedList.this.add(key, value);
-        } else {
-          NamedList.this.setVal(idx, value);
-        }
-        return null;
-      }
-
-      @Override
-      public T remove(Object key) {
-        return  NamedList.this.remove((String) key);
-      }
-
-      @Override
-      @SuppressWarnings({"unchecked"})
-      public void putAll(Map m) {
-        boolean isEmpty = isEmpty();
-        for (Object o : m.entrySet()) {
-          @SuppressWarnings({"rawtypes"})
-          Map.Entry e = (Entry) o;
-          if (isEmpty) {// we know that there are no duplicates
-            add((String) e.getKey(), (T) e.getValue());
-          } else {
-            put(e.getKey() == null ? null : e.getKey().toString(), (T) e.getValue());
-          }
-        }
-      }
-
-      @Override
-      public void clear() {
-        NamedList.this.clear();
-      }
-
-      @Override
-      @SuppressWarnings({"unchecked"})
-      public Set<String> keySet() {
-        //TODO implement more efficiently
-        return  NamedList.this.asMap(1).keySet();
-      }
-
-      @Override
-      @SuppressWarnings({"unchecked", "rawtypes"})
-      public Collection values() {
-        //TODO implement more efficiently
-        return  NamedList.this.asMap(1).values();
-      }
-
-      @Override
-      public Set<Entry<String,T>> entrySet() {
-        //TODO implement more efficiently
-        return NamedList.this.asMap(1).entrySet();
-      }
-
-      @Override
-      public void forEach(BiConsumer action) {
-        NamedList.this.forEach(action);
-      }
-    };
+    return new ShallowMap(this, allowDps);
   }
 
   public Map asMap(int maxDepth) {
-    LinkedHashMap result = new LinkedHashMap();
-    for(int i=0;i<size();i++){
+    LinkedHashMap result = new LinkedHashMap(32);
+    final int size = size();
+    for(int i = 0; i< size; i++){
       Object val = getVal(i);
       if (val instanceof NamedList && maxDepth> 0) {
         //the maxDepth check is to avoid stack overflow due to infinite recursion
@@ -545,21 +465,22 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    */
   public SolrParams toSolrParams() {
     HashMap<String,String[]> map = new HashMap<>();
-    for (int i=0; i<this.size(); i++) {
+    final int size = this.size();
+    for (int i = 0; i< size; i++) {
       String name = this.getName(i);
       Object val = this.getVal(i);
       if (val instanceof String[]) {
         MultiMapSolrParams.addParam(name, (String[]) val, map);
       } else if (val instanceof List) {
         List l = (List) val;
-        String[] s = new String[l.size()];
-        for (int j = 0; j < l.size(); j++) {
+        final int size1 = l.size();
+        String[] s = new String[size1];
+        for (int j = 0; j < size1; j++) {
           s[j] = l.get(j) == null ? null : l.get(j).toString();
         }
         MultiMapSolrParams.addParam(name, s, map);
       } else {
-        //TODO: we NPE if val is null; yet we support val members above. A bug?
-        MultiMapSolrParams.addParam(name, val.toString(), map);
+        MultiMapSolrParams.addParam(name, (val == null ? null : val.toString()), map);
       }
     }
     // always use MultiMap for easier processing further down the chain
@@ -608,9 +529,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * Iterates over the Map and sequentially adds its key/value pairs
    */
   public boolean addAll(Map<String,T> args) {
-    for (Map.Entry<String, T> entry : args.entrySet() ) {
-      add(entry.getKey(), entry.getValue());
-    }
+    args.forEach((key, value) -> add(key, value));
     return args.size()>0;
   }
 
@@ -858,6 +777,105 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
     int sz = size();
     for (int i = 0; i < sz; i++) {
       action.accept(getName(i), getVal(i));
+    }
+  }
+
+  private static class ShallowMap<T> implements Map<String, T> {
+    private final boolean allowDps;
+    private NamedList<T> namedList;
+
+    public ShallowMap(NamedList<T> namedList, boolean allowDps) {
+      this.allowDps = allowDps;
+      this.namedList = namedList;
+    }
+
+    @Override
+    public int size() {
+      return namedList.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return size() == 0;
+    }
+
+    public boolean containsKey(Object  key) {
+      return namedList.get((String) key) != null ;
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+      return false;
+    }
+
+    @Override
+    public T get(Object key) {
+      return  namedList.get((String) key);
+    }
+
+    @Override
+    public T put(String  key, T value) {
+      if (allowDps) {
+        namedList.add(key, value);
+        return null;
+      }
+      int idx = namedList.indexOf(key, 0);
+      if (idx == -1) {
+        namedList.add(key, value);
+      } else {
+        namedList.setVal(idx, value);
+      }
+      return null;
+    }
+
+    @Override
+    public T remove(Object key) {
+      return  namedList.remove((String) key);
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked"})
+    public void putAll(Map m) {
+      boolean isEmpty = isEmpty();
+      for (Object o : m.entrySet()) {
+        @SuppressWarnings({"rawtypes"})
+        Entry e = (Entry) o;
+        if (isEmpty) {// we know that there are no duplicates
+          namedList.add((String) e.getKey(), (T) e.getValue());
+        } else {
+          put(e.getKey() == null ? null : e.getKey().toString(), (T) e.getValue());
+        }
+      }
+    }
+
+    @Override
+    public void clear() {
+      namedList.clear();
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked"})
+    public Set<String> keySet() {
+      //TODO implement more efficiently
+      return  namedList.asMap(1).keySet();
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Collection values() {
+      //TODO implement more efficiently
+      return  namedList.asMap(1).values();
+    }
+
+    @Override
+    public Set<Entry<String,T>> entrySet() {
+      //TODO implement more efficiently
+      return namedList.asMap(1).entrySet();
+    }
+
+    @Override
+    public void forEach(BiConsumer action) {
+      namedList.forEach(action);
     }
   }
 }

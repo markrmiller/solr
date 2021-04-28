@@ -16,22 +16,28 @@
  */
 package org.apache.solr.util;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.LineNumberReader;
+import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.ArrayList;
-import java.net.URLDecoder;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.request.UpdateRequest;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.handler.component.ShardRequest;
@@ -67,7 +73,7 @@ public class SolrLogPostTool {
     HttpSolrClient.Builder builder = new HttpSolrClient.Builder();
     SolrClient client = null;
     try {
-      client = builder.withBaseSolrUrl(baseUrl).build();
+      client = builder.withBaseSolrUrl(baseUrl).markInternalRequest().build();
       File rf = new File(root);
       List<File> files = new ArrayList();
       gatherFiles(rf, files);
@@ -136,6 +142,7 @@ public class SolrLogPostTool {
         client.commit();
         CLIO.out("Committed");
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         CLIO.err("Unable to commit documents: " + e.getMessage());
         e.printStackTrace(CLIO.getErrStream());
       }

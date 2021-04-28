@@ -37,18 +37,16 @@ import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient.Builder;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.handler.AnalyticsHandler;
 import org.apache.solr.handler.component.AnalyticsComponent;
 import org.apache.solr.response.AnalyticsShardResponseWriter;
@@ -106,9 +104,9 @@ public class AnalyticsShardRequestManager {
 
       ZkStateReader zkStateReader = cloudSolrClient.getZkStateReader();
       ClusterState clusterState = zkStateReader.getClusterState();
-      Set<String> liveNodes = clusterState.getLiveNodes();
+      Set<String> liveNodes = zkStateReader.getLiveNodes();
 
-      Slice[] slices = clusterState.getCollection(collection).getActiveSlicesArr();
+      Collection<Slice> slices = clusterState.getCollection(collection).getActiveSlices();
 
       for(Slice slice : slices) {
         Collection<Replica> replicas = slice.getReplicas();
@@ -120,8 +118,7 @@ public class AnalyticsShardRequestManager {
 
         Collections.shuffle(shuffler, new Random());
         Replica rep = shuffler.get(0);
-        ZkCoreNodeProps zkProps = new ZkCoreNodeProps(rep);
-        String url = zkProps.getCoreUrl();
+        String url = rep.getCoreUrl();
         replicaUrls.add(url);
       }
     } catch (Exception e) {
@@ -142,7 +139,7 @@ public class AnalyticsShardRequestManager {
    * @throws IOException if an exception occurs while sending requests.
    */
   private void streamFromShards() throws IOException {
-    ExecutorService service = ExecutorUtil.newMDCAwareCachedThreadPool(new SolrNamedThreadFactory("SolrAnalyticsStream"));
+    ExecutorService service = ParWork.getRootSharedExecutor();
     List<Future<SolrException>> futures = new ArrayList<>();
     List<AnalyticsShardRequester> openers = new ArrayList<>();
     for (String replicaUrl : replicaUrls) {
@@ -163,11 +160,11 @@ public class AnalyticsShardRequestManager {
         }
       }
     } catch (InterruptedException e1) {
+      ParWork.propagateInterrupt(e1);
       throw new RuntimeException(e1);
     } catch (ExecutionException e1) {
       throw new RuntimeException(e1);
     } finally {
-      service.shutdown();
       for (AnalyticsShardRequester opener : openers) {
         opener.close();
       }

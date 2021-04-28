@@ -20,6 +20,8 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.TimeZone;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.TrieField;
@@ -39,7 +41,7 @@ import org.junit.Test;
 @Deprecated
 public class TestTrie extends SolrTestCaseJ4 {
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeTestTrie() throws Exception {
     initCore("solrconfig.xml","schema-trie.xml");
   }
   
@@ -215,7 +217,7 @@ public class TestTrie extends SolrTestCaseJ4 {
   @Test
   public void testTrieFacet_PrecisionStep() throws Exception {
     if (Boolean.getBoolean(NUMERIC_POINTS_SYSPROP)) {
-      assumeTrue("Skipping test: Points+facets require docValues, but randomizer: points=true && DV=false",
+      LuceneTestCase.assumeTrue("Skipping test: Points+facets require docValues, but randomizer: points=true && DV=false",
                  Boolean.getBoolean(NUMERIC_DOCVALUES_SYSPROP));
     }
     
@@ -258,20 +260,29 @@ public class TestTrie extends SolrTestCaseJ4 {
             "facet.field", "tfloat",
             "facet.field", "tdouble");
     testFacetField(req, "tint", "0", "2");
+    h.getCore();
     testFacetField(req, "tint", "5", "1");
+    h.getCore();
     testFacetField(req, "tlong", String.valueOf(Integer.MAX_VALUE), "2");
+    h.getCore();
     testFacetField(req, "tlong", String.valueOf(Integer.MAX_VALUE+5L), "1");
+    h.getCore();
     testFacetField(req, "tfloat", String.valueOf(31.11f), "2");
+    h.getCore();
     testFacetField(req, "tfloat", String.valueOf(5*5*31.11f), "1");
+    h.getCore();
     testFacetField(req, "tdouble", String.valueOf(2.33d), "2");
+    h.getCore();
     testFacetField(req, "tdouble", String.valueOf(5*2.33d), "1");
   }
 
   private void checkPrecisionSteps(String fieldType) {
-    FieldType type = h.getCore().getLatestSchema().getFieldType(fieldType);
-    if (type instanceof TrieField) {
-      TrieField field = (TrieField) type;
-      assertTrue(field.getPrecisionStep() > 0 && field.getPrecisionStep() < 64);
+    try (SolrCore core = h.getCore()) {
+      FieldType type = core.getLatestSchema().getFieldType(fieldType);
+      if (type instanceof TrieField) {
+        TrieField field = (TrieField) type;
+        assertTrue(field.getPrecisionStep() > 0 && field.getPrecisionStep() < 64);
+      }
     }
   }
 

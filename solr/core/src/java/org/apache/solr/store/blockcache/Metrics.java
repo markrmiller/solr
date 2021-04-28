@@ -101,7 +101,7 @@ public class Metrics extends SolrCacheBase implements SolrInfoBean {
 
       previous = now;
 
-    });
+    }, false );
     solrMetricsContext.gauge(metricsMap, true, getName(), getCategory().toString(), scope);
   }
 

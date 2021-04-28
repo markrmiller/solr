@@ -35,7 +35,7 @@ public class RequestInfo {
   private final int start;
   private final long rows; 
   private final boolean clean; 
-  private final List<String> entitiesToRun;
+  private List<String> entitiesToRun;
   private final Map<String,Object> rawParams;
   private final String configFile;
   private final String dataConfig;
@@ -89,7 +89,7 @@ public class RequestInfo {
     
     Object o = requestParams.get("entity");     
     List<String> modifiableEntities = null;
-    if(o != null) {
+    if (o != null) {
       if (o instanceof String) {
         modifiableEntities = new ArrayList<>();
         modifiableEntities.add((String) o);
@@ -97,13 +97,14 @@ public class RequestInfo {
         @SuppressWarnings("unchecked")
         List<String> modifiableEntities1 = new ArrayList<>((List<String>) o);
         modifiableEntities = modifiableEntities1;
-      } 
-      entitiesToRun = Collections.unmodifiableList(modifiableEntities);
+      }
+      if (modifiableEntities != null) {
+        entitiesToRun = Collections.unmodifiableList(modifiableEntities);
+      }
     } else {
       entitiesToRun = null;
     }
-    String configFileParam = (String) requestParams.get("config");
-    configFile = configFileParam;
+    configFile = (String) requestParams.get("config");
     String dataConfigParam = (String) requestParams.get("dataConfig");
     if (dataConfigParam != null && dataConfigParam.trim().length() == 0) {
       // Empty data-config param is not valid, change it to null

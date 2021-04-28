@@ -85,7 +85,7 @@ public class TermVectorComponent extends SearchComponent implements SolrCoreAwar
   private static final String TV_KEY_WARNINGS = "warnings";
 
   @SuppressWarnings({"rawtypes"})
-  protected NamedList initParams;
+  protected volatile NamedList initParams;
 
   /**
    * Helper method for determining the list of fields that we should 

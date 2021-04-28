@@ -16,36 +16,33 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.EmptyEntityResolver;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.core.SolrCore;
-import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.util.SystemIdResolver;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.XMLErrorLogger;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.dataimport.config.ConfigNameConstants;
 import org.apache.solr.handler.dataimport.config.ConfigParseUtil;
 import org.apache.solr.handler.dataimport.config.DIHConfiguration;
 import org.apache.solr.handler.dataimport.config.Entity;
 import org.apache.solr.handler.dataimport.config.PropertyWriter;
 import org.apache.solr.handler.dataimport.config.Script;
-
-import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
-import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
-import static org.apache.solr.handler.dataimport.DocBuilder.loadClass;
-import static org.apache.solr.handler.dataimport.config.ConfigNameConstants.CLASS;
-
+import org.apache.solr.rest.schema.FieldTypeXmlAdapter;
+import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.util.SystemIdResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
-import org.apache.commons.io.IOUtils;
 
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
+import static org.apache.solr.handler.dataimport.DocBuilder.loadClass;
+import static org.apache.solr.handler.dataimport.config.ConfigNameConstants.CLASS;
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.invoke.MethodHandles;
@@ -192,21 +189,7 @@ public class DataImporter {
 
     DIHConfiguration dihcfg = null;
     try {
-      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-      dbf.setValidating(false);
-      
-      // only enable xinclude, if XML is coming from safe source (local file)
-      // and a a SolrCore and SystemId is present (makes no sense otherwise):
-      if (core != null && configFile.getSystemId() != null) {
-        try {
-          dbf.setXIncludeAware(true);
-          dbf.setNamespaceAware(true);
-        } catch( UnsupportedOperationException e ) {
-          log.warn( "XML parser doesn't support XInclude option" );
-        }
-      }
-      
-      DocumentBuilder builder = dbf.newDocumentBuilder();
+      DocumentBuilder builder =  FieldTypeXmlAdapter.dbf.newDocumentBuilder();
       // only enable xinclude / external entities, if XML is coming from
       // safe source (local file) and a a SolrCore and SystemId is present:
       if (core != null && configFile.getSystemId() != null) {

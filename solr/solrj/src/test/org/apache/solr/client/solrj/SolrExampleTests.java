@@ -35,12 +35,15 @@ import java.util.Map;
 import java.util.Random;
 
 import com.google.common.collect.Maps;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
-import org.apache.solr.SolrTestCaseJ4.SuppressSSL;
+import org.apache.solr.SolrTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.client.solrj.embedded.SolrExampleStreamingHttp2Test;
 import org.apache.solr.client.solrj.embedded.SolrExampleStreamingTest.ErrorTrackingConcurrentUpdateSolrClient;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.BaseHttpSolrClient.RemoteSolrException;
 import org.apache.solr.client.solrj.impl.NoOpResponseParser;
@@ -74,6 +77,7 @@ import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.util.RTimer;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -93,30 +97,25 @@ import static org.hamcrest.core.StringContains.containsString;
  *
  * @since solr 1.3
  */
-@SuppressSSL
+@SolrTestCase.SuppressSSL
 abstract public class SolrExampleTests extends SolrExampleTestsBase
 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  static {
-    ignoreException("uniqueKey");
+  @Before
+  public void setUp() throws Exception {
+    super.setUp();
   }
 
-  @Before
-  public void emptyCollection() throws Exception {
-    SolrClient client = getSolrClient();
-    // delete everything!
-    client.deleteByQuery("*:*");
-    client.commit();
+  @After
+  public void tearDown() throws Exception {
+    super.tearDown();
   }
 
   @Test
-  @Monster("Only useful to verify the performance of serialization+ deserialization")
+  @LuceneTestCase.Monster("Only useful to verify the performance of serialization+ deserialization")
   // ant -Dtestcase=SolrExampleBinaryTest -Dtests.method=testQueryPerf -Dtests.monster=true test
   public void testQueryPerf() throws Exception {
-    HttpSolrClient client = (HttpSolrClient) getSolrClient();
-    client.deleteByQuery("*:*");
-    client.commit();
     ArrayList<SolrInputDocument> docs = new ArrayList<>();
     int id = 0;
     docs.add(makeTestDoc("id", id++, "features", "aaa", "manu", "apple", "cat", "a", "inStock", true, "popularity", 12, "price", .017));
@@ -134,13 +133,13 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     client.add(docs);
     client.commit();
     //this sets the cache
-    QueryResponse rsp = getSolrClient().query(new SolrQuery("*:*").setRows(20));
+    QueryResponse rsp = getSolrClient(jetty).query(new SolrQuery("*:*").setRows(20));
 
     RTimer timer = new RTimer();
     int count = 10000;
     log.info("Started perf test....");
     for(int i=0;i< count; i++){
-      rsp = getSolrClient().query(new SolrQuery("*:*").setRows(20));
+      rsp = getSolrClient(jetty).query(new SolrQuery("*:*").setRows(20));
     }
 
     if (log.isInfoEnabled()) {
@@ -156,10 +155,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testExampleConfig() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery( "*:*" );// delete everything!
+    SolrClient client = getSolrClient(jetty);
     
     // Now add something...
     SolrInputDocument doc = new SolrInputDocument();
@@ -287,7 +283,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     if (jetty != null) {
       // check system wide system handler + "/admin/info/system"
       String url = jetty.getBaseUrl().toString();
-      try (HttpSolrClient adminClient = getHttpSolrClient(url)) {
+      try (Http2SolrClient adminClient = getHttpSolrClient(url)) {
         SolrQuery q = new SolrQuery();
         q.set("qt", "/admin/info/system");
         QueryResponse rsp = adminClient.query(q);
@@ -304,11 +300,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
  @Test
  public void testAddRetrieve() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    
+    SolrClient client = getSolrClient(jetty);
+
     // Now add something...
     SolrInputDocument doc1 = new SolrInputDocument();
     doc1.addField( "id", "id1" );
@@ -352,11 +345,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   }
   @Test
   public void testFailOnVersionConflicts() throws Exception {
-    SolrClient client = getSolrClient();
-
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
+    SolrClient client = getSolrClient(jetty);
 
     client.request(new UpdateRequest()
         .add("id", "id1", "name", "doc1.v1"));
@@ -401,11 +390,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testGetEmptyResults() throws Exception
   {    
-    SolrClient client = getSolrClient();
-     
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
+    SolrClient client = getSolrClient(jetty);
      
     // Add two docs
     SolrInputDocument doc = new SolrInputDocument();
@@ -453,9 +438,9 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   
   public void testUnicode() throws Exception {
     Random random = random();
-    int numIterations = atLeast(3);
+    int numIterations = LuceneTestCase.atLeast(3);
     
-    SolrClient client = getSolrClient();
+    SolrClient client = getSolrClient(jetty);
     
     // save the old parser, so we can set it back.
     ResponseParser oldParser = null;
@@ -475,7 +460,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
           }
         }
 
-        int numDocs = TestUtil.nextInt(random(), 1, 10 * RANDOM_MULTIPLIER);
+        int numDocs = TestUtil.nextInt(random(), 1, 10 * LuceneTestCase.RANDOM_MULTIPLIER);
         
         // Empty the database...
         client.deleteByQuery("*:*");// delete everything!
@@ -515,20 +500,20 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testErrorHandling() throws Exception
   {    
-    SolrClient client = getSolrClient();
+    SolrClient client = getSolrClient(jetty);
 
     SolrQuery query = new SolrQuery();
     query.set(CommonParams.QT, "/analysis/field");
     query.set(AnalysisParams.FIELD_TYPE, "pint");
     query.set(AnalysisParams.FIELD_VALUE, "ignore_exception");
-    SolrException ex = expectThrows(SolrException.class, () -> client.query(query));
+    SolrException ex = LuceneTestCase.expectThrows(SolrException.class, () -> client.query(query));
     assertEquals(400, ex.code());
     assertThat(ex.getMessage(), containsString("Invalid Number: ignore_exception"));
 
     //the df=text here is a kluge for the test to supply a default field in case there is none in schema.xml
     // alternatively, the resulting assertion could be modified to assert that no default field is specified.
-    ex = expectThrows(SolrException.class, () -> client.deleteByQuery( "{!df=text} ??::?? ignore_exception" ));
-    assertTrue(ex.getMessage().indexOf("??::?? ignore_exception")>0);  // The reason should get passed through
+    Exception ex2 = LuceneTestCase.expectThrows(Exception.class, () -> client.deleteByQuery( "{!df=text} ??::?? ignore_exception" ));
+    assertTrue(ex2.getMessage().indexOf("??::?? ignore_exception")>0);  // The reason should get passed through
     assertEquals(400, ex.code());
 
     SolrInputDocument doc = new SolrInputDocument();
@@ -537,7 +522,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     doc.addField("name", "hello");
 
     if (client instanceof HttpSolrClient) {
-      ex = expectThrows(SolrException.class, () -> client.add(doc));
+      ex = LuceneTestCase.expectThrows(SolrException.class, () -> client.add(doc));
       assertEquals(400, ex.code());
       assertTrue(ex.getMessage().indexOf("contains multiple values for uniqueKey") > 0);
     } else if (client instanceof ErrorTrackingConcurrentUpdateSolrClient) {
@@ -561,11 +546,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testAugmentFields() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    
+    SolrClient client = getSolrClient(jetty);
+
     // Now add something...
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField( "id", "111" );
@@ -616,11 +598,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   {    
     String rawJson = "{ \"raw\": 1.234, \"id\":\"111\" }";
     String rawXml = "<hello>this is <some/><xml/></hello>";
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    
+    SolrClient client = getSolrClient(jetty);
+
     // Now add something...
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField( "id", "111" );
@@ -695,44 +674,40 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testUpdateRequestWithParameters() throws Exception {
-    SolrClient client = createNewSolrClient();
-    
-    client.deleteByQuery("*:*");
-    client.commit();
-    
-    SolrInputDocument doc = new SolrInputDocument();
-    doc.addField("id", "id1");
-    
-    UpdateRequest req = new UpdateRequest();
-    req.setParam("overwrite", "false");
-    req.add(doc);
-    client.request(req);
-    client.request(req);
-    client.commit();
-    
-    SolrQuery query = new SolrQuery();
-    query.setQuery("*:*");
-    QueryResponse rsp = client.query(query);
-    
-    SolrDocumentList out = rsp.getResults();
-    assertEquals(2, out.getNumFound());
-    if (!(client instanceof EmbeddedSolrServer)) {
-      /* Do not close in case of using EmbeddedSolrServer,
-       * as that would close the CoreContainer */
-      client.close();
+    SolrClient client = createNewSolrClient(jetty);
+    try {
+
+      SolrInputDocument doc = new SolrInputDocument();
+      doc.addField("id", "id1");
+
+      UpdateRequest req = new UpdateRequest();
+      req.setParam("overwrite", "false");
+      req.add(doc);
+      client.request(req);
+      client.request(req);
+      client.commit();
+
+      SolrQuery query = new SolrQuery();
+      query.setQuery("*:*");
+      QueryResponse rsp = client.query(query);
+
+      SolrDocumentList out = rsp.getResults();
+      assertEquals(2, out.getNumFound());
+    } finally {
+      if (!(client instanceof EmbeddedSolrServer)) {
+        /* Do not close in case of using EmbeddedSolrServer,
+         * as that would close the CoreContainer */
+        client.close();
+      }
     }
   }
   
  @Test
  public void testContentStreamRequest() throws Exception {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    QueryResponse rsp = client.query( new SolrQuery( "*:*") );
-    Assert.assertEquals(0, rsp.getResults().getNumFound());
+    SolrClient client = getSolrClient(jetty);
 
     ContentStreamUpdateRequest up = new ContentStreamUpdateRequest("/update");
-    File file = getFile("solrj/books.csv");
+    File file = SolrTestUtil.getFile("solrj/books.csv");
     final int opened[] =  new int[] {0};
     final int closed[] =  new int[] {0};
 
@@ -764,35 +739,26 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     
     if (assertClosed) {
       assertEquals("open only once",1, opened[0]);
-      assertEquals("close exactly once",1, closed[0]);
+      assertEquals("close exactly zero",0, closed[0]);
     }
-    rsp = client.query( new SolrQuery( "*:*") );
+    QueryResponse rsp = client.query(new SolrQuery("*:*"));
     Assert.assertEquals( 10, rsp.getResults().getNumFound() );
  }
  
  
   @Test
   public void testStreamingRequest() throws Exception {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    QueryResponse rsp = client.query( new SolrQuery( "*:*") );
-    Assert.assertEquals(0, rsp.getResults().getNumFound());
-    NamedList<Object> result = client.request(new StreamingUpdateRequest("/update",
-        getFile("solrj/books.csv"), "application/csv")
+    SolrClient client = getSolrClient(jetty);
+    NamedList<Object> result = client.request(new StreamingUpdateRequest("/update", SolrTestUtil.getFile("solrj/books.csv"), "application/csv")
         .setAction(AbstractUpdateRequest.ACTION.COMMIT, true, true));
     assertNotNull("Couldn't upload books.csv", result);
-    rsp = client.query( new SolrQuery( "*:*") );
+    QueryResponse rsp = client.query(new SolrQuery("*:*"));
     Assert.assertEquals( 10, rsp.getResults().getNumFound() );
   }
 
   @Test
   public void testMultiContentWriterRequest() throws Exception {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    QueryResponse rsp = client.query(new SolrQuery("*:*"));
-    Assert.assertEquals(0, rsp.getResults().getNumFound());
+    SolrClient client = getSolrClient(jetty);
 
     List<Pair<NamedList, Object>> docs = new ArrayList<>();
     NamedList params = new NamedList();
@@ -806,13 +772,13 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     up.setAction(AbstractUpdateRequest.ACTION.COMMIT, true, true);
     NamedList<Object> result = client.request(up);
     System.out.println(result.jsonStr());
-    rsp = client.query(new SolrQuery("*:*"));
+    QueryResponse rsp = client.query(new SolrQuery("*:*"));
     Assert.assertEquals(12, rsp.getResults().getNumFound());
 
   }
 
   private ByteBuffer getFileContent(NamedList nl, String name) throws IOException {
-    try (InputStream is = new FileInputStream(getFile(name))) {
+    try (InputStream is = new FileInputStream(SolrTestUtil.getFile(name))) {
       return MultiContentWriterRequest.readByteBuffer(is);
     }
   }
@@ -820,15 +786,11 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
  public void testMultiContentStreamRequest() throws Exception {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    QueryResponse rsp = client.query( new SolrQuery( "*:*") );
-    Assert.assertEquals(0, rsp.getResults().getNumFound());
+    SolrClient client = getSolrClient(jetty);
 
     ContentStreamUpdateRequest up = new ContentStreamUpdateRequest("/update");
-    up.addFile(getFile("solrj/docs1.xml"),"application/xml"); // 2
-    up.addFile(getFile("solrj/docs2.xml"),"application/xml"); // 3
+    up.addFile(SolrTestUtil.getFile("solrj/docs1.xml"),"application/xml"); // 2
+    up.addFile(SolrTestUtil.getFile("solrj/docs2.xml"),"application/xml"); // 3
     up.setParam("a", "\u1234");
     up.setParam(CommonParams.HEADER_ECHO_PARAMS, CommonParams.EchoParamStyle.ALL.toString());
     up.setAction(AbstractUpdateRequest.ACTION.COMMIT, true, true);
@@ -836,18 +798,17 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     Assert.assertEquals("\u1234",
         ((NamedList)((NamedList) result.get("responseHeader")).get("params")).get("a"));
     assertNotNull("Couldn't upload xml files", result);
-    rsp = client.query( new SolrQuery( "*:*") );
+    QueryResponse rsp = client.query(new SolrQuery("*:*"));
     Assert.assertEquals( 5 , rsp.getResults().getNumFound() );
   }
   
  @Test
+ @LuceneTestCase.Nightly
+ // TODO - look into slowness on this
  public void testLukeHandler() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    
+    SolrClient client = getSolrClient(jetty);
+
     SolrInputDocument[] doc = new SolrInputDocument[5];
     for( int i=0; i<doc.length; i++ ) {
       doc[i] = new SolrInputDocument();
@@ -874,13 +835,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
  @Test
  public void testStatistics() throws Exception
   {    
-    SolrClient client = getSolrClient();
+    SolrClient client = getSolrClient(jetty);
     
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound( "*:*", 0 ); // make sure it got in
-
     String f = "val_i";
     
     int i=0;               // 0   1   2   3   4   5   6   7   8   9 
@@ -981,13 +937,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testPingHandler() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound( "*:*", 0 ); // make sure it got in
-    
+    SolrClient client = getSolrClient(jetty);
+
     // should be ok
     client.ping();
     
@@ -996,12 +947,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testFaceting() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound( "*:*", 0 ); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
     
     ArrayList<SolrInputDocument> docs = new ArrayList<>(10);
     for( int i=1; i<=10; i++ ) {
@@ -1069,12 +1015,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     
   @Test
   public void testPivotFacetsStats() throws Exception {
-    SolrClient client = getSolrClient();
-
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound("*:*", 0); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
 
     int id = 1;
     ArrayList<SolrInputDocument> docs = new ArrayList<>();
@@ -1196,12 +1137,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testPivotFacetsStatsNotSupported() throws Exception {
-    SolrClient client = getSolrClient();
-
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound("*:*", 0); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
 
     // results of this test should be the same regardless of whether any docs in index
     if (random().nextBoolean()) {
@@ -1216,7 +1152,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     query.addFacetPivotField("{!stats=s1}features,manu");
     query.addGetFieldStatistics("{!key=inStock_val tag=s1}inStock");
 
-    SolrException e = expectThrows(SolrException.class, () -> client.query(query));
+    SolrException e = LuceneTestCase.expectThrows(SolrException.class, () -> client.query(query));
     assertEquals("Pivot facet on boolean is not currently supported, bad request returned", 400, e.code());
     assertTrue(e.getMessage().contains("is not currently supported"));
     assertTrue(e.getMessage().contains("boolean"));
@@ -1228,7 +1164,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     query2.setFacetMinCount(0);
     query2.setRows(0);
 
-    e = expectThrows(SolrException.class, () -> client.query(query2));
+    e = LuceneTestCase.expectThrows(SolrException.class, () -> client.query(query2));
     assertEquals(400, e.code());
     assertTrue(e.getMessage().contains("stats"));
     assertTrue(e.getMessage().contains("comma"));
@@ -1240,7 +1176,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     query3.addGetFieldStatistics("{!tag=s1}features");
     query3.setFacetMinCount(0);
     query3.setRows(0);
-    e = expectThrows(SolrException.class, () -> client.query(query3));
+    e = LuceneTestCase.expectThrows(SolrException.class, () -> client.query(query3));
     assertEquals("Pivot facet on string is not currently supported, bad request returned", 400, e.code());
     assertTrue(e.getMessage().contains("is not currently supported"));
     assertTrue(e.getMessage().contains("text_general"));
@@ -1248,12 +1184,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testPivotFacetsQueries() throws Exception {
-    SolrClient client = getSolrClient();
-
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound("*:*", 0); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
 
     int id = 1;
     ArrayList<SolrInputDocument> docs = new ArrayList<>();
@@ -1306,12 +1237,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testPivotFacetsRanges() throws Exception {
-    SolrClient client = getSolrClient();
-
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound("*:*", 0); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
 
     int id = 1;
     ArrayList<SolrInputDocument> docs = new ArrayList<>();
@@ -1463,12 +1389,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   }
     
   private void doPivotFacetTest(boolean missing) throws Exception {
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound( "*:*", 0 ); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
     
     int id = 1;
     ArrayList<SolrInputDocument> docs = new ArrayList<>();
@@ -1694,11 +1615,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testChineseDefaults() throws Exception {
-    SolrClient client = getSolrClient();
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    client.commit();
-    assertNumFound( "*:*", 0 ); // make sure it got in
+    SolrClient client = getSolrClient(jetty);
 
     // Beijing medical University
     UpdateRequest req = new UpdateRequest();
@@ -1719,11 +1636,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testRealtimeGet() throws Exception
   {    
-    SolrClient client = getSolrClient();
-    
-    // Empty the database...
-    client.deleteByQuery("*:*");// delete everything!
-    
+    SolrClient client = getSolrClient(jetty);
+
     // Now add something...
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField( "id", "DOCID" );
@@ -1757,9 +1671,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testUpdateField() throws Exception {
     //no versions
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");
-    client.commit();
+    SolrClient client = getSolrClient(jetty);
+
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", "unique");
     doc.addField("name", "gadget");
@@ -1828,7 +1741,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testUpdateMultiValuedField() throws Exception {
-    SolrClient solrClient = getSolrClient();
+    SolrClient solrClient = getSolrClient(jetty);
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", "123");
     solrClient.add(doc);
@@ -1859,7 +1772,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testSetNullUpdates() throws Exception {
-    SolrClient solrClient = getSolrClient();
+    SolrClient solrClient = getSolrClient(jetty);
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", "testSetNullUpdates");
     doc.addField("single_s", "test-value");
@@ -1879,7 +1792,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   }
 
   public void testSetNullUpdateOrder() throws Exception {
-    SolrClient solrClient = getSolrClient();
+    SolrClient solrClient = getSolrClient(jetty);
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", "testSetNullUpdateOrder");
     doc.addField("single_s", "test-value");
@@ -1903,7 +1816,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   
   @Test
   public void testQueryWithParams() throws SolrServerException, IOException {
-    SolrClient client = getSolrClient();
+    SolrClient client = getSolrClient(jetty);
     SolrQuery q = new SolrQuery("query");
     q.setParam("debug", true);
     QueryResponse resp = client.query(q);
@@ -1916,11 +1829,9 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testChildDoctransformer() throws IOException, SolrServerException {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");
-    client.commit();
+    SolrClient client = getSolrClient(jetty);
     
-    int numRootDocs = TestUtil.nextInt(random(), 10, 100);
+    int numRootDocs = TestUtil.nextInt(random(), 10, TEST_NIGHTLY ? 100 : 10);
     int maxDepth = TestUtil.nextInt(random(), 2, 5);
 
     Map<String,SolrInputDocument> allDocs = new HashMap<>();
@@ -2088,8 +1999,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testExpandComponent() throws IOException, SolrServerException {
-    SolrClient server = getSolrClient();
-    server.deleteByQuery("*:*");
+    SolrClient server = getSolrClient(jetty);
 
     ArrayList<SolrInputDocument> docs = new ArrayList<>();
     docs.add( makeTestDoc("id","1", "term_s", "YYYY", "group_s", "group1", "test_i", "5", "test_l", "10", "test_f", "2000", "type_s", "parent"));
@@ -2123,7 +2033,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testFieldGlobbing() throws Exception  {
-    SolrClient client = getSolrClient();
+    SolrClient client = getSolrClient(jetty);
 
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", "testFieldGlobbing");
@@ -2181,8 +2091,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testMoreLikeThis() throws Exception {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");
+    SolrClient client = getSolrClient(jetty);
+
     for (int i=0; i<20; i++)  {
       SolrInputDocument doc = new SolrInputDocument();
       doc.addField("id", "testMoreLikeThis" + i);
@@ -2284,8 +2194,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testAddChildToChildFreeDoc() throws IOException, SolrServerException, IllegalArgumentException, IllegalAccessException, SecurityException, NoSuchFieldException {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");
+    SolrClient client = getSolrClient(jetty);
 
     SolrInputDocument docToUpdate = new SolrInputDocument();
     docToUpdate.addField("id", "p0");
@@ -2325,8 +2234,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
 
   @Test
   public void testDeleteParentDoc() throws IOException, SolrServerException, IllegalArgumentException, IllegalAccessException, SecurityException, NoSuchFieldException {
-    SolrClient client = getSolrClient();
-    client.deleteByQuery("*:*");
+    SolrClient client = getSolrClient(jetty);
 
     SolrInputDocument docToDelete = new SolrInputDocument();
     docToDelete.addField("id", "p0");

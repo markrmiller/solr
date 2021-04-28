@@ -19,6 +19,7 @@ package org.apache.solr.handler.component;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -47,6 +49,7 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.cloud.CloudDescriptor;
+import org.apache.solr.cloud.LeaderElector;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentBase;
@@ -58,6 +61,7 @@ import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.ImplicitDocRouter;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.params.CommonParams;
@@ -67,6 +71,7 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.handler.admin.PrepRecoveryOp;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.ResultContext;
@@ -82,7 +87,6 @@ import org.apache.solr.search.SolrDocumentFetcher;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.SolrReturnFields;
 import org.apache.solr.search.SyntaxError;
-import org.apache.solr.update.CdcrUpdateLog;
 import org.apache.solr.update.DocumentBuilder;
 import org.apache.solr.update.IndexFingerprint;
 import org.apache.solr.update.PeerSync;
@@ -125,8 +129,8 @@ public class RealTimeGetComponent extends SearchComponent
       if (replicaType != null) {
         if (replicaType == Replica.Type.PULL) {
           throw new SolrException(ErrorCode.BAD_REQUEST, 
-              String.format(Locale.ROOT, "%s can't handle realtime get requests. Replicas of type %s do not support these type of requests", 
-                  cloudDesc.getCoreNodeName(),
+              String.format(Locale.ROOT, "%s can't handle realtime get requests. Replicas of type %s do not support these type of requests",
+                  req.getCore().getCoreDescriptor().getName(),
                   Replica.Type.PULL));
         } 
         // non-leader TLOG replicas should not respond to distrib /get requests, but internal requests are OK
@@ -136,16 +140,18 @@ public class RealTimeGetComponent extends SearchComponent
     if (!params.getBool(COMPONENT_NAME, true)) {
       return;
     }
-    
-    // This seems rather kludgey, may there is better way to indicate
-    // that replica can support handling version ranges
-    String val = params.get("checkCanHandleVersionRanges");
-    if(val != null) {
-      rb.rsp.add("canHandleVersionRanges", true);
-      return;
+
+    String onlyIfLeader = params.get("onlyIfLeader");
+
+    if (req.getCore().getCoreContainer().isZooKeeperAware() && Boolean.parseBoolean(onlyIfLeader)) {
+      LeaderElector leaderElector = req.getCore().getCoreContainer().getZkController().getLeaderElector(req.getCore().getName());
+      if (leaderElector == null || !leaderElector.isLeader()) {
+        throw new PrepRecoveryOp.NotValidLeader("Not the valid leader (replica=" + req.getCore().getName() + ')' + (leaderElector == null ? "No leader elector" : "Elector state=" + leaderElector.getState()) + ' '
+            + req.getCore().getCoreContainer().getZkController().getZkStateReader().getCollectionInfo());
+      }
     }
-    
-    val = params.get("getFingerprint");
+
+    String val = params.get("getFingerprint");
     if(val != null) {
       processGetFingeprint(rb);
       return;
@@ -267,11 +273,7 @@ public class RealTimeGetComponent extends SearchComponent
                if (oper == UpdateLog.ADD) {
                  doc = toSolrDoc((SolrInputDocument)entry.get(entry.size()-1), core.getLatestSchema());
                } else if (oper == UpdateLog.UPDATE_INPLACE) {
-                 if (ulog instanceof CdcrUpdateLog) {
-                   assert entry.size() == 6;
-                 } else {
-                   assert entry.size() == 5;
-                 }
+                 assert entry.size() == 5;
                  // For in-place update case, we have obtained the partial document till now. We need to
                  // resolve it to a full document to be returned to the user.
                  doc = resolveFullDocument(core, idBytes.get(), rsp.getReturnFields(), (SolrInputDocument)entry.get(entry.size()-1), entry, null);
@@ -360,7 +362,9 @@ public class RealTimeGetComponent extends SearchComponent
     if (idStr == null) return;
     AtomicLong version = new AtomicLong();
     SolrInputDocument doc = getInputDocument(req.getCore(), new BytesRef(idStr), version, null, Resolution.DOC);
-    log.info("getInputDocument called for id={}, returning {}", idStr, doc);
+    if (log.isDebugEnabled()) {
+      log.debug("getInputDocument called for id={}, returning {}", idStr, doc);
+    }
     rb.rsp.add("inputDocument", doc);
     rb.rsp.add("version", version.get());
   }
@@ -569,12 +573,8 @@ public class RealTimeGetComponent extends SearchComponent
         }
         switch (oper) {
           case UpdateLog.UPDATE_INPLACE:
-            if (ulog instanceof CdcrUpdateLog) {
-              assert entry.size() == 6;
-            } else {
-              assert entry.size() == 5;
-            }
-
+            assert entry.size() == 5;
+            
             if (resolveFullDocument) {
               SolrInputDocument doc = (SolrInputDocument)entry.get(entry.size()-1);
               try {
@@ -917,7 +917,27 @@ public class RealTimeGetComponent extends SearchComponent
 
       Map<String, List<String>> sliceToId = new HashMap<>();
       for (String id : reqIds.allIds) {
-        Slice slice = coll.getRouter().getTargetSlice(params.get(ShardParams._ROUTE_, id), null, null, params, coll);
+        Slice slice;
+        try {
+          slice = coll.getRouter().getTargetSlice(params.get(ShardParams._ROUTE_, id), null, null, params, coll);
+        } catch (ImplicitDocRouter.NoShardException e) {
+          try {
+            zkController.getZkStateReader().waitForState(collection, 5, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
+              if (collectionState == null) {
+                return false;
+              }
+              if (collectionState.getSlice(e.getShard()) != null) {
+                return true;
+              }
+              return false;
+            });
+          } catch (Exception e2) {
+            throw new ImplicitDocRouter.NoShardException(SolrException.ErrorCode.BAD_REQUEST, "No shard found for " + e.getShard(), e.getShard(), e2);
+          }
+          clusterState = zkController.getClusterState();
+          coll = clusterState.getCollection(collection);
+          slice = coll.getRouter().getTargetSlice(params.get(ShardParams._ROUTE_, id), null, null, params, coll);
+        }
 
         List<String> idsForShard = sliceToId.get(slice.getName());
         if (idsForShard == null) {
@@ -978,7 +998,9 @@ public class RealTimeGetComponent extends SearchComponent
     // the mappings.
 
     for (int i=0; i<rb.slices.length; i++) {
-      log.info("LOOKUP_SLICE:{}={}", rb.slices[i], rb.shards[i]);
+      if (log.isDebugEnabled()) {
+        log.debug("LOOKUP_SLICE:{}={}", rb.slices[i], rb.shards[i]);
+      }
       if (lookup.equals(rb.slices[i]) || slice.equals(rb.slices[i])) {
         return new String[]{rb.shards[i]};
       }
@@ -1063,11 +1085,18 @@ public class RealTimeGetComponent extends SearchComponent
     SolrParams params = req.getParams();
 
     long maxVersion = params.getLong("getFingerprint", Long.MAX_VALUE);
+
     if (TestInjection.injectWrongIndexFingerprint())  {
       maxVersion = -1;
     }
     IndexFingerprint fingerprint = IndexFingerprint.getFingerprint(req.getCore(), Math.abs(maxVersion));
-    rb.rsp.add("fingerprint", fingerprint);
+
+    if (fingerprint == null) {
+      rb.rsp.add("fingerprint", "-1");
+    } else {
+      rb.rsp.add("fingerprint", fingerprint);
+    }
+
   }
   
 
@@ -1126,7 +1155,7 @@ public class RealTimeGetComponent extends SearchComponent
     try (PeerSyncWithLeader peerSync = new PeerSyncWithLeader(rb.req.getCore(), syncWithLeader, nVersions)) {
       boolean success = peerSync.sync(versions).isSuccess();
       rb.rsp.add("syncWithLeader", success);
-    } catch (IOException e) {
+    } catch (Exception e) {
       log.error("Error while closing", e);
     }
   }
@@ -1151,6 +1180,7 @@ public class RealTimeGetComponent extends SearchComponent
       boolean success = peerSync.sync().isSuccess();
       // TODO: more complex response?
       rb.rsp.add("sync", success);
+
     } catch (IOException e) {
       log.error("Error while closing", e);
     }
@@ -1196,6 +1226,9 @@ public class RealTimeGetComponent extends SearchComponent
 
     // TODO: get this from cache instead of rebuilding?
     try (UpdateLog.RecentUpdates recentUpdates = ulog.getRecentUpdates()) {
+      if (log.isDebugEnabled()) {
+        log.debug("Get updates  versionsRequested={} params={}", versions.size(), params);
+      }
       for (Long version : versions) {
         try {
           Object o = recentUpdates.lookup(version);
@@ -1324,9 +1357,7 @@ public class RealTimeGetComponent extends SearchComponent
       final List<String> allIds = new ArrayList<>((null == id ? 0 : id.length)
                                                   + (null == ids ? 0 : (2 * ids.length)));
       if (null != id) {
-        for (String singleId : id) {
-          allIds.add(singleId);
-        }
+        allIds.addAll(Arrays.asList(id));
       }
       if (null != ids) {
         for (String idList : ids) {

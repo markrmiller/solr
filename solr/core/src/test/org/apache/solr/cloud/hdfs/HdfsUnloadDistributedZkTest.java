@@ -17,26 +17,24 @@
 package org.apache.solr.cloud.hdfs;
 
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.UnloadDistributedZkTest;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-
 @Slow
-@Nightly
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@LuceneTestCase.Nightly
 public class HdfsUnloadDistributedZkTest extends UnloadDistributedZkTest {
   private static MiniDFSCluster dfsCluster;
-  
+
+  public HdfsUnloadDistributedZkTest() throws Exception {
+  }
+
   @BeforeClass
   public static void setupClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
   
   @AfterClass
@@ -46,10 +44,5 @@ public class HdfsUnloadDistributedZkTest extends UnloadDistributedZkTest {
     } finally {
       dfsCluster = null;
     }
-  }
-  
-  @Override
-  protected String getDataDir(String dataDir) {
-    return HdfsTestUtil.getDataDir(dfsCluster, dataDir);
   }
 }

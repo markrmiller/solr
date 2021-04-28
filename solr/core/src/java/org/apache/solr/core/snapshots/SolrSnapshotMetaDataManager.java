@@ -16,6 +16,7 @@
  */
 package org.apache.solr.core.snapshots;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -28,6 +29,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.codecs.CodecUtil;
@@ -39,7 +43,9 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
-import org.apache.lucene.util.IOUtils;
+
+import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.core.DirectoryFactory;
@@ -56,9 +62,14 @@ import org.slf4j.LoggerFactory;
  * {@linkplain IndexDeletionPolicyWrapper} in Solr uses this class to create/delete the Solr index
  * snapshots.
  */
-public class SolrSnapshotMetaDataManager {
+public class SolrSnapshotMetaDataManager implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String SNAPSHOT_METADATA_DIR = "snapshot_metadata";
+
+  @Override
+  public void close() throws IOException {
+    IOUtils.closeQuietly(dir);
+  }
 
   /**
    * A class defining the meta-data for a specific snapshot.
@@ -108,12 +119,12 @@ public class SolrSnapshotMetaDataManager {
   private static final String CODEC_NAME = "solr-snapshots";
 
   // The index writer which maintains the snapshots metadata
-  private long nextWriteGen;
+  private final AtomicLong nextWriteGen = new AtomicLong();
 
   private final Directory dir;
 
   /** Used to map snapshot name to snapshot meta-data. */
-  protected final Map<String,SnapshotMetaData> nameToDetailsMapping = new LinkedHashMap<>();
+  protected final Map<String,SnapshotMetaData> nameToDetailsMapping = new ConcurrentSkipListMap<>();
   /** Used to figure out the *current* index data directory path */
   private final SolrCore solrCore;
 
@@ -124,7 +135,7 @@ public class SolrSnapshotMetaDataManager {
    *            the existing meta-data.
    * @throws IOException in case of errors.
    */
-  public SolrSnapshotMetaDataManager(SolrCore solrCore, Directory dir) throws IOException {
+  public SolrSnapshotMetaDataManager(SolrCore solrCore, String dir) throws IOException {
     this(solrCore, dir, OpenMode.CREATE_OR_APPEND);
   }
 
@@ -138,26 +149,23 @@ public class SolrSnapshotMetaDataManager {
    *                              Updates the existing structure if one exists.
    * @throws IOException in case of errors.
    */
-  public SolrSnapshotMetaDataManager(SolrCore solrCore, Directory dir, OpenMode mode) throws IOException {
+  public SolrSnapshotMetaDataManager(SolrCore solrCore, String dir, OpenMode mode) throws IOException {
     this.solrCore = solrCore;
-    this.dir = dir;
+    DirectoryFactory dirFactory = solrCore.getDirectoryFactory();
+    this.dir = dirFactory.create(dir, dirFactory.createLockFactory(solrCore.getSolrConfig().indexConfig.lockType), DirContext.META_DATA);
 
-    if (mode == OpenMode.CREATE) {
-      deleteSnapshotMetadataFiles();
+    if (!solrCore.isNewCore()) {
+
+      if (mode == OpenMode.CREATE) {
+        deleteSnapshotMetadataFiles();
+      }
+
+      loadFromSnapshotMetadataFile();
     }
 
-    loadFromSnapshotMetadataFile();
-
-    if (mode == OpenMode.APPEND && nextWriteGen == 0) {
+    if (mode == OpenMode.APPEND && nextWriteGen.get() == 0) {
       throw new IllegalStateException("no snapshots stored in this directory");
     }
-  }
-
-  /**
-   * @return The snapshot meta-data directory
-   */
-  public Directory getSnapshotsDir() {
-    return dir;
   }
 
   /**
@@ -168,7 +176,7 @@ public class SolrSnapshotMetaDataManager {
    * @param gen The generation number for the {@linkplain IndexCommit} being snapshotted.
    * @throws IOException in case of I/O errors.
    */
-  public synchronized void snapshot(String name, String indexDirPath, long gen) throws IOException {
+  public void snapshot(String name, String indexDirPath, long gen) throws IOException {
     Objects.requireNonNull(name);
 
     if (log.isInfoEnabled()) {
@@ -176,12 +184,18 @@ public class SolrSnapshotMetaDataManager {
           , name, solrCore.getName(), gen, indexDirPath);
     }
 
-    if(nameToDetailsMapping.containsKey(name)) {
+    if (nameToDetailsMapping.containsKey(name)) {
       throw new SolrException(ErrorCode.BAD_REQUEST, "A snapshot with name " + name + " already exists");
     }
 
-    SnapshotMetaData d = new SnapshotMetaData(name, indexDirPath, gen);
-    nameToDetailsMapping.put(name, d);
+    nameToDetailsMapping.compute(name, (snapShotName, snapshotMetaData) -> {
+      if (snapshotMetaData != null) {
+        throw new SolrException(ErrorCode.BAD_REQUEST, "A snapshot with name " + name + " already exists");
+      }
+
+      return new SnapshotMetaData(name, indexDirPath, gen);
+    });
+
 
     boolean success = false;
     try {
@@ -192,6 +206,7 @@ public class SolrSnapshotMetaDataManager {
         try {
           release(name);
         } catch (Exception e) {
+          ParWork.propagateInterrupt(e);
           // Suppress so we keep throwing original exception
         }
       }
@@ -205,7 +220,7 @@ public class SolrSnapshotMetaDataManager {
    * @return The snapshot meta-data if the snapshot with the snapshot name exists.
    * @throws IOException in case of I/O error
    */
-  public synchronized Optional<SnapshotMetaData> release(String name) throws IOException {
+  public Optional<SnapshotMetaData> release(String name) throws IOException {
     if (log.isInfoEnabled()) {
       log.info("Deleting the snapshot named {} for core {}", name, solrCore.getName());
     }
@@ -232,7 +247,7 @@ public class SolrSnapshotMetaDataManager {
    * @return true if the snapshot is created.
    *         false otherwise.
    */
-  public synchronized boolean isSnapshotted(long genNumber) {
+  public boolean isSnapshotted(long genNumber) {
     return !nameToDetailsMapping.isEmpty() && isSnapshotted(solrCore.getIndexDir(), genNumber);
   }
 
@@ -244,7 +259,7 @@ public class SolrSnapshotMetaDataManager {
    * @return true if the snapshot is created.
    *         false otherwise.
    */
-  public synchronized boolean isSnapshotted(String indexDirPath, long genNumber) {
+  public boolean isSnapshotted(String indexDirPath, long genNumber) {
     return !nameToDetailsMapping.isEmpty()
         && nameToDetailsMapping.values().stream()
            .anyMatch(entry -> entry.getIndexDirPath().equals(indexDirPath) && entry.getGenerationNumber() == genNumber);
@@ -256,16 +271,16 @@ public class SolrSnapshotMetaDataManager {
    * @param name The name of the snapshot
    * @return The snapshot meta-data if exists.
    */
-  public synchronized Optional<SnapshotMetaData> getSnapshotMetaData(String name) {
+  public Optional<SnapshotMetaData> getSnapshotMetaData(String name) {
     return Optional.ofNullable(nameToDetailsMapping.get(name));
   }
 
   /**
    * @return A list of snapshots created so far.
    */
-  public synchronized List<String> listSnapshots() {
+  public Set<String> listSnapshots() {
     // We create a copy for thread safety.
-    return new ArrayList<>(nameToDetailsMapping.keySet());
+    return nameToDetailsMapping.keySet();
   }
 
   /**
@@ -274,7 +289,7 @@ public class SolrSnapshotMetaDataManager {
    * @param indexDirPath The index directory path.
    * @return a list snapshots stored in the specified directory.
    */
-  public synchronized Collection<SnapshotMetaData> listSnapshotsInIndexDir(String indexDirPath) {
+  public Collection<SnapshotMetaData> listSnapshotsInIndexDir(String indexDirPath) {
     return nameToDetailsMapping.values().stream()
         .filter(entry -> indexDirPath.equals(entry.getIndexDirPath()))
         .collect(Collectors.toList());
@@ -308,7 +323,7 @@ public class SolrSnapshotMetaDataManager {
         }
 
       } finally {
-        solrCore.getDirectoryFactory().release(d);
+      //  solrCore.getDirectoryFactory().release(d);
       }
     } else {
       log.warn("Commit with name {} is not persisted for core {}", commitName, solrCore.getName());
@@ -317,7 +332,7 @@ public class SolrSnapshotMetaDataManager {
     return result;
   }
 
-  private synchronized void persist() throws IOException {
+  private void persist() throws IOException {
     String fileName = SNAPSHOTS_PREFIX + nextWriteGen;
     IndexOutput out = dir.createOutput(fileName, IOContext.DEFAULT);
     boolean success = false;
@@ -331,23 +346,24 @@ public class SolrSnapshotMetaDataManager {
       }
       success = true;
     } finally {
+      IOUtils.closeQuietly(out);
       if (!success) {
-        IOUtils.closeWhileHandlingException(out);
-        IOUtils.deleteFilesIgnoringExceptions(dir, fileName);
+        IOUtils.closeQuietly(out);
+        org.apache.lucene.util.IOUtils.deleteFilesIgnoringExceptions(dir, fileName);
       } else {
-        IOUtils.close(out);
+        IOUtils.closeQuietly(out);
       }
     }
 
     dir.sync(Collections.singletonList(fileName));
 
-    if (nextWriteGen > 0) {
-      String lastSaveFile = SNAPSHOTS_PREFIX + (nextWriteGen-1);
+    if (nextWriteGen.get() > 0) {
+      String lastSaveFile = SNAPSHOTS_PREFIX + (nextWriteGen.get()-1);
       // exception OK: likely it didn't exist
-      IOUtils.deleteFilesIgnoringExceptions(dir, lastSaveFile);
+      org.apache.lucene.util.IOUtils.deleteFilesIgnoringExceptions(dir, lastSaveFile);
     }
 
-    nextWriteGen++;
+    nextWriteGen.incrementAndGet();
   }
 
   private synchronized void deleteSnapshotMetadataFiles() throws IOException {
@@ -361,7 +377,7 @@ public class SolrSnapshotMetaDataManager {
   /**
    * Reads the snapshot meta-data information from the given {@link Directory}.
    */
-  private synchronized void loadFromSnapshotMetadataFile() throws IOException {
+  private void loadFromSnapshotMetadataFile() throws IOException {
     log.debug("Loading from snapshot metadata file...");
     long genLoaded = -1;
     IOException ioe = null;
@@ -410,11 +426,11 @@ public class SolrSnapshotMetaDataManager {
         String curFileName = SNAPSHOTS_PREFIX + genLoaded;
         for(String file : snapshotFiles) {
           if (!curFileName.equals(file)) {
-            IOUtils.deleteFilesIgnoringExceptions(dir, file);
+            org.apache.lucene.util.IOUtils.deleteFilesIgnoringExceptions(dir, file);
           }
         }
       }
-      nextWriteGen = 1+genLoaded;
+      nextWriteGen.set(1 + genLoaded);
     }
   }
 }

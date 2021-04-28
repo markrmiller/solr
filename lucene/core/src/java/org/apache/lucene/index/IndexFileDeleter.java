@@ -114,7 +114,7 @@ final class IndexFileDeleter implements Closeable {
 
   // called only from assert
   private boolean locked() {
-    return writer == null || Thread.holdsLock(writer);
+    return writer == null || writer.lockHeld();
   }
 
   /**
@@ -507,7 +507,7 @@ final class IndexFileDeleter implements Closeable {
   public void checkpoint(SegmentInfos segmentInfos, boolean isCommit) throws IOException {
     assert locked();
 
-    assert Thread.holdsLock(writer);
+    assert writer.lockHeld();
     long t0 = System.nanoTime();
     if (infoStream.isEnabled("IFD")) {
       infoStream.message("IFD", "now checkpoint \"" + writer.segString(writer.toLiveInfos(segmentInfos)) + "\" [" + segmentInfos.size() + " segments " + "; isCommit = " + isCommit + "]");

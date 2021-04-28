@@ -19,6 +19,7 @@ package org.apache.solr.client.solrj;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -28,6 +29,7 @@ import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.HighlightParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.MoreLikeThisParams;
+import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.StatsParams;
 import org.apache.solr.common.params.TermsParams;
 
@@ -1175,6 +1177,18 @@ public class SolrQuery extends ModifiableSolrParams
     return this;
   }
 
+  public SolrQuery setParams(SolrParams params) {
+    Iterator<String> it = params.getParameterNamesIterator();
+    String value;
+    while (it.hasNext()) {
+      String name = it.next();
+      value = params.get(name);
+      this.set(name, value);
+    }
+
+    return this;
+  }
+
   /** get a deep copy of this object **/
   public SolrQuery getCopy() {
     SolrQuery q = new SolrQuery();
@@ -1234,19 +1248,6 @@ public class SolrQuery extends ModifiableSolrParams
     tmp = join(tmp, value, ",");
     this.set(name, tmp);
     return this;
-  }
-   
-  private String join(String[] vals, String sep, String removeVal) {
-    StringBuilder sb = new StringBuilder();
-    for (int i=0; i<vals.length; i++) {
-      if (!vals[i].equals(removeVal)) {
-        if (sb.length() > 0) {
-          sb.append(sep);
-        }
-        sb.append(vals[i]);
-      }
-    }
-    return sb.toString().trim();
   }
 
   /**

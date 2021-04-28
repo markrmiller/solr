@@ -20,6 +20,7 @@ package org.apache.solr.client.solrj.request.json;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.Utils;
+import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * Represents a query using the <a href="https://lucene.apache.org/solr/guide/json-request-api.html">JSON Query DSL</a>
@@ -53,7 +55,7 @@ public class JsonQueryRequest extends QueryRequest {
    */
   public JsonQueryRequest(SolrParams params) {
     super(params, METHOD.POST);
-    this.jsonRequestMap = new HashMap<>();
+    this.jsonRequestMap = new NonBlockingHashMap<>();
   }
 
   /**
@@ -201,7 +203,7 @@ public class JsonQueryRequest extends QueryRequest {
       throw new IllegalArgumentException("'facetWriter' parameter must be non-null");
     }
 
-    if (! jsonRequestMap.containsKey("facet")) {
+    if (!jsonRequestMap.containsKey("facet")) {
       jsonRequestMap.put("facet", new HashMap<String, Object>());
     }
 
@@ -235,7 +237,7 @@ public class JsonQueryRequest extends QueryRequest {
       throw new IllegalArgumentException("'facetValue' parameter must be non-null");
     }
 
-    if (! jsonRequestMap.containsKey("facet")) {
+    if (!jsonRequestMap.containsKey("facet")) {
       jsonRequestMap.put("facet", new HashMap<String, Object>());
     }
 
@@ -344,9 +346,7 @@ public class JsonQueryRequest extends QueryRequest {
   public JsonQueryRequest returnFields(String... fieldNames) {
     jsonRequestMap.putIfAbsent("fields", new ArrayList<String>());
     final List<String> fields = (List<String>) jsonRequestMap.get("fields");
-    for (String fieldName : fieldNames) {
-      fields.add(fieldName);
-    }
+    Collections.addAll(fields, fieldNames);
     return this;
   }
 

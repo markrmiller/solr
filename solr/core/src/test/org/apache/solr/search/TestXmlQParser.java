@@ -16,40 +16,341 @@
  */
 package org.apache.solr.search;
 
+import java.io.BufferedReader;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
 
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.MockAnalyzer;
+import org.apache.lucene.analysis.MockTokenFilter;
+import org.apache.lucene.analysis.MockTokenizer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.queryparser.xml.CoreParser;
 
+import org.apache.lucene.queryparser.xml.ParserException;
 import org.apache.lucene.queryparser.xml.TestCoreParser;
-import org.apache.solr.util.StartupLoggingUtils;
+import org.apache.lucene.search.DisjunctionMaxQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.spans.SpanQuery;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCase;
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.SAXException;
 
-public class TestXmlQParser extends TestCoreParser {
+public class TestXmlQParser extends SolrTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private CoreParser solrCoreParser;
+  private SolrCoreParser solrCoreParser;
 
-  @AfterClass
-  public static void shutdownLogger() throws Exception {
-    StartupLoggingUtils.shutdown();
+  @BeforeClass public static void beforeTestXmlQParser() throws Exception {
+    String resource = "PointRangeQueryWithoutLowerTerm.xml";
+    try (InputStream xmlStream = TestCoreParser.class.getResourceAsStream(resource)) {
+      LuceneTestCase.assumeTrue(
+          "Test XML file " + resource + " cannot be found - " + "these resources are in a lucene module and some IDE's or test runners may not find them",
+          xmlStream != null);
+    }
   }
 
-  @Override
-  protected CoreParser coreParser() {
+  @AfterClass public static void afterTestXmlQParser() throws Exception {
+
+  }
+
+  protected SolrCoreParser coreParser() {
     if (solrCoreParser == null) {
-      solrCoreParser = new SolrCoreParser(
-          super.defaultField(),
-          super.analyzer(),
-          null);
+      solrCoreParser = new SolrCoreParser(defaultField(), analyzer(), null);
     }
     return solrCoreParser;
   }
 
-  //public void testSomeOtherQuery() {
-  //  Query q = parse("SomeOtherQuery.xml");
-  //  dumpResults("SomeOtherQuery", q, ?);
-  //}
+  final private static String defaultField = "contents";
+
+  private static Analyzer analyzer;
+
+  private static CoreParserTestIndexData indexData;
+
+  protected Analyzer newAnalyzer() {
+    // TODO: rewrite test (this needs to set QueryParser.enablePositionIncrements, too, for work with CURRENT):
+    return new MockAnalyzer(random(), MockTokenizer.WHITESPACE, true, MockTokenFilter.ENGLISH_STOPSET);
+  }
+
+  protected CoreParser newCoreParser(String defaultField, Analyzer analyzer) {
+    return new CoreParser(defaultField, analyzer);
+  }
+
+  @AfterClass public static void afterClass() throws Exception {
+    if (indexData != null) {
+      indexData.close();
+      indexData = null;
+    }
+
+    analyzer = null;
+  }
+
+  public void testTermQueryXML() throws ParserException, IOException {
+    Query q = parse("TermQuery.xml");
+    dumpResults("TermQuery", q, 5);
+  }
+
+  public void test_DOCTYPE_TermQueryXML() throws ParserException, IOException {
+    SAXException saxe = LuceneTestCase.expectThrows(ParserException.class, SAXException.class, () -> parse("DOCTYPE_TermQuery.xml"));
+    assertTrue(saxe.getMessage().startsWith("External Entity resolving unsupported:"));
+  }
+
+  public void test_ENTITY_TermQueryXML() throws ParserException, IOException {
+    SAXException saxe = LuceneTestCase.expectThrows(ParserException.class, SAXException.class, () -> parse("ENTITY_TermQuery.xml"));
+    assertTrue(saxe.getMessage().startsWith("External Entity resolving unsupported:"));
+  }
+
+  public void testTermQueryEmptyXML() throws ParserException, IOException {
+    parseShouldFail("TermQueryEmpty.xml", "TermQuery has no text");
+  }
+
+  public void testTermsQueryXML() throws ParserException, IOException {
+    Query q = parse("TermsQuery.xml");
+    dumpResults("TermsQuery", q, 5);
+  }
+
+  public void testBooleanQueryXML() throws ParserException, IOException {
+    Query q = parse("BooleanQuery.xml");
+    dumpResults("BooleanQuery", q, 5);
+  }
+
+  public void testDisjunctionMaxQueryXML() throws ParserException, IOException {
+    Query q = parse("DisjunctionMaxQuery.xml");
+    assertTrue(q instanceof DisjunctionMaxQuery);
+    DisjunctionMaxQuery d = (DisjunctionMaxQuery) q;
+    assertEquals(0.0f, d.getTieBreakerMultiplier(), 0.0001f);
+    assertEquals(2, d.getDisjuncts().size());
+    DisjunctionMaxQuery ndq = (DisjunctionMaxQuery) d.getDisjuncts().get(1);
+    assertEquals(0.3f, ndq.getTieBreakerMultiplier(), 0.0001f);
+    assertEquals(1, ndq.getDisjuncts().size());
+  }
+
+  public void testRangeQueryXML() throws ParserException, IOException {
+    Query q = parse("RangeQuery.xml");
+    dumpResults("RangeQuery", q, 5);
+  }
+
+  public void testUserQueryXML() throws ParserException, IOException {
+    Query q = parse("UserInputQuery.xml");
+    dumpResults("UserInput with Filter", q, 5);
+  }
+
+  public void testCustomFieldUserQueryXML() throws ParserException, IOException {
+    Query q = parse("UserInputQueryCustomField.xml");
+    long h = searcher().search(q, 1000).totalHits.value;
+    assertEquals("UserInputQueryCustomField should produce 0 result ", 0, h);
+  }
+
+  public void testBoostingTermQueryXML() throws Exception {
+    Query q = parse("BoostingTermQuery.xml");
+    dumpResults("BoostingTermQuery", q, 5);
+  }
+
+  public void testSpanTermXML() throws Exception {
+    Query q = parse("SpanQuery.xml");
+    dumpResults("Span Query", q, 5);
+    SpanQuery sq = parseAsSpan("SpanQuery.xml");
+    dumpResults("Span Query", sq, 5);
+    assertEquals(q, sq);
+  }
+
+  public void testSpanPositionRangeQueryXML() throws Exception {
+    Query q = parse("SpanPositionRangeQuery.xml");
+    long h = searcher().search(q, 10).totalHits.value;
+    assertEquals("SpanPositionRangeQuery should produce 2 result ", 2, h);
+    SpanQuery sq = parseAsSpan("SpanPositionRangeQuery.xml");
+    dumpResults("SpanPositionRangeQuery", sq, 5);
+    assertEquals(q, sq);
+  }
+
+  public void testSpanNearQueryWithoutSlopXML() throws Exception {
+    Exception expectedException = new NumberFormatException("For input string: \"\"");
+    try {
+      Query q = parse("SpanNearQueryWithoutSlop.xml");
+      fail("got query " + q + " instead of expected exception " + expectedException);
+    } catch (Exception e) {
+      assertEquals(expectedException.toString(), e.toString());
+    }
+    try {
+      SpanQuery sq = parseAsSpan("SpanNearQueryWithoutSlop.xml");
+      fail("got span query " + sq + " instead of expected exception " + expectedException);
+    } catch (Exception e) {
+      assertEquals(expectedException.toString(), e.toString());
+    }
+  }
+
+  public void testConstantScoreQueryXML() throws Exception {
+    Query q = parse("ConstantScoreQuery.xml");
+    dumpResults("ConstantScoreQuery", q, 5);
+  }
+
+  public void testMatchAllDocsPlusFilterXML() throws ParserException, IOException {
+    Query q = parse("MatchAllDocsQuery.xml");
+    dumpResults("MatchAllDocsQuery with range filter", q, 5);
+  }
+
+  public void testNestedBooleanQuery() throws ParserException, IOException {
+    Query q = parse("NestedBooleanQuery.xml");
+    dumpResults("Nested Boolean query", q, 5);
+  }
+
+  public void testPointRangeQuery() throws ParserException, IOException {
+    Query q = parse("PointRangeQuery.xml");
+    dumpResults("PointRangeQuery", q, 5);
+  }
+
+  public void testPointRangeQueryWithoutLowerTerm() throws ParserException, IOException {
+    Query q = parse("PointRangeQueryWithoutLowerTerm.xml");
+    dumpResults("PointRangeQueryWithoutLowerTerm", q, 5);
+  }
+
+  public void testPointRangeQueryWithoutUpperTerm() throws ParserException, IOException {
+    Query q = parse("PointRangeQueryWithoutUpperTerm.xml");
+    dumpResults("PointRangeQueryWithoutUpperTerm", q, 5);
+  }
+
+  public void testPointRangeQueryWithoutRange() throws ParserException, IOException {
+    Query q = parse("PointRangeQueryWithoutRange.xml");
+    dumpResults("PointRangeQueryWithoutRange", q, 5);
+  }
+
+  //================= Helper methods ===================================
+
+  protected String defaultField() {
+    return defaultField;
+  }
+
+  protected Analyzer analyzer() {
+    if (analyzer == null) {
+      analyzer = newAnalyzer();
+    }
+    return analyzer;
+  }
+
+  private CoreParserTestIndexData indexData() {
+    if (indexData == null) {
+      try {
+        indexData = new CoreParserTestIndexData(analyzer());
+      } catch (Exception e) {
+        fail("caught Exception " + e);
+      }
+    }
+    return indexData;
+  }
+
+  protected IndexReader reader() {
+    return indexData().reader;
+  }
+
+  protected IndexSearcher searcher() {
+    return indexData().searcher;
+  }
+
+  protected void parseShouldFail(String xmlFileName, String expectedParserExceptionMessage) throws IOException {
+    Query q = null;
+    ParserException pe = null;
+    try {
+      q = parse(xmlFileName);
+    } catch (ParserException e) {
+      pe = e;
+    }
+    assertNull("for " + xmlFileName + " unexpectedly got " + q, q);
+    assertNotNull("expected a ParserException for " + xmlFileName, pe);
+    assertEquals("expected different ParserException for " + xmlFileName, expectedParserExceptionMessage, pe.getMessage());
+  }
+
+  protected Query parse(String xmlFileName) throws ParserException, IOException {
+    return implParse(xmlFileName, false);
+  }
+
+  protected SpanQuery parseAsSpan(String xmlFileName) throws ParserException, IOException {
+    return (SpanQuery) implParse(xmlFileName, true);
+  }
+
+  private Query implParse(String xmlFileName, boolean span) throws ParserException, IOException {
+    try (InputStream xmlStream = org.apache.lucene.queryparser.xml.TestCoreParser.class.getResourceAsStream(xmlFileName)) {
+      assertNotNull("Test XML file " + xmlFileName + " cannot be found", xmlStream);
+
+      return coreParser().parse(xmlStream);
+    }
+
+  }
+
+  protected Query rewrite(Query q) throws IOException {
+    return q.rewrite(reader());
+  }
+
+  protected void dumpResults(String qType, Query q, int numDocs) throws IOException {
+    if (VERBOSE) {
+      System.out.println("TEST: qType=" + qType + " numDocs=" + numDocs + " " + q.getClass().getCanonicalName() + " query=" + q);
+    }
+    final IndexSearcher searcher = searcher();
+    TopDocs hits = searcher.search(q, numDocs);
+    final boolean producedResults = (hits.totalHits.value > 0);
+    if (!producedResults) {
+      System.out.println("TEST: qType=" + qType + " numDocs=" + numDocs + " " + q.getClass().getCanonicalName() + " query=" + q);
+    }
+    if (VERBOSE) {
+      ScoreDoc[] scoreDocs = hits.scoreDocs;
+      for (int i = 0; i < Math.min(numDocs, hits.totalHits.value); i++) {
+        Document ldoc = searcher.doc(scoreDocs[i].doc);
+        System.out.println("[" + ldoc.get("date") + "]" + ldoc.get("contents"));
+      }
+      System.out.println();
+    }
+    assertTrue(qType + " produced no results", producedResults);
+  }
+
+  class CoreParserTestIndexData implements Closeable {
+
+    final Directory dir;
+    final IndexReader reader;
+    final IndexSearcher searcher;
+
+    CoreParserTestIndexData(Analyzer analyzer) throws Exception {
+      BufferedReader d = new BufferedReader(new InputStreamReader(TestCoreParser.class.getResourceAsStream("reuters21578.txt"), StandardCharsets.US_ASCII));
+      dir = LuceneTestCase.newDirectory();
+      IndexWriter writer = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(analyzer));
+      String line = d.readLine();
+      while (line != null) {
+        int endOfDate = line.indexOf('\t');
+        String date = line.substring(0, endOfDate).trim();
+        String content = line.substring(endOfDate).trim();
+        Document doc = new Document();
+        doc.add(LuceneTestCase.newTextField("date", date, Field.Store.YES));
+        doc.add(LuceneTestCase.newTextField("contents", content, Field.Store.YES));
+        doc.add(new IntPoint("date3", Integer.parseInt(date)));
+        writer.addDocument(doc);
+        line = d.readLine();
+      }
+      d.close();
+      writer.close();
+      reader = DirectoryReader.open(dir);
+      searcher = LuceneTestCase.newSearcher(reader, false);
+    }
+
+    @Override public void close() throws IOException {
+      reader.close();
+      dir.close();
+    }
+
+  }
 
 }

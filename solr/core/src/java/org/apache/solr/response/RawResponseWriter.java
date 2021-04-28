@@ -19,13 +19,28 @@ package org.apache.solr.response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CloseShieldInputStream;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.servlet.SolrDispatchFilter;
+import org.eclipse.jetty.server.HttpOutput;
+import org.eclipse.jetty.util.Callback;
 
 /**
  * Writes a ContentStream directly to the output.
@@ -71,7 +86,7 @@ public class RawResponseWriter implements BinaryQueryResponseWriter {
   @Override
   public String getContentType(SolrQueryRequest request, SolrQueryResponse response) {
     Object obj = response.getValues().get( CONTENT );
-    if( obj != null && (obj instanceof ContentStream ) ) {
+    if((obj instanceof ContentStream)) {
       return ((ContentStream)obj).getContentType();
     }
     return getBaseWriter( request ).getContentType( request, response );
@@ -80,11 +95,11 @@ public class RawResponseWriter implements BinaryQueryResponseWriter {
   @Override
   public void write(Writer writer, SolrQueryRequest request, SolrQueryResponse response) throws IOException {
     Object obj = response.getValues().get( CONTENT );
-    if( obj != null && (obj instanceof ContentStream ) ) {
+    if((obj instanceof ContentStream)) {
       // copy the contents to the writer...
       ContentStream content = (ContentStream)obj;
-      try(Reader reader = content.getReader()) {
-        IOUtils.copy( reader, writer );
+      try (Reader reader = content.getReader()) {
+        IOUtils.copy(reader, writer );
       }
     } else {
       getBaseWriter( request ).write( writer, request, response );
@@ -94,14 +109,16 @@ public class RawResponseWriter implements BinaryQueryResponseWriter {
   @Override
   public void write(OutputStream out, SolrQueryRequest request, SolrQueryResponse response) throws IOException {
     Object obj = response.getValues().get( CONTENT );
-    if( obj != null && (obj instanceof ContentStream ) ) {
+    if((obj instanceof ContentStream)) {
       // copy the contents to the writer...
       ContentStream content = (ContentStream)obj;
-      try(InputStream in = content.getStream()) {
-        IOUtils.copy( in, out );
-      }
+      InputStream in;
+
+      in = content.getStream();
+      IOUtils.copy(in, out);
+
     } else {
-      QueryResponseWriterUtil.writeQueryResponse(out, 
+      QueryResponseWriterUtil.writeQueryResponse(out,
           getBaseWriter(request), request, response, getContentType(request, response));
     }
   }

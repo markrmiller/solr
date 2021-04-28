@@ -111,6 +111,7 @@ public class ComplexPhraseQParserPlugin extends QParserPlugin {
 
       String defaultField = getParam(CommonParams.DF);
 
+
       SolrQueryParserDelegate reverseAwareParser = new SolrQueryParserDelegate(this, defaultField);
       
       lparser = new ComplexPhraseQueryParser(defaultField, getReq().getSchema().getQueryAnalyzer())
@@ -159,7 +160,7 @@ public class ComplexPhraseQParserPlugin extends QParserPlugin {
         lparser.setDefaultOperator(org.apache.lucene.queryparser.classic.QueryParser.Operator.AND);
       else
         lparser.setDefaultOperator(org.apache.lucene.queryparser.classic.QueryParser.Operator.OR);
-
+      lparser.setAnalyzer(req.getSchema().getQueryAnalyzer());
       try {
         return lparser.parse(qstr);
       } catch (ParseException pe) {

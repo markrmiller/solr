@@ -16,12 +16,6 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Constructor;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.CommonParams;
@@ -47,6 +41,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.handler.dataimport.DataImporter.IMPORT_CMD;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Constructor;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>
@@ -102,7 +101,7 @@ public class DataImportHandler extends RequestHandlerBase implements
   public void inform(SolrCore core) {
     try {
       String name = getPluginInfo().name;
-      if (name.startsWith("/")) {
+      if (!name.isEmpty() && name.charAt(0) == '/') {
         myName = name.substring(1);
       }
       // some users may have '/' in the handler name. replace with '_'
@@ -208,6 +207,7 @@ public class DataImportHandler extends RequestHandlerBase implements
             importer.runCmd(requestParams, sw);
           }
         }
+        processor.close();
       } else if (DataImporter.RELOAD_CONF_CMD.equals(command)) { 
         if(importer.maybeReloadConfiguration(requestParams, defaultParams)) {
           message = DataImporter.MSG.CONFIG_RELOADED;
@@ -262,17 +262,7 @@ public class DataImportHandler extends RequestHandlerBase implements
             "Unable to load Writer implementation:" + writerClassStr, e);
       }
     } else {
-      return new SolrWriter(processor, req) {
-        @Override
-        public boolean upload(SolrInputDocument document) {
-          try {
-            return super.upload(document);
-          } catch (RuntimeException e) {
-            log.error("Exception while adding: {}", document, e);
-            return false;
-          }
-        }
-      };
+      return new MySolrWriter(processor, req);
     }
   }
 
@@ -312,4 +302,20 @@ public class DataImportHandler extends RequestHandlerBase implements
   }
 
   public static final String ENABLE_DEBUG = "enableDebug";
+
+  private static class MySolrWriter extends SolrWriter {
+    public MySolrWriter(UpdateRequestProcessor processor, SolrQueryRequest req) {
+      super(processor, req);
+    }
+
+    @Override
+    public boolean upload(SolrInputDocument document) {
+      try {
+        return super.upload(document);
+      } catch (RuntimeException e) {
+        log.error("Exception while adding: {}", document, e);
+        return false;
+      }
+    }
+  }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.solr.common.cloud;
 
+import java.util.List;
 import java.util.Set;
 
 /**

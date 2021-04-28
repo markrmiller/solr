@@ -153,10 +153,7 @@ public class SpellingQueryConverter extends QueryConverter  {
           && ("AND".equals(nextWord) || "OR".equals(nextWord) || "NOT".equals(nextWord))) {
         flagValue = TERM_PRECEDES_NEW_BOOLEAN_OPERATOR_FLAG;
       //...unless the 1st boolean operator is a NOT, because only AND/OR can be default.
-      } else if (nextWord != null
-          && lastBooleanOp == null
-          && !nextWord.equals(lastBooleanOp)
-          && ("NOT".equals(nextWord))) {
+      } else if (lastBooleanOp == null && "NOT".equals(nextWord)) {
         flagValue = TERM_PRECEDES_NEW_BOOLEAN_OPERATOR_FLAG;
       }
       try {

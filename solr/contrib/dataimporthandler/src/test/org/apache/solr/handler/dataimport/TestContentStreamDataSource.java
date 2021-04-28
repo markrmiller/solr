@@ -17,8 +17,10 @@
 package org.apache.solr.handler.dataimport;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.DirectXmlRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
@@ -40,6 +42,7 @@ import java.util.Properties;
  *
  * @since solr 1.4
  */
+@LuceneTestCase.Nightly
 public class TestContentStreamDataSource extends AbstractDataImportHandlerTestCase {
   private static final String CONF_DIR = "dih/solr/collection1/conf/";
   private static final String ROOT_DIR = "dih/solr/";
@@ -72,7 +75,7 @@ public class TestContentStreamDataSource extends AbstractDataImportHandlerTestCa
     params.set("command", "full-import");
     params.set("clean", "false");
     req.setParams(params);
-    try (HttpSolrClient solrClient = getHttpSolrClient(buildUrl(jetty.getLocalPort(), "/solr/collection1"))) {
+    try (Http2SolrClient solrClient = getHttpSolrClient(buildUrl(jetty.getLocalPort(), "/solr/collection1"))) {
       solrClient.request(req);
       ModifiableSolrParams qparams = new ModifiableSolrParams();
       qparams.add("q", "*:*");
@@ -92,7 +95,7 @@ public class TestContentStreamDataSource extends AbstractDataImportHandlerTestCa
         "clean", "false", UpdateParams.COMMIT, "false", 
         UpdateParams.COMMIT_WITHIN, "1000");
     req.setParams(params);
-    try (HttpSolrClient solrServer = getHttpSolrClient(buildUrl(jetty.getLocalPort(), "/solr/collection1"))) {
+    try (Http2SolrClient solrServer = getHttpSolrClient(buildUrl(jetty.getLocalPort(), "/solr/collection1"))) {
       solrServer.request(req);
       Thread.sleep(100);
       ModifiableSolrParams queryAll = params("q", "*", "df", "desc");
@@ -154,7 +157,7 @@ public class TestContentStreamDataSource extends AbstractDataImportHandlerTestCa
 
 
     public void setUp() throws Exception {
-      homeDir = createTempDir("inst").toFile();
+      homeDir = SolrTestUtil.createTempDir("inst").toFile();
       dataDir = new File(homeDir + "/collection1", "data");
       confDir = new File(homeDir + "/collection1", "conf");
 
@@ -162,14 +165,14 @@ public class TestContentStreamDataSource extends AbstractDataImportHandlerTestCa
       dataDir.mkdirs();
       confDir.mkdirs();
 
-      FileUtils.copyFile(getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
+      FileUtils.copyFile(SolrTestUtil.getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
       File f = new File(confDir, "solrconfig.xml");
-      FileUtils.copyFile(getFile(getSolrConfigFile()), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(getSolrConfigFile()), f);
       f = new File(confDir, "schema.xml");
 
-      FileUtils.copyFile(getFile(getSchemaFile()), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(getSchemaFile()), f);
       f = new File(confDir, "data-config.xml");
-      FileUtils.copyFile(getFile(CONF_DIR + "dataconfig-contentstream.xml"), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(CONF_DIR + "dataconfig-contentstream.xml"), f);
 
       Files.createFile(homeDir.toPath().resolve("collection1/core.properties"));
     }

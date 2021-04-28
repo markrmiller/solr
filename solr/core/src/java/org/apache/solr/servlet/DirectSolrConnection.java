@@ -16,6 +16,7 @@
  */
 package org.apache.solr.servlet;
 
+import java.io.Closeable;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,7 +45,7 @@ import org.apache.solr.response.SolrQueryResponse;
  *
  * @since solr 1.2
  */
-public class DirectSolrConnection 
+public class DirectSolrConnection implements Closeable
 {
   protected final SolrCore core;
   protected final SolrRequestParsers parser;
@@ -73,7 +74,7 @@ public class DirectSolrConnection
     int idx = pathAndParams.indexOf( '?' );
     if( idx > 0 ) {
       path = pathAndParams.substring( 0, idx );
-      params = SolrRequestParsers.parseQueryString( pathAndParams.substring(idx+1) );
+      params = SolrRequestParsers.getInstance().parseQueryString( pathAndParams.substring(idx+1) );
     }
     else {
       path= pathAndParams;
@@ -149,5 +150,9 @@ public class DirectSolrConnection
    */
   public void close() {
     core.close();
+  }
+
+  public SolrCore getCore() {
+    return core;
   }
 }

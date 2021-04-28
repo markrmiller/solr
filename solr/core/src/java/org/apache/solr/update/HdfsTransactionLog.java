@@ -36,6 +36,7 @@ import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.ObjectReleaseTrackerTestImpl;
 import org.apache.solr.util.FSHDFSUtils;
 import org.apache.solr.util.FSHDFSUtils.CallerInfo;
 import org.slf4j.Logger;
@@ -100,7 +101,7 @@ public class HdfsTransactionLog extends TransactionLog {
         tlogOutStream.hsync();
       }
 
-      fos = new FastOutputStream(tlogOutStream, new byte[65536], 0);
+      fos = new FastOutputStream(tlogOutStream);
       long start = tlogOutStream.getPos(); 
 
       if (openExisting) {
@@ -111,7 +112,7 @@ public class HdfsTransactionLog extends TransactionLog {
          // raf.seek(start);
 
         //  assert channel.position() == start;
-          fos.setWritten(start);    // reflect that we aren't starting at the beginning
+          fos.setWritten((int) start);    // reflect that we aren't starting at the beginning
           //assert fos.size() == channel.size();
         } else {
           addGlobalStrings(globalStrings);
@@ -126,7 +127,7 @@ public class HdfsTransactionLog extends TransactionLog {
 
       success = true;
 
-      assert ObjectReleaseTracker.track(this);
+      assert ObjectReleaseTracker.getInstance().track(this);
       log.debug("Opening new tlog {}", this);
       
     } catch (IOException e) {
@@ -265,7 +266,8 @@ public class HdfsTransactionLog extends TransactionLog {
   }
 
   private void doCloseOutput() throws IOException {
-    synchronized (this) {
+    fosLock.lock();
+    try {
       if (fos == null) return;
       if (debug) {
         log.debug("Closing output for {}", tlogFile);
@@ -273,6 +275,8 @@ public class HdfsTransactionLog extends TransactionLog {
       fos.flushBuffer();
       finalLogSize = fos.size();
       fos = null;
+    } finally {
+      fosLock.unlock();
     }
 
     tlogOutStream.hflush();
@@ -333,7 +337,7 @@ public class HdfsTransactionLog extends TransactionLog {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     } finally {
       isClosed  = true;
-      assert ObjectReleaseTracker.release(this);
+      assert ObjectReleaseTracker.getInstance().release(this);
       if (deleteOnClose) {
         try {
           fs.delete(tlogFile, true);

@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.common.util.ContentStream;
@@ -94,9 +96,10 @@ abstract public class EmbeddedSolrServerTestBase extends SolrTestCaseJ4 {
       for (final ContentStream content : contents) {
         final File file = new File(base.toFile(), content.getName());
         file.getParentFile().mkdirs();
-
-        try (OutputStream os = new FileOutputStream(file)) {
-          ByteStreams.copy(content.getStream(), os);
+        try (InputStream is = new CloseShieldInputStream(content.getStream())) {
+          try (OutputStream os = new FileOutputStream(file)) {
+            ByteStreams.copy(is, os);
+          }
         }
       }
     } catch (final IOException e) {

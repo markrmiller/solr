@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.solr.store.blockcache.BlockCache.OnRelease;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-
+import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * @lucene.experimental
@@ -49,7 +49,7 @@ public class BlockDirectoryCache implements Cache {
     names = Caffeine.newBuilder().maximumSize(50000).build();
     
     if (releaseBlocks) {
-      keysToRelease = Collections.newSetFromMap(new ConcurrentHashMap<BlockCacheKey,Boolean>(1024, 0.75f, 512));
+      keysToRelease = Collections.newSetFromMap(new NonBlockingHashMap<BlockCacheKey,Boolean>(1024));
       blockCache.setOnRelease(new OnRelease() {
         
         @Override

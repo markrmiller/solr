@@ -19,18 +19,24 @@ package org.apache.solr.handler.dataimport;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.request.LocalSolrQueryRequest;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 public class TestFileListWithLineEntityProcessor extends AbstractDataImportHandlerTestCase {
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeTestFileListWithLineEntityProcessor() throws Exception {
     initCore("dataimport-solrconfig.xml", "dataimport-schema.xml");
+  }
+
+  @AfterClass
+  public static void afterTestFileListWithLineEntityProcessor() throws Exception {
+    deleteCore();
   }
   
   public void test() throws Exception {
-    File tmpdir = createTempDir(LuceneTestCase.getTestClass().getSimpleName()).toFile();
+    File tmpdir = SolrTestUtil.createTempDir(SolrTestUtil.getTestName()).toFile();
     createFile(tmpdir, "a.txt", "a line one\na line two\na line three".getBytes(StandardCharsets.UTF_8), false);
     createFile(tmpdir, "b.txt", "b line one\nb line two".getBytes(StandardCharsets.UTF_8), false);
     createFile(tmpdir, "c.txt", "c line one\nc line two\nc line three\nc line four".getBytes(StandardCharsets.UTF_8), false);
@@ -39,7 +45,7 @@ public class TestFileListWithLineEntityProcessor extends AbstractDataImportHandl
     LocalSolrQueryRequest request = lrf.makeRequest(
         "command", "full-import", "dataConfig", config,
         "clean", "true", "commit", "true", "synchronous", "true", "indent", "true");
-    h.query("/dataimport", request);
+    query("/dataimport", request);
     
     assertQ(req("*:*"), "//*[@numFound='9']");
     assertQ(req("id:?\\ line\\ one"), "//*[@numFound='3']");

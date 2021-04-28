@@ -280,24 +280,7 @@ public class MoreLikeThisComponent extends SearchComponent {
     // Comparator to sort docs based on score. null scores/docs are set to 0.
     
     // hmm...we are ordering by scores that are not really comparable...
-    Comparator<SolrDocument> c = new Comparator<SolrDocument>() {
-      public int compare(SolrDocument o1, SolrDocument o2) {
-        Float f1 = getFloat(o1);
-        Float f2 = getFloat(o2);
-        return f2.compareTo(f1);
-      }
-      
-      private Float getFloat(SolrDocument doc) {
-        Float f = 0f;
-        if (doc != null) {
-          Object o = doc.getFieldValue("score");
-          if (o != null && o instanceof Float) {
-            f = (Float) o;
-          }
-        }
-        return f;
-      }
-    };
+    Comparator<SolrDocument> c = new SolrDocumentComparator();
     
     Collections.sort(l, c);
     
@@ -456,5 +439,24 @@ public class MoreLikeThisComponent extends SearchComponent {
   @Override
   public Category getCategory() {
     return Category.QUERY;
+  }
+
+  private static class SolrDocumentComparator implements Comparator<SolrDocument> {
+    public int compare(SolrDocument o1, SolrDocument o2) {
+      Float f1 = getFloat(o1);
+      Float f2 = getFloat(o2);
+      return f2.compareTo(f1);
+    }
+
+    private Float getFloat(SolrDocument doc) {
+      Float f = 0f;
+      if (doc != null) {
+        Object o = doc.getFieldValue("score");
+        if (o != null && o instanceof Float) {
+          f = (Float) o;
+        }
+      }
+      return f;
+    }
   }
 }

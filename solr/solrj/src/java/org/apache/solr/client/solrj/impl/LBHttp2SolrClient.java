@@ -16,10 +16,24 @@
  */
 package org.apache.solr.client.solrj.impl;
 
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.request.IsUpdateRequest;
+import org.apache.solr.client.solrj.util.Cancellable;
+import org.apache.solr.client.solrj.util.AsyncListener;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.NamedList;
+import org.slf4j.MDC;
 
+import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
 /**
  * LBHttp2SolrClient or "LoadBalanced LBHttp2SolrClient" is a load balancing wrapper around
  * {@link Http2SolrClient}. This is useful when you
@@ -56,14 +70,157 @@ import org.apache.solr.client.solrj.SolrClient;
  * @since solr 8.0
  */
 public class LBHttp2SolrClient extends LBSolrClient {
-  private Http2SolrClient httpClient;
+  private final Http2SolrClient httpClient;
 
   public LBHttp2SolrClient(Http2SolrClient httpClient, String... baseSolrUrls) {
-    super(Arrays.asList(baseSolrUrls));
-    this.httpClient = httpClient;
+    this(httpClient, httpClient == null ? false : httpClient.isMarkedInternal(), baseSolrUrls);
   }
+
+  public LBHttp2SolrClient(Http2SolrClient httpClient, boolean markInternal, String... baseSolrUrls) {
+    super(Arrays.asList(baseSolrUrls));
+    // MRM TODO: - should only be internal for us
+    Http2SolrClient.Builder builder = new Http2SolrClient.Builder().withHttpClient(httpClient);
+    if (markInternal) {
+      builder = builder.markInternalRequest();
+    }
+    this.httpClient = builder.build();
+  }
+
+  public LBHttp2SolrClient(String... baseSolrUrls) {
+    super(Arrays.asList(baseSolrUrls));
+    // MRM TODO: - should only be internal for us
+    Http2SolrClient.Builder builder = new Http2SolrClient.Builder();
+    this.httpClient = builder.build();
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    httpClient.close();
+  }
+
   @Override
   protected SolrClient getClient(String baseUrl) {
     return httpClient;
+  }
+
+  public Cancellable asyncReq(Req req, AsyncListener<Rsp> asyncListener) {
+    Rsp rsp = new Rsp();
+    boolean isNonRetryable = req.request instanceof IsUpdateRequest || ADMIN_PATHS.contains(req.request.getPath());
+    ServerIterator it = new ServerIterator(req, zombieServers);
+    asyncListener.onStart();
+    final AtomicBoolean cancelled = new AtomicBoolean(false);
+    AtomicReference<Cancellable> currentCancellable = new AtomicReference<>();
+    RetryListener retryListener = new RetryListener() {
+
+      @Override
+      public void onSuccess(Rsp rsp) {
+        asyncListener.onSuccess(rsp, 200);
+      }
+
+      @Override
+      public void onFailure(Exception e, boolean retryReq) {
+        if (retryReq) {
+          String url;
+          try {
+            url = it.nextOrError(e);
+          } catch (Exception ex) {
+            asyncListener.onFailure(e, 500);
+            return;
+          }
+          try {
+            MDC.put("LBSolrClient.url", url);
+
+            Cancellable cancellable = doRequest(url, req, rsp, isNonRetryable, it.isServingZombieServer(), this);
+            currentCancellable.set(cancellable);
+
+          } finally {
+            MDC.remove("LBSolrClient.url");
+          }
+        } else {
+          int code = -1;
+          if (e instanceof SolrException) {
+            code = ((SolrException) e).code();
+          }
+          asyncListener.onFailure(e, code);
+        }
+      }
+    };
+    try {
+      Cancellable cancellable = doRequest(it.nextOrError(), req, rsp, isNonRetryable, it.isServingZombieServer(), retryListener);
+      currentCancellable.set(cancellable);
+    } catch (SolrServerException e) {
+      asyncListener.onFailure(e, 500);
+    }
+    return () -> {
+
+      cancelled.set(true);
+      if (currentCancellable.get() != null) {
+        currentCancellable.get().cancel();
+      }
+
+    };
+  }
+
+  private interface RetryListener {
+    void onSuccess(Rsp rsp);
+    void onFailure(Exception e, boolean retryReq);
+  }
+
+  private Cancellable doRequest(String baseUrl, Req req, Rsp rsp, boolean isNonRetryable,
+                         boolean isZombie, RetryListener listener) {
+    rsp.server = baseUrl;
+    req.getRequest().setBasePath(baseUrl);
+
+    return ((Http2SolrClient)getClient(baseUrl)).asyncRequest(req.getRequest(), null, new AsyncListener<>() {
+      @Override
+      public void onSuccess(NamedList<Object> result, int statusCode) {
+        rsp.rsp = result;
+        if (isZombie) {
+          zombieServers.remove(baseUrl);
+        }
+        listener.onSuccess(rsp);
+      }
+
+      @Override
+      public void onFailure(Throwable oe, int code) {
+        try {
+          throw (Exception) oe;
+        } catch (BaseHttpSolrClient.RemoteExecutionException e) {
+          listener.onFailure(e, false);
+        } catch (SolrException e) {
+          // we retry on 404 or 403 or 503 or 500
+          // unless it's an update - then we only retry on connect exception
+          if (!isNonRetryable && (RETRY_CODES.contains(e.code()) || e.getMessage().contains("Connection refused"))) {
+            listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
+          } else {
+            // Server is alive but the request was likely malformed or invalid
+            if (isZombie) {
+              zombieServers.remove(baseUrl);
+            }
+            listener.onFailure(e, false);
+          }
+        } catch (SocketException e) {
+          listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
+        } catch (SocketTimeoutException e) {
+          if (!isNonRetryable) {
+            listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
+          } else {
+            listener.onFailure(e, false);
+          }
+        } catch (SolrServerException e) {
+          Throwable rootCause = e.getRootCause();
+          if (!isNonRetryable && rootCause instanceof IOException) {
+            listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
+          } else if (isNonRetryable && rootCause instanceof ConnectException) {
+            listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
+          } else {
+            listener.onFailure(e, false);
+          }
+        } catch (Exception e) {
+          listener.onFailure(new SolrServerException(e), false);
+        }
+      }
+    });
   }
 }

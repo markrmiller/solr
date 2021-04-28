@@ -35,9 +35,11 @@ import java.util.Locale;
 import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.request.RequestWriter;
+import org.apache.solr.common.ParWork;
 
 /**
  * Three concrete implementations for ContentStream - one for File/URL/String
@@ -94,19 +96,21 @@ public abstract class ContentStreamBase implements ContentStream
 
   private String attemptToDetermineTypeFromFirstCharacter() {
     String type = null;
-    try (InputStream stream = getStream()) {
+    try {
+      InputStream stream = new CloseShieldInputStream(getStream());
       // Last ditch effort to determine content, if the first non-white space
       // is a '<' or '{', assume xml or json.
       int data = stream.read();
-      while (( data != -1 ) && ( ( (char)data ) == ' ' )) {
+      while ((data != -1) && (((char) data) == ' ')) {
         data = stream.read();
       }
-      if ((char)data == '<') {
+      if ((char) data == '<') {
         type = ContentType.APPLICATION_XML.getMimeType();
-      } else if ((char)data == '{') {
+      } else if ((char) data == '{') {
         type = ContentType.APPLICATION_JSON.getMimeType();
       }
     } catch (Exception ex) {
+      ParWork.propagateInterrupt(ex);
       // This code just eats, the exception and leaves
       // the contentType untouched.
     }
@@ -152,7 +156,7 @@ public abstract class ContentStreamBase implements ContentStream
       contentType = conn.getContentType();
       name = url.toExternalForm();
       size = conn.getContentLengthLong();
-      InputStream is = conn.getInputStream();
+      InputStream is = new CloseShieldInputStream(conn.getInputStream());
       String urlFile = url.getFile().toLowerCase(Locale.ROOT);
       if( "gzip".equals(conn.getContentEncoding()) || urlFile.endsWith( ".gz" ) || urlFile.endsWith( ".gzip" )){
         is = new GZIPInputStream(is);
@@ -270,8 +274,8 @@ public abstract class ContentStreamBase implements ContentStream
   public Reader getReader() throws IOException {
     String charset = getCharsetFromContentType( getContentType() );
     return charset == null 
-      ? new InputStreamReader( getStream(), DEFAULT_CHARSET )
-      : new InputStreamReader( getStream(), charset );
+      ? new InputStreamReader( new CloseShieldInputStream(getStream()), DEFAULT_CHARSET )
+      : new InputStreamReader( new CloseShieldInputStream(getStream()), charset );
   }
 
   //------------------------------------------------------------------
@@ -326,11 +330,11 @@ public abstract class ContentStreamBase implements ContentStream
   public static class ByteArrayStream extends ContentStreamBase
   {
     private final byte[] bytes;
-    public ByteArrayStream( byte[] bytes, String source ) {
-      this(bytes,source, null);
+    public ByteArrayStream(byte[] bytes, String source ) {
+      this(bytes, source, null);
     }
     
-    public ByteArrayStream( byte[] bytes, String source, String contentType ) {
+    public ByteArrayStream(byte[] bytes, String source, String contentType ) {
       this.bytes = bytes;
       
       this.contentType = contentType;

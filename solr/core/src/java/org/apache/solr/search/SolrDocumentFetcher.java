@@ -310,18 +310,7 @@ public class SolrDocumentFetcher {
 
     @Override
     public void stringField(FieldInfo fieldInfo, String value) throws IOException {
-      Predicate<String> readAsBytes = ResultContext.READASBYTES.get();
-      if (readAsBytes != null && readAsBytes.test(fieldInfo.name)) {
-        final FieldType ft = new FieldType(TextField.TYPE_STORED);
-        ft.setStoreTermVectors(fieldInfo.hasVectors());
-        ft.setOmitNorms(fieldInfo.omitsNorms());
-        ft.setIndexOptions(fieldInfo.getIndexOptions());
-        Objects.requireNonNull(value, "String value should not be null");
-        doc.add(new StoredField(fieldInfo.name, value, ft));
-      } else {
-        super.stringField(fieldInfo, value);
-      }
-
+      super.stringField(fieldInfo, value);
     }
 
     @Override

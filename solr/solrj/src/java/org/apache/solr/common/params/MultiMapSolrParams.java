@@ -101,7 +101,7 @@ public class MultiMapSolrParams extends SolrParams {
       }
       return map;
     } else {
-      Map<String,String[]> map = new HashMap<>();
+      Map<String,String[]> map = new HashMap<>(32);
       for (Map.Entry<String, String[]> pair : params) {
         map.put(pair.getKey(), pair.getValue());
       }

@@ -17,6 +17,7 @@
 package org.apache.solr.common.util;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.io.Writer;
 
 /** Single threaded BufferedWriter
@@ -38,10 +39,6 @@ public class FastWriter extends Writer {
     this.sink = sink;
     this.buf = tempBuffer;
     this.pos = start;
-  }
-
-  public static FastWriter wrap(Writer sink) {
-    return (sink instanceof FastWriter) ? (FastWriter)sink : new FastWriter(sink);
   }
 
   @Override

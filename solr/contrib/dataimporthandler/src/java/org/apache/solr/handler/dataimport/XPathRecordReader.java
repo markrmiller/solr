@@ -16,20 +16,33 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.common.util.XMLErrorLogger;
-import org.apache.solr.common.EmptyEntityResolver;
-import javax.xml.stream.XMLInputFactory;
-import static javax.xml.stream.XMLStreamConstants.*;
+import org.codehaus.stax2.XMLStreamReader2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static javax.xml.stream.XMLStreamConstants.CDATA;
+import static javax.xml.stream.XMLStreamConstants.CHARACTERS;
+import static javax.xml.stream.XMLStreamConstants.END_DOCUMENT;
+import static javax.xml.stream.XMLStreamConstants.END_ELEMENT;
+import static javax.xml.stream.XMLStreamConstants.SPACE;
+import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.invoke.MethodHandles;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -175,12 +188,21 @@ public class XPathRecordReader {
    * @param handler The callback instance
    */
   public void streamRecords(Reader r, Handler handler) {
+    XMLStreamReader2 parser = null;
     try {
-      XMLStreamReader parser = factory.createXMLStreamReader(r);
+      parser = (XMLStreamReader2) XMLResponseParser.inputFactory.createXMLStreamReader(r);
       rootNode.parse(parser, handler, new HashMap<>(),
           new Stack<>(), false);
     } catch (Exception e) {
       throw new RuntimeException(e);
+    } finally {
+      if (parser != null) {
+        try {
+          parser.closeCompletely();
+        } catch (XMLStreamException e) {
+          log.warn("Exception closing parser", e);
+        }
+      }
     }
   }
 
@@ -572,7 +594,7 @@ public class XPathRecordReader {
           attribs.put(m.group(3), m.group(5));
           start = m.end(6);
           if (n.attribAndValues == null)
-            n.attribAndValues = new ArrayList<>();
+            n.attribAndValues = new ArrayList<>(attribs.size());
           n.attribAndValues.addAll(attribs.entrySet());
         }
       }
@@ -629,25 +651,6 @@ public class XPathRecordReader {
       result.add(sb.toString());
     }
     return result;
-  }
-
-  static XMLInputFactory factory = XMLInputFactory.newInstance();
-  static {
-    EmptyEntityResolver.configureXMLInputFactory(factory);
-    factory.setXMLReporter(XMLLOG);
-    try {
-      // The java 1.6 bundled stax parser (sjsxp) does not currently have a thread-safe
-      // XMLInputFactory, as that implementation tries to cache and reuse the
-      // XMLStreamReader.  Setting the parser-specific "reuse-instance" property to false
-      // prevents this.
-      // All other known open-source stax parsers (and the bea ref impl)
-      // have thread-safe factories.
-      factory.setProperty("reuse-instance", Boolean.FALSE);
-    } catch (IllegalArgumentException ex) {
-      // Other implementations will likely throw this exception since "reuse-instance"
-      // isimplementation specific.
-      log.debug("Unable to set the 'reuse-instance' property for the input chain: {}", factory);
-    }
   }
 
   /**Implement this interface to stream records as and when one is found.

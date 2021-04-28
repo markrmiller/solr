@@ -19,9 +19,11 @@ package org.apache.solr.analytics.legacy.facet;
 
 import java.util.ArrayList;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+@LuceneTestCase.Nightly
 public class LegacyQueryFacetTest extends LegacyAbstractAnalyticsFacetTest {
   static String fileName = "queryFacets.txt";
 
@@ -34,7 +36,7 @@ public class LegacyQueryFacetTest extends LegacyAbstractAnalyticsFacetTest {
   public final int NUM_LOOPS = 100;
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeLegacyQueryFacetTest() throws Exception {
     initCore("solrconfig-analytics.xml","schema-analytics.xml");
   }
 

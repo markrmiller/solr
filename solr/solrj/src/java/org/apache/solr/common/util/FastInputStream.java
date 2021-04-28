@@ -16,6 +16,8 @@
  */
 package org.apache.solr.common.util;
 
+import org.apache.solr.common.SolrInputDocument;
+
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -25,6 +27,12 @@ import java.io.InputStream;
  *  Internal Solr use only, subject to change.
  */
 public class FastInputStream extends DataInputInputStream {
+//  public final static ThreadLocal<byte[]> THREAD_LOCAL_BYTEARRAY= new ThreadLocal<>(){
+//    protected byte[] initialValue() {
+//      return new byte[8192];
+//    }
+//  };
+
   protected final InputStream in;
   protected final byte[] buf;
   protected int pos;
@@ -32,8 +40,6 @@ public class FastInputStream extends DataInputInputStream {
   protected long readFromStream; // number of bytes read from the underlying inputstream
 
   public FastInputStream(InputStream in) {
-  // use default BUFSIZE of BufferedOutputStream so if we wrap that
-  // it won't cause double buffering.
     this(in, new byte[8192], 0, 0);
   }
 
@@ -78,15 +84,13 @@ public class FastInputStream extends DataInputInputStream {
   public int readUnsignedByte() throws IOException {
     if (pos >= end) {
       refill();
-      if (pos >= end) {
-        throw new EOFException();
-      }
+      if (pos >= end) throw new EOFException();
     }
     return buf[pos++] & 0xff;
   }
 
   public int readWrappedStream(byte[] target, int offset, int len) throws IOException {
-    if(in == null) return -1;
+    if (in == null) return -1;
     return in.read(target, offset, len);
   }
 
@@ -123,8 +127,7 @@ public class FastInputStream extends DataInputInputStream {
 
   @Override
   public int read(byte b[], int off, int len) throws IOException {
-    int r=0;  // number of bytes we have read
-
+    int r=0;  // number of bytes read
     // first read from our buffer;
     if (end-pos > 0) {
       r = Math.min(end-pos, len);
@@ -215,7 +218,7 @@ public class FastInputStream extends DataInputInputStream {
   public byte readByte() throws IOException {
     if (pos >= end) {
       refill();
-      if (pos >= end) throw new EOFException();
+      if (pos >= end) throw new EOFException("pos=" + pos + " end=" + end);
     }
     return buf[pos++];
   }

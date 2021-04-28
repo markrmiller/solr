@@ -48,6 +48,7 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionNamedParamete
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionParameter;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionValue;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.params.StreamParams;
 
 import static org.apache.solr.common.params.CommonParams.SORT;
@@ -297,8 +298,9 @@ public class JDBCStream extends TupleStream implements Expressible {
   }
 
   private ResultSetValueSelector[] constructValueSelectors(ResultSetMetaData metadata) throws SQLException{
-    ResultSetValueSelector[] valueSelectors = new ResultSetValueSelector[metadata.getColumnCount()];    
-    for (int columnIdx = 0; columnIdx < metadata.getColumnCount(); ++columnIdx) {      
+    final int columnCount = metadata.getColumnCount();
+    ResultSetValueSelector[] valueSelectors = new ResultSetValueSelector[columnCount];
+    for (int columnIdx = 0; columnIdx < columnCount; ++columnIdx) {
       ResultSetValueSelector valueSelector = determineValueSelector(columnIdx, metadata);
       if(valueSelector==null) {
         int columnNumber = columnIdx + 1;
@@ -405,29 +407,9 @@ public class JDBCStream extends TupleStream implements Expressible {
         }
       };
     } else if (jdbcType == Types.TIME ) {
-      valueSelector = new ResultSetValueSelector() {
-        @Override
-        public Object selectValue(ResultSet resultSet) throws SQLException {
-          Time sqlTime = resultSet.getTime(columnNumber);
-          return resultSet.wasNull() ? null : sqlTime.toString();
-        }
-        @Override
-        public String getColumnName() {
-          return columnName;
-        }
-      };
+      valueSelector = new JDBCResultSetValueSelector(columnNumber, columnName);
     } else if (jdbcType == Types.TIMESTAMP) {
-      valueSelector = new ResultSetValueSelector() {
-        @Override
-        public Object selectValue(ResultSet resultSet) throws SQLException {
-          Timestamp sqlTimestamp = resultSet.getTimestamp(columnNumber);
-          return resultSet.wasNull() ? null : sqlTimestamp.toInstant().toString();
-        }
-        @Override
-        public String getColumnName() {
-          return columnName;
-        }
-      };
+      valueSelector = new JDBCTimeStampResultSetValueSelector(columnNumber, columnName);
     } 
     // Now we're going to start seeing if things are assignable from the returned type
     // to a more general type - this allows us to cover cases where something we weren't 
@@ -437,6 +419,7 @@ public class JDBCStream extends TupleStream implements Expressible {
       try {
         clazz = Class.forName(className, false, getClass().getClassLoader());
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         throw new RuntimeException(e);
       }
       final int scale = metadata.getScale(columnNumber);
@@ -616,6 +599,48 @@ public class JDBCStream extends TupleStream implements Expressible {
   public interface ResultSetValueSelector {
     String getColumnName();
     Object selectValue(ResultSet resultSet) throws SQLException;
+  }
+
+  private static class JDBCResultSetValueSelector implements ResultSetValueSelector {
+    private final int columnNumber;
+    private final String columnName;
+
+    public JDBCResultSetValueSelector(int columnNumber, String columnName) {
+      this.columnNumber = columnNumber;
+      this.columnName = columnName;
+    }
+
+    @Override
+    public Object selectValue(ResultSet resultSet) throws SQLException {
+      Time sqlTime = resultSet.getTime(columnNumber);
+      return resultSet.wasNull() ? null : sqlTime.toString();
+    }
+
+    @Override
+    public String getColumnName() {
+      return columnName;
+    }
+  }
+
+  private static class JDBCTimeStampResultSetValueSelector implements ResultSetValueSelector {
+    private final int columnNumber;
+    private final String columnName;
+
+    public JDBCTimeStampResultSetValueSelector(int columnNumber, String columnName) {
+      this.columnNumber = columnNumber;
+      this.columnName = columnName;
+    }
+
+    @Override
+    public Object selectValue(ResultSet resultSet) throws SQLException {
+      Timestamp sqlTimestamp = resultSet.getTimestamp(columnNumber);
+      return resultSet.wasNull() ? null : sqlTimestamp.toInstant().toString();
+    }
+
+    @Override
+    public String getColumnName() {
+      return columnName;
+    }
   }
 }
 

@@ -19,15 +19,40 @@ apply plugin: 'java-library'
 
 description = 'Solr Test Framework'
 
+
+task jmh(type: JavaExec) {
+
+    group = "benchmark"
+    main = "org.openjdk.jmh.Main"
+    classpath = sourceSets.main.runtimeClasspath
+    args "-Dfile.encoding=UTF-8 org.apache.solr.jmh.Bench.BenchmarkMode", "-Dlog4j.configurationFile=src/resources/logconf/log4j2-startup-debug.xml"
+    // To pass parameters ("-h" gives a list of possible parameters)
+    // args(listOf("-h"))
+  }
+
 dependencies {
   api project(':solr:core')
   api project(':solr:solrj')
   api project(':lucene:test-framework')
   api project(':lucene:analysis:common')
 
+  api 'org.openjdk.jmh:jmh-core'
+  annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess'
+
+  api ('com.google.guava:guava', {
+    exclude group: "org.codehaus.mojo", module: "animal-sniffer-annotations"
+    exclude group: "com.google.j2objc", module: "j2objc-annotations"
+    exclude group: "com.google.errorprone", module: "error_prone_annotations"
+    exclude group: "org.checkerframework", module: "checker-qual"
+    exclude group: "com.google.code.findbugs", module: "jsr305"
+  })
+
   api 'org.apache.logging.log4j:log4j-core'
   api 'io.opentracing:opentracing-mock'
+  api 'io.opentracing:opentracing-api'
 
   implementation 'io.dropwizard.metrics:metrics-jetty9'
   implementation 'com.lmax:disruptor'
+  api 'org.awaitility:awaitility'
 }
+

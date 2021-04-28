@@ -22,10 +22,10 @@ import java.io.IOException;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.MockDirectoryWrapper;
-import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.lucene.store.NoLockFactory;
 import org.apache.lucene.store.TrackingDirectoryWrapper;
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.filestore.NRTCachingDirectory;
 
 /**
  * Opens a directory with {@link LuceneTestCase#newDirectory()}
@@ -37,13 +37,16 @@ public class MockDirectoryFactory extends EphemeralDirectoryFactory {
   private boolean allowReadingFilesStillOpenForWrite = Boolean.getBoolean(SOLR_TESTS_ALLOW_READING_FILES_STILL_OPEN_FOR_WRITE);
   private boolean useMockDirectoryWrapper = Boolean.getBoolean(SOLR_TESTS_USING_MOCK_DIRECTORY_WRAPPER);
 
-  @Override
-  protected LockFactory createLockFactory(String rawLockType) throws IOException {
+  @Override public LockFactory createLockFactory(String rawLockType) throws IOException {
     return NoLockFactory.INSTANCE; // dummy, actually unused
   }
 
+  @Override public void release(String directory) throws IOException {
+
+  }
+
   @Override
-  protected Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
+  public Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
     Directory dir;
     if (useMockDirectoryWrapper) dir = LuceneTestCase.newMockDirectory();
     else dir = LuceneTestCase.newDirectory(); // we ignore the given lock factory

@@ -22,7 +22,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
-import java.net.InetAddress;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Date;
@@ -105,16 +104,17 @@ public class SystemInfoHandler extends RequestHandlerBase
     }
     
     RTimer timer = new RTimer();
-    try {
-      InetAddress addr = InetAddress.getLocalHost();
-      hostname = addr.getCanonicalHostName();
-    } catch (Exception e) {
-      log.warn("Unable to resolve canonical hostname for local host, possible DNS misconfiguration. SET THE '{}' {}"
-          , PREVENT_REVERSE_DNS_OF_LOCALHOST_SYSPROP
-          , " sysprop to true on startup to prevent future lookups if DNS can not be fixed.", e);
-      hostname = null;
-      return;
-    }
+    // MRM TODO: - this is bad for tests, blocks a lot
+//    try {
+//      InetAddress addr = InetAddress.getLocalHost();
+//      hostname = addr.getCanonicalHostName();
+//    } catch (Exception e) {
+//      log.warn("Unable to resolve canonical hostname for local host, possible DNS misconfiguration. SET THE '{}' {}"
+//          , PREVENT_REVERSE_DNS_OF_LOCALHOST_SYSPROP
+//          , " sysprop to true on startup to prevent future lookups if DNS can not be fixed.", e);
+//      hostname = null;
+//      return;
+//    }
     timer.stop();
     
     if (15000D < timer.getTime()) {
@@ -130,9 +130,9 @@ public class SystemInfoHandler extends RequestHandlerBase
   {
     rsp.setHttpCaching(false);
     SolrCore core = req.getCore();
-    if (AdminHandlersProxy.maybeProxyToNodes(req, rsp, getCoreContainer(req, core))) {
-      return; // Request was proxied to other node
-    }
+//    if (AdminHandlersProxy.maybeProxyToNodes(req, rsp, getCoreContainer(req, core))) {
+//      return; // Request was proxied to other node
+//    }
     if (core != null) rsp.add( "core", getCoreInfo( core, req.getSchema() ) );
     boolean solrCloudMode =  getCoreContainer(req, core).isZooKeeperAware();
     rsp.add( "mode", solrCloudMode ? "solrcloud" : "std");

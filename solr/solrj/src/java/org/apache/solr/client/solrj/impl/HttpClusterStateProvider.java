@@ -21,6 +21,8 @@ import java.util.List;
 
 import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.ObjectReleaseTrackerTestImpl;
 
 public class HttpClusterStateProvider extends BaseHttpClusterStateProvider {
 
@@ -28,20 +30,24 @@ public class HttpClusterStateProvider extends BaseHttpClusterStateProvider {
   private final boolean clientIsInternal;
 
   public HttpClusterStateProvider(List<String> solrUrls, HttpClient httpClient) throws Exception {
-    this.httpClient = httpClient == null? HttpClientUtil.createClient(null): httpClient;
-    this.clientIsInternal = httpClient == null;
+    assert ObjectReleaseTracker.getInstance().track(this);
+    if (httpClient == null) {
+      this.clientIsInternal = true;
+      this.httpClient = null;
+    } else {
+      this.clientIsInternal = false;
+      this.httpClient = null;
+    }
     init(solrUrls);
   }
 
   @Override
   protected SolrClient getSolrClient(String baseUrl) {
-    return new HttpSolrClient.Builder().withBaseSolrUrl(baseUrl).withHttpClient(httpClient).build();
+    return new HttpSolrClient.Builder().withBaseSolrUrl(baseUrl).withHttpClient(httpClient).markInternalRequest().build();
   }
 
   @Override
   public void close() throws IOException {
-    if (this.clientIsInternal && this.httpClient != null) {
-      HttpClientUtil.close(httpClient);
-    }
+    assert ObjectReleaseTracker.getInstance().release(this);
   }
 }

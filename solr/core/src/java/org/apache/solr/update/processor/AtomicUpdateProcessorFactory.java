@@ -154,7 +154,9 @@ public class AtomicUpdateProcessorFactory extends UpdateRequestProcessorFactory 
       if (isAtomicUpdateAddedByMe) {
         Long lastVersion = vinfo.lookupVersion(cmd.getIndexedId());
         // if lastVersion is null then we put -1 to assert that document must not exist
-        lastVersion = lastVersion == null ? -1 : lastVersion;
+        if (lastVersion == null) {
+          lastVersion = -1L;
+        }
         orgdoc.setField(VERSION, lastVersion);
         processAddWithRetry(cmd, 1, cmd.getSolrInputDocument().deepCopy());
       } else {
@@ -177,7 +179,9 @@ public class AtomicUpdateProcessorFactory extends UpdateRequestProcessorFactory 
 
           Long lastVersion = vinfo.lookupVersion(cmd.getIndexedId());
           // if lastVersion is null then we put -1 to assert that document must not exist
-          lastVersion = lastVersion == null ? -1 : lastVersion;
+          if (lastVersion == null) {
+            lastVersion = -1L;
+          }
 
           // The AtomicUpdateDocumentMerger modifies the AddUpdateCommand.solrDoc to populate the real values of the
           // modified fields. We don't want those absolute values because they are out-of-date due to the conflict

@@ -22,13 +22,15 @@ import java.io.StringWriter;
 import java.lang.invoke.MethodHandles;
 import java.util.Locale;
 
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.loader.ContentStreamLoader;
 import org.apache.solr.request.SolrQueryRequest;
@@ -87,6 +89,9 @@ public class ExtractingDocumentLoader extends ContentStreamLoader {
   final SolrParams params;
   final UpdateRequestProcessor processor;
   final boolean ignoreTikaException;
+  private final SolrQueryRequest req;
+  private final boolean overwrite;
+  private final int commitWithin;
   protected AutoDetectParser autoDetectParser;
 
   private final AddUpdateCommand templateAdd;
@@ -104,9 +109,11 @@ public class ExtractingDocumentLoader extends ContentStreamLoader {
     this.parseContextConfig = parseContextConfig;
     this.processor = processor;
 
-    templateAdd = new AddUpdateCommand(req);
-    templateAdd.overwrite = params.getBool(UpdateParams.OVERWRITE, true);
-    templateAdd.commitWithin = params.getInt(UpdateParams.COMMIT_WITHIN, -1);
+    templateAdd = AddUpdateCommand.THREAD_LOCAL_AddUpdateCommand.get();
+    templateAdd.clear();
+    this.req = req;
+    this.overwrite = params.getBool(UpdateParams.OVERWRITE, true);
+    this.commitWithin = params.getInt(UpdateParams.COMMIT_WITHIN, -1);
 
     //this is lightweight
     autoDetectParser = new AutoDetectParser(config);
@@ -122,12 +129,15 @@ public class ExtractingDocumentLoader extends ContentStreamLoader {
    */
   void doAdd(SolrContentHandler handler, AddUpdateCommand template)
           throws IOException {
-    template.solrDoc = handler.newDocument();
     processor.processAdd(template);
   }
 
   void addDoc(SolrContentHandler handler) throws IOException {
     templateAdd.clear();
+    templateAdd.setReq(req);
+    templateAdd.solrDoc = handler.newDocument();
+    templateAdd.overwrite = overwrite;
+    templateAdd.commitWithin = commitWithin;
     doAdd(handler, templateAdd);
   }
 
@@ -159,7 +169,7 @@ public class ExtractingDocumentLoader extends ContentStreamLoader {
 
       InputStream inputStream = null;
       try {
-        inputStream = stream.getStream();
+        inputStream = new CloseShieldInputStream(stream.getStream());
         metadata.add(ExtractingMetadataConstants.STREAM_NAME, stream.getName());
         metadata.add(ExtractingMetadataConstants.STREAM_SOURCE_INFO, stream.getSourceInfo());
         metadata.add(ExtractingMetadataConstants.STREAM_SIZE, String.valueOf(stream.getSize()));
@@ -233,7 +243,7 @@ public class ExtractingDocumentLoader extends ContentStreamLoader {
           else
             throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
         }
-        if (extractOnly == false) {
+        if (!extractOnly) {
           addDoc(handler);
         } else {
           //serializer is not null, so we need to call endDoc on it if using xpath

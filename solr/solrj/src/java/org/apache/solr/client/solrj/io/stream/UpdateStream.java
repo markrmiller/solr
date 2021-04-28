@@ -24,8 +24,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.CloudSolrClient.Builder;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
 import org.apache.solr.client.solrj.io.SolrClientCache;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.comp.StreamComparator;
@@ -65,7 +64,7 @@ public class UpdateStream extends TupleStream implements Expressible {
   private long totalDocsIndex;
   private PushBackStream tupleSource;
   private transient SolrClientCache cache;
-  private transient CloudSolrClient cloudSolrClient;
+  private transient CloudHttp2SolrClient cloudSolrClient;
   private List<SolrInputDocument> documentBatch = new ArrayList();
   private String coreName;
 
@@ -278,18 +277,18 @@ public class UpdateStream extends TupleStream implements Expressible {
   }
   
   /** Only viable after calling {@link #open} */
-  protected CloudSolrClient getCloudSolrClient() {
+  protected CloudHttp2SolrClient getCloudSolrClient() {
     assert null != this.cloudSolrClient;
     return this.cloudSolrClient;
   }
   
   private void setCloudSolrClient() {
     if(this.cache != null) {
-      this.cloudSolrClient = this.cache.getCloudSolrClient(zkHost);
+      this.cloudSolrClient = this.cache.getCloudSolrClient();
     } else {
       final List<String> hosts = new ArrayList<>();
       hosts.add(zkHost);
-      this.cloudSolrClient = new Builder(hosts, Optional.empty()).build();
+      this.cloudSolrClient = new CloudHttp2SolrClient.Builder(hosts, Optional.empty()).markInternalRequest().build();
       this.cloudSolrClient.connect();
     }
   }

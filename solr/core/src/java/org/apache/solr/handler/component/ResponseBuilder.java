@@ -16,13 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.search.grouping.SearchGroup;
@@ -46,6 +39,14 @@ import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.grouping.GroupingSpecification;
 import org.apache.solr.search.grouping.distributed.command.QueryCommandResult;
 import org.apache.solr.util.RTimer;
+import org.jctools.maps.NonBlockingHashMap;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class is experimental and will be changing in the future.
@@ -185,12 +186,12 @@ public class ResponseBuilder
   boolean _isOlapAnalytics;
 
   // Context fields for grouping
-  public final Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups = new HashMap<>();
-  public final Map<String, Integer> mergedGroupCounts = new HashMap<>();
-  public final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new HashMap<>();
-  public final Map<String, TopGroups<BytesRef>> mergedTopGroups = new HashMap<>();
-  public final Map<String, QueryCommandResult> mergedQueryCommandResults = new HashMap<>();
-  public final Map<Object, SolrDocument> retrievedDocuments = new HashMap<>();
+  public final Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups = new NonBlockingHashMap<>();
+  public final Map<String, Integer> mergedGroupCounts = new NonBlockingHashMap<>();
+  public final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new NonBlockingHashMap<>();
+  public final Map<String, TopGroups<BytesRef>> mergedTopGroups = new NonBlockingHashMap<>();
+  public final Map<String, QueryCommandResult> mergedQueryCommandResults = new NonBlockingHashMap<>();
+  public final Map<Object, SolrDocument> retrievedDocuments = new NonBlockingHashMap<>();
   public int totalHitCount; // Hit count used when distributed grouping is performed.
   // Used for timeAllowed parameter. First phase elapsed time is subtracted from the time allowed for the second phase.
   public int firstPhaseElapsedTime;

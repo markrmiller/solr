@@ -55,7 +55,7 @@ public abstract class ResultContext {
   public Iterator<SolrDocument> getProcessedDocuments() {
     return new DocsStreamer(this);
   }
-  public static final ThreadLocal<Predicate<String>>  READASBYTES = new ThreadLocal<>();
+  //public static final ThreadLocal<Predicate<String>>  READASBYTES = new ThreadLocal<>();
 }
 
 
