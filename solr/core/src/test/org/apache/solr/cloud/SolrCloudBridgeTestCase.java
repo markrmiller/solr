@@ -176,8 +176,9 @@ public abstract class SolrCloudBridgeTestCase extends SolrCloudTestCase {
       }
 
       if (zkClient.exists("/configs/_default/managed-schema")) {
-        byte[] data = FileUtils.readFileToByteArray(TEST_PATH.resolve("collection1").resolve("conf").resolve(schemaString).toFile());
-        zkClient.setData("/configs/_default/managed-schema", data, true);
+        zkClient.delete("/configs/_default/managed-schema", -1);
+        //byte[] data = FileUtils.readFileToByteArray(TEST_PATH.resolve("collection1").resolve("conf").resolve(schemaString).toFile());
+        //zkClient.setData("/configs/_default/managed-schema", data, true);
       }
     }
     if (solrconfigString != null) {

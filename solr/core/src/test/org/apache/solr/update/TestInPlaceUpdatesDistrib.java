@@ -48,6 +48,7 @@ import org.apache.solr.index.NoMergePolicyFactory;
 import org.apache.solr.update.processor.DistributedUpdateProcessor;
 import org.apache.solr.util.TimeOut;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,7 @@ import java.util.concurrent.TimeoutException;
  */
 @Slow
 @LuceneTestCase.Nightly // MRM TODO: - finish converting this test, also nightly due to all the delays it injects
+@Ignore
 public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private final boolean onlyLeaderIndexes = random().nextBoolean();
@@ -82,13 +84,16 @@ public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
     numJettys = 3;
     schemaString = "schema-inplace-updates.xml";
     solrconfigString = "solrconfig-tlog.xml";
+
+    System.setProperty("solr.autoCommit.maxTime", "-1");
+    System.setProperty("solr.autoSoftCommit.maxTime", "-1");
     System.setProperty("solr.tests.numeric.dv", "true");
     useFactory(null);
     System.setProperty("solr.tests.mergePolicyFactory", "org.apache.solr.index.NoMergePolicyFactory");
   }
 
   @BeforeClass
-  public static void beforeSuperClass() throws Exception {
+  public static void beforeTestInPlaceUpdatesDistrib() throws Exception {
 
 
     // we need consistent segments that aren't re-ordered on merge because we're
@@ -143,7 +148,7 @@ public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
     // AwaitsFix this test fails easily
     // delayedReorderingFetchesMissingUpdateFromLeaderTest();
     resetDelays();
-   // docValuesUpdateTest();
+    docValuesUpdateTest();
     resetDelays();
     // outOfOrderUpdatesIndividualReplicaTest(); MRM TODO: debug, when the other tests were changed to testExecutor this started hitting a 404
     resetDelays();
@@ -608,33 +613,33 @@ public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
     // do an initial (non-inplace) update to ensure both the float & int fields we care about have (any) value
     // that way all subsequent atomic updates will be inplace
     currentVersion = addDocAndGetVersion("id", 100,
-                                         "inplace_updatable_float", SolrTestCaseJ4.map("set", random().nextFloat()),
-                                         "inplace_updatable_int", SolrTestCaseJ4.map("set", random().nextInt()));
+                                         "inplace_updatable_float_with_default", SolrTestCaseJ4.map("set", random().nextFloat()),
+                                         "inplace_updatable_int_with_default", SolrTestCaseJ4.map("set", random().nextInt()));
     LEADER.commit();
     
     // get the internal docids of id=100 document from the three replicas
     List<Integer> docids = getInternalDocIds("100");
 
     // update doc, set
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float", SolrTestCaseJ4.map("set", inplace_updatable_float));
+    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float_with_default", SolrTestCaseJ4.map("set", inplace_updatable_float));
     assertTrue(currentVersion > version);
     version = currentVersion;
     LEADER.commit();
     assertTrue("Earlier: "+docids+", now: "+getInternalDocIds("100"), docids.equals(getInternalDocIds("100")));
     
     SolrDocument sdoc = LEADER.getById("100");  // RTG straight from the index
-    assertEquals(sdoc.toString(), (float) inplace_updatable_float, sdoc.get("inplace_updatable_float"));
+    assertEquals(sdoc.toString(), (float) inplace_updatable_float, sdoc.get("inplace_updatable_float_with_default"));
     assertEquals(sdoc.toString(), title, sdoc.get("title_s"));
     assertEquals(sdoc.toString(), version, sdoc.get("_version_"));
 
     if(random().nextBoolean()) {
       title = "newtitle100";
-      currentVersion = addDocAndGetVersion("id", 100, "title_s", title, "inplace_updatable_float", inplace_updatable_float); // full indexing
+      currentVersion = addDocAndGetVersion("id", 100, "title_s", title, "inplace_updatable_float_with_default", inplace_updatable_float); // full indexing
       assertTrue(currentVersion > version);
       version = currentVersion;
 
       sdoc = LEADER.getById("100");  // RTG from the tlog
-      assertEquals(sdoc.toString(), (float) inplace_updatable_float, sdoc.get("inplace_updatable_float"));
+      assertEquals(sdoc.toString(), (float) inplace_updatable_float, sdoc.get("inplace_updatable_float_with_default"));
       assertEquals(sdoc.toString(), title, sdoc.get("title_s"));
       assertEquals(sdoc.toString(), version, sdoc.get("_version_"));
 
@@ -644,18 +649,18 @@ public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
     }
 
     inplace_updatable_float++;
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float", SolrTestCaseJ4.map("inc", 1));
+    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float_with_default", SolrTestCaseJ4.map("inc", 1));
     assertTrue(currentVersion > version);
     version = currentVersion;
     LEADER.commit();
     assertTrue("Earlier: "+docids+", now: "+getInternalDocIds("100"), docids.equals(getInternalDocIds("100")));
     
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_int", SolrTestCaseJ4.map("set", "100"));
+    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_int_with_default", SolrTestCaseJ4.map("set", "100"));
     assertTrue(currentVersion > version);
     version = currentVersion;
 
     inplace_updatable_float++;
-    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float", SolrTestCaseJ4.map("inc", 1));
+    currentVersion = addDocAndGetVersion("id", 100, "inplace_updatable_float_with_default", SolrTestCaseJ4.map("inc", 1));
     assertTrue(currentVersion > version);
     version = currentVersion;
 
@@ -664,8 +669,8 @@ public class TestInPlaceUpdatesDistrib extends SolrCloudBridgeTestCase {
       final String clientDebug = client.toString() + (LEADER.equals(client) ? " (leader)" : " (not leader)");
       sdoc = client.getById("100", params("distrib", "false"));
 
-      assertEquals(clientDebug + " => "+ sdoc, (int) 100, sdoc.get("inplace_updatable_int"));
-      assertEquals(clientDebug + " => "+ sdoc, (float) inplace_updatable_float, sdoc.get("inplace_updatable_float"));
+      assertEquals(clientDebug + " => "+ sdoc, (int) 100, sdoc.get("inplace_updatable_int_with_default"));
+      assertEquals(clientDebug + " => "+ sdoc, (float) inplace_updatable_float, sdoc.get("inplace_updatable_float_with_default"));
       assertEquals(clientDebug + " => "+ sdoc, title, sdoc.get("title_s"));
       assertEquals(clientDebug + " => "+ sdoc, version, sdoc.get("_version_"));
     }

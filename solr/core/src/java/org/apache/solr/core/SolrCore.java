@@ -2442,9 +2442,9 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       SolrIndexSearcher tmp = null;
       RefCounted<SolrIndexSearcher> newestSearcher = null;
       boolean success = false;
-      if (coreContainer.isShutDown()) {
-        throw new AlreadyClosedException();
-      }
+//      if (coreContainer.isShutDown()) {
+//        throw new AlreadyClosedException();
+//      }
       try {
         openSearcherLock.lockInterruptibly();
         try {
@@ -2461,9 +2461,9 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
           searcherLock.lock();
           try {
-            if (coreContainer.isShutDown()) { // if we start new searchers after close we won't close them
-              throw new SolrCoreState.CoreIsClosedException();
-            }
+//            if (coreContainer.isShutDown()) { // if we start new searchers after close we won't close them
+//              throw new SolrCoreState.CoreIsClosedException();
+//            }
 
             newestSearcher = realtimeSearcher;
             if (newestSearcher != null) {
@@ -2523,17 +2523,17 @@ public final class SolrCore implements SolrInfoBean, Closeable {
             // (caches take a little while to instantiate)
             final boolean useCaches = !realtime;
             final String newName = realtime ? "realtime" : "main";
-            if (coreContainer.isShutDown() || closing.get()) { // if we start new searchers after close we won't close them
-              throw new SolrCoreState.CoreIsClosedException();
-            }
+//            if (coreContainer.isShutDown() || closing.get()) { // if we start new searchers after close we won't close them
+//              throw new SolrCoreState.CoreIsClosedException();
+//            }
 
             tmp = new SolrIndexSearcher(this, newIndexDir, getLatestSchema(), newName, newReader, true, useCaches, true, directoryFactory);
 
           } else {
             // newestSearcher == null at this point
-            if (coreContainer.isShutDown() || closing.get()) {
-              throw new AlreadyClosedException();
-            }
+//            if (coreContainer.isShutDown() || closing.get()) {
+//              throw new AlreadyClosedException();
+//            }
             if (newReaderCreator != null) {
               // this is set in the constructor if there is a currently open index writer
               // so that we pick up any uncommitted changes and so we don't go backwards
@@ -2587,7 +2587,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
           ParWork.propagateInterrupt(e);
           throw new SolrException(ErrorCode.SERVER_ERROR, "Error opening new searcher", e);
         } finally {
-          if (openSearcherLock != null && openSearcherLock.isHeldByCurrentThread()) openSearcherLock.unlock();
+          if (openSearcherLock.isHeldByCurrentThread()) openSearcherLock.unlock();
           if (newestSearcher != null) {
             newestSearcher.decref();
           }

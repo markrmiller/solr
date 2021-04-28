@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -115,7 +116,8 @@ public class TestConfigSetsAPI extends SolrTestCaseJ4 {
   @Before
   public void setUp() throws Exception {
     super.setUp();
-    solrCluster = new MiniSolrCloudCluster(1, SolrTestUtil.createTempDir(), buildJettyConfig("/solr"));
+    solrCluster = new MiniSolrCloudCluster(1, SolrTestUtil.createTempDir(), MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML,
+        buildJettyConfig("/solr"), null, Optional.empty(),  false, true);
   }
 
   @Override
