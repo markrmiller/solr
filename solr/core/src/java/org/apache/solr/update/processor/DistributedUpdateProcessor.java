@@ -240,18 +240,18 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     if (!forwardToLeader) {
       CompletableFuture<Object> distFuture = versionAdd(cmd);
       if (distFuture != null) {
-        try {
-          distFuture.join();
-        } catch (CompletionException e) {
-          Throwable de = e.getCause();
-          if (de instanceof RuntimeException) {
-            throw (RuntimeException) de;
-          } else {
-            throw new SolrException(ErrorCode.SERVER_ERROR, e);
-          }
-        } catch (CancellationException e) {
-          // okay
-        }
+//        try {
+//          distFuture.join();
+//        } catch (CompletionException e) {
+//          Throwable de = e.getCause();
+//          if (de instanceof RuntimeException) {
+//            throw (RuntimeException) de;
+//          } else {
+//            throw new SolrException(ErrorCode.SERVER_ERROR, e);
+//          }
+//        } catch (CancellationException e) {
+//          // okay
+//        }
       } else {
         // drop it
         log.debug("drop docid={}", cmd.getPrintableId());
@@ -573,8 +573,8 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
       finalCloneCmd = Objects.requireNonNullElse(cloneCmd, cmd);
 
       Supplier distCall = new DistAddCallable(finalCloneCmd);
-
-      distFuture = CompletableFuture.supplyAsync(distCall, ParWork.getRootSharedIOExecutor());
+      distCall.get();
+      distFuture = CompletableFuture.completedFuture(null);
     } else {
       distFuture = CompletableFuture.completedFuture(null);
     }
@@ -864,18 +864,18 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     if (!forwardToLeader) {
       CompletableFuture<Object> future = versionDelete(cmd);
       if (future != null) {
-        try {
-          future.join();
-        } catch (CompletionException e) {
-          Throwable de = e.getCause();
-          if (de instanceof RuntimeException) {
-            throw (RuntimeException) de;
-          } else {
-            throw new SolrException(ErrorCode.SERVER_ERROR, e);
-          }
-        } catch (CancellationException e) {
-          // okay
-        }
+//        try {
+//          future.join();
+//        } catch (CompletionException e) {
+//          Throwable de = e.getCause();
+//          if (de instanceof RuntimeException) {
+//            throw (RuntimeException) de;
+//          } else {
+//            throw new SolrException(ErrorCode.SERVER_ERROR, e);
+//          }
+//        } catch (CancellationException e) {
+//          // okay
+//        }
       } else {
         // drop
         return;
@@ -958,19 +958,19 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     Future future = versionDeleteByQuery(cmd, replicas, coll);
 
     if (future != null) {
-      try {
-        future.get();
-      } catch (InterruptedException e) {
-        ParWork.propagateInterrupt(e, true);
-        throw new SolrException(ErrorCode.SERVER_ERROR, e);
-      } catch (ExecutionException e) {
-        Throwable t;
-        t = e.getCause();
-        if (t instanceof RuntimeException) {
-          throw (RuntimeException) t;
-        }
-        throw new SolrException(ErrorCode.SERVER_ERROR, t);
-      }
+//      try {
+//        future.get();
+//      } catch (InterruptedException e) {
+//        ParWork.propagateInterrupt(e, true);
+//        throw new SolrException(ErrorCode.SERVER_ERROR, e);
+//      } catch (ExecutionException e) {
+//        Throwable t;
+//        t = e.getCause();
+//        if (t instanceof RuntimeException) {
+//          throw (RuntimeException) t;
+//        }
+//        throw new SolrException(ErrorCode.SERVER_ERROR, t);
+//      }
     }
 
     if (returnVersions && rsp != null) {
@@ -1041,14 +1041,12 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
         clonedCmd = (DeleteUpdateCommand) cmd.clone();
 
         DeleteUpdateCommand finalClonedCmd1 = clonedCmd;
-        future = CompletableFuture.supplyAsync(() -> {
-          try {
-            doDistribDeleteByQuery(finalClonedCmd1, replicas, coll);
-          } catch (IOException e) {
-            log.error("doDistribDeleteByQuery failed", e);
-          }
-          return null;
-        }, ParWork.getRootSharedIOExecutor());
+        try {
+          doDistribDeleteByQuery(finalClonedCmd1, replicas, coll);
+        } catch (IOException e) {
+          log.error("doDistribDeleteByQuery failed", e);
+        }
+        future = CompletableFuture.completedFuture(null);
 
       } else {
         cmd.setVersion(-versionOnUpdate);
@@ -1065,14 +1063,12 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
           clonedCmd = (DeleteUpdateCommand) cmd.clone();
 
           DeleteUpdateCommand finalClonedCmd = clonedCmd;
-          future = CompletableFuture.supplyAsync(() -> {
-            try {
-              doDistribDeleteByQuery(finalClonedCmd, replicas, coll);
-            } catch (IOException e) {
-              log.error("doDistribDeleteByQuery failed", e);
-            }
-            return null;
-          }, ParWork.getRootSharedIOExecutor());
+          try {
+            doDistribDeleteByQuery(finalClonedCmd, replicas, coll);
+          } catch (IOException e) {
+            log.error("doDistribDeleteByQuery failed", e);
+          }
+          future = CompletableFuture.completedFuture(null);
         }
 
         if (!isSubShardLeader && replicaType == Replica.Type.TLOG && (cmd.getFlags() & UpdateCommand.REPLAY) == 0) {
@@ -1212,14 +1208,13 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
         cmd.setVersion(-version);
         cloneCmd = cmd.clone();
         UpdateCommand finalCloneCmd = cloneCmd;
-        distFuture = CompletableFuture.supplyAsync(() -> {
-          try {
-            doDistribDeleteById((DeleteUpdateCommand) finalCloneCmd);
-          } catch (IOException e) {
-            log.error("doDistribDeleteById failed", e); // MRM TODO
-          }
-          return null;
-        }, ParWork.getRootSharedIOExecutor());
+
+        try {
+          doDistribDeleteById((DeleteUpdateCommand) finalCloneCmd);
+        } catch (IOException e) {
+          log.error("doDistribDeleteById failed", e); // MRM TODO
+        }
+        distFuture = CompletableFuture.completedFuture(null);
 
         bucket.updateHighest(version);
       } else {

@@ -47,6 +47,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.SysStats;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.Diagnostics;
 import org.apache.solr.request.SolrQueryRequest;
@@ -88,7 +89,8 @@ public class SolrCmdDistributor implements Closeable {
     assert ObjectReleaseTracker.getInstance().track(this);
     coreDesc = null;
     zkShardTerms = null;
-    this.requestSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().build();
+    this.requestSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().maxOutstandingAsyncRequests(
+        SysStats.PROC_COUNT).build();
     //this.replicaSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().build();
     isClosed = null;
   }

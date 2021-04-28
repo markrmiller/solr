@@ -1803,7 +1803,7 @@ public class ZkController implements Closeable, Runnable {
         log.warn("could not get stat");
       }
 
-      log.info("failed to set data version in zk is {} and expected version is {} ", stat.getVersion(), znodeVersion);
+      log.info("failed to set data version in zk is {} and expected version is {} ", stat == null ? "(null)" : stat.getVersion(), znodeVersion);
       if (log.isInfoEnabled()) {
         log.info(StrUtils.formatString("%s zkVersion= %d %s %d", errMsg, resourceLocation, znodeVersion));
       }

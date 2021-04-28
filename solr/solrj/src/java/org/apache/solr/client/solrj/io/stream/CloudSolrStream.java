@@ -54,6 +54,8 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.jctools.maps.NonBlockingHashMap;
 
 import static org.apache.solr.common.params.CommonParams.DISTRIB;
@@ -395,21 +397,27 @@ public class CloudSolrStream extends TupleStream implements Expressible {
     }
   }
 
-  protected void openStreams() throws IOException {
-    final ExecutorService service = ParWork.getRootSharedIOExecutor();
-    List<Future<TupleWrapper>> futures =
-        solrStreams.stream().map(ss -> service.submit(new StreamOpener((SolrStream)ss, comp, eofTuples))).collect(Collectors.toList());
-    try {
-      for (Future<TupleWrapper> f : futures) {
-        TupleWrapper w = f.get();
-        if (w != null) {
-          tuples.add(w);
-        }
+  void openStreams() throws IOException {
+    ExecutorService service = ParWork.getRootSharedIOExecutor();
+
+      List<Future<TupleWrapper>> futures = new ArrayList();
+      for (TupleStream solrStream : solrStreams) {
+        StreamOpener so = new StreamOpener((SolrStream) solrStream, comp, eofTuples);
+        Future<TupleWrapper> future = service.submit(so);
+        futures.add(future);
       }
-    } catch (Exception e) {
-      ParWork.propagateInterrupt(e);
-      throw new IOException(e);
-    }
+
+      try {
+        for (Future<TupleWrapper> f : futures) {
+          TupleWrapper w = f.get();
+          if (w != null) {
+            tuples.add(w);
+          }
+        }
+      } catch (Exception e) {
+        throw new IOException(e);
+      }
+
   }
 
   /**

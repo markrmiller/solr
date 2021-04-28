@@ -69,7 +69,6 @@ public class SolrStream extends TupleStream {
   private transient volatile SolrClientCache cache;
   private String slice;
   private long checkpoint = -1;
-  private CloseableHttpResponse closeableHttpResponse;
   private boolean distrib = true;
   private String user;
   private String password;
@@ -171,12 +170,7 @@ public class SolrStream extends TupleStream {
   }
 
   private String getPartitionFilter() {
-    StringBuilder buf = new StringBuilder("{!hash workers=");
-    buf.append(this.numWorkers);
-    buf.append(" worker=");
-    buf.append(this.workerID);
-    buf.append("}");
-    return buf.toString();
+    return "{!hash workers=" + this.numWorkers + " worker=" + this.workerID + "}";
   }
 
   @Override
@@ -194,9 +188,6 @@ public class SolrStream extends TupleStream {
   * */
 
   public void close() throws IOException {
-    if (closeableHttpResponse != null) {
-      closeableHttpResponse.close();
-    }
     IOUtils.closeQuietly(tupleStreamParser);
 
     // if the cache is null, then we opened the client
@@ -266,9 +257,7 @@ public class SolrStream extends TupleStream {
 
   private Map mapFields(Map fields, Map<String,String> mappings) {
 
-    Iterator<Map.Entry<String,String>> it = mappings.entrySet().iterator();
-    while(it.hasNext()) {
-      Map.Entry<String,String> entry = it.next();
+    for (Map.Entry<String,String> entry : mappings.entrySet()) {
       String mapFrom = entry.getKey();
       String mapTo = entry.getValue();
       Object o = fields.get(mapFrom);
@@ -303,14 +292,16 @@ public class SolrStream extends TupleStream {
       NamedList<Object> genericResponse = server.request(query);
        stream = (InputStream) genericResponse.get("stream");
 
-      this.closeableHttpResponse = (CloseableHttpResponse) genericResponse.get("closeableResponse");
       if (CommonParams.JAVABIN.equals(wt)) {
         return new JavabinTupleStreamParser(stream, true);
       } else {
         return new JSONTupleStream(stream);
       }
     }catch (Exception e) {
-      while (stream.read() != -1) {}
+      if (stream != null) {
+        while (stream.read() != -1) {}
+      }
+      IOUtils.closeQuietly(stream);
       throw new SolrException(SolrException.ErrorCode.UNKNOWN, "", e);
     }
   }

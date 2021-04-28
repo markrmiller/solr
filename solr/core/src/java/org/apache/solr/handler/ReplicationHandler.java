@@ -1704,7 +1704,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
      * Used to write a marker for EOF
      */
     protected void writeNothingAndFlush() throws IOException {
-      fos.writeInt(0);
+      //fos.writeInt(0);
     }
   }
 
@@ -1945,7 +1945,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
 
   private static final Pattern INTERVAL_PATTERN = Pattern.compile("(\\d*?):(\\d*?):(\\d*)");
 
-  public static final int PACKET_SZ = 1024 * 1024 * 16;
+  public static final int PACKET_SZ = 1024 * 1024 * 8;
 
   public static final String RESERVE = "commitReserveDuration";
 

@@ -228,21 +228,21 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       }
     }
 
-    if (localCommitFuture != null) {
-      try {
-        localCommitFuture.get();
-      } catch (InterruptedException e) {
-        ParWork.propagateInterrupt(e);
-        throw new AlreadyClosedException(e);
-      } catch (ExecutionException e) {
-        throw new SolrException(ErrorCode.SERVER_ERROR, e);
-      }
-    }
+//    if (localCommitFuture != null) {
+//      try {
+//        localCommitFuture.get();
+//      } catch (InterruptedException e) {
+//        ParWork.propagateInterrupt(e);
+//        throw new AlreadyClosedException(e);
+//      } catch (ExecutionException e) {
+//        throw new SolrException(ErrorCode.SERVER_ERROR, e);
+//      }
+//    }
 
     if (log.isDebugEnabled()) log.debug("processCommit(CommitUpdateCommand) - end");
   }
 
-  private Future<?> sendCommitToReplicasAndLocalCommit(CommitUpdateCommand cmd, String leaderName, ModifiableSolrParams params) {
+  private Future<?> sendCommitToReplicasAndLocalCommit(CommitUpdateCommand cmd, String leaderName, ModifiableSolrParams params) throws IOException {
 
     List<SolrCmdDistributor.Node> useNodes = getReplicaNodesForLeader(cloudDesc.getShardId(), leaderName);
 
@@ -264,17 +264,12 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         log.debug("processCommit - Do a local commit for leader");
       }
 
-      return ParWork.submitIO("localCommit", () -> {
-        try {
-          doLocalCommit(cmd);
-        } catch (Exception e) {
-          log.error("Failed local leader commit", e);
-          throw new SolrException(ErrorCode.SERVER_ERROR, e);
-        }
-      });
+
+      doLocalCommit(cmd);
+
     }
-    throw new IllegalStateException();
-    // return CompletableFuture.completedFuture(null);
+
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override

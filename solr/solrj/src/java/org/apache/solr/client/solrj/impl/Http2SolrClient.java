@@ -46,6 +46,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrInternalHttpClient;
 import org.apache.solr.common.util.SolrQTP;
+import org.apache.solr.common.util.SysStats;
 import org.apache.solr.common.util.Utils;
 import org.eclipse.jetty.client.ConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
@@ -178,7 +179,7 @@ public class Http2SolrClient extends SolrClient {
       }
       this.serverBaseUrl = serverBaseUrl;
     }
-    int maxOutstandingAsyncRequests = 200;
+    int maxOutstandingAsyncRequests = SysStats.PROC_COUNT;
     if (builder.maxOutstandingAsyncRequests != null) maxOutstandingAsyncRequests = builder.maxOutstandingAsyncRequests;
     asyncTracker = new AsyncTracker(maxOutstandingAsyncRequests);
     this.headers = builder.headers;
@@ -479,13 +480,8 @@ public class Http2SolrClient extends SolrClient {
     }
     final ResponseParser parser = solrRequest.getResponseParser() == null
         ? this.parser: solrRequest.getResponseParser();
+    boolean tracking = false;
     try {
-      asyncTracker.register();
-    } catch (InterruptedException e) {
-      throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "request interrupted", e);
-    }
-    try {
-
       BufferingResponseListener listener = new BufferingResponseListener(4 * 1024 * 1024) {
         @Override public void onComplete(Result result) {
           InputStream is = getContentAsInputStream();
@@ -551,7 +547,8 @@ public class Http2SolrClient extends SolrClient {
           });
         }
       };
-
+      asyncTracker.register();
+      tracking = true;
       req.send(listener);
 
     } catch (Exception e) {
@@ -561,7 +558,9 @@ public class Http2SolrClient extends SolrClient {
           asyncListener.onFailure(e, -1);
         }
       } finally {
-        asyncTracker.arrive();
+        if (tracking) {
+          asyncTracker.arrive();
+        }
       }
     }
 

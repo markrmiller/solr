@@ -341,7 +341,7 @@ public class ZkStateReaderQueue implements Closeable {
         return docCollection;
       }, ParWork.getRootSharedExecutor()); // uses common pool, no IO
     } catch (Exception e) {
-      log.error("{} exception trying to process additional state updates", docCollection.getName(), e);
+      log.error("{} exception trying to process additional state updates", docCollection == null ? "(null)" : docCollection.getName(), e);
       return CompletableFuture.failedFuture(new SolrException(SolrException.ErrorCode.SERVER_ERROR, e));
     }
   }

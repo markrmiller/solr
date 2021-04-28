@@ -48,6 +48,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SuppressForbidden;
+import org.apache.solr.common.util.SysStats;
 import org.apache.solr.core.CloseHook;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
@@ -279,7 +280,8 @@ public class IndexFetcher {
     String httpBasicAuthUser = (String) initArgs.get(HttpClientUtil.PROP_BASIC_AUTH_USER);
     String httpBasicAuthPassword = (String) initArgs.get(HttpClientUtil.PROP_BASIC_AUTH_PASS);
     // MRM TODO:
-    solrClient = new Http2SolrClient.Builder().withHttpClient(sc.getCoreContainer().getUpdateShardHandler().getRecoveryOnlyClient()).build(); // TODO: maybe we leave not internal?
+    solrClient = new Http2SolrClient.Builder().withHttpClient(sc.getCoreContainer().getUpdateShardHandler().getRecoveryOnlyClient()).maxOutstandingAsyncRequests(
+        SysStats.PROC_COUNT).build(); // TODO: maybe we leave not internal?
 
     // createHttpClient(solrCore, httpBasicAuthUser, httpBasicAuthPassword, useExternalCompression);
   }

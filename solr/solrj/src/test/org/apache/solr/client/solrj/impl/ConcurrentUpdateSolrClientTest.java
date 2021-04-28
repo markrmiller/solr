@@ -107,7 +107,7 @@ public class ConcurrentUpdateSolrClientTest extends SolrJettyTestBase {
         } catch (EOFException e) {
           break; // this is expected
         }
-      }      
+      }
     }
     
     private void recordRequest(HttpServletRequest req, HttpServletResponse resp) {
@@ -248,10 +248,9 @@ public class ConcurrentUpdateSolrClientTest extends SolrJettyTestBase {
       ExecutorService threadPool = ParWork.getExecutorService("testCUSS", 25, true);
 
       for (int r=0; r < numRunnables; r++)
-        threadPool.execute(new SendDocsRunnable(String.valueOf(r), numDocs, concurrentClient, "collection1"));
+        threadPool.submit(new SendDocsRunnable(String.valueOf(r), numDocs, concurrentClient, "collection1"));
 
       // ensure all docs are sent
-      threadPool.shutdown();
       threadPool.awaitTermination(5, TimeUnit.SECONDS);
 
 

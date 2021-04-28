@@ -46,6 +46,7 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assume;
 import org.junit.Before;
@@ -95,6 +96,15 @@ private static boolean useAlias;
 
 @BeforeClass
 public static void beforeStreamingTest() throws Exception {
+  System.setProperty(SolrTestCaseJ4.USE_NUMERIC_POINTS_SYSPROP, "true");
+  System.setProperty("solr.tests.IntegerFieldType", "org.apache.solr.schema.IntPointField");
+  System.setProperty("solr.tests.FloatFieldType", "org.apache.solr.schema.FloatPointField");
+  System.setProperty("solr.tests.LongFieldType", "org.apache.solr.schema.LongPointField");
+  System.setProperty("solr.tests.DoubleFieldType", "org.apache.solr.schema.DoublePointField");
+  System.setProperty("solr.tests.DateFieldType", "org.apache.solr.schema.DatePointField");
+
+  System.setProperty("solr.tests.EnumFieldType", "org.apache.solr.schema.EnumFieldType");
+  System.setProperty("solr.tests.numeric.dv", "true");
 
   numShards = random().nextInt(2) + 2;  //1 - 3
   numWorkers = numShards > 2 ? random().nextInt(numShards - 1) + 1 : numShards;
@@ -115,6 +125,7 @@ public static void beforeStreamingTest() throws Exception {
   CollectionAdminRequest.createCollection(collection, "conf", numShards, 1)
       .process(cluster.getSolrClient());
 
+  cluster.waitForActiveCollection(collection, numShards, numShards);
   if (useAlias) {
     CollectionAdminRequest.createAlias(COLLECTIONORALIAS, collection).process(cluster.getSolrClient());
   }
@@ -131,6 +142,8 @@ public static void beforeStreamingTest() throws Exception {
   CollectionAdminRequest.createCollection(collection, "conf", numShards, 1, 1, 1)
       .setMaxShardsPerNode(numShards * 3)
       .process(cluster.getSolrClient());
+  cluster
+      .waitForActiveCollection(collection, numShards, numShards * 3);
   if (useAlias) {
     CollectionAdminRequest.createAlias(MULTI_REPLICA_COLLECTIONORALIAS, collection).process(cluster.getSolrClient());
   }
@@ -144,7 +157,7 @@ public static void afterStreamingTest() throws Exception {
 
 private static final String id = "id";
 
-@Before
+@After
 public void clearCollection() throws Exception {
   clearIndex(COLLECTIONORALIAS);
 }

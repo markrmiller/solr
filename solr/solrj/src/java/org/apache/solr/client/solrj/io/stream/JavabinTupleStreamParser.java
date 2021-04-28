@@ -32,7 +32,6 @@ import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JavaBinCodec;
 
 public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStreamParser {
-  private final InputStream is;
   final FastInputStream fis;
   private int arraySize = Integer.MAX_VALUE;
   private boolean onlyJsonTypes = false;
@@ -41,7 +40,6 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
 
   public JavabinTupleStreamParser(InputStream is, boolean onlyJsonTypes) throws IOException {
     this.onlyJsonTypes = onlyJsonTypes;
-    this.is = is;
     this.fis = initRead(is);
     if (!readTillDocs()) arraySize = 0;
   }

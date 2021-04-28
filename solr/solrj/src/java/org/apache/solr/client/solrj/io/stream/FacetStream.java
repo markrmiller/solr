@@ -189,8 +189,8 @@ public class FacetStream extends TupleStream implements Expressible  {
       bucketSortString = ((StreamExpressionValue)bucketSortExpression.getParameter()).getValue();
       if(bucketSortString.contains("(") &&
           metricExpressions.size() == 0 &&
-          (!bucketSortExpression.equals("count(*) desc") &&
-           !bucketSortExpression.equals("count(*) asc"))) {
+          (!bucketSortString.equals("count(*) desc") &&
+           !bucketSortString.equals("count(*) asc"))) {
       //Attempting bucket sort on a metric that is not going to be calculated.
         throw new IOException(String.format(Locale.ROOT,"invalid expression %s - the bucketSort is being performed on a metric that is not being calculated.",expression,collectionName));
       }
@@ -457,7 +457,7 @@ public class FacetStream extends TupleStream implements Expressible  {
     
     // bucketSorts
     {
-      StringBuilder builder = new StringBuilder();
+      StringBuilder builder = new StringBuilder(128);
       for(FieldComparator sort : bucketSorts){
         if(0 != builder.length()){ builder.append(","); }
         builder.append(sort.toExpression(factory));
@@ -539,10 +539,12 @@ public class FacetStream extends TupleStream implements Expressible  {
   public void open() throws IOException {
     if(cache != null) {
       cloudSolrClient = cache.getCloudSolrClient();
+      cloudSolrClient.setDefaultCollection(collection);
     } else {
       final List<String> hosts = new ArrayList<>();
       hosts.add(zkHost);
       cloudSolrClient = new CloudHttp2SolrClient.Builder(hosts, Optional.empty()).markInternalRequest().build();
+      cloudSolrClient.setDefaultCollection(collection);
     }
 
     FieldComparator[] adjustedSorts = adjustSorts(buckets, bucketSorts);
@@ -560,7 +562,7 @@ public class FacetStream extends TupleStream implements Expressible  {
       getTuples(response, buckets, metrics);
 
       if(resortNeeded) {
-        Collections.sort(tuples, getStreamSort());
+        tuples.sort(getStreamSort());
       }
 
       index=this.offset;
