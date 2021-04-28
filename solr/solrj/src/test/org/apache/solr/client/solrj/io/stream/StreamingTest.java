@@ -99,7 +99,8 @@ public static void beforeStreamingTest() throws Exception {
   numShards = random().nextInt(2) + 2;  //1 - 3
   numWorkers = numShards > 2 ? random().nextInt(numShards - 1) + 1 : numShards;
   configureCluster(numShards)
-      .addConfig("conf", SolrTestUtil.getFile("solrj").toPath().resolve("solr").resolve("configsets").resolve("streaming").resolve(
+      .addConfig("conf", SolrTestUtil.getFile("solrj").toPath()
+          .resolve("solr").resolve("configsets").resolve("streaming").resolve(
           "conf"))
       .configure();
 

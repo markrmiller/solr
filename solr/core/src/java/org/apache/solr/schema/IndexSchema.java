@@ -729,18 +729,15 @@ public class IndexSchema {
 
   public void postReadInform() {
     //Run the callbacks on SchemaAware now that everything else is done
-    try (ParWork work = new ParWork(this)) {
-      for (SchemaAware aware : schemaAware) {
-        work.collect("postReadInform", () -> {
-          if (aware == null) {
-            log.warn("Ran into a null SchemaAware object in postReadInform");
-          } else {
-            aware.inform(this);
-          }
-        });
-      }
-    };
-
+    for (SchemaAware aware : schemaAware) {
+      ParWork.submitIO("postReadInform", () -> {
+        if (aware == null) {
+          log.warn("Ran into a null SchemaAware object in postReadInform");
+        } else {
+          aware.inform(this);
+        }
+      });
+    }
   }
 
   /**

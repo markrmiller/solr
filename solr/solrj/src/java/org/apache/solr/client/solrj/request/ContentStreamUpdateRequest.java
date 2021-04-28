@@ -94,9 +94,7 @@ public class ContentStreamUpdateRequest extends AbstractUpdateRequest {
 
     @Override
     public void write(OutputStream os) throws IOException {
-      try(var inStream = stream.getStream()) {
-        IOUtils.copy(inStream, os);
-      }
+      IOUtils.copy(stream.getStream(), os);
     }
 
     @Override

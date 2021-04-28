@@ -74,7 +74,7 @@ public class NodePreferenceRulesComparatorTest extends SolrTestCaseJ4 {
                 ZkStateReader.NODE_NAME_PROP, "node4",
                 ZkStateReader.CORE_NAME_PROP, "collection1",
                 ZkStateReader.REPLICA_TYPE, "TLOG",
-                "id", "-1"
+                "id", -1
             ),"collection1",-1, "shard1")
     );
 

@@ -430,6 +430,13 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   public void doFilter(ServletRequest _request, ServletResponse _response, FilterChain chain) throws IOException, ServletException {
     if (!(_request instanceof HttpServletRequest)) return;
 
+    log.info("PATH:" + ((HttpServletRequest) _request).getPathInfo());
+
+    Boolean passthrough = (Boolean) _request.getAttribute("PASSTHROUGH");
+    if (passthrough != null && passthrough) {
+      chain.doFilter(_request, _response);
+      return;
+    }
 
     if (ASYNC) {
       AsyncContext asyncContext = _request.startAsync();
@@ -531,6 +538,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         switch (result) {
           case PASSTHROUGH:
             if (ASYNC) {
+              log.info("PASSTHROUGH");
+              asyncContext.getRequest().setAttribute("PASSTHROUGH", true);
               asyncContext.dispatch();
               return;
             } else {

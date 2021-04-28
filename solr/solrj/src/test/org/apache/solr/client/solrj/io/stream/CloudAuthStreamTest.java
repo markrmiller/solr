@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -85,6 +86,7 @@ public class CloudAuthStreamTest extends SolrCloudTestCase {
 
   @BeforeClass
   public static void beforeCloudAuthStreamTest() throws Exception {
+    System.setProperty("solr.suppressDefaultConfigBootstrap", "false");
     final List<String> users = Arrays.asList(READ_ONLY_USER, WRITE_X_USER, WRITE_Y_USER, ADMIN_USER);
     // For simplicity: every user uses a password the same as their name...
     final Map<String,String> credentials = users.stream()
@@ -121,12 +123,15 @@ public class CloudAuthStreamTest extends SolrCloudTestCase {
                                    "credentials", credentials)));
     
     // we want at most one core per node to force lots of network traffic to try and tickle distributed bugs
-    configureCluster(5)
+    configureCluster(5).
+        addConfig("conf", SolrTestUtil.getFile("solrj").toPath()
+        .resolve("solr").resolve("configsets").resolve("streaming").resolve(
+            "conf"))
       .withSecurityJson(SECURITY_JSON)
       .configure();
 
     for (String collection : Arrays.asList(COLLECTION_X, COLLECTION_Y)) {
-      CollectionAdminRequest.createCollection(collection, "_default", 2, 2)
+      CollectionAdminRequest.createCollection(collection, "conf", 2, 2)
         .setBasicAuthCredentials(ADMIN_USER, ADMIN_USER)
         .process(cluster.getSolrClient());
     }
