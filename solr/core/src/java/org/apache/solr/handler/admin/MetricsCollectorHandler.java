@@ -193,7 +193,7 @@ public class MetricsCollectorHandler extends RequestHandlerBase {
       });
     }
 
-    private AggregateMetric getOrCreate(MetricRegistry registry, String name) {
+    private static AggregateMetric getOrCreate(MetricRegistry registry, String name) {
       AggregateMetric existing = (AggregateMetric)registry.getMetrics().get(name);
       if (existing != null) {
         return existing;

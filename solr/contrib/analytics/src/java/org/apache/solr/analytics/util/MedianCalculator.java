@@ -72,7 +72,7 @@ public class MedianCalculator {
   private static <T extends Comparable<T>> T split(List<T> list, int begin, int end) {
     T temp;
     int num = (end - begin + 1);
-    int recursiveSize = (int) Math.sqrt((double) num);
+    int recursiveSize = (int) Math.sqrt(num);
     int step = num / recursiveSize;
     for (int i = 1; i < recursiveSize; i++) {
       int swapFrom = i * step + begin;
@@ -82,7 +82,7 @@ public class MedianCalculator {
       list.set(swapTo, temp);
     }
     recursiveSize--;
-    select(list, recursiveSize / 2 + begin, begin, recursiveSize + begin);
+    select(list, (recursiveSize / 2.0) + begin, begin, recursiveSize + begin);
     return list.get(recursiveSize / 2 + begin);
   }
 

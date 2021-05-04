@@ -52,18 +52,21 @@ public class ReporterClientCache<T> implements Closeable {
    * @param id client id
    * @param clientProvider provider of new client instances
    */
-  public synchronized T getOrCreate(String id, ClientProvider<T> clientProvider) {
-    T item = cache.get(id);
-    if (item == null) {
-      try {
-        item = clientProvider.get();
-        cache.put(id, item);
-      } catch (Exception e) {
-        log.warn("Error providing a new client for id={}", id, e);
-        item = null;
+  public T getOrCreate(String id, ClientProvider<T> clientProvider) {
+    return cache.compute(id, (s, t) -> {
+
+      if (t == null) {
+        try {
+          t = clientProvider.get();
+          return t;
+        } catch (Exception e) {
+          log.warn("Error providing a new client for id={}", id, e);
+          return null;
+        }
       }
-    }
-    return item;
+      return t;
+    });
+
   }
 
   /**

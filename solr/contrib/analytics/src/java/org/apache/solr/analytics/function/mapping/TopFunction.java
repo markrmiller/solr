@@ -51,7 +51,7 @@ public class TopFunction {
     AnalyticsValueStream param = params[0];
     if (param instanceof DateValueStream) {
       if (params.length == 1) {
-        return LambdaFunction.createDateLambdaFunction(name, (a,b) -> (a>b)? a:b, (DateValueStream)param);
+        return LambdaFunction.createDateLambdaFunction(name, (a,b) -> Math.max(a, b), (DateValueStream)param);
       }
       DateValue[] castedParams = new DateValue[params.length];
       boolean tryNextType = false;
@@ -64,12 +64,12 @@ public class TopFunction {
         }
       }
       if (!tryNextType) {
-        return LambdaFunction.createDateLambdaFunction(name, (a,b) -> (a>b)? a:b, castedParams, false);
+        return LambdaFunction.createDateLambdaFunction(name, (a,b) -> Math.max(a, b), castedParams, false);
       }
     }
     if (param instanceof IntValueStream) {
       if (params.length == 1) {
-        return LambdaFunction.createIntLambdaFunction(name, (a,b) -> (a>b)? a:b, (IntValueStream)param);
+        return LambdaFunction.createIntLambdaFunction(name, (a,b) -> Math.max(a, b), (IntValueStream)param);
       }
       IntValue[] castedParams = new IntValue[params.length];
       boolean tryNextType = false;
@@ -82,12 +82,12 @@ public class TopFunction {
         }
       }
       if (!tryNextType) {
-        return LambdaFunction.createIntLambdaFunction(name, (a,b) -> (a>b)? a:b, castedParams, false);
+        return LambdaFunction.createIntLambdaFunction(name, (a,b) -> Math.max(a, b), castedParams, false);
       }
     }
     if (param instanceof LongValueStream) {
       if (params.length == 1) {
-        return LambdaFunction.createLongLambdaFunction(name, (a,b) -> (a>b)? a:b, (LongValueStream)param);
+        return LambdaFunction.createLongLambdaFunction(name, (a,b) -> Math.max(a, b), (LongValueStream)param);
       }
       LongValue[] castedParams = new LongValue[params.length];
       boolean tryNextType = false;
@@ -100,12 +100,12 @@ public class TopFunction {
         }
       }
       if (!tryNextType) {
-        return LambdaFunction.createLongLambdaFunction(name, (a,b) -> (a>b)? a:b, castedParams, false);
+        return LambdaFunction.createLongLambdaFunction(name, (a,b) -> Math.max(a, b), castedParams, false);
       }
     }
     if (param instanceof FloatValueStream) {
       if (params.length == 1) {
-        return LambdaFunction.createFloatLambdaFunction(name, (a,b) -> (a>b)? a:b, (FloatValueStream)param);
+        return LambdaFunction.createFloatLambdaFunction(name, (a,b) -> Math.max(a, b), (FloatValueStream)param);
       }
       FloatValue[] castedParams = new FloatValue[params.length];
       boolean tryNextType = false;
@@ -118,12 +118,12 @@ public class TopFunction {
         }
       }
       if (!tryNextType) {
-        return LambdaFunction.createFloatLambdaFunction(name, (a,b) -> (a>b)? a:b, castedParams, false);
+        return LambdaFunction.createFloatLambdaFunction(name, (a,b) -> Math.max(a, b), castedParams, false);
       }
     }
     if (param instanceof DoubleValueStream) {
       if (params.length == 1) {
-        return LambdaFunction.createDoubleLambdaFunction(name, (a,b) -> (a>b)? a:b, (DoubleValueStream)param);
+        return LambdaFunction.createDoubleLambdaFunction(name, (a,b) -> Math.max(a, b), (DoubleValueStream)param);
       }
       DoubleValue[] castedParams = new DoubleValue[params.length];
       boolean tryNextType = false;
@@ -136,7 +136,7 @@ public class TopFunction {
         }
       }
       if (!tryNextType) {
-        return LambdaFunction.createDoubleLambdaFunction(name, (a,b) -> (a>b)? a:b, castedParams, false);
+        return LambdaFunction.createDoubleLambdaFunction(name, (a,b) -> Math.max(a, b), castedParams, false);
       }
     }
     if (param instanceof StringValueStream) {

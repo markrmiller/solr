@@ -35,6 +35,8 @@ import org.apache.lucene.search.join.BitSetProducer;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
 import org.apache.lucene.search.join.ToParentBlockJoinQuery;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.handler.dataimport.config.ConfigNameConstants;
 import org.apache.solr.request.SolrQueryRequest;
@@ -91,7 +93,7 @@ public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCas
   }
   
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeTestHierarchicalDocBuilder() throws Exception {
     initCore("dataimport-solrconfig.xml", "dataimport-schema.xml");    
   }
   
@@ -111,7 +113,7 @@ public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCas
   }
 
   @Test
-  @AwaitsFix(bugUrl = "https://issues.apache.org/jira/browse/SOLR-12801") // this test fails easily under beasting
+  @LuceneTestCase.AwaitsFix(bugUrl = "https://issues.apache.org/jira/browse/SOLR-12801") // this test fails easily under beasting
   public void testThreeLevelHierarchy() throws Exception {
     int parentsNum = 3; //fixed for simplicity of test
     int childrenNum = 0;
@@ -137,7 +139,7 @@ public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCas
     final String childId = childrenIds.get(0);
     String description = "grandchild of first parent, child of " + childId + " child";
     select = "select * from GRANDCHILD where parent_id='" + childId + "'";
-    List<String> grandChildrenIds = createDataIterator(select, grandChildType, description, atLeast(2));
+    List<String> grandChildrenIds = createDataIterator(select, grandChildType, description, SolrTestUtil.atLeast(2));
     grandChildrenNum += grandChildrenIds.size();
     
     // grand children of first parent second child
@@ -146,7 +148,7 @@ public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCas
       description = "grandchild of first parent, child of " + childId2 + " child";
       select = "select * from GRANDCHILD where parent_id='" + childId2 + "'";
     }
-    final List<String> grandChildrenIds2 = createDataIterator(select, grandChildType, description, atLeast(2));
+    final List<String> grandChildrenIds2 = createDataIterator(select, grandChildType, description, SolrTestUtil.atLeast(2));
     grandChildrenNum += grandChildrenIds2.size();
     
     List<String> allGrandChildrenIds = new ArrayList<>(grandChildrenIds);
@@ -156,7 +158,7 @@ public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCas
     
     // parent 2 children (no grand children)   
     select = "select * from CHILD where parent_id='" + parentId2 + "'";
-    childrenIds = createDataIterator(select, childType, "child of second parent", atLeast(2));
+    childrenIds = createDataIterator(select, childType, "child of second parent", SolrTestUtil.atLeast(2));
     childrenNum += childrenIds.size();
     
     // parent 3 has no children and grand children
@@ -167,8 +169,7 @@ public class TestHierarchicalDocBuilder extends AbstractDataImportHandlerTestCas
     String xpath = "//arr[@name='documents']/lst[arr[@name='id']/str='"+parentId1+"']/"+
       "arr[@name='_childDocuments_']/lst[arr[@name='id']/str='"+childId+"']/"+
       "arr[@name='_childDocuments_']/lst[arr[@name='id']/str='"+grandChildrenIds.get(0)+"']";
-    String results = TestHarness.validateXPath(resp, 
-           xpath);
+    String results = TestHarness.validateXPath(h.getCore().getResourceLoader(), resp, xpath);
     assertTrue("Debug documents does not contain child documents\n"+resp+"\n"+ xpath+
                                                         "\n"+results, results == null);
     

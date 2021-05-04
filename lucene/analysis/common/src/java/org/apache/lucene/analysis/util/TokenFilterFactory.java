@@ -30,22 +30,36 @@ import org.apache.lucene.analysis.TokenStream;
  */
 public abstract class TokenFilterFactory extends AbstractAnalysisFactory {
 
-  private static final AnalysisSPILoader<TokenFilterFactory> loader =
-      new AnalysisSPILoader<>(TokenFilterFactory.class);
+  private static class AnalysisSPILoaderHolder {
+    private static AnalysisSPILoader<TokenFilterFactory> HOLDER_INSTANCE;
+
+    static {
+      try {
+        HOLDER_INSTANCE = new AnalysisSPILoader<>(TokenFilterFactory.class);
+      } catch (Exception e) {
+        System.err.println("Exception creating AnalysisSPILoader");
+        throw e;
+      }
+    }
+  }
+
+  private static AnalysisSPILoader<TokenFilterFactory> getInstance() {
+    return AnalysisSPILoaderHolder.HOLDER_INSTANCE;
+  }
 
   /** looks up a tokenfilter by name from context classpath */
   public static TokenFilterFactory forName(String name, Map<String,String> args) {
-    return loader.newInstance(name, args);
+    return getInstance().newInstance(name, args);
   }
   
   /** looks up a tokenfilter class by name from context classpath */
   public static Class<? extends TokenFilterFactory> lookupClass(String name) {
-    return loader.lookupClass(name);
+    return getInstance().lookupClass(name);
   }
   
   /** returns a list of all available tokenfilter names from context classpath */
   public static Set<String> availableTokenFilters() {
-    return loader.availableServices();
+    return getInstance().availableServices();
   }
 
   /** looks up a SPI name for the specified token filter factory */
@@ -69,7 +83,7 @@ public abstract class TokenFilterFactory extends AbstractAnalysisFactory {
    * of new factories on the given classpath/classloader!</em>
    */
   public static void reloadTokenFilters(ClassLoader classloader) {
-    loader.reload(classloader);
+    getInstance().reload(classloader);
   }
   
   /** Default ctor for compatibility with SPI */

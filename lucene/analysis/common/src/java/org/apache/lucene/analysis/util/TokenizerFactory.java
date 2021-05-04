@@ -32,22 +32,36 @@ import java.util.Set;
  */
 public abstract class TokenizerFactory extends AbstractAnalysisFactory {
 
-  private static final AnalysisSPILoader<TokenizerFactory> loader =
-      new AnalysisSPILoader<>(TokenizerFactory.class);
+  private static class AnalysisSPILoaderHolder {
+    private static AnalysisSPILoader<TokenizerFactory> HOLDER_INSTANCE;
+
+    static {
+      try {
+        HOLDER_INSTANCE = new AnalysisSPILoader<>(TokenizerFactory.class);
+      } catch (Exception e) {
+        System.err.println("Exception creating AnalysisSPILoader");
+        throw e;
+      }
+    }
+  }
+
+  private static AnalysisSPILoader<TokenizerFactory> getInstance() {
+    return AnalysisSPILoaderHolder.HOLDER_INSTANCE;
+  }
   
   /** looks up a tokenizer by name from context classpath */
   public static TokenizerFactory forName(String name, Map<String,String> args) {
-    return loader.newInstance(name, args);
+    return getInstance().newInstance(name, args);
   }
   
   /** looks up a tokenizer class by name from context classpath */
   public static Class<? extends TokenizerFactory> lookupClass(String name) {
-    return loader.lookupClass(name);
+    return getInstance().lookupClass(name);
   }
   
   /** returns a list of all available tokenizer names from context classpath */
   public static Set<String> availableTokenizers() {
-    return loader.availableServices();
+    return getInstance().availableServices();
   }
 
   /** looks up a SPI name for the specified tokenizer factory */
@@ -71,7 +85,7 @@ public abstract class TokenizerFactory extends AbstractAnalysisFactory {
    * of new factories on the given classpath/classloader!</em>
    */
   public static void reloadTokenizers(ClassLoader classloader) {
-    loader.reload(classloader);
+    getInstance().reload(classloader);
   }
   
   /** Default ctor for compatibility with SPI */

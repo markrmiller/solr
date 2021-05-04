@@ -27,7 +27,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 
-
 /**
  * Basic functionality to upload a File or {@link org.apache.solr.common.util.ContentStream} to a Solr Cell or some
  * other handler that takes ContentStreams (CSV)
@@ -56,21 +55,9 @@ public class ContentStreamUpdateRequest extends AbstractUpdateRequest {
 
   @Override
   public RequestWriter.ContentWriter getContentWriter(String expectedType) {
-    if (contentStreams == null || contentStreams.isEmpty() || contentStreams.size() > 1) return null;
+    if (contentStreams == null || contentStreams.size() != 1) return null;
     ContentStream stream = contentStreams.get(0);
-    return new RequestWriter.ContentWriter() {
-      @Override
-      public void write(OutputStream os) throws IOException {
-        try(var inStream = stream.getStream()) {
-          IOUtils.copy(inStream, os);
-        }
-      }
-
-      @Override
-      public String getContentType() {
-        return stream.getContentType();
-      }
-    };
+    return new MyContentWriter(stream);
   }
 
   /**
@@ -94,5 +81,22 @@ public class ContentStreamUpdateRequest extends AbstractUpdateRequest {
   public void addContentStream(ContentStream contentStream){
     contentStreams.add(contentStream);
   }
-  
+
+  private static class MyContentWriter implements RequestWriter.ContentWriter {
+    private final ContentStream stream;
+
+    public MyContentWriter(ContentStream stream) {
+      this.stream = stream;
+    }
+
+    @Override
+    public void write(OutputStream os) throws IOException {
+      IOUtils.copy(stream.getStream(), os);
+    }
+
+    @Override
+    public String getContentType() {
+      return stream.getContentType();
+    }
+  }
 }

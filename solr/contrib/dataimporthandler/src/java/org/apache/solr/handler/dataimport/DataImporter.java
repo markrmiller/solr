@@ -16,36 +16,33 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.EmptyEntityResolver;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.core.SolrCore;
-import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.util.SystemIdResolver;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.XMLErrorLogger;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.dataimport.config.ConfigNameConstants;
 import org.apache.solr.handler.dataimport.config.ConfigParseUtil;
 import org.apache.solr.handler.dataimport.config.DIHConfiguration;
 import org.apache.solr.handler.dataimport.config.Entity;
 import org.apache.solr.handler.dataimport.config.PropertyWriter;
 import org.apache.solr.handler.dataimport.config.Script;
-
-import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
-import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
-import static org.apache.solr.handler.dataimport.DocBuilder.loadClass;
-import static org.apache.solr.handler.dataimport.config.ConfigNameConstants.CLASS;
-
+import org.apache.solr.rest.schema.FieldTypeXmlAdapter;
+import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.util.SystemIdResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
-import org.apache.commons.io.IOUtils;
 
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
+import static org.apache.solr.handler.dataimport.DocBuilder.loadClass;
+import static org.apache.solr.handler.dataimport.config.ConfigNameConstants.CLASS;
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.invoke.MethodHandles;
@@ -192,21 +189,7 @@ public class DataImporter {
 
     DIHConfiguration dihcfg = null;
     try {
-      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-      dbf.setValidating(false);
-      
-      // only enable xinclude, if XML is coming from safe source (local file)
-      // and a a SolrCore and SystemId is present (makes no sense otherwise):
-      if (core != null && configFile.getSystemId() != null) {
-        try {
-          dbf.setXIncludeAware(true);
-          dbf.setNamespaceAware(true);
-        } catch( UnsupportedOperationException e ) {
-          log.warn( "XML parser doesn't support XInclude option" );
-        }
-      }
-      
-      DocumentBuilder builder = dbf.newDocumentBuilder();
+      DocumentBuilder builder =  FieldTypeXmlAdapter.dbf.newDocumentBuilder();
       // only enable xinclude / external entities, if XML is coming from
       // safe source (local file) and a a SolrCore and SystemId is present:
       if (core != null && configFile.getSystemId() != null) {
@@ -381,7 +364,7 @@ public class DataImporter {
       dataSrc = new JdbcDataSource();
     } else {
       try {
-        dataSrc = (DataSource) DocBuilder.loadClass(type, getCore()).getConstructor().newInstance();
+        dataSrc = (DataSource) DocBuilder.loadClass(type, core).getConstructor().newInstance();
       } catch (Exception e) {
         wrapAndThrow(SEVERE, e, "Invalid type for data source: " + type);
       }
@@ -418,10 +401,10 @@ public class DataImporter {
 
   public void doFullImport(DIHWriter writer, RequestInfo requestParams) {
     log.info("Starting Full Import");
-    setStatus(Status.RUNNING_FULL_DUMP);
+    status = Status.RUNNING_FULL_DUMP;
     try {
       DIHProperties dihPropWriter = createPropertyWriter();
-      setIndexStartTime(dihPropWriter.getCurrentTimestamp());
+      indexStartTime = DIHProperties.getCurrentTimestamp();
       docBuilder = new DocBuilder(this, writer, dihPropWriter, requestParams);
       checkWritablePersistFile(writer, dihPropWriter);
       docBuilder.execute();
@@ -431,7 +414,7 @@ public class DataImporter {
       SolrException.log(log, "Full Import failed", e);
       docBuilder.handleError("Full Import failed", e);
     } finally {
-      setStatus(Status.IDLE);
+      status = Status.IDLE;
       DocBuilder.INSTANCE.set(null);
     }
 
@@ -446,10 +429,10 @@ public class DataImporter {
 
   public void doDeltaImport(DIHWriter writer, RequestInfo requestParams) {
     log.info("Starting Delta Import");
-    setStatus(Status.RUNNING_DELTA_DUMP);
+    status = Status.RUNNING_DELTA_DUMP;
     try {
       DIHProperties dihPropWriter = createPropertyWriter();
-      setIndexStartTime(dihPropWriter.getCurrentTimestamp());
+      indexStartTime = DIHProperties.getCurrentTimestamp();
       docBuilder = new DocBuilder(this, writer, dihPropWriter, requestParams);
       checkWritablePersistFile(writer, dihPropWriter);
       docBuilder.execute();
@@ -459,7 +442,7 @@ public class DataImporter {
       log.error("Delta Import Failed", e);
       docBuilder.handleError("Delta Import Failed", e);
     } finally {
-      setStatus(Status.IDLE);
+      status = Status.IDLE;
       DocBuilder.INSTANCE.set(null);
     }
 
@@ -492,7 +475,6 @@ public class DataImporter {
     }
   }
 
-  @SuppressWarnings("unchecked")
   Map<String, String> getStatusMessages() {
     //this map object is a Collections.synchronizedMap(new LinkedHashMap()). if we
     // synchronize on the object it must be safe to iterate through the map
@@ -536,7 +518,7 @@ public class DataImporter {
     evaluators.put(Evaluator.SQL_ESCAPE_EVALUATOR, new SqlEscapingEvaluator());
     evaluators.put(Evaluator.URL_ENCODE_EVALUATOR, new UrlEvaluator());
     evaluators.put(Evaluator.ESCAPE_SOLR_QUERY_CHARS, new SolrQueryEscapingEvaluator());
-    SolrCore core = docBuilder == null ? null : docBuilder.dataImporter.getCore();
+    SolrCore core = docBuilder == null ? null : docBuilder.dataImporter.core;
     for (Map<String, String> map : fn) {
       try {
         evaluators.put(map.get(NAME), (Evaluator) loadClass(map.get(CLASS), core).getConstructor().newInstance());

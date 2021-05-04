@@ -38,7 +38,7 @@ public abstract class DIHProperties {
   
   public abstract String convertDateToString(Date d);
   
-  public Date getCurrentTimestamp() {
+  public static Date getCurrentTimestamp() {
     return new Date();
   }
   

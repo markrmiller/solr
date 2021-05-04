@@ -71,9 +71,9 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected volatile List<SearchComponent> components;
-  private ShardHandlerFactory shardHandlerFactory;
-  private PluginInfo shfInfo;
-  private SolrCore core;
+  private volatile ShardHandlerFactory shardHandlerFactory;
+  private volatile PluginInfo shfInfo;
+  private volatile SolrCore core;
 
   protected List<String> getDefaultComponents() {
     ArrayList<String> names = new ArrayList<>(8);
@@ -258,7 +258,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
       String shardsTolerant = req.getParams().get(ShardParams.SHARDS_TOLERANT);
       boolean requireZkConnected = shardsTolerant != null && shardsTolerant.equals(ShardParams.REQUIRE_ZK_CONNECTED);
       ZkController zkController = cc.getZkController();
-      boolean zkConnected = zkController != null && ! zkController.getZkClient().getConnectionManager().isLikelyExpired();
+      boolean zkConnected = zkController.getZkClient().isConnected();
       if (requireZkConnected && false == zkConnected) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "ZooKeeper is not connected");
       } else {
@@ -275,7 +275,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
   /**
    * Override this method if you require a custom {@link ResponseBuilder} e.g. for use by a custom {@link SearchComponent}.
    */
-  protected ResponseBuilder newResponseBuilder(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components) {
+  protected static ResponseBuilder newResponseBuilder(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components) {
     return new ResponseBuilder(req, rsp, components);
   }
 
@@ -504,7 +504,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
 
   @Override
   public String getDescription() {
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(32);
     sb.append("Search using components: ");
     if( components != null ) {
       for(SearchComponent c : components){

@@ -40,6 +40,7 @@ import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockFactory;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.store.blockcache.CustomBufferedIndexInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,8 +81,8 @@ public class HdfsDirectory extends BaseDirectory {
         try {
           Thread.sleep(5000);
         } catch (InterruptedException e) {
-          Thread.interrupted();
-          // continue
+          ParWork.propagateInterrupt(e);
+          return;
         }
       }
     }
@@ -117,7 +118,7 @@ public class HdfsDirectory extends BaseDirectory {
   @Override
   public IndexOutput createOutput(String name, IOContext context) throws IOException {
     try {
-      return new HdfsFileWriter(getFileSystem(), new Path(hdfsDirPath, name), name);
+      return new HdfsFileWriter(fileSystem, new Path(hdfsDirPath, name), name);
     } catch (FileAlreadyExistsException e) {
       java.nio.file.FileAlreadyExistsException ex = new java.nio.file.FileAlreadyExistsException(e.getMessage());
       ex.initCause(e);
@@ -130,14 +131,14 @@ public class HdfsDirectory extends BaseDirectory {
     while (true) {
       try {
         String name = getTempFileName(prefix, suffix, nextTempFileCounter.getAndIncrement());
-        return new HdfsFileWriter(getFileSystem(), new Path(hdfsDirPath, name), name);
+        return new HdfsFileWriter(fileSystem, new Path(hdfsDirPath, name), name);
       } catch (FileAlreadyExistsException faee) {
         // Retry with next incremented name
       }
     }
   }
   
-  private String[] getNormalNames(List<String> files) {
+  private static String[] getNormalNames(List<String> files) {
     int size = files.size();
     for (int i = 0; i < size; i++) {
       String str = files.get(i);
@@ -146,7 +147,7 @@ public class HdfsDirectory extends BaseDirectory {
     return files.toArray(new String[] {});
   }
   
-  private String toNormalName(String name) {
+  private static String toNormalName(String name) {
     if (name.endsWith(LF_EXT)) {
       return name.substring(0, name.length() - 3);
     }
@@ -156,7 +157,7 @@ public class HdfsDirectory extends BaseDirectory {
   @Override
   public IndexInput openInput(String name, IOContext context)
       throws IOException {
-    return new HdfsIndexInput(name, getFileSystem(), new Path(
+    return new HdfsIndexInput(name, fileSystem, new Path(
         hdfsDirPath, name), bufferSize);
   }
   
@@ -164,7 +165,7 @@ public class HdfsDirectory extends BaseDirectory {
   public void deleteFile(String name) throws IOException {
     Path path = new Path(hdfsDirPath, name);
     log.debug("Deleting {}", path);
-    getFileSystem().delete(path, false);
+    fileSystem.delete(path, false);
   }
   
   @Override
@@ -186,14 +187,14 @@ public class HdfsDirectory extends BaseDirectory {
   }
   
   public long fileModified(String name) throws IOException {
-    FileStatus fileStatus = getFileSystem().getFileStatus(
+    FileStatus fileStatus = fileSystem.getFileStatus(
         new Path(hdfsDirPath, name));
     return fileStatus.getModificationTime();
   }
   
   @Override
   public String[] listAll() throws IOException {
-    FileStatus[] listStatus = getFileSystem().listStatus(hdfsDirPath);
+    FileStatus[] listStatus = fileSystem.listStatus(hdfsDirPath);
     List<String> files = new ArrayList<>();
     if (listStatus == null) {
       return new String[] {};

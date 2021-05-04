@@ -41,6 +41,8 @@ import java.util.regex.Pattern;
  */
 public abstract class Evaluator {
 
+  private static final Pattern COMPILE = Pattern.compile("\\\\'");
+
   /**
    * Return a String after processing an expression and a {@link VariableResolver}
    *
@@ -65,7 +67,7 @@ public abstract class Evaluator {
    *
    * @return a List of objects which can either be a string, number or a variable wrapper
    */
-  protected List<Object> parseParams(String expression, VariableResolver vr) {
+  protected static List<Object> parseParams(String expression, VariableResolver vr) {
     List<Object> result = new ArrayList<>();
     expression = expression.trim();
     String[] ss = expression.split(",");
@@ -82,7 +84,7 @@ public abstract class Evaluator {
           sb.append(",");
         }
         String s = sb.substring(1, sb.length() - 1);
-        s = s.replaceAll("\\\\'", "'");
+        s = COMPILE.matcher(s).replaceAll("'");
         result.add(s);
       } else {
         if (Character.isDigit(ss[i].charAt(0))) {
@@ -104,7 +106,7 @@ public abstract class Evaluator {
     return result;
   }
 
-  protected VariableWrapper getVariableWrapper(String s, VariableResolver vr) {
+  protected static VariableWrapper getVariableWrapper(String s, VariableResolver vr) {
     return new VariableWrapper(s,vr);
   }
 

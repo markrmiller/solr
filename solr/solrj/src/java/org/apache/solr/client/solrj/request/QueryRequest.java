@@ -57,7 +57,7 @@ public class QueryRequest extends SolrRequest<QueryResponse> {
     if( qt == null ) {
       qt = super.getPath();
     }
-    if( qt != null && qt.startsWith( "/" ) ) {
+    if(qt != null && !qt.isEmpty() && qt.charAt(0) == '/') {
       return qt;
     }
     return "/select";

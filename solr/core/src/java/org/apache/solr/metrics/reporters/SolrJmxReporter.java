@@ -45,16 +45,16 @@ public class SolrJmxReporter extends FilteringSolrMetricReporter {
 
   private static final ReporterClientCache<MBeanServer> serviceRegistry = new ReporterClientCache<>();
 
-  private String domain;
-  private String agentId;
-  private String serviceUrl;
-  private String rootName;
+  private volatile String domain;
+  private volatile String agentId;
+  private volatile String serviceUrl;
+  private volatile String rootName;
 
-  private MetricRegistry registry;
-  private MBeanServer mBeanServer;
-  private JmxMetricsReporter reporter;
-  private String instanceTag;
-  private boolean started;
+  private volatile MetricRegistry registry;
+  private volatile MBeanServer mBeanServer;
+  private volatile JmxMetricsReporter reporter;
+  private volatile String instanceTag;
+  private volatile boolean started;
 
   /**
    * Creates a new instance of {@link SolrJmxReporter}.
@@ -122,7 +122,7 @@ public class SolrJmxReporter extends FilteringSolrMetricReporter {
    * Stops the reporter from publishing metrics.
    */
   @Override
-  public synchronized void close() {
+  public void close() {
     log.info("Closing reporter {} for registry {}/{}", this, registryName, registry);
     started = false;
     if (reporter != null) {

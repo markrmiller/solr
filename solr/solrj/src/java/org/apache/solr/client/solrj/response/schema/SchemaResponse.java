@@ -81,7 +81,6 @@ public class SchemaResponse extends SolrResponseBase {
     return analyzerDefinition;
   }
 
-  @SuppressWarnings("unchecked")
   private static FieldTypeDefinition createFieldTypeDefinition(NamedList<Object> fieldTypeNamedList) {
     FieldTypeDefinition fieldTypeDefinition = new FieldTypeDefinition();
     fillFieldTypeDefinition(fieldTypeDefinition, fieldTypeNamedList);
@@ -224,9 +223,7 @@ public class SchemaResponse extends SolrResponseBase {
     return fieldTypeRepresentations;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public void setResponse(NamedList<Object> response) {
+  @Override public void setResponse(NamedList<Object> response) {
     super.setResponse(response);
 
     Map schemaObj = (Map) response.get("schema");
@@ -240,9 +237,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class SchemaNameResponse extends SolrResponseBase {
     private String schemaName;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       schemaName = SchemaResponse.getSchemaName(response.asShallowMap());
@@ -257,9 +252,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class SchemaVersionResponse extends SolrResponseBase {
     private float schemaVersion;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       schemaVersion = SchemaResponse.getSchemaVersion(response.asShallowMap());
@@ -292,9 +285,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class FieldsResponse extends SolrResponseBase {
     List<Map<String, Object>> fields;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       fields = SchemaResponse.getFields(response.asShallowMap());
@@ -326,9 +317,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class DynamicFieldsResponse extends SolrResponseBase {
     List<Map<String, Object>> dynamicFields;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       dynamicFields = SchemaResponse.getDynamicFields(response.asMap(3));
@@ -342,9 +331,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class UniqueKeyResponse extends SolrResponseBase {
     private String uniqueKey;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       uniqueKey = SchemaResponse.getSchemaUniqueKey(response.asShallowMap());
@@ -358,9 +345,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class GlobalSimilarityResponse extends SolrResponseBase {
     Map<String, Object> similarity;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       similarity = SchemaResponse.getSimilarity(response.asShallowMap());
@@ -375,9 +360,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class CopyFieldsResponse extends SolrResponseBase {
     List<Map<String, Object>> copyFields;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       copyFields = SchemaResponse.getCopyFields(response.asShallowMap());
@@ -409,9 +392,7 @@ public class SchemaResponse extends SolrResponseBase {
   public static class FieldTypesResponse extends SolrResponseBase {
     List<FieldTypeRepresentation> fieldTypes;
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
 
       fieldTypes = SchemaResponse.getFieldTypeRepresentations(response.asShallowMap());
@@ -423,9 +404,7 @@ public class SchemaResponse extends SolrResponseBase {
   }
 
   public static class UpdateResponse extends SolrResponseBase {
-    @Override
-    @SuppressWarnings("unchecked")
-    public void setResponse(NamedList<Object> response) {
+    @Override public void setResponse(NamedList<Object> response) {
       super.setResponse(response);
     }
   }

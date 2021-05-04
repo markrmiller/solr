@@ -67,9 +67,7 @@ public class IntMultiTrieField extends AnalyticsField implements CastingIntValue
 
   private void resizeValues() {
     int[] newValues = new int[values.length*2];
-    for (int i = 0; i < count; ++i) {
-      newValues[i] = values[i];
-    }
+    if (count >= 0) System.arraycopy(values, 0, newValues, 0, count);
     values = newValues;
   }
 
@@ -81,7 +79,7 @@ public class IntMultiTrieField extends AnalyticsField implements CastingIntValue
   }
   @Override
   public void streamLongs(LongConsumer cons) {
-    streamInts(value -> cons.accept((long)value));
+    streamInts(value -> cons.accept(value));
   }
   @Override
   public void streamFloats(FloatConsumer cons) {
@@ -89,7 +87,7 @@ public class IntMultiTrieField extends AnalyticsField implements CastingIntValue
   }
   @Override
   public void streamDoubles(DoubleConsumer cons) {
-    streamInts(value -> cons.accept((double)value));
+    streamInts(value -> cons.accept(value));
   }
   @Override
   public void streamStrings(Consumer<String> cons) {

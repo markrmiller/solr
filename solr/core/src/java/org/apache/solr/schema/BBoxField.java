@@ -112,7 +112,7 @@ public class BBoxField extends AbstractSpatialFieldType<BBoxStrategy> implements
   }
 
   // note: Registering the field is probably optional; it makes it show up in the schema browser and may have other
-  //  benefits.
+  //  benefits. (AND IS ILLEGAL)
   private void register(IndexSchema schema, String name, FieldType fieldType) {
     int props = fieldType.properties;
     if(storeSubFields) {
@@ -121,8 +121,9 @@ public class BBoxField extends AbstractSpatialFieldType<BBoxStrategy> implements
     else {
       props &= ~STORED;
     }
-    SchemaField sf = new SchemaField(name, fieldType, props, null);
-    schema.getFields().put(sf.getName(), sf);
+   // SchemaField sf = new SchemaField(name, fieldType, props, null);
+   // schema.getFields().put(sf.getName(), sf);
+
   }
 
   @Override

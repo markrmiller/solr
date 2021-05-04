@@ -17,7 +17,9 @@
 package org.apache.solr.handler.dataimport;
 
 import junit.framework.Assert;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.util.SuppressForbidden;
+import org.apache.solr.util.TestHarness;
 import org.junit.After;
 import org.junit.Before;
 import org.slf4j.Logger;
@@ -67,7 +69,7 @@ public abstract class AbstractSqlEntityProcessorTestCase extends
   
   @Before
   public void beforeSqlEntitiyProcessorTestCase() throws Exception {
-    File tmpdir = createTempDir().toFile();
+    File tmpdir = SolrTestUtil.createTempDir().toFile();
     fileLocation = tmpdir.getPath();
     fileName = "the.properties";
   } 
@@ -121,7 +123,7 @@ public abstract class AbstractSqlEntityProcessorTestCase extends
   protected abstract String deltaQueriesPersonTable();
   
   protected void singleEntity(int numToExpect) throws Exception {
-    h.query("/dataimport", generateRequest());
+    TestHarness.query("/dataimport", generateRequest());
     assertQ("There should be 1 document per person in the database: "
         + totalPeople(), req("*:*"), "//*[@numFound='" + totalPeople() + "']");
     Assert.assertTrue("Expecting " + numToExpect
@@ -131,7 +133,7 @@ public abstract class AbstractSqlEntityProcessorTestCase extends
   
   protected void simpleTransform(int numToExpect) throws Exception {
     rootTransformerName = "AddAColumnTransformer";
-    h.query("/dataimport", generateRequest());
+    TestHarness.query("/dataimport", generateRequest());
     assertQ(
         "There should be 1 document with a transformer-added column per person is the database: "
             + totalPeople(), req("AddAColumn_s:Added"), "//*[@numFound='"
@@ -149,7 +151,7 @@ public abstract class AbstractSqlEntityProcessorTestCase extends
   protected void complexTransform(int numToExpect, int numDeleted)
       throws Exception {
     rootTransformerName = "TripleThreatTransformer";
-    h.query("/dataimport", generateRequest());
+    TestHarness.query("/dataimport", generateRequest());
     int totalDocs = ((totalPeople() * 3) + (numDeleted * 2));
     int totalAddedDocs = (totalPeople() + numDeleted);
     assertQ(
@@ -224,7 +226,7 @@ public abstract class AbstractSqlEntityProcessorTestCase extends
         }
       }
     }
-    h.query("/dataimport", generateRequest());
+    TestHarness.query("/dataimport", generateRequest());
     
     assertQ("There should be 1 document per person in the database: "
         + totalPeople(), req("*:*"), "//*[@numFound='" + (totalPeople()) + "']");
@@ -307,7 +309,7 @@ public abstract class AbstractSqlEntityProcessorTestCase extends
     sportsCached = true;
     int dbRequestsMoreThan = 3;
     int dbRequestsLessThan = totalPeople() * 2 + 1;
-    h.query("/dataimport", generateRequest());
+    TestHarness.query("/dataimport", generateRequest());
     assertQ(req("*:*"), "//*[@numFound='" + (totalPeople()) + "']");
     if (!underlyingDataModified
         || (personNameExists("Samantha") && "Nauru"

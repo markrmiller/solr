@@ -57,14 +57,15 @@ public class EmbeddedSolrNoSerializeTest extends SolrTestCaseJ4 {
   static EmbeddedSolrServer solrServer;
 
   @BeforeClass
-  public static void init() throws Exception {
+  public static void beforeEmbeddedSolrNoSerializeTest() throws Exception {
     initCore("solrconfig-tagger.xml", "schema-tagger.xml");
     solrServer = new EmbeddedSolrServer(h.getCoreContainer(), "collection1");
     //we don't need to close the EmbeddedSolrServer because SolrTestCaseJ4 closes the core
   }
 
   @AfterClass
-  public static void cleanUpAfterClass() throws Exception {
+  public static void afterEmbeddedSolrNoSerializeTest() throws Exception {
+    deleteCore();
     solrServer = null;
   }
 

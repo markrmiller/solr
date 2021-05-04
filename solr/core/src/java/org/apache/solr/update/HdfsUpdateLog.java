@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
@@ -32,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.lucene.util.BytesRef;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.IOUtils;
@@ -150,7 +152,8 @@ public class HdfsUpdateLog extends UpdateLog {
           try {
             Thread.sleep(5000);
           } catch (InterruptedException e1) {
-            Thread.interrupted();
+            ParWork.propagateInterrupt(e);
+            break;
           }
           continue;
         }
@@ -219,7 +222,7 @@ public class HdfsUpdateLog extends UpdateLog {
     // TODO: these startingVersions assume that we successfully recover from all
     // non-complete tlogs.
     try (RecentUpdates startingUpdates = getRecentUpdates()) {
-      startingVersions = startingUpdates.getVersions(getNumRecordsToKeep());
+      startingVersions = Collections.unmodifiableList(startingUpdates.getVersions(getNumRecordsToKeep()));
 
       // populate recent deletes list (since we can't get that info from the
       // index)
@@ -378,13 +381,7 @@ public class HdfsUpdateLog extends UpdateLog {
   
   public String[] getLogList(Path tlogDir) throws FileNotFoundException, IOException {
     final String prefix = TLOG_NAME+'.';
-    FileStatus[] files = fs.listStatus(tlogDir, new PathFilter() {
-      
-      @Override
-      public boolean accept(Path name) {
-        return name.getName().startsWith(prefix);
-      }
-    });
+    FileStatus[] files = fs.listStatus(tlogDir, new MyPathFilter(prefix));
     List<String> fileList = new ArrayList<>(files.length);
     for (FileStatus file : files) {
       fileList.add(file.getPath().getName());
@@ -428,5 +425,18 @@ public class HdfsUpdateLog extends UpdateLog {
   public String toString() {
     return "HDFSUpdateLog{state=" + getState() + ", tlog=" + tlog + "}";
   }
-  
+
+  private static class MyPathFilter implements PathFilter {
+
+    private final String prefix;
+
+    public MyPathFilter(String prefix) {
+      this.prefix = prefix;
+    }
+
+    @Override
+    public boolean accept(Path name) {
+      return name.getName().startsWith(prefix);
+    }
+  }
 }

@@ -32,22 +32,31 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.Directory;
-import org.junit.BeforeClass;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
+import org.junit.After;
+import org.junit.Before;
 
 /**
  * Tests {@link SweetSpotSimilarityFactory}
  */
 public class TestSweetSpotSimilarityFactory extends BaseSimilarityTestCase {
-  @BeforeClass
-  public static void beforeClass() throws Exception {
+
+  @Before
+  public void beforeTestSweetSpotSimilarityFactory() throws Exception {
     initCore("solrconfig-basic.xml","schema-sweetspot.xml");
+  }
+
+  @After
+  public void afterTestSweetSpotSimilarityFactory() {
+    deleteCore();
   }
 
   private static float computeNorm(Similarity sim, int length) throws IOException {
     String value = IntStream.range(0, length).mapToObj(i -> "a").collect(Collectors.joining(" "));
-    Directory dir = newDirectory();
-    IndexWriter w = new IndexWriter(dir, newIndexWriterConfig().setSimilarity(sim));
-    w.addDocument(Collections.singleton(newTextField("foo", value, Store.NO)));
+    Directory dir = SolrTestUtil.newDirectory();
+    IndexWriter w = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig().setSimilarity(sim));
+    w.addDocument(Collections.singleton(LuceneTestCase.newTextField("foo", value, Store.NO)));
     DirectoryReader reader = DirectoryReader.open(w);
     w.close();
     IndexSearcher searcher = new IndexSearcher(reader);

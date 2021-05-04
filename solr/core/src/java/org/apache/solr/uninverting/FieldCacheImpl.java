@@ -61,6 +61,7 @@ import org.apache.lucene.util.packed.PackedLongValues;
  */
 public class FieldCacheImpl implements FieldCache {
 
+  public static final CacheEntry[] EMPTY_CACHE_ENTRIES = new CacheEntry[0];
   private Map<Class<?>,Cache> caches;
   FieldCacheImpl() {
     init();
@@ -107,7 +108,7 @@ public class FieldCacheImpl implements FieldCache {
         }
       }
     }
-    return result.toArray(new CacheEntry[result.size()]);
+    return result.toArray(EMPTY_CACHE_ENTRIES);
   }
 
   // per-segment fieldcaches don't purge until the shared core closes.
@@ -456,7 +457,7 @@ public class FieldCacheImpl implements FieldCache {
       }
     }
 
-    private BitsEntry createValueDocValues(LeafReader reader, String field) throws IOException {
+    private static BitsEntry createValueDocValues(LeafReader reader, String field) throws IOException {
       FieldInfo fieldInfo = reader.getFieldInfos().fieldInfo(field);
       
       DocValuesType dvType = fieldInfo.getDocValuesType();
@@ -493,7 +494,7 @@ public class FieldCacheImpl implements FieldCache {
       return new BitsEntry(bits);
     }
 
-    private BitsEntry createValuePoints(LeafReader reader, String field) throws IOException {
+    private static BitsEntry createValuePoints(LeafReader reader, String field) throws IOException {
       final int maxDoc = reader.maxDoc();
       PointValues values = reader.getPointValues(field);
       assert values != null;
@@ -507,24 +508,13 @@ public class FieldCacheImpl implements FieldCache {
       }
       
       // otherwise a no-op uninvert!
-      Uninvert u = new Uninvert(true) {
-        @Override
-        protected TermsEnum termsEnum(Terms terms) throws IOException {
-          throw new AssertionError();
-        }
-
-        @Override
-        protected void visitTerm(BytesRef term) {}
-
-        @Override
-        protected void visitDoc(int docID) {}
-      };
+      Uninvert u = new MyUninvert();
       u.uninvert(reader, field);
       return new BitsEntry(u.docsWithField);
     }
     
     // TODO: it is dumb that uninverting code is duplicated here in this method!!
-    private BitsEntry createValuePostings(LeafReader reader, String field) throws IOException {
+    private static BitsEntry createValuePostings(LeafReader reader, String field) throws IOException {
       final int maxDoc = reader.maxDoc();
 
       // Visit all docs that have terms for this field
@@ -570,6 +560,23 @@ public class FieldCacheImpl implements FieldCache {
         return new BitsEntry(new Bits.MatchAllBits(maxDoc));
       }
       return new BitsEntry(res);
+    }
+
+    private static class MyUninvert extends Uninvert {
+      public MyUninvert() {
+        super(true);
+      }
+
+      @Override
+      protected TermsEnum termsEnum(Terms terms) throws IOException {
+        throw new AssertionError();
+      }
+
+      @Override
+      protected void visitTerm(BytesRef term) {}
+
+      @Override
+      protected void visitDoc(int docID) {}
     }
   }
 
@@ -707,46 +714,7 @@ public class FieldCacheImpl implements FieldCache {
 
       final HoldsOneThing<GrowableWriterAndMinValue> valuesRef = new HoldsOneThing<>();
 
-      Uninvert u = new Uninvert(parser instanceof PointParser) {
-          private long minValue;
-          private long currentValue;
-          private GrowableWriter values;
-
-          @Override
-          public void visitTerm(BytesRef term) {
-            currentValue = parser.parseValue(term);
-            if (values == null) {
-              // Lazy alloc so for the numeric field case
-              // (which will hit a NumberFormatException
-              // when we first try the DEFAULT_INT_PARSER),
-              // we don't double-alloc:
-              int startBitsPerValue;
-              // Make sure than missing values (0) can be stored without resizing
-              if (currentValue < 0) {
-                minValue = currentValue;
-                startBitsPerValue = minValue == Long.MIN_VALUE ? 64 : PackedInts.bitsRequired(-minValue);
-              } else {
-                minValue = 0;
-                startBitsPerValue = PackedInts.bitsRequired(currentValue);
-              }
-              values = new GrowableWriter(startBitsPerValue, reader.maxDoc(), PackedInts.FAST);
-              if (minValue != 0) {
-                values.fill(0, values.size(), -minValue); // default value must be 0
-              }
-              valuesRef.set(new GrowableWriterAndMinValue(values, minValue));
-            }
-          }
-
-          @Override
-          public void visitDoc(int docID) {
-            values.set(docID, currentValue - minValue);
-          }
-          
-          @Override
-          protected TermsEnum termsEnum(Terms terms) throws IOException {
-            return parser.termsEnum(terms);
-          }
-        };
+      Uninvert u = new MyUninvert2(parser, reader, valuesRef);
 
       u.uninvert(reader, key.field);
       wrapper.setDocsWithField(reader, key.field, u.docsWithField, parser);
@@ -756,6 +724,57 @@ public class FieldCacheImpl implements FieldCache {
         return new LongsFromArray(key.field, new PackedInts.NullReader(reader.maxDoc()), 0L, docsWithField);
       }
       return new LongsFromArray(key.field, values.writer.getMutable(), values.minValue, docsWithField);
+    }
+
+    private static class MyUninvert2 extends Uninvert {
+      private final Parser parser;
+      private final LeafReader reader;
+      private final HoldsOneThing<GrowableWriterAndMinValue> valuesRef;
+      private long minValue;
+      private long currentValue;
+      private GrowableWriter values;
+
+      public MyUninvert2(Parser parser, LeafReader reader, HoldsOneThing<GrowableWriterAndMinValue> valuesRef) {
+        super(parser instanceof PointParser);
+        this.parser = parser;
+        this.reader = reader;
+        this.valuesRef = valuesRef;
+      }
+
+      @Override
+      public void visitTerm(BytesRef term) {
+        currentValue = parser.parseValue(term);
+        if (values == null) {
+          // Lazy alloc so for the numeric field case
+          // (which will hit a NumberFormatException
+          // when we first try the DEFAULT_INT_PARSER),
+          // we don't double-alloc:
+          int startBitsPerValue;
+          // Make sure than missing values (0) can be stored without resizing
+          if (currentValue < 0) {
+            minValue = currentValue;
+            startBitsPerValue = minValue == Long.MIN_VALUE ? 64 : PackedInts.bitsRequired(-minValue);
+          } else {
+            minValue = 0;
+            startBitsPerValue = PackedInts.bitsRequired(currentValue);
+          }
+          values = new GrowableWriter(startBitsPerValue, reader.maxDoc(), PackedInts.FAST);
+          if (minValue != 0) {
+            values.fill(0, values.size(), -minValue); // default value must be 0
+          }
+          valuesRef.set(new GrowableWriterAndMinValue(values, minValue));
+        }
+      }
+
+      @Override
+      public void visitDoc(int docID) {
+        values.set(docID, currentValue - minValue);
+      }
+
+      @Override
+      protected TermsEnum termsEnum(Terms terms) throws IOException {
+        return parser.termsEnum(terms);
+      }
     }
   }
 
@@ -860,8 +879,7 @@ public class FieldCacheImpl implements FieldCache {
     public long ramBytesUsed() {
       return bytes.ramBytesUsed() + 
              termOrdToBytesOffset.ramBytesUsed() + 
-             docToTermOrd.ramBytesUsed() + 
-             3*RamUsageEstimator.NUM_BYTES_OBJECT_REF +
+             docToTermOrd.ramBytesUsed() + 3L *RamUsageEstimator.NUM_BYTES_OBJECT_REF +
              Integer.BYTES;
     }
     
@@ -1056,7 +1074,7 @@ public class FieldCacheImpl implements FieldCache {
 
     @Override
     public long ramBytesUsed() {
-      return bytes.ramBytesUsed() + docToOffset.ramBytesUsed() + 2*RamUsageEstimator.NUM_BYTES_OBJECT_REF;
+      return bytes.ramBytesUsed() + docToOffset.ramBytesUsed() + 2L *RamUsageEstimator.NUM_BYTES_OBJECT_REF;
     }
 
     @Override
@@ -1175,21 +1193,31 @@ public class FieldCacheImpl implements FieldCache {
       }
 
       final PackedInts.Reader offsetReader = docToOffset.getMutable();
-      Bits docsWithField = new Bits() {
-        @Override
-        public boolean get(int index) {
-          return offsetReader.get(index) != 0;
-        }
-
-        @Override
-        public int length() {
-          return maxDoc;
-        }
-      };
+      Bits docsWithField = new MyBits(offsetReader, maxDoc);
 
       wrapper.setDocsWithField(reader, key.field, docsWithField, null);
       // maybe an int-only impl?
       return new BinaryDocValuesImpl(bytes.freeze(true), offsetReader, docsWithField);
+    }
+
+    private static class MyBits implements Bits {
+      private final PackedInts.Reader offsetReader;
+      private final int maxDoc;
+
+      public MyBits(PackedInts.Reader offsetReader, int maxDoc) {
+        this.offsetReader = offsetReader;
+        this.maxDoc = maxDoc;
+      }
+
+      @Override
+      public boolean get(int index) {
+        return offsetReader.get(index) != 0;
+      }
+
+      @Override
+      public int length() {
+        return maxDoc;
+      }
     }
   }
 

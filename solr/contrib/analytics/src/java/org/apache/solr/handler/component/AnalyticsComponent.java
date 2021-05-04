@@ -162,7 +162,7 @@ public class AnalyticsComponent extends SearchComponent {
     return "Perform analytics";
   }
 
-  private AnalyticsRequestManager getAnalyticsRequestManager(ResponseBuilder rb) {
+  private static AnalyticsRequestManager getAnalyticsRequestManager(ResponseBuilder rb) {
     return (AnalyticsRequestManager)rb.getAnalyticsRequestManager();
   }
 

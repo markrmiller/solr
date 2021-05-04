@@ -30,8 +30,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
  */
 public class RAMDirectoryFactory extends EphemeralDirectoryFactory {
 
-  @Override
-  protected LockFactory createLockFactory(String rawLockType) throws IOException {
+  @Override public LockFactory createLockFactory(String rawLockType) {
     if (!(rawLockType == null || DirectoryFactory.LOCK_TYPE_SINGLE.equalsIgnoreCase(rawLockType.trim()))) {
       throw new SolrException(ErrorCode.FORBIDDEN,
           "RAMDirectory can only be used with the '" +
@@ -40,8 +39,11 @@ public class RAMDirectoryFactory extends EphemeralDirectoryFactory {
     return new SingleInstanceLockFactory();
   }
 
-  @Override
-  protected Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
+  @Override public void release(String directory) throws IOException {
+
+  }
+
+  @Override public Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
     return new ByteBuffersDirectory(lockFactory);
   }
 }

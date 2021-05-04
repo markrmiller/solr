@@ -25,6 +25,7 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.index.MultiDocValues.MultiSortedDocValues;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.Version;
+import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * This class forces a composite reader (eg a {@link
@@ -52,7 +53,7 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   // also have a cached FieldInfos instance so this is consistent. SOLR-12878
   private final FieldInfos fieldInfos;
 
-  final Map<String,Terms> cachedTerms = new ConcurrentHashMap<>();
+  final Map<String,Terms> cachedTerms = new NonBlockingHashMap<>(64);
 
   // TODO: consider ConcurrentHashMap ?
   // TODO: this could really be a weak map somewhere else on the coreCacheKey,
@@ -115,15 +116,28 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   public Terms terms(String field) throws IOException {
     ensureOpen();
     try {
-      return cachedTerms.computeIfAbsent(field, f -> {
-        try {
-          return MultiTerms.getTerms(in, f);
-        } catch (IOException e) { // yuck!  ...sigh... checked exceptions with built-in lambdas are a pain
-          throw new RuntimeException("unwrapMe", e);
-        }
-      });
+
+      Terms ct = cachedTerms.get(field);
+      if (ct != null) {
+        return ct;
+      }
+
+      Terms nt = MultiTerms.getTerms(in, field);
+      if (nt == null) {
+        return null;
+      }
+      cachedTerms.put(field, nt);
+      return nt;
+
+      //      return cachedTerms.computeIfAbsent(field, f -> {
+      //        try {
+      //          return MultiTerms.getTerms(in, f);
+      //        } catch (IOException e) { // yuck!  ...sigh... checked exceptions with built-in lambdas are a pain
+      //          throw new RuntimeException("unwrapMe", e);
+      //        }
+      //      });
     } catch (RuntimeException e) {
-      if (e.getMessage().equals("unwrapMe") && e.getCause() instanceof IOException) {
+      if (e.getMessage() != null && e.getCause() != null && e.getMessage().equals("unwrapMe") && e.getCause() instanceof IOException) {
         throw (IOException) e.getCause();
       }
       throw e;

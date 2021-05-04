@@ -68,7 +68,7 @@ public class SolrDocumentList extends ArrayList<SolrDocument>
   @Override
   public String toString() {
     return "{numFound="+numFound
-            +",numFoundExact="+String.valueOf(numFoundExact)
+            +",numFoundExact="+ numFoundExact
             +",start="+start
             + (maxScore!=null ? ",maxScore="+maxScore : "")
             +",docs="+super.toString()

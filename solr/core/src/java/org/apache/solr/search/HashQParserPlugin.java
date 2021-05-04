@@ -84,9 +84,9 @@ public class HashQParserPlugin extends QParserPlugin {
 
   private static class HashQuery extends ExtendedQueryBase implements PostFilter {
 
-    private String[] keys;
-    private int workers;
-    private int worker;
+    private final String[] keys;
+    private final int workers;
+    private final int worker;
 
     public boolean getCache() {
       if(getCost() > 99) {
@@ -98,7 +98,7 @@ public class HashQParserPlugin extends QParserPlugin {
 
     public int hashCode() {
       return classHash() + 
-          31 * keys.hashCode() +
+          31 * Arrays.hashCode(keys) +
           31 * workers + 
           31 * worker;
     }
@@ -110,7 +110,7 @@ public class HashQParserPlugin extends QParserPlugin {
 
     private boolean equalsTo(HashQuery other) {
       return keys.equals(other.keys) &&
-             workers == other.workers && 
+             workers == other.workers &&
              worker == other.worker;
     }
 
@@ -149,7 +149,7 @@ public class HashQParserPlugin extends QParserPlugin {
     }
 
     public static class BitsFilter extends Filter {
-      private FixedBitSet[] bitSets;
+      private final FixedBitSet[] bitSets;
       public BitsFilter(FixedBitSet[] bitSets) {
         this.bitSets = bitSets;
       }
@@ -182,9 +182,9 @@ public class HashQParserPlugin extends QParserPlugin {
     static class SegmentPartitioner implements Runnable {
 
       public LeafReaderContext context;
-      private int worker;
-      private int workers;
-      private HashKey k;
+      private final int worker;
+      private final int workers;
+      private final HashKey k;
       public FixedBitSet docs;
       public SegmentPartitioner(LeafReaderContext context,
                                 int worker,

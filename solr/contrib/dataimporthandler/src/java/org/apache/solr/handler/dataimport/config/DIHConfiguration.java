@@ -123,7 +123,7 @@ public class DIHConfiguration {
     }
   }
 
-  private Map<String,EntityField> gatherAllFields(DataImporter di, Entity e) {
+  private static Map<String,EntityField> gatherAllFields(DataImporter di, Entity e) {
     Map<String,EntityField> fields = new HashMap<>();
     if (e.getFields() != null) {
       for (EntityField f : e.getFields()) {

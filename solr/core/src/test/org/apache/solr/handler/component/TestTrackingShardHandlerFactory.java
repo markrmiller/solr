@@ -16,43 +16,49 @@
  */
 package org.apache.solr.handler.component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.solr.BaseDistributedSearchTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.cloud.AbstractFullDistribZkTestBase;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.cloud.SolrCloudBridgeTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.core.CoreContainer;
+import org.junit.BeforeClass;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Test for {@link org.apache.solr.handler.component.TrackingShardHandlerFactory}
  * See SOLR-7147 for more information
  */
 @SolrTestCaseJ4.SuppressSSL
-public class TestTrackingShardHandlerFactory extends AbstractFullDistribZkTestBase {
+public class TestTrackingShardHandlerFactory extends SolrCloudBridgeTestCase {
 
   public TestTrackingShardHandlerFactory() {
+
     schemaString = "schema15.xml"; // we need a string id
+    solrconfigString = "solrconfig.xml";
+    solrxmlString = "solr-trackingshardhandler.xml";
+    uploadSelectCollection1Config = true;
+    createControl = false;
+    numJettys = 2;
+    createCollection1 = false;
   }
 
-  @Override
-  protected String getSolrXml() {
-    return "solr-trackingshardhandler.xml";
+  @BeforeClass
+  public static void beforeTestTrackingShardHandlerFactory() throws Exception {
+    System.setProperty("solr.suppressDefaultConfigBootstrap", "false");
   }
 
   @Test
-  @BaseDistributedSearchTestCase.ShardsFixed(num = 2)
   public void testRequestTracking() throws Exception {
     String collectionName = "testTwoPhase";
 
-    List<JettySolrRunner> runners = new ArrayList<>(jettys);
-    runners.add(controlJetty);
+    List<JettySolrRunner> runners = new ArrayList<>(cluster.getJettySolrRunners());
+
 
     TrackingShardHandlerFactory.RequestTrackingQueue trackingQueue = new TrackingShardHandlerFactory.RequestTrackingQueue();
     TrackingShardHandlerFactory.setTrackingQueue(runners, trackingQueue);
@@ -66,15 +72,13 @@ public class TestTrackingShardHandlerFactory extends AbstractFullDistribZkTestBa
       assertSame(trackingQueue, trackingShardHandlerFactory.getTrackingQueue());
     }
 
-    createCollection(collectionName, "conf1", 2, 1, 1);
-
-    waitForRecoveriesToFinish(collectionName, true);
+    createCollection(collectionName, 2, 1);
 
     List<TrackingShardHandlerFactory.ShardRequestAndParams> coreAdminRequests = trackingQueue.getCoreAdminRequests();
     assertNotNull(coreAdminRequests);
     assertEquals("Unexpected number of core admin requests were found", 2, coreAdminRequests.size());
 
-    CloudSolrClient client = cloudClient;
+    CloudHttp2SolrClient client = cloudClient;
 
     client.setDefaultCollection(collectionName);
         /*
@@ -92,14 +96,14 @@ public class TestTrackingShardHandlerFactory extends AbstractFullDistribZkTestBa
 
     client.query(new SolrQuery("*:*"));
 
-    TrackingShardHandlerFactory.ShardRequestAndParams getTopIdsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "shard1", ShardRequest.PURPOSE_GET_TOP_IDS);
+    TrackingShardHandlerFactory.ShardRequestAndParams getTopIdsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "s1", ShardRequest.PURPOSE_GET_TOP_IDS);
     assertNotNull(getTopIdsRequest);
-    getTopIdsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "shard2", ShardRequest.PURPOSE_GET_TOP_IDS);
+    getTopIdsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "s2", ShardRequest.PURPOSE_GET_TOP_IDS);
     assertNotNull(getTopIdsRequest);
 
-    TrackingShardHandlerFactory.ShardRequestAndParams getFieldsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "shard1", ShardRequest.PURPOSE_GET_FIELDS);
+    TrackingShardHandlerFactory.ShardRequestAndParams getFieldsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "s1", ShardRequest.PURPOSE_GET_FIELDS);
     assertNotNull(getFieldsRequest);
-    getFieldsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "shard2", ShardRequest.PURPOSE_GET_FIELDS);
+    getFieldsRequest = trackingQueue.getShardRequestByPurpose(client.getZkStateReader(), collectionName, "s2", ShardRequest.PURPOSE_GET_FIELDS);
     assertNotNull(getFieldsRequest);
 
     int numRequests = 0;

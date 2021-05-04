@@ -30,6 +30,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.Query;
@@ -92,6 +93,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
    * Name of Carrot2 document's field containing Solr document's identifier.
    */
   private static final String SOLR_DOCUMENT_ID = "solrId";
+  private static final Pattern COMPILE = Pattern.compile("[, ]");
 
   /**
    * Name of Solr document's field containing the document's identifier. To avoid
@@ -209,7 +211,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
 
     SchemaField uniqueField = core.getLatestSchema().getUniqueKeyField();
     if (uniqueField == null) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, 
+      throw new SolrException(ErrorCode.SERVER_ERROR,
           CarrotClusteringEngine.class.getSimpleName() + " requires the schema to have a uniqueKeyField");
     }
     this.idFieldName = uniqueField.getName();
@@ -269,18 +271,18 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
    * content for clustering. Currently, there are two such fields: document
    * title and document content.
    */
-  private Set<String> getFieldsForClustering(SolrQueryRequest sreq) {
+  private static Set<String> getFieldsForClustering(SolrQueryRequest sreq) {
     SolrParams solrParams = sreq.getParams();
 
     String titleFieldSpec = solrParams.get(CarrotParams.TITLE_FIELD_NAME, "title");
     String snippetFieldSpec = solrParams.get(CarrotParams.SNIPPET_FIELD_NAME, titleFieldSpec);
     if (StringUtils.isBlank(snippetFieldSpec)) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, CarrotParams.SNIPPET_FIELD_NAME
+      throw new SolrException(ErrorCode.SERVER_ERROR, CarrotParams.SNIPPET_FIELD_NAME
               + " must not be blank.");
     }
     
     final Set<String> fields = new HashSet<>();
-    fields.addAll(Arrays.asList(titleFieldSpec.split("[, ]")));
+    fields.addAll(Arrays.asList(COMPILE.split(titleFieldSpec)));
     fields.addAll(Arrays.asList(snippetFieldSpec.split("[, ]")));
     return fields;
   }
@@ -332,12 +334,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
         args.put(HighlightParams.SIMPLE_POST, "");
         args.put(HighlightParams.FRAGSIZE, solrParams.getInt(CarrotParams.SUMMARY_FRAGSIZE, solrParams.getInt(HighlightParams.FRAGSIZE, 100)));
         args.put(HighlightParams.SNIPPETS, solrParams.getInt(CarrotParams.SUMMARY_SNIPPETS, solrParams.getInt(HighlightParams.SNIPPETS, 1)));
-        req = new LocalSolrQueryRequest(core, query.toString(), "", 0, 1, args) {
-          @Override
-          public SolrIndexSearcher getSearcher() {
-            return sreq.getSearcher();
-          }
-        };
+        req = new MyLocalSolrQueryRequest(core, query, args, sreq);
       } else {
         log.warn("No highlighter configured, cannot produce summary");
         produceSummary = false;
@@ -449,7 +446,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
    * Prepares a map of Solr field names (keys) to the corresponding Carrot2
    * custom field names.
    */
-  private Map<String, String> getCustomFieldsMap(SolrParams solrParams) {
+  private static Map<String, String> getCustomFieldsMap(SolrParams solrParams) {
     Map<String, String> customFields = new HashMap<>();
     String [] customFieldsSpec = solrParams.getParams(CarrotParams.CUSTOM_FIELD_NAME);
     if (customFieldsSpec != null) {
@@ -467,7 +464,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
     return customFields;
   }
 
-  private String getConcatenated(SolrDocument sdoc, String fieldsSpec) {
+  private static String getConcatenated(SolrDocument sdoc, String fieldsSpec) {
     StringBuilder result = new StringBuilder();
     for (String field : fieldsSpec.split("[, ]")) {
       Collection<Object> vals = sdoc.getFieldValues(field);
@@ -483,8 +480,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
     return result.toString().trim();
   }
 
-  private List<NamedList<Object>> clustersToNamedList(List<Cluster> carrotClusters,
-                                   SolrParams solrParams) {
+  private static List<NamedList<Object>> clustersToNamedList(List<Cluster> carrotClusters, SolrParams solrParams) {
     List<NamedList<Object>> result = new ArrayList<>();
     clustersToNamedList(carrotClusters, result, solrParams.getBool(
             CarrotParams.OUTPUT_SUB_CLUSTERS, true), solrParams.getInt(
@@ -492,8 +488,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
     return result;
   }
 
-  private void clustersToNamedList(List<Cluster> outputClusters,
-                                   List<NamedList<Object>> parent, boolean outputSubClusters, int maxLabels) {
+  private static void clustersToNamedList(List<Cluster> outputClusters, List<NamedList<Object>> parent, boolean outputSubClusters, int maxLabels) {
     for (Cluster outCluster : outputClusters) {
       NamedList<Object> cluster = new SimpleOrderedMap<>();
       parent.add(cluster);
@@ -537,8 +532,7 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
   /**
    * Extracts parameters that can possibly match some attributes of Carrot2 algorithms.
    */
-  private void extractCarrotAttributes(SolrParams solrParams,
-                                       Map<String, Object> attributes) {
+  private static void extractCarrotAttributes(SolrParams solrParams, Map<String,Object> attributes) {
     // Extract all non-predefined parameters. This way, we'll be able to set all
     // parameters of Carrot2 algorithms without defining their names as constants.
     for (Iterator<String> paramNames = solrParams.getParameterNamesIterator(); paramNames
@@ -562,4 +556,17 @@ public class CarrotClusteringEngine extends SearchClusteringEngine {
     }
   }
 
+  private static class MyLocalSolrQueryRequest extends LocalSolrQueryRequest {
+    private final SolrQueryRequest sreq;
+
+    public MyLocalSolrQueryRequest(SolrCore core, Query query, Map<String,Object> args, SolrQueryRequest sreq) {
+      super(core, query.toString(), "", 0, 1, args);
+      this.sreq = sreq;
+    }
+
+    @Override
+    public SolrIndexSearcher getSearcher() {
+      return sreq.getSearcher();
+    }
+  }
 }

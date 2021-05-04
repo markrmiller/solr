@@ -16,7 +16,32 @@
  */
 package org.apache.solr.core.snapshots;
 
-import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.lucene.util.TestUtil;
+import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.client.solrj.request.CollectionAdminRequest;
+import org.apache.solr.client.solrj.request.CoreAdminRequest.ListSnapshots;
+import org.apache.solr.client.solrj.response.CollectionAdminResponse;
+import org.apache.solr.client.solrj.response.RequestStatusState;
+import org.apache.solr.cloud.SolrCloudTestCase;
+import org.apache.solr.common.cloud.DocCollection;
+import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Replica.State;
+import org.apache.solr.common.cloud.Slice;
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.snapshots.CollectionSnapshotMetaData.CoreSnapshotMetaData;
+import org.apache.solr.core.snapshots.SolrSnapshotMetaDataManager.SnapshotMetaData;
+import org.apache.solr.handler.BackupRestoreUtils;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -27,34 +52,10 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.apache.lucene.util.TestUtil;
-import org.apache.lucene.util.LuceneTestCase.Slow;
-import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.request.CollectionAdminRequest;
-import org.apache.solr.client.solrj.request.CoreAdminRequest.ListSnapshots;
-import org.apache.solr.client.solrj.response.CollectionAdminResponse;
-import org.apache.solr.client.solrj.response.RequestStatusState;
-import org.apache.solr.cloud.AbstractDistribZkTestBase;
-import org.apache.solr.cloud.SolrCloudTestCase;
-import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Replica.State;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.core.snapshots.CollectionSnapshotMetaData.CoreSnapshotMetaData;
-import org.apache.solr.core.snapshots.SolrSnapshotMetaDataManager.SnapshotMetaData;
-import org.apache.solr.handler.BackupRestoreUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @SolrTestCaseJ4.SuppressSSL // Currently unknown why SSL does not work with this test
 @Slow
+@LuceneTestCase.Nightly
+@Ignore // MRM TODO: vet snapshots
 public class TestSolrCloudSnapshots extends SolrCloudTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static long docsSeed; // see indexDocs()
@@ -66,7 +67,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
   public static void setupClass() throws Exception {
     useFactory("solr.StandardDirectoryFactory");
     configureCluster(NUM_NODES)// nodes
-        .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
+        .addConfig("conf1", SolrTestUtil.TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
         .configure();
 
     docsSeed = random().nextLong();
@@ -80,9 +81,9 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
 
   @Test
   public void testSnapshots() throws Exception {
-    CloudSolrClient solrClient = cluster.getSolrClient();
+    CloudHttp2SolrClient solrClient = cluster.getSolrClient();
     String collectionName = "SolrCloudSnapshots";
-    CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collectionName, "conf1", NUM_SHARDS, NUM_REPLICAS);
+    CollectionAdminRequest.Create create = CollectionAdminRequest.createCollection(collectionName, "_default", NUM_SHARDS, NUM_REPLICAS);
     create.process(solrClient);
     cluster.waitForActiveCollection(collectionName, NUM_SHARDS, NUM_SHARDS * NUM_REPLICAS);
 
@@ -90,7 +91,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
     BackupRestoreUtils.verifyDocs(nDocs, solrClient, collectionName);
 
     // Set a collection property
-    final boolean collectionPropertySet = usually();
+    final boolean collectionPropertySet = LuceneTestCase.usually();
     if (collectionPropertySet) {
       CollectionAdminRequest.CollectionProp setProperty = CollectionAdminRequest.setCollectionProperty(collectionName, "test.property", "test.value");
       setProperty.process(solrClient);
@@ -99,7 +100,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
     String commitName = TestUtil.randomSimpleString(random(), 1, 5);
 
     // Verify if snapshot creation works with replica failures.
-    boolean replicaFailures = usually();
+    boolean replicaFailures = LuceneTestCase.usually();
     Optional<String> stoppedCoreName = Optional.empty();
     if (replicaFailures) {
       // Here the assumption is that Solr will spread the replicas uniformly across nodes.
@@ -115,7 +116,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
       for (Slice s : collState.getSlices()) {
         for (Replica replica : s.getReplicas()) {
           if (replica.getState() == State.DOWN) {
-            stoppedCoreName = Optional.of(replica.getCoreName());
+            stoppedCoreName = Optional.of(replica.getName());
           }
         }
       }
@@ -140,17 +141,17 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
     for ( Slice shard : collectionState.getActiveSlices() ) {
       assertEquals(2, shard.getReplicas().size());
       for (Replica replica : shard.getReplicas()) {
-        if (stoppedCoreName.isPresent() && stoppedCoreName.get().equals(replica.getCoreName())) {
+        if (stoppedCoreName.isPresent() && stoppedCoreName.get().equals(replica.getName())) {
           continue; // We know that the snapshot is not created for this replica.
         }
 
-        String replicaBaseUrl = replica.getStr(BASE_URL_PROP);
-        String coreName = replica.getStr(ZkStateReader.CORE_NAME_PROP);
+        String replicaBaseUrl = replica.getBaseUrl();
+        String coreName = replica.getName();
 
         assertTrue(snapshotByCoreName.containsKey(coreName));
         CoreSnapshotMetaData coreSnapshot = snapshotByCoreName.get(coreName);
 
-        try (SolrClient adminClient = getHttpSolrClient(replicaBaseUrl)) {
+        try (SolrClient adminClient = SolrTestCaseJ4.getHttpSolrClient(replicaBaseUrl)) {
           Collection<SnapshotMetaData> snapshots = listCoreSnapshots(adminClient, coreName);
           Optional<SnapshotMetaData> metaData = snapshots.stream().filter(x -> commitName.equals(x.getName())).findFirst();
           assertTrue("Snapshot not created for core " + coreName, metaData.isPresent());
@@ -167,7 +168,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
       BackupRestoreUtils.verifyDocs(0, solrClient, collectionName);
     }
 
-    String backupLocation = createTempDir().toFile().getAbsolutePath();
+    String backupLocation = SolrTestUtil.createTempDir().toFile().getAbsolutePath();
     String backupName = "mytestbackup";
     String restoreCollectionName = collectionName + "_restored";
 
@@ -196,8 +197,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
       } else {
         assertEquals(RequestStatusState.COMPLETED, restore.processAndWait(solrClient, 30));//async
       }
-      AbstractDistribZkTestBase.waitForRecoveriesToFinish(
-          restoreCollectionName, cluster.getSolrClient().getZkStateReader(), log.isDebugEnabled(), true, 30);
+
       BackupRestoreUtils.verifyDocs(nDocs, solrClient, restoreCollectionName);
     }
 
@@ -211,7 +211,7 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
 
     // Verify if the snapshot deletion works correctly when one or more replicas containing the snapshot are
     // deleted
-    boolean replicaDeletion = rarely();
+    boolean replicaDeletion = LuceneTestCase.rarely();
     if (replicaDeletion) {
       CoreSnapshotMetaData replicaToDelete = null;
       for (String shardId : meta.getShards()) {
@@ -226,13 +226,13 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
         collectionState = solrClient.getZkStateReader().getClusterState().getCollection(collectionName);
         for (Slice s : collectionState.getSlices()) {
           for (Replica r : s.getReplicas()) {
-            if (r.getCoreName().equals(replicaToDelete.getCoreName())) {
+            if (r.getName().equals(replicaToDelete.getCoreName())) {
               log.info("Deleting replica {}", r);
               CollectionAdminRequest.DeleteReplica delReplica = CollectionAdminRequest.deleteReplica(collectionName,
                   replicaToDelete.getShardId(), r.getName());
               delReplica.process(solrClient);
               // The replica deletion will cleanup the snapshot meta-data.
-              snapshotByCoreName.remove(r.getCoreName());
+              snapshotByCoreName.remove(r.getName());
               break;
             }
           }
@@ -244,20 +244,20 @@ public class TestSolrCloudSnapshots extends SolrCloudTestCase {
     CollectionAdminRequest.DeleteSnapshot deleteSnap = new CollectionAdminRequest.DeleteSnapshot(collectionName, commitName);
     deleteSnap.process(solrClient);
 
-    // Wait for a while so that the clusterstate.json updates are propagated to the client side.
+    // Wait for a while so that the cluster state updates are propagated to the client side.
     Thread.sleep(2000);
     collectionState = solrClient.getZkStateReader().getClusterState().getCollection(collectionName);
 
     for ( Slice shard : collectionState.getActiveSlices() ) {
       for (Replica replica : shard.getReplicas()) {
-        if (stoppedCoreName.isPresent() && stoppedCoreName.get().equals(replica.getCoreName())) {
+        if (stoppedCoreName.isPresent() && stoppedCoreName.get().equals(replica.getName())) {
           continue; // We know that the snapshot was not created for this replica.
         }
 
-        String replicaBaseUrl = replica.getStr(BASE_URL_PROP);
-        String coreName = replica.getStr(ZkStateReader.CORE_NAME_PROP);
+        String replicaBaseUrl = replica.getBaseUrl();
+        String coreName = replica.getName();
 
-        try (SolrClient adminClient = getHttpSolrClient(replicaBaseUrl)) {
+        try (SolrClient adminClient = SolrTestCaseJ4.getHttpSolrClient(replicaBaseUrl)) {
           Collection<SnapshotMetaData> snapshots = listCoreSnapshots(adminClient, coreName);
           Optional<SnapshotMetaData> metaData = snapshots.stream().filter(x -> commitName.equals(x.getName())).findFirst();
           assertFalse("Snapshot not deleted for core " + coreName, metaData.isPresent());

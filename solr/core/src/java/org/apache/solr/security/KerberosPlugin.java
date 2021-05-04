@@ -128,7 +128,7 @@ public class KerberosPlugin extends AuthenticationPlugin implements HttpClientBu
           putParam(params, "token.validity", DELEGATION_TOKEN_VALIDITY, "36000");
           params.put("zk-dt-secret-manager.enable", "true");
 
-          String chrootPath = zkHost.contains("/")? zkHost.substring(zkHost.indexOf("/")): "";
+          String chrootPath = zkHost.contains("/")? zkHost.substring(zkHost.indexOf('/')): "";
           String znodeWorkingPath = chrootPath + SecurityAwareZkACLProvider.SECURITY_ZNODE_PATH + "/zkdtsm";
           // Note - Curator complains if the znodeWorkingPath starts with /
           znodeWorkingPath = znodeWorkingPath.startsWith("/")? znodeWorkingPath.substring(1): znodeWorkingPath;
@@ -190,32 +190,12 @@ public class KerberosPlugin extends AuthenticationPlugin implements HttpClientBu
     }
     log.info("Params: {}", params);
 
-    FilterConfig conf = new FilterConfig() {
-      @Override
-      public ServletContext getServletContext() {
-        return servletContext;
-      }
-
-      @Override
-      public Enumeration<String> getInitParameterNames() {
-        return Collections.enumeration(params.keySet());
-      }
-
-      @Override
-      public String getInitParameter(String param) {
-        return params.get(param);
-      }
-
-      @Override
-      public String getFilterName() {
-        return "KerberosFilter";
-      }
-    };
+    FilterConfig conf = new MyFilterConfig(servletContext, params);
 
     return conf;
   }
 
-  private void putParam(Map<String, String> params, String internalParamName, String externalParamName, String defaultValue) {
+  private static void putParam(Map<String,String> params, String internalParamName, String externalParamName, String defaultValue) {
     String value = System.getProperty(externalParamName, defaultValue);
     if (value==null) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "Missing required parameter '"+externalParamName+"'.");
@@ -223,7 +203,7 @@ public class KerberosPlugin extends AuthenticationPlugin implements HttpClientBu
     params.put(internalParamName, value);
   }
 
-  private void putParamOptional(Map<String, String> params, String internalParamName, String externalParamName) {
+  private static void putParamOptional(Map<String,String> params, String internalParamName, String externalParamName) {
     String value = System.getProperty(externalParamName);
     if (value!=null) {
       params.put(internalParamName, value);
@@ -304,4 +284,34 @@ public class KerberosPlugin extends AuthenticationPlugin implements HttpClientBu
   protected Filter getKerberosFilter() { return kerberosFilter; }
 
   protected void setKerberosFilter(Filter kerberosFilter) { this.kerberosFilter = kerberosFilter; }
+
+  private static class MyFilterConfig implements FilterConfig {
+    private final ServletContext servletContext;
+    private final Map<String,String> params;
+
+    public MyFilterConfig(ServletContext servletContext, Map<String,String> params) {
+      this.servletContext = servletContext;
+      this.params = params;
+    }
+
+    @Override
+    public ServletContext getServletContext() {
+      return servletContext;
+    }
+
+    @Override
+    public Enumeration<String> getInitParameterNames() {
+      return Collections.enumeration(params.keySet());
+    }
+
+    @Override
+    public String getInitParameter(String param) {
+      return params.get(param);
+    }
+
+    @Override
+    public String getFilterName() {
+      return "KerberosFilter";
+    }
+  }
 }

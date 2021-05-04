@@ -22,6 +22,7 @@ import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.handler.dataimport.config.ConfigNameConstants;
 import org.apache.solr.util.RTimer;
 import org.apache.tika.Tika;
+import org.apache.tika.metadata.HttpHeaders;
 import org.apache.tika.metadata.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,11 +54,9 @@ import com.sun.mail.gimap.GmailRawSearchTerm;
  * @since solr 1.4
  */
 public class MailEntityProcessor extends EntityProcessorBase {
-  
-  private static final SimpleDateFormat sinceDateParser = 
-      new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
-  private static final SimpleDateFormat afterFmt = 
-      new SimpleDateFormat("yyyy/MM/dd", Locale.ROOT);
+
+  private static ThreadLocal<SimpleDateFormat> sinceDateParser = ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT));
+  private static ThreadLocal<SimpleDateFormat> afterFmt = ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy/MM/dd", Locale.ROOT));
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   public static interface CustomFilter {
@@ -85,13 +84,13 @@ public class MailEntityProcessor extends EntityProcessorBase {
     
     exclude.clear();
     String excludes = getStringFromContext("exclude", "");
-    if (excludes != null && !excludes.trim().equals("")) {
+    if (excludes != null && !excludes.trim().isEmpty()) {
       exclude = Arrays.asList(excludes.split(","));
     }
     
     include.clear();
     String includes = getStringFromContext("include", "");
-    if (includes != null && !includes.trim().equals("")) {
+    if (includes != null && !includes.trim().isEmpty()) {
       include = Arrays.asList(includes.split(","));
     }
     batchSize = getIntFromContext("batchSize", 20);
@@ -121,7 +120,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
       // initial value, in which case means we should use fetchMailsSince instead
       Date tmp = null;
       try {
-        tmp = sinceDateParser.parse((String)varValue);
+        tmp = sinceDateParser.get().parse((String)varValue);
         if (tmp.getTime() == 0) {
           log.info("Ignoring initial value {} for {} in favor of fetchMailsSince config parameter"
               , varValue, varName);
@@ -148,7 +147,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
       log.info("{}={}", varName, varValue);
     }
       
-    if (varValue != null && varValue instanceof String) {
+    if (varValue instanceof String) {
       lastIndexTime = (String)varValue;
       if (lastIndexTime != null && lastIndexTime.length() == 0)
         lastIndexTime = null;
@@ -162,7 +161,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
     this.fetchMailsSince = null;
     if (lastIndexTime != null && lastIndexTime.length() > 0) {
       try {
-        fetchMailsSince = sinceDateParser.parse(lastIndexTime);
+        fetchMailsSince = sinceDateParser.get().parse(lastIndexTime);
         log.info("Parsed fetchMailsSince={}", lastIndexTime);
       } catch (ParseException e) {
         throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
@@ -263,7 +262,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
     ContentType ctype = new ContentType(ct);
     if (part.isMimeType("multipart/*")) {
       Object content = part.getContent();
-      if (content != null && content instanceof Multipart) {
+      if (content instanceof Multipart) {
         Multipart mp = (Multipart) part.getContent();
         int count = mp.getCount();
         if (part.isMimeType("multipart/alternative")) count = 1;
@@ -282,7 +281,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
           && !(disp != null && disp.equalsIgnoreCase(Part.ATTACHMENT))) {
         InputStream is = part.getInputStream();
         Metadata contentTypeHint = new Metadata();
-        contentTypeHint.set(Metadata.CONTENT_TYPE, ctype.getBaseType()
+        contentTypeHint.set(HttpHeaders.CONTENT_TYPE, ctype.getBaseType()
             .toLowerCase(Locale.ENGLISH));
         String content = (new Tika()).parseToString(is, contentTypeHint);
         if (row.get(CONTENT) == null) row.put(CONTENT, new ArrayList<String>());
@@ -295,7 +294,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
       InputStream is = part.getInputStream();
       String fileName = part.getFileName();
       Metadata contentTypeHint = new Metadata();
-      contentTypeHint.set(Metadata.CONTENT_TYPE, ctype.getBaseType()
+      contentTypeHint.set(HttpHeaders.CONTENT_TYPE, ctype.getBaseType()
           .toLowerCase(Locale.ENGLISH));
       String content = (new Tika()).parseToString(is, contentTypeHint);
       if (content == null || content.trim().length() == 0) return;
@@ -313,7 +312,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
     }
   }
   
-  private void addEnvelopeToDocument(Part part, Map<String,Object> row)
+  private static void addEnvelopeToDocument(Part part, Map<String,Object> row)
       throws MessagingException {
     MimeMessage mail = (MimeMessage) part;
     Address[] adresses;
@@ -354,7 +353,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
     if (hdrs != null) row.put(XMAILER, hdrs[0]);
   }
   
-  private void addAddressToList(Address[] adresses, List<String> to)
+  private static void addAddressToList(Address[] adresses, List<String> to)
       throws AddressException {
     for (Address address : adresses) {
       to.add(address.toString());
@@ -387,7 +386,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
       props.setProperty("mail." + imapPropPrefix + ".connectiontimeout", "" + cTimeout);
       
       int port = -1;
-      int colonAt = host.indexOf(":");
+      int colonAt = host.indexOf(':');
       if (colonAt != -1) {
         port = Integer.parseInt(host.substring(colonAt + 1));
         host = host.substring(0, colonAt);
@@ -417,7 +416,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
     if (fetchMailsSince != null) {
       filters.add(new MailsSinceLastCheckFilter(fetchMailsSince));
     }
-    if (customFilter != null && !customFilter.equals("")) {
+    if (customFilter != null && !customFilter.isEmpty()) {
       try {
         Class<?> cf = Class.forName(customFilter);
         Object obj = cf.getConstructor().newInstance();
@@ -533,7 +532,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
         } while (!hasMessages);
         return next;
       } catch (Exception e) {
-        log.warn("Failed to read folders due to: {}", e);
+        log.warn("Failed to read folders due to", e);
         // throw new
         // DataImportHandlerException(DataImportHandlerException.SEVERE,
         // "Folder open failed", e);
@@ -572,8 +571,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
         Folder[] ufldrs = mailbox.getUserNamespaces(null);
         if (ufldrs != null) {
           log.info("Found {} user namespace folders", ufldrs.length);
-          for (Folder ufldr : ufldrs)
-            folders.add(ufldr);
+          folders.addAll(Arrays.asList(ufldrs));
         }
       } catch (MessagingException me) {
         log.warn("Messaging exception retrieving user namespaces: {}"
@@ -586,8 +584,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
         Folder[] sfldrs = mailbox.getSharedNamespaces();
         if (sfldrs != null) {
           log.info("Found {} shared namespace folders", sfldrs.length);
-          for (Folder sfldr : sfldrs)
-            folders.add(sfldr);
+          folders.addAll(Arrays.asList(sfldrs));
         }
       } catch (MessagingException me) {
         log.warn("Messaging exception retrieving shared namespaces: {}"
@@ -646,7 +643,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
           // granularity only but the local filters are also applied
                     
           if (folder instanceof GmailFolder && fetchMailsSince != null) {
-            String afterCrit = "after:" + afterFmt.format(fetchMailsSince);
+            String afterCrit = "after:" + afterFmt.get().format(fetchMailsSince);
             log.info("Added server-side gmail filter: {}", afterCrit);
             Message[] afterMessages = folder.search(new GmailRawSearchTerm(
                 afterCrit));
@@ -688,7 +685,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
         }
       }
       int lastMsg = (currentBatch + 1) * batchSize;
-      lastMsg = lastMsg > totalInFolder ? totalInFolder : lastMsg;
+      lastMsg = Math.min(lastMsg, totalInFolder);
       messagesInCurBatch = folder.getMessages(currentBatch * batchSize + 1,
           lastMsg);
       folder.fetch(messagesInCurBatch, fp);
@@ -752,7 +749,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
     public SearchTerm getCustomSearch(final Folder folder) {
       if (log.isInfoEnabled()) {
         log.info("Building mail filter for messages in {} that occur after {}"
-            , folder.getName(), sinceDateParser.format(since));
+            , folder.getName(), sinceDateParser.get().format(since));
       }
       return new DateTerm(ComparisonTerm.GE, since) {
         private int matched = 0;
@@ -770,8 +767,8 @@ public class MailEntityProcessor extends EntityProcessorBase {
               ++matched;
               isMatch = true;
             } else {
-              String msgDateStr = (msgDate != null) ? sinceDateParser.format(msgDate) : "null";
-              String sinceDateStr = (since != null) ? sinceDateParser.format(since) : "null";
+              String msgDateStr = (msgDate != null) ? sinceDateParser.get().format(msgDate) : "null";
+              String sinceDateStr = (since != null) ? sinceDateParser.get().format(since) : "null";
               if (log.isDebugEnabled()) {
                 log.debug("Message {} was received at [{}], since filter is [{}]"
                     , msg.getSubject(), msgDateStr, sinceDateStr);
@@ -784,7 +781,7 @@ public class MailEntityProcessor extends EntityProcessorBase {
           if (seen % 100 == 0) {
             if (log.isInfoEnabled()) {
               log.info("Matched {} of {} messages since: {}"
-                  , matched, seen, sinceDateParser.format(since));
+                  , matched, seen, sinceDateParser.get().format(since));
             }
           }
           

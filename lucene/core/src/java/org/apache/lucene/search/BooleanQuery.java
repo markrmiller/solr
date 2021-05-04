@@ -133,6 +133,10 @@ public class BooleanQuery extends Query implements Iterable<BooleanClause> {
       return new BooleanQuery(minimumNumberShouldMatch, clauses.toArray(new BooleanClause[0]));
     }
 
+    public List<BooleanClause> clauses() {
+      return clauses;
+    }
+
   }
 
   private final int minimumNumberShouldMatch;

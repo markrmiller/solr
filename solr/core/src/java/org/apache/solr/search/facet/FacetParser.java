@@ -51,7 +51,7 @@ abstract class FacetParser<FacetRequestT extends FacetRequest> {
     if (parent == null) {
       return "/" + key;
     }
-    return parent.getKey() + "/" + key;
+    return parent.key + "/" + key;
   }
 
   protected RuntimeException err(String msg) {
@@ -258,7 +258,7 @@ abstract class FacetParser<FacetRequestT extends FacetRequest> {
    * it in a new list.
    */
   @SuppressWarnings({"unchecked"})
-  private List<Object> parseJSONQueryStruct(Object raw) {
+  private static List<Object> parseJSONQueryStruct(Object raw) {
     List<Object> result = null;
     if (null == raw) {
       return result;

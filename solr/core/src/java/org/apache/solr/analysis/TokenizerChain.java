@@ -35,9 +35,11 @@ import org.apache.lucene.analysis.util.TokenizerFactory;
  * @since 3.1
  */
 public final class TokenizerChain extends SolrAnalyzer {
-  private static final CharFilterFactory[] EMPTY_CHAR_FITLERS = new CharFilterFactory[0];
+  public static final CharFilterFactory[] EMPTY_CFF_ARRAY = new CharFilterFactory[0];
+  private static final CharFilterFactory[] EMPTY_CHAR_FITLERS = EMPTY_CFF_ARRAY;
   private static final TokenFilterFactory[] EMPTY_TOKEN_FITLERS = new TokenFilterFactory[0];
-  
+  public static final TokenFilterFactory[] EMPTY_TFF_ARRAY = new TokenFilterFactory[0];
+
   final private CharFilterFactory[] charFilters;
   final private TokenizerFactory tokenizer;
   final private TokenFilterFactory[] filters;
@@ -45,9 +47,9 @@ public final class TokenizerChain extends SolrAnalyzer {
   /** Copy from CustomAnalyzer. */
   public TokenizerChain(CustomAnalyzer customAnalyzer) {
     this(
-        customAnalyzer.getCharFilterFactories().toArray(new CharFilterFactory[0]),
+        customAnalyzer.getCharFilterFactories().toArray(EMPTY_CFF_ARRAY),
         customAnalyzer.getTokenizerFactory(),
-        customAnalyzer.getTokenFilterFactories().toArray(new TokenFilterFactory[0]));
+        customAnalyzer.getTokenFilterFactories().toArray(EMPTY_TFF_ARRAY));
     setPositionIncrementGap(customAnalyzer.getPositionIncrementGap(null));
     setVersion(customAnalyzer.getVersion());
     assert customAnalyzer.getOffsetGap(null) == 1; // note: we don't support setting the offset gap

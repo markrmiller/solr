@@ -18,27 +18,44 @@ package org.apache.solr.servlet;
 
 import java.net.URLEncoder;
 
+import org.apache.solr.SolrTestCaseUtil;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.core.SolrCore;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 
 public class DirectSolrConnectionTest extends SolrTestCaseJ4 {
 
-  
+  private SolrCore core;
+
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeDirectSolrConnectionTest() throws Exception {
     initCore("solr/crazy-path-to-config.xml", "solr/crazy-path-to-schema.xml");
   }
 
-  
+  @AfterClass
+  public static void afterDirectSolrConnectionTest() throws Exception {
+    deleteCore();
+  }
+
   DirectSolrConnection direct;
   
   @Override
   public void setUp() throws Exception
   {
     super.setUp();
-    direct = new DirectSolrConnection(h.getCore());
+    core = h.getCore();
+    direct = new DirectSolrConnection(core);
+  }
+
+  @Override
+  public void tearDown() throws Exception
+  {
+    super.tearDown();
+    IOUtils.closeQuietly(core);
   }
 
   // Check that a request gets back the echoParams call
@@ -51,7 +68,7 @@ public class DirectSolrConnectionTest extends SolrTestCaseJ4 {
     assertTrue( got.indexOf( "<str name=\"echoParams\">explicit</str>" ) > 5 );
     
     // It should throw an exception for unknown handler
-    expectThrows(Exception.class, () -> direct.request( "/path to nonexistang thingy!!", null ));
+    SolrTestCaseUtil.expectThrows(Exception.class, () -> direct.request("/path to nonexistang thingy!!", null));
   }
   
 

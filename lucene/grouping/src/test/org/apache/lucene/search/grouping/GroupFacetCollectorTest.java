@@ -101,9 +101,9 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
 
     IndexSearcher indexSearcher = newSearcher(w.getReader());
 
-    List<TermGroupFacetCollector.FacetEntry> entries;
+    List<FacetEntry> entries;
     GroupFacetCollector groupedAirportFacetCollector;
-    TermGroupFacetCollector.GroupedFacetResult airportResult;
+    org.apache.lucene.search.grouping.GroupedFacetResult airportResult;
     
     for (int limit : new int[] { 2, 10, 100, Integer.MAX_VALUE }) {
       // any of these limits is plenty for the data we have
@@ -137,7 +137,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
 
     GroupFacetCollector groupedDurationFacetCollector = createRandomCollector(useDv ? "hotel_dv" : "hotel", useDv ? "duration_dv" : "duration", null, false);
     indexSearcher.search(new MatchAllDocsQuery(), groupedDurationFacetCollector);
-    TermGroupFacetCollector.GroupedFacetResult durationResult = groupedDurationFacetCollector.mergeSegmentResults(10, 0, false);
+    org.apache.lucene.search.grouping.GroupedFacetResult durationResult = groupedDurationFacetCollector.mergeSegmentResults(10, 0, false);
     assertEquals(4, durationResult.getTotalCount());
     assertEquals(0, durationResult.getTotalMissingCount());
 
@@ -345,11 +345,11 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
     IndexSearcher indexSearcher = newSearcher(DirectoryReader.open(dir));
     GroupFacetCollector groupedAirportFacetCollector = createRandomCollector(groupField + "_dv", "airport", null, true);
     indexSearcher.search(new MatchAllDocsQuery(), groupedAirportFacetCollector);
-    TermGroupFacetCollector.GroupedFacetResult airportResult = groupedAirportFacetCollector.mergeSegmentResults(10, 0, false);
+    org.apache.lucene.search.grouping.GroupedFacetResult airportResult = groupedAirportFacetCollector.mergeSegmentResults(10, 0, false);
     assertEquals(3, airportResult.getTotalCount());
     assertEquals(1, airportResult.getTotalMissingCount());
 
-    List<TermGroupFacetCollector.FacetEntry> entries = airportResult.getFacetEntries(0, 10);
+    List<FacetEntry> entries = airportResult.getFacetEntries(0, 10);
     assertEquals(2, entries.size());
     assertEquals("ams", entries.get(0).getValue().utf8ToString());
     assertEquals(2, entries.get(0).getCount());
@@ -405,10 +405,10 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
         GroupedFacetResult expectedFacetResult = createExpectedFacetResult(searchTerm, context, offset, limit, minCount, orderByCount, facetPrefix);
         GroupFacetCollector groupFacetCollector = createRandomCollector("group", "facet", facetPrefix, multipleFacetsPerDocument);
         searcher.search(new TermQuery(new Term("content", searchTerm)), groupFacetCollector);
-        TermGroupFacetCollector.GroupedFacetResult actualFacetResult = groupFacetCollector.mergeSegmentResults(size, minCount, orderByCount);
+        org.apache.lucene.search.grouping.GroupedFacetResult actualFacetResult = groupFacetCollector.mergeSegmentResults(size, minCount, orderByCount);
 
-        List<TermGroupFacetCollector.FacetEntry> expectedFacetEntries = expectedFacetResult.getFacetEntries();
-        List<TermGroupFacetCollector.FacetEntry> actualFacetEntries = actualFacetResult.getFacetEntries(offset, limit);
+        List<FacetEntry> expectedFacetEntries = expectedFacetResult.getFacetEntries();
+        List<FacetEntry> actualFacetEntries = actualFacetResult.getFacetEntries(offset, limit);
 
         if (VERBOSE) {
           System.out.println("Collector: " + groupFacetCollector.getClass().getSimpleName());
@@ -429,7 +429,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
           System.out.println("Total count " + expectedFacetResult.getTotalCount());
           System.out.println("Total missing count " + expectedFacetResult.getTotalMissingCount());
           int counter = 0;
-          for (TermGroupFacetCollector.FacetEntry expectedFacetEntry : expectedFacetEntries) {
+          for (FacetEntry expectedFacetEntry : expectedFacetEntries) {
             System.out.println(
                 String.format(Locale.ROOT,
                     "%d. Expected facet value %s with count %d",
@@ -442,7 +442,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
           System.out.println("Total count " + actualFacetResult.getTotalCount());
           System.out.println("Total missing count " + actualFacetResult.getTotalMissingCount());
           counter = 0;
-          for (TermGroupFacetCollector.FacetEntry actualFacetEntry : actualFacetEntries) {
+          for (FacetEntry actualFacetEntry : actualFacetEntries) {
             System.out.println(
                 String.format(Locale.ROOT,
                     "%d. Actual facet value %s with count %d",
@@ -457,8 +457,8 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
         assertEquals(expectedFacetResult.getTotalMissingCount(), actualFacetResult.getTotalMissingCount());
         assertEquals(expectedFacetEntries.size(), actualFacetEntries.size());
         for (int i = 0; i < expectedFacetEntries.size(); i++) {
-          TermGroupFacetCollector.FacetEntry expectedFacetEntry = expectedFacetEntries.get(i);
-          TermGroupFacetCollector.FacetEntry actualFacetEntry = actualFacetEntries.get(i);
+          FacetEntry expectedFacetEntry = expectedFacetEntries.get(i);
+          FacetEntry actualFacetEntry = actualFacetEntries.get(i);
           assertEquals("i=" + i + ": " + expectedFacetEntry.getValue().utf8ToString() + " != " + actualFacetEntry.getValue().utf8ToString(), expectedFacetEntry.getValue(), actualFacetEntry.getValue());
           assertEquals("i=" + i + ": " + expectedFacetEntry.getCount() + " != " + actualFacetEntry.getCount(), expectedFacetEntry.getCount(), actualFacetEntry.getCount());
         }
@@ -653,7 +653,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
       facetValues = context.facetValues;
     }
 
-    List<TermGroupFacetCollector.FacetEntry> entries = new ArrayList<>(facetGroups.size());
+    List<FacetEntry> entries = new ArrayList<>(facetGroups.size());
     // also includes facets with count 0
     for (String facetValue : facetValues) {
       if (facetValue == null) {
@@ -663,7 +663,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
       Set<String> groups = facetGroups.get(facetValue);
       int count = groups != null ? groups.size() : 0;
       if (count >= minCount) {
-        entries.add(new TermGroupFacetCollector.FacetEntry(new BytesRef(facetValue), count));
+        entries.add(new FacetEntry(new BytesRef(facetValue), count));
       }
       totalCount += count;
     }
@@ -676,10 +676,10 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
       }
     }
 
-    Collections.sort(entries, new Comparator<TermGroupFacetCollector.FacetEntry>() {
+    Collections.sort(entries, new Comparator<FacetEntry>() {
 
       @Override
-      public int compare(TermGroupFacetCollector.FacetEntry a, TermGroupFacetCollector.FacetEntry b) {
+      public int compare(FacetEntry a, FacetEntry b) {
         if (orderByCount) {
           int cmp = b.getCount() - a.getCount();
           if (cmp != 0) {
@@ -692,7 +692,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
     });
 
     int endOffset = offset + limit;
-    List<TermGroupFacetCollector.FacetEntry> entriesResult;
+    List<FacetEntry> entriesResult;
     if (offset >= entries.size()) {
       entriesResult = Collections.emptyList();
     } else if (endOffset >= entries.size()) {
@@ -747,9 +747,9 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
 
     final int totalCount;
     final int totalMissingCount;
-    final List<TermGroupFacetCollector.FacetEntry> facetEntries;
+    final List<FacetEntry> facetEntries;
 
-    private GroupedFacetResult(int totalCount, int totalMissingCount, List<TermGroupFacetCollector.FacetEntry> facetEntries) {
+    private GroupedFacetResult(int totalCount, int totalMissingCount, List<FacetEntry> facetEntries) {
       this.totalCount = totalCount;
       this.totalMissingCount = totalMissingCount;
       this.facetEntries = facetEntries;
@@ -763,7 +763,7 @@ public class GroupFacetCollectorTest extends AbstractGroupingTestCase {
       return totalMissingCount;
     }
 
-    public List<TermGroupFacetCollector.FacetEntry> getFacetEntries() {
+    public List<FacetEntry> getFacetEntries() {
       return facetEntries;
     }
   }

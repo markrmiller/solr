@@ -39,7 +39,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 
 import org.apache.lucene.store.ByteBuffersDirectory;
@@ -195,6 +194,7 @@ public final class IOUtils {
    */
   public static void deleteFilesIgnoringExceptions(Directory dir, Collection<String> files) {
     for(String name : files) {
+      if (name == null) continue;
       try {
         dir.deleteFile(name);
       } catch (Throwable ignored) {
@@ -309,13 +309,7 @@ public final class IOUtils {
     LinkedHashMap<Path,Throwable> unremoved = rm(new LinkedHashMap<Path,Throwable>(), locations);
     if (!unremoved.isEmpty()) {
       StringBuilder b = new StringBuilder("Could not remove the following files (in the order of attempts):\n");
-      for (Map.Entry<Path,Throwable> kv : unremoved.entrySet()) {
-        b.append("   ")
-         .append(kv.getKey().toAbsolutePath())
-         .append(": ")
-         .append(kv.getValue())
-         .append("\n");
-      }
+      unremoved.forEach((key, value) -> b.append("   ").append(key.toAbsolutePath()).append(": ").append(value).append("\n"));
       throw new IOException(b.toString());
     }
   }
@@ -548,7 +542,7 @@ public final class IOUtils {
     String devName = store.name();
 
     // not a device (e.g. NFS server)
-    if (!devName.startsWith("/")) {
+    if (!(!devName.isEmpty() && devName.charAt(0) == '/')) {
       return true;
     }
     

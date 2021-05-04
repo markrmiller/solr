@@ -36,7 +36,7 @@ public abstract class BaseManagedTokenFilterFactory extends TokenFilterFactory
   implements ResourceLoaderAware, ManagedResourceObserver
 {
   
-  protected String handle;
+  protected final String handle;
   
   protected BaseManagedTokenFilterFactory(Map<String,String> args) {
     super(args);    

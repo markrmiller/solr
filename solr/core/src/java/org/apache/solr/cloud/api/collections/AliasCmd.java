@@ -17,15 +17,12 @@
 
 package org.apache.solr.cloud.api.collections;
 
-import java.util.Map;
-
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.OverseerSolrResponse;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.CollectionProperties;
 import org.apache.solr.common.cloud.ZkNodeProps;
-import org.apache.solr.common.params.CollectionParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.admin.CollectionsHandler;
@@ -35,6 +32,7 @@ import static org.apache.solr.cloud.api.collections.RoutedAlias.CREATE_COLLECTIO
 import static org.apache.solr.cloud.api.collections.RoutedAlias.ROUTED_ALIAS_NAME_CORE_PROP;
 import static org.apache.solr.common.params.CollectionAdminParams.COLL_CONF;
 import static org.apache.solr.common.params.CommonParams.NAME;
+import java.util.Map;
 
 /**
  * Common superclass for commands that maintain or manipulate aliases. In the routed alias parlance, "maintain"
@@ -77,11 +75,14 @@ abstract class AliasCmd implements OverseerCollectionMessageHandler.Cmd {
     createMsgMap.put(Overseer.QUEUE_OPERATION, "create");
 
     NamedList results = new NamedList();
+    ZkNodeProps zkProps = new ZkNodeProps(createMsgMap);
     try {
       // Since we are running in the Overseer here, send the message directly to the Overseer CreateCollectionCmd.
       // note: there's doesn't seem to be any point in locking on the collection name, so we don't. We currently should
       //   already have a lock on the alias name which should be sufficient.
-      ocmh.commandMap.get(CollectionParams.CollectionAction.CREATE).call(clusterState, new ZkNodeProps(createMsgMap), results);
+
+
+      CollectionsHandler.sendToOCPQueue(ocmh.overseer.getCoreContainer(), zkProps, 30000);
     } catch (SolrException e) {
       // The collection might already exist, and that's okay -- we can adopt it.
       if (!e.getMessage().contains("collection already exists")) {
@@ -91,8 +92,10 @@ abstract class AliasCmd implements OverseerCollectionMessageHandler.Cmd {
 
     CollectionsHandler.waitForActiveCollection(createCollName, ocmh.overseer.getCoreContainer(),
         new OverseerSolrResponse(results));
-    CollectionProperties collectionProperties = new CollectionProperties(ocmh.zkStateReader.getZkClient());
+    CollectionProperties collectionProperties = new CollectionProperties(ocmh.zkStateReader);
     collectionProperties.setCollectionProperty(createCollName,ROUTED_ALIAS_NAME_CORE_PROP,aliasName);
+
+    // MRM TODO: make efficient
     while (!ocmh.zkStateReader.getCollectionProperties(createCollName,1000).containsKey(ROUTED_ALIAS_NAME_CORE_PROP)) {
       Thread.sleep(50);
     }

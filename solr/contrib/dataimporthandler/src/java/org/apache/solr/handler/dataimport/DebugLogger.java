@@ -59,16 +59,7 @@ class DebugLogger {
   public DebugLogger() {
 //    writer = solrWriter;
     output = new NamedList();
-    debugStack = new Stack<DebugInfo>() {
-
-      @Override
-      public DebugInfo pop() {
-        if (size() == 1)
-          throw new DataImportHandlerException(
-                  DataImportHandlerException.SEVERE, "Stack is becoming empty");
-        return super.pop();
-      }
-    };
+    debugStack = new DebugInfoStack();
     debugStack.push(new DebugInfo(null, DIHLogLevels.NONE, null));
     output = debugStack.peek().lst;
   }
@@ -154,7 +145,7 @@ class DebugLogger {
   }
 
   @SuppressWarnings({"unchecked"})
-  private void addToNamedList(@SuppressWarnings({"rawtypes"})NamedList nl, Object row) {
+  private static void addToNamedList(@SuppressWarnings({"rawtypes"}) NamedList nl, Object row) {
     if (row instanceof List) {
       @SuppressWarnings({"rawtypes"})
       List list = (List) row;
@@ -292,4 +283,14 @@ class DebugLogger {
     }
   }
 
+  private static class DebugInfoStack extends Stack<DebugInfo> {
+
+    @Override
+    public DebugInfo pop() {
+      if (size() == 1)
+        throw new DataImportHandlerException(
+                DataImportHandlerException.SEVERE, "Stack is becoming empty");
+      return super.pop();
+    }
+  }
 }

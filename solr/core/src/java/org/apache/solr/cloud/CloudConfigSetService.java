@@ -18,11 +18,11 @@ package org.apache.solr.cloud;
 
 import java.lang.invoke.MethodHandles;
 
-import org.apache.solr.cloud.api.collections.CreateCollectionCmd;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ZkConfigManager;
-import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.cloud.ZooKeeperException;
+import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.ConfigSetProperties;
 import org.apache.solr.core.ConfigSetService;
@@ -51,30 +51,18 @@ public class CloudConfigSetService extends ConfigSetService {
   public SolrResourceLoader createCoreResourceLoader(CoreDescriptor cd) {
     final String colName = cd.getCollectionName();
 
-    // For back compat with cores that can create collections without the collections API
-    try {
-      if (!zkController.getZkClient().exists(ZkStateReader.COLLECTIONS_ZKNODE + "/" + colName, true)) {
-        // TODO remove this functionality or maybe move to a CLI mechanism
-        log.warn("Auto-creating collection (in ZK) from core descriptor (on disk).  This feature may go away!");
-        CreateCollectionCmd.createCollectionZkNode(zkController.getSolrCloudManager().getDistribStateManager(), colName, cd.getCloudDescriptor().getParams());
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "Interrupted auto-creating collection", e);
-    } catch (KeeperException e) {
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "Failure auto-creating collection", e);
-    }
-
+    String configSetName = cd.getCoreProperty(CollectionAdminParams.COLL_CONF, null);
     // The configSet is read from ZK and populated.  Ignore CD's pre-existing configSet; only populated in standalone
-    final String configSetName;
-    try {
-      configSetName = zkController.getZkStateReader().readConfigName(colName);
-      cd.setConfigSet(configSetName);
-    } catch (KeeperException ex) {
-      throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "Trouble resolving configSet for collection " + colName + ": " + ex.getMessage());
+    if (configSetName == null) {
+      try {
+        configSetName = zkController.getZkStateReader().readConfigName(colName);
+        cd.setConfigSet(configSetName);
+      } catch (KeeperException ex) {
+        throw new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "Trouble resolving configSet for collection " + colName + ": " + ex.getMessage());
+      }
     }
 
-    return new ZkSolrResourceLoader(cd.getInstanceDir(), configSetName, parentLoader.getClassLoader(), zkController);
+    return new ZkSolrResourceLoader(cd.getInstanceDir(), configSetName, null, zkController);
   }
 
   @Override
@@ -82,7 +70,7 @@ public class CloudConfigSetService extends ConfigSetService {
     try {
       return ConfigSetProperties.readFromResourceLoader(loader, ".");
     } catch (Exception ex) {
-      log.debug("No configSet flags", ex);
+      if (log.isDebugEnabled()) log.debug("No configSet flags", ex);
       return null;
     }
   }
@@ -97,7 +85,7 @@ public class CloudConfigSetService extends ConfigSetService {
       log.warn("Unexpected exception when getting modification time of {}", zkPath, e);
       return null; // debatable; we'll see an error soon if there's a real problem
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      ParWork.propagateInterrupt(e);
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     }
     if (stat == null) { // not found

@@ -45,7 +45,7 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
   }
 
   @Override
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @SuppressWarnings({"rawtypes"})
   public void merge(Object facetResult, Context mcontext) {
     super.merge(facetResult, mcontext);
     if (numReturnedPerShard == null) {
@@ -186,7 +186,8 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
     return refinement;
   }
 
-  private Map<String, Object> getRefinementSpecial(Context mcontext, Map<String, Object> refinement, Collection<String> tagsWithPartial, FacetBucket bucket, String label) {
+  private static Map<String, Object> getRefinementSpecial(Context mcontext, Map<String,Object> refinement, Collection<String> tagsWithPartial,
+      FacetBucket bucket, String label) {
     // boolean prev = mcontext.setBucketWasMissing(true); // the special buckets should have the same "missing" status as this facet, so no need to set it again
     Map<String, Object> bucketRefinement = bucket.getRefinement(mcontext, tagsWithPartial);
     if (bucketRefinement != null) {
@@ -203,7 +204,7 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
     Set<Object> values;
 
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"rawtypes"})
     public void merge(Object facetResult, Context mcontext) {
       SimpleOrderedMap map = (SimpleOrderedMap)facetResult;
       long numBuckets = ((Number)map.get("numBuckets")).longValue();

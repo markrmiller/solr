@@ -61,6 +61,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
   private static final String DEFAULT_BOOST_FIELDNAME = "urlboost";
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Pattern COMPILE = Pattern.compile("^#.*$");
 
   private boolean enabled = true;
   private String inputFieldname = DEFAULT_INPUT_FIELDNAME;
@@ -79,10 +80,10 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
 
     if (this.boostFilename == null) {
       log.warn("Null boost filename.  Disabling processor.");
-      setEnabled(false);
+      enabled = false;
     }
 
-    if (!isEnabled()) {
+    if (!enabled) {
       return;
     }
 
@@ -112,14 +113,14 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
 
   private void initParameters(SolrParams parameters) {
     if (parameters != null) {
-      this.setEnabled(parameters.getBool("enabled", true));
+      this.enabled = parameters.getBool("enabled", true);
       this.inputFieldname = parameters.get(INPUT_FIELD_PARAM, DEFAULT_INPUT_FIELDNAME);
       this.boostFieldname = parameters.get(BOOST_FIELD_PARAM, DEFAULT_BOOST_FIELDNAME);
       this.boostFilename = parameters.get(BOOST_FILENAME_PARAM);
     }
   }
 
-  private List<BoostEntry> initBoostEntries(InputStream is) throws IOException {
+  private static List<BoostEntry> initBoostEntries(InputStream is) throws IOException {
     List<BoostEntry> newBoostEntries = new ArrayList<>();
     
     BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
@@ -128,7 +129,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
       while ((line = reader.readLine()) != null) {
         // Remove comments
         line = line.replaceAll("\\s+#.*$", "");
-        line = line.replaceAll("^#.*$", "");
+        line = COMPILE.matcher(line).replaceAll("");
 
         // Skip empty lines or comment lines
         if (line.trim().length() == 0) {
@@ -156,7 +157,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
 
   @Override
   public void processAdd(AddUpdateCommand command) throws IOException {
-    if (isEnabled()) {
+    if (enabled) {
       processBoost(command);
     }
     super.processAdd(command);

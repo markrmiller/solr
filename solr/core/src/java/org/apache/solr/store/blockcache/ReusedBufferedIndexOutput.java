@@ -58,7 +58,7 @@ public abstract class ReusedBufferedIndexOutput extends IndexOutput {
     return bufferStart;
   }
   
-  private void checkBufferSize(int bufferSize) {
+  private static void checkBufferSize(int bufferSize) {
     if (bufferSize <= 0) throw new IllegalArgumentException(
         "bufferSize must be greater than 0 (got " + bufferSize + ")");
   }

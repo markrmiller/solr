@@ -185,7 +185,7 @@ public abstract class LogWatcher<E> {
       return loader != null ? loader.newInstance(fname, LogWatcher.class) : null;
     }
     catch (Throwable e) {
-      log.warn("Unable to load LogWatcher {}: {}", fname, e);
+      log.warn("Unable to load LogWatcher {}", fname, e);
       if (e instanceof OutOfMemoryError) {
         throw (OutOfMemoryError) e;
       }

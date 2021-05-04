@@ -31,22 +31,37 @@ import org.apache.lucene.analysis.CharFilter;
  */
 public abstract class CharFilterFactory extends AbstractAnalysisFactory {
 
-  private static final AnalysisSPILoader<CharFilterFactory> loader =
-      new AnalysisSPILoader<>(CharFilterFactory.class);
+
+  private static class AnalysisSPILoaderHolder {
+    private static AnalysisSPILoader<CharFilterFactory> HOLDER_INSTANCE;
+
+    static {
+      try {
+        HOLDER_INSTANCE = new AnalysisSPILoader<>(CharFilterFactory.class);
+      } catch (Exception e) {
+        System.err.println("Exception creating AnalysisSPILoader");
+        throw e;
+      }
+    }
+  }
+
+  private static AnalysisSPILoader<CharFilterFactory> getInstance() {
+    return AnalysisSPILoaderHolder.HOLDER_INSTANCE;
+  }
   
   /** looks up a charfilter by name from context classpath */
   public static CharFilterFactory forName(String name, Map<String,String> args) {
-    return loader.newInstance(name, args);
+    return getInstance().newInstance(name, args);
   }
   
   /** looks up a charfilter class by name from context classpath */
   public static Class<? extends CharFilterFactory> lookupClass(String name) {
-    return loader.lookupClass(name);
+    return getInstance().lookupClass(name);
   }
   
   /** returns a list of all available charfilter names */
   public static Set<String> availableCharFilters() {
-    return loader.availableServices();
+    return getInstance().availableServices();
   }
 
   /** looks up a SPI name for the specified char filter factory */
@@ -70,7 +85,7 @@ public abstract class CharFilterFactory extends AbstractAnalysisFactory {
    * of new factories on the given classpath/classloader!</em>
    */
   public static void reloadCharFilters(ClassLoader classloader) {
-    loader.reload(classloader);
+    getInstance().reload(classloader);
   }
 
   /** Default ctor for compatibility with SPI */

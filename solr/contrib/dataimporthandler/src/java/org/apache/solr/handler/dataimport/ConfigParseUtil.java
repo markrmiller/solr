@@ -28,7 +28,7 @@ import org.w3c.dom.NodeList;
 public class ConfigParseUtil {
   public static String getStringAttribute(Element e, String name, String def) {
     String r = e.getAttribute(name);
-    if (r == null || "".equals(r.trim()))
+    if (r == null || r.trim().isEmpty())
       r = def;
     return r;
   }

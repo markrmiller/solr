@@ -17,38 +17,33 @@
 
 package org.apache.solr.cloud;
 
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.UpdateRequest;
-import org.apache.solr.cloud.ZkTestServer.LimitViolationAction;
 import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.cloud.ClusterState;
-import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.util.TimeOut;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.Collections.singletonList;
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 
@@ -57,6 +52,8 @@ import static java.util.Collections.singletonList;
  * This test is modeled after SyncSliceTest
  */
 @Slow
+@LuceneTestCase.Nightly
+@Ignore // MRM TODO: convert to bridge base class
 public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestBase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -65,6 +62,11 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
   int docId = 0;
 
   List<CloudJettyRunner> nodesDown = new ArrayList<>();
+
+  @BeforeClass
+  public static void beforeLeaderFailureAfterFreshStartTest() {
+    System.setProperty("solr.suppressDefaultConfigBootstrap", "false");
+  }
 
   @Override
   public void distribTearDown() throws Exception {
@@ -83,6 +85,7 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
     fixShardCount(3);
   }
 
+  // MRM TODO: no longer used
   protected String getCloudSolrConfig() {
     return "solrconfig-tlog.xml";
   }
@@ -93,7 +96,6 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
     // make sure that tlog stays intact after we restart a node
     System.setProperty("solr.directoryFactory", "solr.StandardDirectoryFactory");
     System.setProperty("solr.ulog.numRecordsToKeep", "1000");
-    System.setProperty("tests.zk.violationReportAction", LimitViolationAction.IGNORE.toString());
     super.distribSetUp();
   }
 
@@ -119,7 +121,6 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
       forceNodeFailures(singletonList(freshNode));
 
       del("*:*");
-      waitForThingsToLevelOut(30, TimeUnit.SECONDS);
 
       checkShardConsistency(false, true);
 
@@ -129,7 +130,6 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
             "document number " + docId++);
       }
       commit();
-      waitForThingsToLevelOut(30, TimeUnit.SECONDS);
 
       checkShardConsistency(false, true);
       
@@ -154,8 +154,8 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
       // shutdown the original leader
       log.info("Now shutting down initial leader");
       forceNodeFailures(singletonList(initialLeaderJetty));
-      waitForNewLeader(cloudClient, "shard1", (Replica)initialLeaderJetty.client.info  , new TimeOut(15, TimeUnit.SECONDS, TimeSource.NANO_TIME));
-      waitTillNodesActive();
+      waitForNewLeader(cloudClient, DEFAULT_COLLECTION, "s1", (Replica)initialLeaderJetty.client.info  , new TimeOut(15, TimeUnit.SECONDS, TimeSource.NANO_TIME));
+      waitForRecoveriesToFinish(DEFAULT_COLLECTION, cloudClient.getZkStateReader(),false);
       log.info("Updating mappings from zk");
       updateMappingsFromZk(jettys, clients, true);
       assertEquals("Node went into replication", md5, DigestUtils.md5Hex(Files.readAllBytes(Paths.get(replicationProperties))));
@@ -171,7 +171,7 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
       node.jetty.start();
       nodesDown.remove(node);
     }
-    waitTillNodesActive();
+    waitForRecoveriesToFinish(DEFAULT_COLLECTION, cloudClient.getZkStateReader(),false);
     checkShardConsistency(false, true);
   }
 
@@ -199,42 +199,6 @@ public class LeaderFailureAfterFreshStartTest extends AbstractFullDistribZkTestB
     nodesDown.addAll(replicasToShutDown);
   }
 
-  
-
-  private void waitTillNodesActive() throws Exception {
-    for (int i = 0; i < 60; i++) {
-      Thread.sleep(3000);
-      ZkStateReader zkStateReader = cloudClient.getZkStateReader();
-      ClusterState clusterState = zkStateReader.getClusterState();
-      DocCollection collection1 = clusterState.getCollection("collection1");
-      Slice slice = collection1.getSlice("shard1");
-      Collection<Replica> replicas = slice.getReplicas();
-      boolean allActive = true;
-
-      Collection<String> nodesDownNames = nodesDown.stream()
-          .map(n -> n.coreNodeName)
-          .collect(Collectors.toList());
-      
-      Collection<Replica> replicasToCheck = null;
-      replicasToCheck = replicas.stream()
-          .filter(r -> !nodesDownNames.contains(r.getName()))
-          .collect(Collectors.toList());
-
-      for (Replica replica : replicasToCheck) {
-        if (!clusterState.liveNodesContain(replica.getNodeName()) || replica.getState() != Replica.State.ACTIVE) {
-          allActive = false;
-          break;
-        }
-      }
-      if (allActive) {
-        return;
-      }
-    }
-    printLayout();
-    fail("timeout waiting to see all nodes active");
-  }
-
-  
   private List<CloudJettyRunner> getOtherAvailableJetties(CloudJettyRunner leader) {
     List<CloudJettyRunner> candidates = new ArrayList<>();
     candidates.addAll(shardToJetty.get("shard1"));

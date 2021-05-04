@@ -20,6 +20,7 @@ import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
 import java.util.Arrays;
+import java.util.regex.Pattern;
 
 import com.codahale.metrics.jmx.ObjectNameFactory;
 import org.apache.solr.metrics.SolrMetricInfo;
@@ -29,6 +30,8 @@ import org.apache.solr.metrics.SolrMetricInfo;
  */
 public class JmxObjectNameFactory implements ObjectNameFactory {
 
+  private static final Pattern PATTERN = Pattern.compile(":");
+  private static final Pattern COMPILE = Pattern.compile(":");
   private final String domain;
   private final String[] subdomains;
   private final String reporterName;
@@ -43,7 +46,7 @@ public class JmxObjectNameFactory implements ObjectNameFactory {
   public JmxObjectNameFactory(String reporterName, String domain, String... additionalProperties) {
     this.reporterName = reporterName.replaceAll(":", "_");
     this.domain = domain;
-    this.subdomains = domain.replaceAll(":", "_").split("\\.");
+    this.subdomains = PATTERN.matcher(domain).replaceAll("_").split("\\.");
     if (additionalProperties != null && (additionalProperties.length % 2) != 0) {
       throw new IllegalArgumentException("additionalProperties length must be even: " + Arrays.toString(additionalProperties));
     }
@@ -75,12 +78,12 @@ public class JmxObjectNameFactory implements ObjectNameFactory {
   public ObjectName createName(String type, String currentDomain, String name) {
     SolrMetricInfo metricInfo = SolrMetricInfo.of(name);
     String safeName = metricInfo != null ? metricInfo.name : name;
-    safeName = safeName.replaceAll(":", "_");
+    safeName = COMPILE.matcher(safeName).replaceAll("_");
     // It turns out that ObjectName(String) mostly preserves key ordering
     // as specified in the constructor (except for the 'type' key that ends
     // up at top level) - unlike ObjectName(String, Map) constructor
     // that seems to have a mind of its own...
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(512);
     if (domain.equals(currentDomain)) {
       if (subdomains != null && subdomains.length > 1) {
         // use only first segment as domain

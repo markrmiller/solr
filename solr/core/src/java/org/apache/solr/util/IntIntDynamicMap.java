@@ -29,8 +29,8 @@ public class IntIntDynamicMap implements DynamicMap {
   private int maxSize;
   private IntIntHashMap hashMap;
   private int[] keyValues;
-  private int emptyValue;
-  private int threshold;
+  private final int emptyValue;
+  private final int threshold;
 
   /**
    * Create map with expected max value of key.

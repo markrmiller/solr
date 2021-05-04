@@ -55,7 +55,7 @@ public class SchemaCodecFactory extends CodecFactory implements SolrCoreAware {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
-  private Codec codec;
+  private volatile Codec codec;
   private volatile SolrCore core;
   
   
@@ -76,7 +76,6 @@ public class SchemaCodecFactory extends CodecFactory implements SolrCoreAware {
   @SuppressWarnings({"rawtypes"})
   public void init(NamedList args) {
     super.init(args);
-    assert codec == null;
     String compressionModeStr = (String)args.get(COMPRESSION_MODE);
     Mode compressionMode;
     if (compressionModeStr != null) {

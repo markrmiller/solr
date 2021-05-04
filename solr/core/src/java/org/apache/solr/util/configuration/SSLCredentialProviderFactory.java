@@ -72,7 +72,7 @@ public class SSLCredentialProviderFactory {
     return providers;
   }
 
-  private SSLCredentialProvider getProviderByClassName(String clazzName) {
+  private static SSLCredentialProvider getProviderByClassName(String clazzName) {
     try {
       return (SSLCredentialProvider) Class.forName(clazzName).getConstructor().newInstance();
     } catch (InstantiationException | ClassNotFoundException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
@@ -82,7 +82,7 @@ public class SSLCredentialProviderFactory {
     }
   }
 
-  private SSLCredentialProvider getDefaultProvider(Class aClass) {
+  private static SSLCredentialProvider getDefaultProvider(Class aClass) {
     try {
       return (SSLCredentialProvider) aClass.getConstructor().newInstance();
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {

@@ -90,7 +90,7 @@ public class AnalysisResponseBase extends SolrResponseBase {
    * @param value String value
    * @return The built token info (with type set to null)
    */
-  protected TokenInfo buildTokenInfoFromString(String value) {
+  protected static TokenInfo buildTokenInfoFromString(String value) {
     return new TokenInfo(value, value, null, 0, value.length(), 1, false);
   }
 

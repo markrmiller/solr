@@ -94,7 +94,7 @@ public class SolrEntityProcessor extends EntityProcessorBase {
    *
    * @return a {@link HttpClient} instance used for interfacing with a source Solr service
    */
-  protected HttpClient getHttpClient() {
+  protected static HttpClient getHttpClient() {
     return HttpClientUtil.createClient(null);
   }
 
@@ -117,12 +117,14 @@ public class SolrEntityProcessor extends EntityProcessorBase {
         solrClient = new Builder(url.toExternalForm())
             .withHttpClient(client)
             .withResponseParser(new XMLResponseParser())
+            .markInternalRequest()
             .build();
         log.info("using XMLResponseParser");
       } else {
         // TODO: it doesn't matter for this impl when passing a client currently, but we should close this!
         solrClient = new Builder(url.toExternalForm())
             .withHttpClient(client)
+            .markInternalRequest()
             .build();
         log.info("using BinaryResponseParser");
       }
@@ -279,7 +281,7 @@ public class SolrEntityProcessor extends EntityProcessorBase {
       
       solrQuery.setTimeAllowed(timeout * 1000);
       
-      solrQuery.setStart(getStart() + getSize());
+      solrQuery.setStart(start + size);
     }
     
     @Override

@@ -82,7 +82,7 @@ public class NumberFormatTransformer extends Transformer {
           }
           row.put(column, results);
         } else {
-          if (val == null || val.toString().trim().equals(""))
+          if (val == null || val.toString().trim().isEmpty())
             continue;
           try {
             row.put(column, process(val.toString(), styleSmall, locale));
@@ -97,7 +97,7 @@ public class NumberFormatTransformer extends Transformer {
     return row;
   }
 
-  private Number process(String val, String style, Locale locale) throws ParseException {
+  private static Number process(String val, String style, Locale locale) throws ParseException {
     if (INTEGER.equals(style)) {
       return parseNumber(val, NumberFormat.getIntegerInstance(locale));
     } else if (NUMBER.equals(style)) {
@@ -111,7 +111,7 @@ public class NumberFormatTransformer extends Transformer {
     return null;
   }
 
-  private Number parseNumber(String val, NumberFormat numFormat) throws ParseException {
+  private static Number parseNumber(String val, NumberFormat numFormat) throws ParseException {
     ParsePosition parsePos = new ParsePosition(0);
     Number num = numFormat.parse(val, parsePos);
     if (parsePos.getIndex() != val.length()) {

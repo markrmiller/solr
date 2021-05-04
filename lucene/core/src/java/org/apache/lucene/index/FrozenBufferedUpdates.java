@@ -61,7 +61,7 @@ final class FrozenBufferedUpdates {
   
   /** Counts down once all deletes/updates have been applied */
   public final CountDownLatch applied = new CountDownLatch(1);
-  private final ReentrantLock applyLock = new ReentrantLock();
+  private final ReentrantLock applyLock = new ReentrantLock(true);
   private final Map<String, FieldUpdatesBuffer> fieldUpdates;
 
   /** How many total documents were deleted/updated. */

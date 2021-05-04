@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -30,7 +29,6 @@ import org.apache.hadoop.conf.Configuration;
  * which is configured to be redundant. Volumes containing file system edits dirs
  * are added by default, and arbitrary extra volumes may be configured as well.
  */
-@InterfaceAudience.Private
 public class NameNodeResourceChecker {
   public static final Object SOLR_HACK_FOR_CLASS_VERIFICATION = new Object();
 

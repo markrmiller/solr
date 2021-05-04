@@ -356,7 +356,7 @@ public class Hash {
       } else {
         // surrogate pair
         // int utf32 = pos < end ? (int) data.charAt(pos++) : 0;
-        int utf32 = (int) data.charAt(pos++);
+        int utf32 = data.charAt(pos++);
         utf32 = ((code - 0xD7C0) << 10) + (utf32 & 0x3FF);
         k2 = (0xff & (0xF0 | (utf32 >> 18)))
             | ((0x80 | ((utf32 >> 12) & 0x3F))) << 8

@@ -83,14 +83,14 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
         if (srsp.getException() != null) {
           Throwable t = srsp.getException();
           if (t instanceof SolrServerException) {
-            t = ((SolrServerException) t).getCause();
+            t = t.getCause();
           }
           nl.add("error", t.toString());
           StringWriter trace = new StringWriter();
           t.printStackTrace(new PrintWriter(trace));
           nl.add("trace", trace.toString());
         } else {
-          nl.add("numFound", (Integer) srsp.getSolrResponse().getResponse().get("totalHitCount"));
+          nl.add("numFound", srsp.getSolrResponse().getResponse().get("totalHitCount"));
         }
         if (srsp.getSolrResponse() != null) {
           nl.add("time", srsp.getSolrResponse().getElapsedTime());

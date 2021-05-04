@@ -210,7 +210,7 @@ public class LuceneCarrot2StemmerFactory implements IStemmerFactory {
         return null;
       }
 
-      private boolean equals(char[] buffer, int len, CharSequence word) {
+      private static boolean equals(char[] buffer, int len, CharSequence word) {
         assert len == word.length();
 
         for (int i = 0; i < len; i++) {

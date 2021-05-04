@@ -56,7 +56,9 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     codec = new StreamCodec(stream);
     codec.start();
     EntryImpl entry = codec.beginRead(rootEntry);
-    listener.entry(entry);
+    if (listener != null) {
+      listener.entry(entry);
+    }
     if (entry.tag.type.isContainer && entry.entryListener != null) {
       entry.tag.stream(entry, codec);
     }
@@ -74,6 +76,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
 
     public void skip(int sz) throws IOException {
+      ByteBuffer brr = getByteArr(0);
+      byte[] bytes = brr.array();
       while (sz > 0) {
         int read = dis.read(bytes, 0, Math.min(bytes.length, sz));
         sz -= read;
@@ -111,8 +115,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
       return t;
     }
 
-    public ByteBuffer readByteBuffer(DataInputInputStream dis, int sz) throws IOException {
-      ByteBuffer result = dis.readDirectByteBuffer(sz);
+    public static ByteBuffer readByteBuffer(DataInputInputStream dis, int sz) throws IOException {
+      ByteBuffer result = DataInputInputStream.readDirectByteBuffer(sz);
       if(result != null) return result;
       byte[] arr = new byte[readVInt(dis)];
       dis.readFully(arr);
@@ -271,7 +275,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
     void reset() {
       this.doubleVal = 0.0d;
-      this.numericVal = 0l;
+      this.numericVal = 0L;
       this.objVal = null;
       this.ctx = null;
       this.entryListener = null;
@@ -498,7 +502,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) throws IOException {
-        ByteBuffer buf = codec.readByteBuffer(codec.dis, entry.size);
+        ByteBuffer buf = StreamCodec.readByteBuffer(codec.dis, entry.size);
         entry.size = buf.limit() - buf.position();
         return buf;
       }
@@ -680,8 +684,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     };
 
     private static int readObjSz(StreamCodec codec, Tag tag) throws IOException {
-      return tag.isLower5Bits ?
-          StreamCodec.readVInt(codec.dis) :
+      return tag.isLower5Bits ? readVInt(codec.dis) :
           codec.readSize(codec.dis);
     }
 
@@ -794,7 +797,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
           ((Collection) e.ctx()).add(ctx);
         }
       }
-      e.listenContainer(ctx, getEntryListener());
+      e.listenContainer(ctx, ENTRY_LISTENER);
     } else {
       Object val = e.val();
       if (val instanceof Utf8CharSequence) val = ((Utf8CharSequence) val).clone();

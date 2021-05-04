@@ -60,7 +60,7 @@ public class FloatField extends AnalyticsField implements CastingFloatValue {
   }
   @Override
   public double getDouble() {
-    return (double)value;
+    return value;
   }
   @Override
   public String getString() {
@@ -84,7 +84,7 @@ public class FloatField extends AnalyticsField implements CastingFloatValue {
   @Override
   public void streamDoubles(DoubleConsumer cons) {
     if (exists) {
-      cons.accept((double)value);
+      cons.accept(value);
     }
   }
   @Override

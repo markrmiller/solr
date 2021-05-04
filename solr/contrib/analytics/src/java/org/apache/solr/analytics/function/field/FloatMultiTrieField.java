@@ -66,9 +66,7 @@ public class FloatMultiTrieField extends AnalyticsField implements CastingFloatV
 
   private void resizeValues() {
     float[] newValues = new float[values.length*2];
-    for (int i = 0; i < count; ++i) {
-      newValues[i] = values[i];
-    }
+    if (count >= 0) System.arraycopy(values, 0, newValues, 0, count);
     values = newValues;
   }
 
@@ -80,7 +78,7 @@ public class FloatMultiTrieField extends AnalyticsField implements CastingFloatV
   }
   @Override
   public void streamDoubles(DoubleConsumer cons) {
-    streamFloats(value -> cons.accept((double)value));
+    streamFloats(value -> cons.accept(value));
   }
   @Override
   public void streamStrings(Consumer<String> cons) {

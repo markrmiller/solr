@@ -39,7 +39,7 @@ public class RoutingRule extends ZkNodeProps {
     if (rangesArr != null && rangesArr.length > 0)  {
       this.routeRanges = new ArrayList<>();
       for (String r : rangesArr) {
-        routeRanges.add(DocRouter.DEFAULT.fromString(r));
+        routeRanges.add(DocRouter.fromString(r));
       }
     } else  {
       this.routeRanges = null;
@@ -72,6 +72,6 @@ public class RoutingRule extends ZkNodeProps {
 
   @Override
   public String toString() {
-    return Utils.toJSONString(propMap);
+    return Utils.toJSONString(this);
   }
 }

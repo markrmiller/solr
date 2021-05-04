@@ -78,7 +78,7 @@ public class SolrQueryResponse {
    * @see #setAllValues
    * @see <a href="#returnable_data">Note on Returnable Data</a>
    */
-  protected NamedList<Object> values = new SimpleOrderedMap<>();
+  protected volatile NamedList<Object> values = new SimpleOrderedMap<>();
   
   
 /**
@@ -224,7 +224,8 @@ public class SolrQueryResponse {
 
   /** Returns a string of the form "logid name1=value1 name2=value2 ..." */
   public String getToLogAsString(String logid) {
-    StringBuilder sb = new StringBuilder(logid);
+    StringBuilder sb = new StringBuilder(logid.length() + 1024);
+    sb.append(logid);
     for (int i=0; i<toLog.size(); i++) {
       if (sb.length() > 0) {
         sb.append(' ');
@@ -359,5 +360,9 @@ public class SolrQueryResponse {
    */
   public Iterator<Entry<String, String>> httpHeaders() {
     return headers.iterator();
+  }
+
+  public NamedList<String> getHeaders() {
+    return headers;
   }
 }

@@ -25,7 +25,7 @@ public class LegacyFacetSortingTest extends LegacyAbstractAnalyticsTest {
   private static String fileName = "facetSorting.txt";
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeLegacyFacetSortingTest() throws Exception {
     initCore("solrconfig-analytics.xml", "schema-analytics.xml");
     h.update("<delete><query>*:*</query></delete>");
 
@@ -47,7 +47,7 @@ public class LegacyFacetSortingTest extends LegacyAbstractAnalyticsTest {
   public void addTest() throws Exception {
     Double minResult = (Double) getStatResult("ar", "min", VAL_TYPE.DOUBLE);
     Long maxResult = (Long) getStatResult("ar", "max", VAL_TYPE.LONG);
-    assertEquals(Double.valueOf(minResult), Double.valueOf(3.0));
-    assertEquals(Long.valueOf(maxResult),Long.valueOf(4));
+    assertEquals(minResult, Double.valueOf(3.0));
+    assertEquals(maxResult,Long.valueOf(4));
   }
 }

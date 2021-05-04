@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.metrics.MetricsMap;
 import org.apache.solr.metrics.SolrMetricsContext;
+import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class HdfsLocalityReporter implements SolrInfoBean {
   private SolrMetricsContext solrMetricsContext;
 
   public HdfsLocalityReporter() {
-    cache = new ConcurrentHashMap<>();
+    cache = new NonBlockingHashMap<>();
   }
 
   /**
@@ -154,7 +155,7 @@ public class HdfsLocalityReporter implements SolrInfoBean {
         log.info("Registering direcotry {} for locality metrics.", dir.getHdfsDirPath());
       }
     }
-    cache.put(dir, new ConcurrentHashMap<FileStatus, BlockLocation[]>());
+    cache.put(dir, new NonBlockingHashMap<FileStatus, BlockLocation[]>());
   }
 
   /**

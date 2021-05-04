@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.common.util.Utils;
@@ -39,6 +40,7 @@ import org.apache.solr.update.MergeIndexesCommand;
 import org.apache.solr.update.RollbackUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorFactory;
+import org.apache.solr.util.TestHarness;
 import org.junit.BeforeClass;
 
 /**
@@ -56,8 +58,8 @@ public abstract class AbstractDataImportHandlerTestCase extends
 
   // note, a little twisted that we shadow this static method
   public static void initCore(String config, String schema) throws Exception {
-    File testHome = createTempDir("core-home").toFile();
-    FileUtils.copyDirectory(getFile("dih/solr"), testHome);
+    File testHome = SolrTestUtil.createTempDir("core-home").toFile();
+    FileUtils.copyDirectory(SolrTestUtil.getFile("dih/solr"), testHome);
     initCore(config, schema, testHome.getAbsolutePath());
   }
 
@@ -67,8 +69,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
   }
 
   protected String loadDataConfig(String dataConfigFileName) {
-    try {
-      SolrCore core = h.getCore();
+    try (SolrCore core = h.getCore()) {
       return SolrWriter.getResourceAsString(core.getResourceLoader()
               .openResource(dataConfigFileName));
     } catch (IOException e) {
@@ -77,18 +78,18 @@ public abstract class AbstractDataImportHandlerTestCase extends
     }
   }
 
-  protected String runFullImport(String dataConfig) throws Exception {
+  protected static String runFullImport(String dataConfig) throws Exception {
     LocalSolrQueryRequest request = lrf.makeRequest("command", "full-import",
             "debug", "on", "clean", "true", "commit", "true", "dataConfig",
             dataConfig);
-    return h.query("/dataimport", request);
+    return query("/dataimport", request);
   }
 
-  protected void runDeltaImport(String dataConfig) throws Exception {
+  protected static void runDeltaImport(String dataConfig) throws Exception {
     LocalSolrQueryRequest request = lrf.makeRequest("command", "delta-import",
             "debug", "on", "clean", "false", "commit", "true", "dataConfig",
             dataConfig);
-    h.query("/dataimport", request);
+    TestHarness.query("/dataimport", request);
   }
 
   /**
@@ -97,7 +98,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
    */
   protected File redirectTempProperties(DataImporter di) {
     try {
-      File tempFile = createTempFile().toFile();
+      File tempFile = SolrTestUtil.createTempFile().toFile();
       di.getConfig().getPropertyWriter().getParameters()
         .put(SimplePropertiesWriter.FILENAME, tempFile.getAbsolutePath());
       return tempFile;
@@ -116,7 +117,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
    * @throws Exception in case of any error
    */
   @SuppressWarnings({"unchecked"})
-  protected void runFullImport(String dataConfig, Map<String, String> extraParams) throws Exception {
+  protected static void runFullImport(String dataConfig, Map<String,String> extraParams) throws Exception {
     HashMap<String, String> params = new HashMap<>();
     params.put("command", "full-import");
     params.put("debug", "on");
@@ -129,8 +130,8 @@ public abstract class AbstractDataImportHandlerTestCase extends
     for (Map.Entry<String, String> e : params.entrySet()) {
       l.add(e.getKey(),e.getValue());
     }
-    LocalSolrQueryRequest request = new LocalSolrQueryRequest(h.getCore(), l);  
-    h.query("/dataimport", request);
+    LocalSolrQueryRequest request = new LocalSolrQueryRequest(h.getCore(), l, true);
+    query("/dataimport", request);
   }
 
   /**
@@ -337,6 +338,15 @@ public abstract class AbstractDataImportHandlerTestCase extends
     public TestUpdateRequestProcessor(UpdateRequestProcessor next) {
       super(next);
       reset();
+    }
+
+    public void doClose() {
+      super.doClose();
+      try {
+        next.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
 
     @Override

@@ -33,7 +33,7 @@ public class StreamExpressionNamedParameter implements StreamExpressionParameter
   }
   public StreamExpressionNamedParameter(String name, StreamExpressionParameter parameter){
     this.name = name;
-    setParameter(parameter);
+    this.parameter = parameter;
   }
   
   public String getName(){
@@ -54,7 +54,7 @@ public class StreamExpressionNamedParameter implements StreamExpressionParameter
     this.parameter = parameter;
   }
   public StreamExpressionNamedParameter withParameter(StreamExpressionParameter parameter){
-    setParameter(parameter);
+    this.parameter = parameter;
     return this;
   }
   public void setParameter(String parameter){

@@ -160,24 +160,7 @@ public class ExactStatsCache extends StatsCache {
       HashSet<Term> terms = new HashSet<>();
       HashMap<String,TermStats> statsMap = new HashMap<>();
       HashMap<String,CollectionStats> colMap = new HashMap<>();
-      IndexSearcher statsCollectingSearcher = new IndexSearcher(searcher.getIndexReader()){
-        @Override
-        public CollectionStatistics collectionStatistics(String field) throws IOException {
-          CollectionStatistics cs = super.collectionStatistics(field);
-          if (cs != null) {
-            colMap.put(field, new CollectionStats(cs));
-          }
-          return cs;
-        }
-
-        @Override
-        public TermStatistics termStatistics(Term term, int docFreq, long totalTermFreq) throws IOException {
-          TermStatistics ts = super.termStatistics(term, docFreq, totalTermFreq);
-          terms.add(term);
-          statsMap.put(term.toString(), new TermStats(term.field(), ts));
-          return ts;
-        }
-      };
+      IndexSearcher statsCollectingSearcher = new MyIndexSearcher(searcher, colMap, terms, statsMap);
       statsCollectingSearcher.createWeight(searcher.rewrite(q), ScoreMode.COMPLETE, 1);
       for (String field : additionalFields) {
         if (colMap.containsKey(field)) {
@@ -366,6 +349,36 @@ public class ExactStatsCache extends StatsCache {
       } else {
         return colStats.toCollectionStatistics();
       }
+    }
+  }
+
+  private static class MyIndexSearcher extends IndexSearcher {
+    private final HashMap<String,CollectionStats> colMap;
+    private final HashSet<Term> terms;
+    private final HashMap<String,TermStats> statsMap;
+
+    public MyIndexSearcher(SolrIndexSearcher searcher, HashMap<String,CollectionStats> colMap, HashSet<Term> terms, HashMap<String,TermStats> statsMap) {
+      super(searcher.getIndexReader());
+      this.colMap = colMap;
+      this.terms = terms;
+      this.statsMap = statsMap;
+    }
+
+    @Override
+    public CollectionStatistics collectionStatistics(String field) throws IOException {
+      CollectionStatistics cs = super.collectionStatistics(field);
+      if (cs != null) {
+        colMap.put(field, new CollectionStats(cs));
+      }
+      return cs;
+    }
+
+    @Override
+    public TermStatistics termStatistics(Term term, int docFreq, long totalTermFreq) throws IOException {
+      TermStatistics ts = super.termStatistics(term, docFreq, totalTermFreq);
+      terms.add(term);
+      statsMap.put(term.toString(), new TermStats(term.field(), ts));
+      return ts;
     }
   }
 }

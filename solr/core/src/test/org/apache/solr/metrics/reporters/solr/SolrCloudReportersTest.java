@@ -20,6 +20,8 @@ import java.nio.file.Paths;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.core.CoreContainer;
@@ -31,7 +33,7 @@ import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricReporter;
 import org.apache.solr.metrics.reporters.SolrJmxReporter;
 import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.codahale.metrics.Metric;
@@ -39,17 +41,11 @@ import com.codahale.metrics.Metric;
 /**
  *
  */
+@Ignore // MRM TODO: fix silly sleeps
 public class SolrCloudReportersTest extends SolrCloudTestCase {
   volatile int leaderRegistries;
   volatile int clusterRegistries;
   volatile int jmxReporter;
-
-
-
-  @BeforeClass
-  public static void configureDummyCluster() throws Exception {
-    configureCluster(0).configure();
-  }
 
   @Before
   public void closePreviousCluster() throws Exception {
@@ -60,14 +56,13 @@ public class SolrCloudReportersTest extends SolrCloudTestCase {
 
   @Test
   // commented 4-Sep-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 2-Aug-2018
+  @LuceneTestCase.AwaitsFix(bugUrl = "remove silly sleep")
   public void testExplicitConfiguration() throws Exception {
     String solrXml = IOUtils.toString(SolrCloudReportersTest.class.getResourceAsStream("/solr/solr-solrreporter.xml"), "UTF-8");
-    configureCluster(2)
-        .withSolrXml(solrXml).configure();
-    cluster.uploadConfigSet(Paths.get(TEST_PATH().toString(), "configsets", "minimal", "conf"), "test");
+    configureCluster(2).withSolrXml(solrXml).addConfig("test", SolrTestUtil.configset("cloud-minimal")).configure();
 
     CollectionAdminRequest.createCollection("test_collection", "test", 2, 2)
-        .setMaxShardsPerNode(4)
+        .setMaxShardsPerNode(2)
         .process(cluster.getSolrClient());
     cluster.waitForActiveCollection("test_collection", 2, 4);
     
@@ -166,7 +161,7 @@ public class SolrCloudReportersTest extends SolrCloudTestCase {
     String solrXml = IOUtils.toString(SolrCloudReportersTest.class.getResourceAsStream("/solr/solr.xml"), "UTF-8");
     configureCluster(2)
         .withSolrXml(solrXml).configure();
-    cluster.uploadConfigSet(Paths.get(TEST_PATH().toString(), "configsets", "minimal", "conf"), "test");
+    cluster.uploadConfigSet(Paths.get(SolrTestUtil.TEST_PATH().toString(), "configsets", "minimal", "conf"), "test");
 
     CollectionAdminRequest.createCollection("test_collection", "test", 2, 2)
         .setMaxShardsPerNode(4)

@@ -27,10 +27,11 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import org.apache.http.client.HttpClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.cloud.LeaderElector;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.ZkController;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.core.CoreContainer;
@@ -101,28 +102,9 @@ public class SolrClusterReporter extends SolrCoreContainerReporter {
         SolrMetricManager.enforcePrefix(SolrInfoBean.Group.jetty.toString()),
         Collections.emptySet())); // all metrics
     add(new SolrReporter.Report(CLUSTER_GROUP, "jvm",
-        SolrMetricManager.enforcePrefix(SolrInfoBean.Group.jvm.toString()),
-        new HashSet<String>() {{
-          add("memory\\.total\\..*");
-          add("memory\\.heap\\..*");
-          add("os\\.SystemLoadAverage");
-          add("os\\.FreePhysicalMemorySize");
-          add("os\\.FreeSwapSpaceSize");
-          add("os\\.OpenFileDescriptorCount");
-          add("threads\\.count");
-        }}));
-    add(new SolrReporter.Report(CLUSTER_GROUP, "node", SolrMetricManager.enforcePrefix(SolrInfoBean.Group.node.toString()),
-        new HashSet<String>() {{
-          add("CONTAINER\\.cores\\..*");
-          add("CONTAINER\\.fs\\..*");
-        }}));
-    add(new SolrReporter.Report(CLUSTER_GROUP, "leader.$1", "solr\\.core\\.(.*)\\.leader",
-        new HashSet<String>(){{
-          add("UPDATE\\./update/.*");
-          add("QUERY\\./select.*");
-          add("INDEX\\..*");
-          add("TLOG\\..*");
-    }}));
+        SolrMetricManager.enforcePrefix(SolrInfoBean.Group.jvm.toString()), new JVMSet()));
+    add(new SolrReporter.Report(CLUSTER_GROUP, "node", SolrMetricManager.enforcePrefix(SolrInfoBean.Group.node.toString()), new ContainerSet()));
+    add(new SolrReporter.Report(CLUSTER_GROUP, "leader.$1", "solr\\.core\\.(.*)\\.leader", new CoreLeaderSet()));
   }};
 
   private String handler = MetricsCollectorHandler.HANDLER_PATH;
@@ -208,7 +190,7 @@ public class SolrClusterReporter extends SolrCoreContainerReporter {
       log.info("Turning off node reporter, period={}", period);
       return;
     }
-    HttpClient httpClient = cc.getUpdateShardHandler().getDefaultHttpClient();
+    Http2SolrClient httpClient = cc.getUpdateShardHandler().getTheSharedHttpClient();
     ZkController zk = cc.getZkController();
     String reporterId = zk.getNodeName();
     reporter = SolrReporter.Builder.forReports(metricManager, reports)
@@ -220,7 +202,7 @@ public class SolrClusterReporter extends SolrCoreContainerReporter {
         .cloudClient(false) // we want to send reports specifically to a selected leader instance
         .skipAggregateValues(true) // we don't want to transport details of aggregates
         .skipHistograms(true) // we don't want to transport histograms
-        .build(httpClient, new OverseerUrlSupplier(zk));
+        .build(cc.getZkController().getZkStateReader(), httpClient, new OverseerUrlSupplier(zk));
 
     reporter.start(period, TimeUnit.SECONDS);
   }
@@ -256,12 +238,12 @@ public class SolrClusterReporter extends SolrCoreContainerReporter {
       ZkNodeProps props;
       try {
         props = ZkNodeProps.load(zkClient.getData(
-            Overseer.OVERSEER_ELECT + "/leader", null, null, true));
+            Overseer.OVERSEER_ELECT + "/leader", null, null));
       } catch (KeeperException e) {
         log.warn("Could not obtain overseer's address, skipping.", e);
         return lastKnownUrl;
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
+        ParWork.propagateInterrupt(e);
         return lastKnownUrl;
       }
       if (props == null) {
@@ -292,4 +274,31 @@ public class SolrClusterReporter extends SolrCoreContainerReporter {
     }
   }
 
+  private static class JVMSet extends HashSet<String> {
+    {
+      add("memory\\.total\\..*");
+      add("memory\\.heap\\..*");
+      add("os\\.SystemLoadAverage");
+      add("os\\.FreePhysicalMemorySize");
+      add("os\\.FreeSwapSpaceSize");
+      add("os\\.OpenFileDescriptorCount");
+      add("threads\\.count");
+    }
+  }
+
+  private static class ContainerSet extends HashSet<String> {
+    {
+      add("CONTAINER\\.cores\\..*");
+      add("CONTAINER\\.fs\\..*");
+    }
+  }
+
+  private static class CoreLeaderSet extends HashSet<String> {
+    {
+      add("UPDATE\\./update/.*");
+      add("QUERY\\./select.*");
+      add("INDEX\\..*");
+      add("TLOG\\..*");
+}
+  }
 }

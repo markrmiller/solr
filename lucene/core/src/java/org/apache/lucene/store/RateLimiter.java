@@ -106,7 +106,7 @@ public abstract class RateLimiter {
 
       long startNS = System.nanoTime();
 
-      double secondsToPause = (bytes/1024./1024.) / mbPerSec;
+      double secondsToPause = (bytes/1024.0/1024.0) / mbPerSec;
 
       long targetNS;
 
@@ -123,7 +123,7 @@ public abstract class RateLimiter {
           // no pausing to do.
 
           // Set to startNS, not targetNS, to enforce the instant rate, not
-          // the "averaaged over all history" rate:
+          // the "averaged over all history" rate:
           lastNS = startNS;
           return 0;
         }
@@ -149,7 +149,7 @@ public abstract class RateLimiter {
               sleepMS = Integer.MAX_VALUE;
               sleepNS = 0;
             } else {
-              sleepMS = (int) (pauseNS/1000000);
+              sleepMS = (int) (pauseNS/1000000.0);
               sleepNS = (int) (pauseNS % 1000000);
             }
             Thread.sleep(sleepMS, sleepNS);

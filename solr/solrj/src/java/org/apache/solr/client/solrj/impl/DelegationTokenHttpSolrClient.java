@@ -17,7 +17,6 @@
 package org.apache.solr.client.solrj.impl;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -52,14 +51,14 @@ public class DelegationTokenHttpSolrClient extends HttpSolrClient {
     if (delegationToken == null) {
       throw new IllegalArgumentException("Delegation token cannot be null");
     }
-    setQueryParams(new TreeSet<>(Arrays.asList(DELEGATION_TOKEN_PARAM)));
+    setQueryParams(new TreeSet<>(Collections.singletonList(DELEGATION_TOKEN_PARAM)));
     invariantParams = new ModifiableSolrParams();
     invariantParams.set(DELEGATION_TOKEN_PARAM, delegationToken);
   }
   
   protected DelegationTokenHttpSolrClient(Builder builder) {
     super(builder);
-    setQueryParams(new TreeSet<>(Arrays.asList(DELEGATION_TOKEN_PARAM)));
+    setQueryParams(new TreeSet<>(Collections.singletonList(DELEGATION_TOKEN_PARAM)));
   }
 
   /**
@@ -84,7 +83,7 @@ public class DelegationTokenHttpSolrClient extends HttpSolrClient {
       ModifiableSolrParams invariantParams) {
     super(baseURL, client, parser, allowCompression, invariantParams);
 
-    setQueryParams(new TreeSet<>(Arrays.asList(DELEGATION_TOKEN_PARAM)));
+    setQueryParams(new TreeSet<>(Collections.singletonList(DELEGATION_TOKEN_PARAM)));
   }
 
   @Override

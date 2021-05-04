@@ -22,8 +22,10 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.store.NativeFSLockFactory;
 import org.apache.lucene.store.SimpleFSLockFactory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +35,7 @@ import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.util.Map;
 
+@Ignore // MRM TODO:
 public class SolrCoreCheckLockOnStartupTest extends SolrTestCaseJ4 {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -52,7 +55,7 @@ public class SolrCoreCheckLockOnStartupTest extends SolrTestCaseJ4 {
   @Test
   public void testSimpleLockErrorOnStartup() throws Exception {
 
-    Directory directory = newFSDirectory(new File(initAndGetDataDir(), "index").toPath(), SimpleFSLockFactory.INSTANCE);
+    Directory directory = LuceneTestCase.newFSDirectory(new File(initAndGetDataDir(), "index").toPath(), SimpleFSLockFactory.INSTANCE);
     //creates a new IndexWriter without releasing the lock yet
     IndexWriter indexWriter = new IndexWriter(directory, new IndexWriterConfig(null));
 
@@ -80,7 +83,7 @@ public class SolrCoreCheckLockOnStartupTest extends SolrTestCaseJ4 {
     if (log.isInfoEnabled()) {
       log.info("Acquiring lock on {}", indexDir.getAbsolutePath());
     }
-    Directory directory = newFSDirectory(indexDir.toPath(), NativeFSLockFactory.INSTANCE);
+    Directory directory = LuceneTestCase.newFSDirectory(indexDir.toPath(), NativeFSLockFactory.INSTANCE);
     //creates a new IndexWriter without releasing the lock yet
     IndexWriter indexWriter = new IndexWriter(directory, new IndexWriterConfig(null));
 

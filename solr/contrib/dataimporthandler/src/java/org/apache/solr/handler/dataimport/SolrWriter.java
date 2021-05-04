@@ -157,7 +157,7 @@ public class SolrWriter extends DIHWriterBase implements DIHWriter {
 
       }
     }
-    return new String(baos.toByteArray(), StandardCharsets.UTF_8);
+    return baos.toString(StandardCharsets.UTF_8);
   }
 
   static String getDocCount() {

@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.commons.io.IOUtils;
 
+import javax.xml.XMLConstants;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
@@ -118,6 +119,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
       try {
         // create an instance of TransformerFactory
         TransformerFactory transFact = TransformerFactory.newInstance();
+        transFact.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         final SolrCore core = context.getSolrCore();
         final StreamSource xsltSource;
         if (core != null) {
@@ -226,7 +228,6 @@ public class XPathEntityProcessor extends EntityProcessorBase {
     readUsefulVars(r);
   }
 
-  @SuppressWarnings("unchecked")
   private Map<String, Object> fetchNextRow() {
     Map<String, Object> r = null;
     while (true) {
@@ -353,7 +354,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
     }
   }
 
-  private void closeIt(Reader data) {
+  private static void closeIt(Reader data) {
     try {
       data.close();
     } catch (Exception e) { /* Ignore */
@@ -399,7 +400,6 @@ public class XPathEntityProcessor extends EntityProcessorBase {
 
   }
 
-  @SuppressWarnings("unchecked")
   private Map<String, Object> readUsefulVars(Map<String, Object> r) {
     Object val = r.get(HAS_MORE);
     if (val != null)

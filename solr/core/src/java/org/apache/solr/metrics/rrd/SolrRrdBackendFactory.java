@@ -28,14 +28,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
 import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -45,9 +47,11 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
+import org.jctools.maps.NonBlockingHashMap;
 import org.rrd4j.core.RrdBackend;
 import org.rrd4j.core.RrdBackendFactory;
 import org.slf4j.Logger;
@@ -81,11 +85,12 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
   private final String collection;
   private final int syncPeriod;
   private final int idPrefixLength;
+  private final ScheduledFuture<?> scheduledFuture;
   private ScheduledThreadPoolExecutor syncService;
   private volatile boolean closed = false;
   private volatile boolean persistent = true;
 
-  private final Map<String, SolrRrdBackend> backends = new ConcurrentHashMap<>();
+  private final Map<String, SolrRrdBackend> backends = new NonBlockingHashMap<>();
 
   /**
    * Create a factory.
@@ -97,6 +102,7 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
    * @param timeSource time source
    */
   public SolrRrdBackendFactory(SolrClient solrClient, String collection, int syncPeriod, TimeSource timeSource) {
+    assert ObjectReleaseTracker.getInstance().track(this);
     this.solrClient = solrClient;
     this.timeSource = timeSource;
     this.collection = collection;
@@ -106,10 +112,11 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
     }
     this.idPrefixLength = ID_PREFIX.length() + ID_SEP.length();
     syncService = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(2,
-        new SolrNamedThreadFactory("SolrRrdBackendFactory"));
+        new SolrNamedThreadFactory("SolrRrdBackendFactory", true));
     syncService.setRemoveOnCancelPolicy(true);
     syncService.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-    syncService.scheduleWithFixedDelay(() -> maybeSyncBackends(),
+    syncService.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+    scheduledFuture = syncService.scheduleWithFixedDelay(() -> maybeSyncBackends(),
         timeSource.convertDelay(TimeUnit.SECONDS, syncPeriod, TimeUnit.MILLISECONDS),
         timeSource.convertDelay(TimeUnit.SECONDS, syncPeriod, TimeUnit.MILLISECONDS),
         TimeUnit.MILLISECONDS);
@@ -130,7 +137,7 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
     if (uri == null) {
       return false;
     }
-    if (uri.getScheme().toUpperCase(Locale.ROOT).equals(getName())) {
+    if (uri.getScheme().toUpperCase(Locale.ROOT).equalsIgnoreCase(NAME)) {
       return true;
     } else {
       return false;
@@ -223,7 +230,7 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
       }
       if (o instanceof byte[]) {
         Object timeObj = doc.getFieldValue("timestamp_l");
-        Long time = timeObj instanceof Number ? ((Number)timeObj).longValue() : Long.parseLong(String.valueOf(timeObj));
+        long time = timeObj instanceof Number ? ((Number)timeObj).longValue() : Long.parseLong(String.valueOf(timeObj));
         return new SolrRrdBackend.SyncData((byte[])o, time);
       } else {
         throw new SolrServerException("Unexpected value of '" + DATA_FIELD + "' field: " + o.getClass().getName() + ": " + o);
@@ -332,6 +339,11 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
       return;
     }
     // remove Solr doc
+    if (solrClient instanceof BaseCloudSolrClient) {
+      if (((BaseCloudSolrClient) solrClient).getZkStateReader().getClusterState().getCollectionOrNull(collection) == null) {
+        return;
+      }
+    }
     try {
       solrClient.deleteByQuery(collection, "{!term f=id}" + ID_PREFIX + ID_SEP + path);
     } catch (SolrServerException | SolrException e) {
@@ -459,9 +471,26 @@ public class SolrRrdBackendFactory extends RrdBackendFactory implements SolrClos
       log.debug("Closing {}", hashCode());
     }
     closed = true;
-    backends.forEach((p, b) -> IOUtils.closeQuietly(b));
-    backends.clear();
-    syncService.shutdownNow();
+
+    if (scheduledFuture != null) {
+      scheduledFuture.cancel(false);
+    }
+    if (syncService != null) {
+      syncService.shutdown();
+      try {
+        boolean success = syncService.awaitTermination(1, TimeUnit.SECONDS);
+        if (!success) {
+          syncService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        ParWork.propagateInterrupt(e);
+      }
+    }
+
+    try (ParWork closer = new ParWork(this, true)) {
+      closer.collect(backends.values());
+    }
     syncService = null;
+    assert ObjectReleaseTracker.getInstance().release(this);
   }
 }

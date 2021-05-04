@@ -85,7 +85,7 @@ public abstract class MergePolicy {
       OTHER
     };
 
-    private final ReentrantLock pauseLock = new ReentrantLock();
+    private final ReentrantLock pauseLock = new ReentrantLock(true);
     private final Condition pausing = pauseLock.newCondition();
 
     /**

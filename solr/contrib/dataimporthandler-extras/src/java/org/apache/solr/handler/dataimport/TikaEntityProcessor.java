@@ -18,6 +18,7 @@ package org.apache.solr.handler.dataimport;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.tika.config.TikaConfig;
+import org.apache.tika.metadata.Geographic;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.EmptyParser;
@@ -33,6 +34,7 @@ import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+import javax.xml.XMLConstants;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
@@ -190,8 +192,8 @@ public class TikaEntityProcessor extends EntityProcessorBase {
 
   private void tryToAddLatLon(Metadata metadata, Map<String, Object> row) {
     if (spatialMetadataField == null) return;
-    String latString = metadata.get(Metadata.LATITUDE);
-    String lonString = metadata.get(Metadata.LONGITUDE);
+    String latString = metadata.get(Geographic.LATITUDE);
+    String lonString = metadata.get(Geographic.LONGITUDE);
     if (latString != null && lonString != null) {
       row.put(spatialMetadataField, String.format(Locale.ROOT, "%s,%s", latString, lonString));
     }
@@ -199,8 +201,9 @@ public class TikaEntityProcessor extends EntityProcessorBase {
 
   private static ContentHandler getHtmlHandler(Writer writer)
           throws TransformerConfigurationException {
-    SAXTransformerFactory factory = (SAXTransformerFactory)
-            TransformerFactory.newInstance();
+    TransformerFactory newInstance = TransformerFactory.newInstance();
+    newInstance.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    SAXTransformerFactory factory = (SAXTransformerFactory) newInstance;
     TransformerHandler handler = factory.newTransformerHandler();
     handler.getTransformer().setOutputProperty(OutputKeys.METHOD, "html");
     handler.setResult(new StreamResult(writer));
@@ -242,8 +245,9 @@ public class TikaEntityProcessor extends EntityProcessorBase {
 
   private static ContentHandler getXmlContentHandler(Writer writer)
           throws TransformerConfigurationException {
-    SAXTransformerFactory factory = (SAXTransformerFactory)
-            TransformerFactory.newInstance();
+    TransformerFactory newInstance = TransformerFactory.newInstance();
+    newInstance.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    SAXTransformerFactory factory = (SAXTransformerFactory) newInstance;
     TransformerHandler handler = factory.newTransformerHandler();
     handler.getTransformer().setOutputProperty(OutputKeys.METHOD, "xml");
     handler.setResult(new StreamResult(writer));

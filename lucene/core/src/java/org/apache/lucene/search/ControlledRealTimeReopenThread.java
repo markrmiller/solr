@@ -156,7 +156,7 @@ public class ControlledRealTimeReopenThread<T> extends Thread implements Closeab
       // Notify the reopen thread that the waitingGen has
       // changed, so it may wake up and realize it should
       // not sleep for much or any longer before reopening:
-      reopenLock.lock();
+      reopenCond.signalAll();
 
       // Need to find waitingGen inside lock as it's used to determine
       // stale time

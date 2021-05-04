@@ -163,7 +163,7 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
     long jwkCacheDuration = Long.parseLong((String) pluginConfig.getOrDefault(PARAM_JWK_CACHE_DURATION, "3600"));
     JWTIssuerConfig.setHttpsJwksFactory(new JWTIssuerConfig.HttpsJwksFactory(jwkCacheDuration, DEFAULT_REFRESH_REPRIEVE_THRESHOLD));
 
-    issuerConfigs = new ArrayList<>();
+    issuerConfigs = Collections.synchronizedList(new ArrayList<>());
 
     // Try to parse an issuer from top level config, and add first (primary issuer)
     Optional<JWTIssuerConfig> topLevelIssuer = parseIssuerFromTopLevelConfig(pluginConfig);
@@ -205,7 +205,7 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
   }
 
   @SuppressWarnings("unchecked")
-  private Optional<JWTIssuerConfig> parseIssuerFromTopLevelConfig(Map<String, Object> conf) {
+  private static Optional<JWTIssuerConfig> parseIssuerFromTopLevelConfig(Map<String,Object> conf) {
     try {
       if (conf.get(JWTIssuerConfig.PARAM_JWK_URL) != null) {
         log.warn("Configuration uses deprecated key {}. Please use {} instead", JWTIssuerConfig.PARAM_JWK_URL, JWTIssuerConfig.PARAM_JWKS_URL);
@@ -250,8 +250,7 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
    * @param pluginConfig the main config object
    * @return a list of parsed {@link JWTIssuerConfig} objects
    */
-  @SuppressWarnings("unchecked")
-  List<JWTIssuerConfig> parseIssuers(Map<String, Object> pluginConfig) {
+  @SuppressWarnings("unchecked") static List<JWTIssuerConfig> parseIssuers(Map<String,Object> pluginConfig) {
     List<JWTIssuerConfig> configs = new ArrayList<>();
     try {
       List<Map<String, Object>> issuers = (List<Map<String, Object>>) pluginConfig.get(PARAM_ISSUERS);
@@ -476,7 +475,7 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
     }
   }
 
-  private String parseAuthorizationHeader(String authorizationHeader) {
+  private static String parseAuthorizationHeader(String authorizationHeader) {
     StringTokenizer st = new StringTokenizer(authorizationHeader);
     if (st.hasMoreTokens()) {
       String bearer = st.nextToken();
@@ -526,12 +525,11 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
    * if no changes are to be made as a result of this edit. It is the responsibility
    * of the implementation to ensure that the returned config is valid . The framework
    * does no validation of the data
-   *
-   * @param latestConf latest version of config
+   *  @param latestConf latest version of config
    * @param commands the list of command operations to perform
-   */
+   * @return*/
   @Override
-  public Map<String, Object> edit(Map<String, Object> latestConf, List<CommandOperation> commands) {
+  public Map<String,Object> edit(Map<String,Object> latestConf, List<CommandOperation> commands) {
     for (CommandOperation command : commands) {
       if (command.name.equals("set-property")) {
         for (Map.Entry<String, Object> e : command.getDataMap().entrySet()) {

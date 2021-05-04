@@ -38,7 +38,7 @@ public class ManagedStopFilterFactory extends BaseManagedTokenFilterFactory {
 
   // this only gets changed once during core initialization and not every
   // time an update is made to the underlying managed word set.
-  private CharArraySet stopWords = null;
+  private volatile CharArraySet stopWords = null;
 
   /**
    * Initialize the managed "handle"

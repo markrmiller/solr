@@ -18,12 +18,12 @@ package org.apache.solr.ltr.store;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.ltr.model.LTRScoringModel;
 import org.apache.solr.ltr.model.ModelException;
+import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * Contains the model and features declared.
@@ -33,7 +33,7 @@ public class ModelStore {
   private final Map<String,LTRScoringModel> availableModels;
 
   public ModelStore() {
-    availableModels = new HashMap<>();
+    availableModels = new NonBlockingHashMap<>();
   }
 
   public synchronized LTRScoringModel getModel(String name) {
@@ -59,16 +59,17 @@ public class ModelStore {
     return availableModels.remove(modelName);
   }
 
-  public synchronized void addModel(LTRScoringModel modeldata)
+  public void addModel(LTRScoringModel modeldata)
       throws ModelException {
     final String name = modeldata.getName();
 
-    if (availableModels.containsKey(name)) {
-      throw new ModelException("model '" + name
-          + "' already exists. Please use a different name");
-    }
-
-    availableModels.put(modeldata.getName(), modeldata);
+    availableModels.compute(name, (s, ltrScoringModel) -> {
+      if (ltrScoringModel != null) {
+        throw new ModelException("model '" + name
+            + "' already exists. Please use a different name");
+      }
+      return modeldata;
+    });
   }
 
 }

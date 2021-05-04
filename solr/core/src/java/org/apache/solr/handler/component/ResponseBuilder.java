@@ -16,13 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.search.grouping.SearchGroup;
@@ -46,6 +39,13 @@ import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.grouping.GroupingSpecification;
 import org.apache.solr.search.grouping.distributed.command.QueryCommandResult;
 import org.apache.solr.util.RTimer;
+import org.jctools.maps.NonBlockingHashMap;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * This class is experimental and will be changing in the future.
@@ -55,6 +55,8 @@ import org.apache.solr.util.RTimer;
  */
 public class ResponseBuilder
 {
+  public static final int[] EMPTY_INTS = {};
+  public static final float[] EMPTY_FLOATS = {};
   public SolrQueryRequest req;
   public SolrQueryResponse rsp;
   public boolean doHighlights;
@@ -185,12 +187,12 @@ public class ResponseBuilder
   boolean _isOlapAnalytics;
 
   // Context fields for grouping
-  public final Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups = new HashMap<>();
-  public final Map<String, Integer> mergedGroupCounts = new HashMap<>();
-  public final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new HashMap<>();
-  public final Map<String, TopGroups<BytesRef>> mergedTopGroups = new HashMap<>();
-  public final Map<String, QueryCommandResult> mergedQueryCommandResults = new HashMap<>();
-  public final Map<Object, SolrDocument> retrievedDocuments = new HashMap<>();
+  public final Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups = new NonBlockingHashMap<>();
+  public final Map<String, Integer> mergedGroupCounts = new NonBlockingHashMap<>();
+  public final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new NonBlockingHashMap<>();
+  public final Map<String, TopGroups<BytesRef>> mergedTopGroups = new NonBlockingHashMap<>();
+  public final Map<String, QueryCommandResult> mergedQueryCommandResults = new NonBlockingHashMap<>();
+  public final Map<Object, SolrDocument> retrievedDocuments = new NonBlockingHashMap<>();
   public int totalHitCount; // Hit count used when distributed grouping is performed.
   // Used for timeAllowed parameter. First phase elapsed time is subtracted from the time allowed for the second phase.
   public int firstPhaseElapsedTime;
@@ -423,14 +425,14 @@ public class ResponseBuilder
    */
   public QueryCommand createQueryCommand() {
     QueryCommand cmd = new QueryCommand();
-    cmd.setQuery(wrap(getQuery()))
-            .setFilterList(getFilters())
-            .setSort(getSortSpec().getSort())
-            .setOffset(getSortSpec().getOffset())
-            .setLen(getSortSpec().getCount())
-            .setFlags(getFieldFlags())
-            .setNeedDocSet(isNeedDocSet())
-            .setCursorMark(getCursorMark());
+    cmd.setQuery(wrap(query))
+            .setFilterList(filters)
+            .setSort(sortSpec.getSort())
+            .setOffset(sortSpec.getOffset())
+            .setLen(sortSpec.getCount())
+            .setFlags(fieldFlags)
+            .setNeedDocSet(needDocSet)
+            .setCursorMark(cursorMark);
     return cmd;
   }
 
@@ -447,12 +449,12 @@ public class ResponseBuilder
    * Sets results from a SolrIndexSearcher.QueryResult.
    */
   public void setResult(QueryResult result) {
-    setResults(result.getDocListAndSet());
+    results = result.getDocListAndSet();
     if (result.isPartialResults()) {
       rsp.getResponseHeader().asShallowMap()
           .put(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY, Boolean.TRUE);
-      if(getResults() != null && getResults().docList==null) {
-        getResults().docList = new DocSlice(0, 0, new int[] {}, new float[] {}, 0, 0, TotalHits.Relation.EQUAL_TO);
+      if(results != null && results.docList==null) {
+        results.docList = new DocSlice(0, 0, EMPTY_INTS, EMPTY_FLOATS, 0, 0, TotalHits.Relation.EQUAL_TO);
       }
     }
     final Boolean segmentTerminatedEarly = result.getSegmentTerminatedEarly();
@@ -461,7 +463,7 @@ public class ResponseBuilder
     }
     if (null != cursorMark) {
       assert null != result.getNextCursorMark() : "using cursor but no next cursor set";
-      this.setNextCursorMark(result.getNextCursorMark());
+      this.nextCursorMark = result.getNextCursorMark();
     }
   }
   

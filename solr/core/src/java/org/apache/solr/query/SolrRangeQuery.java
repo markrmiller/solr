@@ -118,9 +118,9 @@ public final class SolrRangeQuery extends ExtendedQueryBase implements DocSetPro
 
   @Override
   public String toString(String field) {
-    StringBuilder buffer = new StringBuilder();
-    if (!getField().equals(field)) {
-      buffer.append(getField());
+    StringBuilder buffer = new StringBuilder(32);
+    if (!this.field.equals(field)) {
+      buffer.append(this.field);
       buffer.append(":");
     }
     // TODO: use our schema?
@@ -137,7 +137,7 @@ public final class SolrRangeQuery extends ExtendedQueryBase implements DocSetPro
     visitor.visitLeaf(this);
   }
 
-  private String endpoint(BytesRef ref) {
+  private static String endpoint(BytesRef ref) {
     if (ref == null) return "*";
     String toStr = Term.toString(ref);
     if ("*".equals(toStr)) {
@@ -300,7 +300,7 @@ public final class SolrRangeQuery extends ExtendedQueryBase implements DocSetPro
 
 
   public TermsEnum getTermsEnum(LeafReaderContext ctx) throws IOException {
-    return new RangeTermsEnum( ctx.reader().terms(getField()) );
+    return new RangeTermsEnum( ctx.reader().terms(field) );
   }
 
 

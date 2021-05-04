@@ -18,9 +18,9 @@ package org.apache.lucene.analysis.ja;
 
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.TokenStream;
@@ -47,7 +47,7 @@ public class JapanesePartOfSpeechStopFilterFactory extends TokenFilterFactory im
   public static final String NAME = "japanesePartOfSpeechStop";
 
   private final String stopTagFiles;
-  private Set<String> stopTags;
+  private final Set<String> stopTags = ConcurrentHashMap.newKeySet();
 
   /** Creates a new JapanesePartOfSpeechStopFilterFactory */
   public JapanesePartOfSpeechStopFilterFactory(Map<String,String> args) {
@@ -65,10 +65,9 @@ public class JapanesePartOfSpeechStopFilterFactory extends TokenFilterFactory im
 
   @Override
   public void inform(ResourceLoader loader) throws IOException {
-    stopTags = null;
+    stopTags.clear();
     CharArraySet cas = getWordSet(loader, stopTagFiles, false);
     if (cas != null) {
-      stopTags = new HashSet<>();
       for (Object element : cas) {
         char chars[] = (char[]) element;
         stopTags.add(new String(chars));
@@ -79,7 +78,7 @@ public class JapanesePartOfSpeechStopFilterFactory extends TokenFilterFactory im
   @Override
   public TokenStream create(TokenStream stream) {
     // if stoptags is null, it means the file is empty
-    if (stopTags != null) {
+    if (stopTags .size() > 0) {
       final TokenStream filter = new JapanesePartOfSpeechStopFilter(stream, stopTags);
       return filter;
     } else {

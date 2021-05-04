@@ -41,9 +41,7 @@ public class DateFormatTransformer extends Transformer {
   private Map<String, SimpleDateFormat> fmtCache = new HashMap<>();
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public Object transformRow(Map<String, Object> aRow, Context context) {
+  @Override public Object transformRow(Map<String, Object> aRow, Context context) {
 
     for (Map<String, String> map : context.getAllEntityFields()) {
       Locale locale = Locale.ENGLISH; // we default to ENGLISH for dates for full Java 9 compatibility

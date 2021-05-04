@@ -35,7 +35,7 @@ public class StoppableCommitThread extends StoppableThread {
   private final AtomicInteger numFails = new AtomicInteger(0);
 
   public StoppableCommitThread(SolrClient cloudClient, long timeBetweenCommitsMs, boolean softCommits) {
-    super("StoppableCommitThread");
+    super();
     this.cloudClient = cloudClient;
     this.timeBetweenCommitsMs = timeBetweenCommitsMs;
     this.softCommits = softCommits;

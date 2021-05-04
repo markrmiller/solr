@@ -369,40 +369,6 @@ public abstract class SlotAcc implements Closeable {
     }
   }
 
-  abstract class IntSlotAcc extends SlotAcc {
-    int[] result; // use LongArray32
-    int initialValue;
-
-    public IntSlotAcc(FacetContext fcontext, int numSlots, int initialValue) {
-      super(fcontext);
-      this.initialValue = initialValue;
-      result = new int[numSlots];
-      if (initialValue != 0) {
-        reset();
-      }
-    }
-
-    @Override
-    public int compare(int slotA, int slotB) {
-      return Integer.compare(result[slotA], result[slotB]);
-    }
-
-    @Override
-    public Object getValue(int slot) {
-      return result[slot];
-    }
-
-    @Override
-    public void reset() {
-      Arrays.fill(result, initialValue);
-    }
-
-    @Override
-    public void resize(Resizer resizer) {
-      result = resizer.resize(result, initialValue);
-    }
-  }
-
   static class SumSlotAcc extends DoubleFuncSlotAcc {
     public SumSlotAcc(ValueSource values, FacetContext fcontext, int numSlots) {
       super(values, fcontext, numSlots);
@@ -439,9 +405,7 @@ public abstract class SlotAcc implements Closeable {
     @Override
     public void reset() {
       super.reset();
-      for (int i = 0; i < counts.length; i++) {
-        counts[i] = 0;
-      }
+      Arrays.fill(counts, 0);
     }
 
     @Override
@@ -571,9 +535,7 @@ public abstract class SlotAcc implements Closeable {
       return Double.compare(this.stdDev(slotA), this.stdDev(slotB));
     }
 
-    @Override
-    @SuppressWarnings({"unchecked"})
-    public Object getValue(int slot) {
+    @Override public Object getValue(int slot) {
       if (fcontext.isShard()) {
         ArrayList<Object> lst = new ArrayList<>(3);
         lst.add(counts[slot]);
@@ -605,63 +567,6 @@ public abstract class SlotAcc implements Closeable {
 
     public abstract long getCount(int slot);
   }
-
-  /**
-   * This CountSlotAcc exists as a /dev/null sink for callers of collect(...) and other "write"-type
-   * methods. It should be used in contexts where "read"-type access methods will never be called.
-   */
-  static final CountSlotAcc DEV_NULL_SLOT_ACC = new CountSlotAcc(null) {
-
-    @Override
-    public void resize(Resizer resizer) {
-      // No-op
-    }
-
-    @Override
-    public void reset() throws IOException {
-      // No-op
-    }
-
-    @Override
-    public void collect(int doc, int slot, IntFunction<SlotContext> slotContext) throws IOException {
-      // No-op
-    }
-
-    @Override
-    public void incrementCount(int slot, long count) {
-      // No-op
-    }
-
-    @Override
-    public void setNextReader(LeafReaderContext readerContext) throws IOException {
-      // No-op
-    }
-
-    @Override
-    public int collect(DocSet docs, int slot, IntFunction<SlotContext> slotContext) throws IOException {
-      return docs.size(); // dressed up no-op
-    }
-
-    @Override
-    public Object getValue(int slotNum) throws IOException {
-      throw new UnsupportedOperationException("not supported");
-    }
-
-    @Override
-    public int compare(int slotA, int slotB) {
-      throw new UnsupportedOperationException("not supported");
-    }
-
-    @Override
-    public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
-      throw new UnsupportedOperationException("not supported");
-    }
-
-    @Override
-    public long getCount(int slot) {
-      throw new UnsupportedOperationException("not supported");
-    }
-  };
 
   static class CountSlotArrAcc extends CountSlotAcc {
     long[] result;
@@ -745,4 +650,5 @@ public abstract class SlotAcc implements Closeable {
       throw new UnsupportedOperationException();
     }
   }
+
 }

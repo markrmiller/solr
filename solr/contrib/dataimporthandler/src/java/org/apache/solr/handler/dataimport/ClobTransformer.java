@@ -49,9 +49,9 @@ public class ClobTransformer extends Transformer {
         @SuppressWarnings({"unchecked"})
         List<Clob> inputs = (List<Clob>) o;
         List<String> results = new ArrayList<>();
-        for (Object input : inputs) {
+        for (Clob input : inputs) {
           if (input instanceof Clob) {
-            Clob clob = (Clob) input;
+            Clob clob = input;
             results.add(readFromClob(clob));
           }
         }
@@ -66,7 +66,7 @@ public class ClobTransformer extends Transformer {
     return aRow;
   }
 
-  private String readFromClob(Clob clob) {
+  private static String readFromClob(Clob clob) {
     Reader reader = FieldReaderDataSource.readCharStream(clob);
     StringBuilder sb = new StringBuilder();
     char[] buf = new char[1024];

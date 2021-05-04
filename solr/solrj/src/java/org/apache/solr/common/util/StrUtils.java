@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.apache.solr.common.SolrException;
 
@@ -32,6 +33,7 @@ import org.apache.solr.common.SolrException;
 public class StrUtils {
   public static final char[] HEX_DIGITS = {'0', '1', '2', '3', '4', '5', '6',
       '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+  private static final Pattern COMPILE = Pattern.compile("\\\\(?=,)");
 
   public static List<String> splitSmart(String s, char separator) {
     ArrayList<String> lst = new ArrayList<>(4);
@@ -173,7 +175,7 @@ public class StrUtils {
 
     List<String> result = new ArrayList<>();
     for (String file : fileNames.split("(?<!\\\\),")) {
-      result.add(file.replaceAll("\\\\(?=,)", ""));
+      result.add(COMPILE.matcher(file).replaceAll(""));
     }
 
     return result;

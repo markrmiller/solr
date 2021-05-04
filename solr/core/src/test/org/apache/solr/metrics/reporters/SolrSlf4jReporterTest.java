@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
@@ -33,6 +34,8 @@ import org.apache.solr.logging.LogWatcherConfig;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricReporter;
 import org.apache.solr.util.TestHarness;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,19 +43,25 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
+@Ignore // MRM TODO: debug
 public class SolrSlf4jReporterTest extends SolrTestCaseJ4 {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+  @BeforeClass
+  public static void beforeSolrSlf4jReporterTest() throws Exception {
+    System.setProperty("solr.disableDefaultJmxReporter", "false");
+  }
 
   @Test
   public void testReporter() throws Exception {
     ensureLoggingConfiguredAppropriately();
-    Path home = Paths.get(TEST_HOME());
+    Path home = Paths.get(SolrTestUtil.TEST_HOME());
     // define these properties, they are used in solrconfig.xml
     System.setProperty("solr.test.sys.prop1", "propone");
     System.setProperty("solr.test.sys.prop2", "proptwo");
 
     String solrXml = FileUtils.readFileToString(Paths.get(home.toString(), "solr-slf4jreporter.xml").toFile(), "UTF-8");
-    NodeConfig cfg = SolrXmlConfig.fromString(home, solrXml);
+    NodeConfig cfg = new SolrXmlConfig().fromString(home, solrXml);
     CoreContainer cc = createCoreContainer(cfg, new TestHarness.TestCoresLocator
                                            (DEFAULT_TEST_CORENAME, initAndGetDataDir().getAbsolutePath(),
                                             "solrconfig.xml", "schema.xml"));

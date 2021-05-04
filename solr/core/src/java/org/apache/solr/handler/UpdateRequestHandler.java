@@ -103,7 +103,7 @@ public class UpdateRequestHandler extends ContentStreamHandlerBase implements Pe
         String wt = loader.getDefaultWT();
         // Make sure it is a valid writer
         if(req.getCore().getQueryResponseWriter(wt)!=null) {
-          Map<String,String> map = new HashMap<>(1);
+          Map<String,String> map = new HashMap<>(2);
           map.put(CommonParams.WT, wt);
           req.setParams(SolrParams.wrapDefaults(params,
               new MapSolrParams(map)));

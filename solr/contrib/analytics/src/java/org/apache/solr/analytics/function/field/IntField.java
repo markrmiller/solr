@@ -62,7 +62,7 @@ public class IntField extends AnalyticsField implements CastingIntValue {
   }
   @Override
   public long getLong() {
-    return (long)value;
+    return value;
   }
   @Override
   public float getFloat() {
@@ -70,7 +70,7 @@ public class IntField extends AnalyticsField implements CastingIntValue {
   }
   @Override
   public double getDouble() {
-    return (double)value;
+    return value;
   }
   @Override
   public String getString() {
@@ -94,7 +94,7 @@ public class IntField extends AnalyticsField implements CastingIntValue {
   @Override
   public void streamLongs(LongConsumer cons) {
     if (exists) {
-      cons.accept((long)value);
+      cons.accept(value);
     }
   }
   @Override
@@ -106,7 +106,7 @@ public class IntField extends AnalyticsField implements CastingIntValue {
   @Override
   public void streamDoubles(DoubleConsumer cons) {
     if (exists) {
-      cons.accept((double)value);
+      cons.accept(value);
     }
   }
   @Override

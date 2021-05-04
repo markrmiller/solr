@@ -17,13 +17,17 @@
 
 package org.apache.solr.ltr;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.ltr.feature.SolrFeature;
 import org.apache.solr.ltr.model.LinearModel;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@LuceneTestCase.Nightly
+@Ignore // MRM TODO:
 public class TestLTRWithFacet extends TestRerankBase {
 
   @Before

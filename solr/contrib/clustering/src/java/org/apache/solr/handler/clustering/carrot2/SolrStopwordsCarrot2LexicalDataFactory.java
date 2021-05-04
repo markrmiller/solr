@@ -17,8 +17,8 @@
 package org.apache.solr.handler.clustering.carrot2;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -39,6 +39,7 @@ import org.carrot2.text.util.MutableCharArray;
 import org.carrot2.util.attribute.Attribute;
 import org.carrot2.util.attribute.Bindable;
 import org.carrot2.util.attribute.Input;
+import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * An implementation of Carrot2's {@link ILexicalDataFactory} that adds stop
@@ -67,7 +68,7 @@ public class SolrStopwordsCarrot2LexicalDataFactory implements ILexicalDataFacto
   /**
    * A lazily-built cache of stop words per field.
    */
-  private HashMap<String, List<CharArraySet>> solrStopWords = new HashMap<>();
+  private Map<String, List<CharArraySet>> solrStopWords = new NonBlockingHashMap<>();
 
   /**
    * Carrot2's default lexical resources to use in addition to Solr's stop
@@ -82,31 +83,29 @@ public class SolrStopwordsCarrot2LexicalDataFactory implements ILexicalDataFacto
   private List<CharArraySet> getSolrStopWordsForField(String fieldName) {
     // No need to synchronize here, Carrot2 ensures that instances
     // of this class are not used by multiple threads at a time.
-    synchronized (solrStopWords) {
-      if (!solrStopWords.containsKey(fieldName)) {
-        solrStopWords.put(fieldName, new ArrayList<>());
 
-        IndexSchema schema = core.getLatestSchema();
-        final Analyzer fieldAnalyzer = schema.getFieldType(fieldName).getIndexAnalyzer();
-        if (fieldAnalyzer instanceof TokenizerChain) {
-          final TokenFilterFactory[] filterFactories = 
-              ((TokenizerChain) fieldAnalyzer).getTokenFilterFactories();
-          for (TokenFilterFactory factory : filterFactories) {
-            if (factory instanceof StopFilterFactory) {
-              // StopFilterFactory holds the stop words in a CharArraySet
-              CharArraySet stopWords = ((StopFilterFactory) factory).getStopWords();
-              solrStopWords.get(fieldName).add(stopWords);
-            }
+    if (!solrStopWords.containsKey(fieldName)) {
+      solrStopWords.put(fieldName, new ArrayList<>());
 
-            if (factory instanceof CommonGramsFilterFactory) {
-              CharArraySet commonWords = ((CommonGramsFilterFactory) factory).getCommonWords();
-              solrStopWords.get(fieldName).add(commonWords);
-            }
+      IndexSchema schema = core.getLatestSchema();
+      final Analyzer fieldAnalyzer = schema.getFieldType(fieldName).getIndexAnalyzer();
+      if (fieldAnalyzer instanceof TokenizerChain) {
+        final TokenFilterFactory[] filterFactories = ((TokenizerChain) fieldAnalyzer).getTokenFilterFactories();
+        for (TokenFilterFactory factory : filterFactories) {
+          if (factory instanceof StopFilterFactory) {
+            // StopFilterFactory holds the stop words in a CharArraySet
+            CharArraySet stopWords = ((StopFilterFactory) factory).getStopWords();
+            solrStopWords.get(fieldName).add(stopWords);
+          }
+
+          if (factory instanceof CommonGramsFilterFactory) {
+            CharArraySet commonWords = ((CommonGramsFilterFactory) factory).getCommonWords();
+            solrStopWords.get(fieldName).add(commonWords);
           }
         }
       }
-      return solrStopWords.get(fieldName);
     }
+    return solrStopWords.get(fieldName);
   }
 
   @Override

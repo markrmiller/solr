@@ -16,8 +16,6 @@
  */
 package org.apache.solr.client.solrj.embedded;
 
-import static org.apache.solr.common.params.CommonParams.PATH;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +37,7 @@ import org.apache.solr.client.solrj.impl.BinaryRequestWriter;
 import org.apache.solr.client.solrj.impl.BinaryRequestWriter.BAOS;
 import org.apache.solr.client.solrj.request.ContentStreamUpdateRequest;
 import org.apache.solr.client.solrj.request.RequestWriter;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
@@ -47,6 +46,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.CoreContainer;
@@ -59,6 +59,8 @@ import org.apache.solr.response.BinaryResponseWriter;
 import org.apache.solr.response.ResultContext;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.servlet.SolrRequestParsers;
+
+import static org.apache.solr.common.params.CommonParams.PATH;
 
 /**
  * SolrClient that connects directly to a CoreContainer.
@@ -92,7 +94,7 @@ public class EmbeddedSolrServer extends SolrClient {
    * @param solrHome        the solr home directory
    * @param defaultCoreName the core to route requests to by default (optional)
    */
-  public EmbeddedSolrServer(Path solrHome, String defaultCoreName) {
+  public EmbeddedSolrServer(Path solrHome, String defaultCoreName) throws IOException {
     this(load(new CoreContainer(solrHome, new Properties())), defaultCoreName);
   }
 
@@ -177,7 +179,11 @@ public class EmbeddedSolrServer extends SolrClient {
         return BinaryResponseWriter.getParsedResponse(req, resp);
       } catch (IOException | SolrException iox) {
         throw iox;
-      } catch (Exception ex) {
+      } catch (Throwable ex) {
+        if (ex instanceof Error) {
+          throw (Error) ex;
+        }
+        ParWork.propagateInterrupt(ex);
         throw new SolrServerException(ex);
       }
     }
@@ -192,7 +198,15 @@ public class EmbeddedSolrServer extends SolrClient {
 
     // Check for cores action
     SolrQueryRequest req = null;
-    try (SolrCore core = coreContainer.getCore(coreName)) {
+    SolrCore core = null;
+    boolean closeCore = false;
+    try {
+      if (req == null) {
+        core = coreContainer.getCore(coreName);
+        closeCore = true;
+      } else {
+        core = req.getCore();
+      }
 
       if (core == null) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "No such core: " + coreName);
@@ -232,22 +246,7 @@ public class EmbeddedSolrServer extends SolrClient {
       if (request.getStreamingResponseCallback() != null) {
         try {
           final StreamingResponseCallback callback = request.getStreamingResponseCallback();
-          BinaryResponseWriter.Resolver resolver =
-              new BinaryResponseWriter.Resolver(req, rsp.getReturnFields()) {
-                @Override
-                public void writeResults(ResultContext ctx, JavaBinCodec codec) throws IOException {
-                  // write an empty list...
-                  SolrDocumentList docs = new SolrDocumentList();
-                  docs.setNumFound(ctx.getDocList().matches());
-                  docs.setNumFoundExact(ctx.getDocList().hitCountRelation() == Relation.EQUAL_TO);
-                  docs.setStart(ctx.getDocList().offset());
-                  docs.setMaxScore(ctx.getDocList().maxScore());
-                  codec.writeSolrDocumentList(docs);
-
-                  // This will transform
-                  writeResultsBody(ctx, codec);
-                }
-              };
+          BinaryResponseWriter.Resolver resolver = new MyResolver(req, rsp);
 
 
           try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -257,7 +256,11 @@ public class EmbeddedSolrServer extends SolrClient {
               return (NamedList<Object>) new JavaBinCodec(resolver).unmarshal(in);
             }
           }
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
+          if (ex instanceof Error) {
+            throw (Error) ex;
+          }
+          ParWork.propagateInterrupt(ex);
           throw new RuntimeException(ex);
         }
       }
@@ -267,10 +270,17 @@ public class EmbeddedSolrServer extends SolrClient {
       return normalized;
     } catch (IOException | SolrException iox) {
       throw iox;
-    } catch (Exception ex) {
+    } catch (Throwable ex) {
+      if (ex instanceof Error) {
+        throw (Error) ex;
+      }
+      ParWork.propagateInterrupt(ex);
       throw new SolrServerException(ex);
     } finally {
-      if (req != null) req.close();
+      IOUtils.closeQuietly(req);
+      if (closeCore) {
+        IOUtils.closeQuietly(core);
+      }
       SolrRequestInfo.clearRequestInfo();
     }
   }
@@ -298,49 +308,17 @@ public class EmbeddedSolrServer extends SolrClient {
 
     final byte[] buf = baos.toByteArray();
     if (buf.length > 0) {
-      return Collections.singleton(new ContentStreamBase() {
-
-        @Override
-        public InputStream getStream() throws IOException {
-          return new ByteArrayInputStream(buf);
-        }
-
-        @Override
-        public String getContentType() {
-          return cType;
-        }
-      });
+      return Collections.singleton(new MyContentStreamBase(buf, cType));
     }
 
     return null;
   }
 
-  private JavaBinCodec createJavaBinCodec(final StreamingResponseCallback callback, final BinaryResponseWriter.Resolver resolver) {
-    return new JavaBinCodec(resolver) {
-
-      @Override
-      public void writeSolrDocument(SolrDocument doc) {
-        callback.streamSolrDocument(doc);
-        //super.writeSolrDocument( doc, fields );
-      }
-
-      @Override
-      public void writeSolrDocumentList(SolrDocumentList docs) throws IOException {
-        if (docs.size() > 0) {
-          SolrDocumentList tmp = new SolrDocumentList();
-          tmp.setMaxScore(docs.getMaxScore());
-          tmp.setNumFound(docs.getNumFound());
-          tmp.setStart(docs.getStart());
-          docs = tmp;
-        }
-        callback.streamDocListInfo(docs.getNumFound(), docs.getStart(), docs.getMaxScore());
-        super.writeSolrDocumentList(docs);
-      }
-
-    };
+  private static JavaBinCodec createJavaBinCodec(final StreamingResponseCallback callback, final BinaryResponseWriter.Resolver resolver) {
+    return new MyJavaBinCodec(resolver, callback);
   }
 
-  private static void checkForExceptions(SolrQueryResponse rsp) throws Exception {
+  private static void checkForExceptions(SolrQueryResponse rsp) throws Throwable {
     if (rsp.getException() != null) {
       if (rsp.getException() instanceof SolrException) {
         throw rsp.getException();
@@ -365,5 +343,76 @@ public class EmbeddedSolrServer extends SolrClient {
    */
   public CoreContainer getCoreContainer() {
     return coreContainer;
+  }
+
+  private static class MyResolver extends BinaryResponseWriter.Resolver {
+    public MyResolver(SolrQueryRequest req, SolrQueryResponse rsp) {
+      super(req, rsp.getReturnFields());
+    }
+
+    @Override
+    public void writeResults(ResultContext ctx, JavaBinCodec codec) throws IOException {
+      // write an empty list...
+      SolrDocumentList docs = new SolrDocumentList();
+      docs.setNumFound(ctx.getDocList().matches());
+      docs.setNumFoundExact(ctx.getDocList().hitCountRelation() == Relation.EQUAL_TO);
+      docs.setStart(ctx.getDocList().offset());
+      docs.setMaxScore(ctx.getDocList().maxScore());
+      codec.writeSolrDocumentList(docs);
+
+      // This will transform
+      writeResultsBody(ctx, codec);
+    }
+  }
+
+  private static class MyContentStreamBase extends ContentStreamBase {
+
+    private final byte[] buf;
+    private final String cType;
+
+    public MyContentStreamBase(byte[] buf, String cType) {
+      this.buf = buf;
+      this.cType = cType;
+    }
+
+    @Override
+    public InputStream getStream() throws IOException {
+      return new ByteArrayInputStream(buf);
+    }
+
+    @Override
+    public String getContentType() {
+      return cType;
+    }
+  }
+
+  private static class MyJavaBinCodec extends JavaBinCodec {
+
+    private final StreamingResponseCallback callback;
+
+    public MyJavaBinCodec(BinaryResponseWriter.Resolver resolver, StreamingResponseCallback callback) {
+      super(resolver);
+      this.callback = callback;
+    }
+
+    @Override
+    public void writeSolrDocument(SolrDocument doc) {
+      callback.streamSolrDocument(doc);
+      //super.writeSolrDocument( doc, fields );
+    }
+
+    @Override
+    public void writeSolrDocumentList(SolrDocumentList docs) throws IOException {
+      if (docs.size() > 0) {
+        SolrDocumentList tmp = new SolrDocumentList();
+        tmp.setMaxScore(docs.getMaxScore());
+        tmp.setNumFound(docs.getNumFound());
+        tmp.setStart(docs.getStart());
+        docs = tmp;
+      }
+      callback.streamDocListInfo(docs.getNumFound(), docs.getStart(), docs.getMaxScore());
+      super.writeSolrDocumentList(docs);
+    }
+
   }
 }

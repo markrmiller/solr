@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 import junit.framework.Assert;
 
 import org.apache.solr.request.LocalSolrQueryRequest;
+import org.apache.solr.util.TestHarness;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -167,9 +168,9 @@ public abstract class AbstractDIHJdbcTestCase extends
     // no-op
   }
   
-  public int totalDatabaseRequests(String dihHandlerName) throws Exception {
+  public static int totalDatabaseRequests(String dihHandlerName) throws Exception {
     LocalSolrQueryRequest request = lrf.makeRequest("indent", "true");
-    String response = h.query(dihHandlerName, request);
+    String response = TestHarness.query(dihHandlerName, request);
     Matcher m = totalRequestsPattern.matcher(response);
     Assert.assertTrue("The handler " + dihHandlerName
         + " is not reporting any database requests. ",

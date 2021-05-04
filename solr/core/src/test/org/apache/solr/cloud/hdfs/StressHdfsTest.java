@@ -16,18 +16,17 @@
  */
 package org.apache.solr.cloud.hdfs;
 
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.cloud.BasicDistributedZkTest;
 import org.apache.solr.common.cloud.ClusterState;
@@ -38,7 +37,6 @@ import org.apache.solr.common.params.CollectionParams.CollectionAction;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeSource;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.apache.solr.util.TimeOut;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -54,10 +52,7 @@ import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 @Slow
-@Nightly
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@LuceneTestCase.Nightly
 public class StressHdfsTest extends BasicDistributedZkTest {
   private static final String DELETE_DATA_DIR_COLLECTION = "delete_data_dir";
   private static MiniDFSCluster dfsCluster;
@@ -66,7 +61,7 @@ public class StressHdfsTest extends BasicDistributedZkTest {
   
   @BeforeClass
   public static void setupClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
   
   @AfterClass
@@ -107,9 +102,7 @@ public class StressHdfsTest extends BasicDistributedZkTest {
       Timer timer = new Timer();
       
       try {
-        createCollection(DELETE_DATA_DIR_COLLECTION, "conf1", 1, 1, 1);
-        
-        waitForRecoveriesToFinish(DELETE_DATA_DIR_COLLECTION, false);
+        createCollection(DELETE_DATA_DIR_COLLECTION, "_default", 1, 1, 1);
 
         jettys.get(0).stop();
         
@@ -127,8 +120,6 @@ public class StressHdfsTest extends BasicDistributedZkTest {
         }, rnd);
         
         jettys.get(0).start();
-        
-        waitForRecoveriesToFinish(DELETE_DATA_DIR_COLLECTION, false);
       } finally {
         timer.cancel();
       }
@@ -151,10 +142,8 @@ public class StressHdfsTest extends BasicDistributedZkTest {
       if (nShards == 0) nShards = 1;
     }
     
-    createCollection(DELETE_DATA_DIR_COLLECTION, "conf1", nShards, rep, maxReplicasPerNode);
+    createCollection(DELETE_DATA_DIR_COLLECTION, "_default", nShards, rep, maxReplicasPerNode);
 
-    waitForRecoveriesToFinish(DELETE_DATA_DIR_COLLECTION, false);
-    
     // data dirs should be in zk, SOLR-8913
     ClusterState clusterState = cloudClient.getZkStateReader().getClusterState();
     final DocCollection docCollection = clusterState.getCollectionOrNull(DELETE_DATA_DIR_COLLECTION);
@@ -163,12 +152,11 @@ public class StressHdfsTest extends BasicDistributedZkTest {
     assertNotNull(docCollection.getSlices().toString(), slice);
     Collection<Replica> replicas = slice.getReplicas();
     for (Replica replica : replicas) {
-      assertNotNull(replica.getProperties().toString(), replica.get("dataDir"));
-      assertNotNull(replica.getProperties().toString(), replica.get("ulogDir"));
+      assertNotNull(replica.toString(), replica.get("dataDir"));
+      assertNotNull(replica.toString(), replica.get("ulogDir"));
     }
     
     cloudClient.setDefaultCollection(DELETE_DATA_DIR_COLLECTION);
-    cloudClient.getZkStateReader().forceUpdateCollection(DELETE_DATA_DIR_COLLECTION);
     
     for (int i = 1; i < nShards + 1; i++) {
       cloudClient.getZkStateReader().getLeaderRetry(DELETE_DATA_DIR_COLLECTION, "shard" + i, 30000);
@@ -179,7 +167,7 @@ public class StressHdfsTest extends BasicDistributedZkTest {
     
     int i = 0;
     for (SolrClient client : clients) {
-      try (HttpSolrClient c = getHttpSolrClient(getBaseUrl(client) + "/" + DELETE_DATA_DIR_COLLECTION, 30000)) {
+      try (Http2SolrClient c = getHttpSolrClient(getBaseUrl(client) + "/" + DELETE_DATA_DIR_COLLECTION, 30000)) {
         int docCnt = random().nextInt(1000) + 1;
         for (int j = 0; j < docCnt; j++) {
           c.add(getDoc("id", i++, "txt_t", "just some random text for a doc"));

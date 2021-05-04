@@ -274,7 +274,7 @@ public class FileListEntityProcessor extends EntityProcessorBase {
   }
 
   public static final Pattern PLACE_HOLDER_PATTERN = Pattern
-          .compile("\\$\\{(.*?)\\}");
+          .compile("\\$\\{(.*?)}");
 
   public static final String DIR = "fileDir";
 

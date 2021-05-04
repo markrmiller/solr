@@ -23,7 +23,6 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -33,10 +32,12 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.SolrTestUtil;
+import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.cloud.hdfs.HdfsTestUtil;
@@ -44,22 +45,16 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.common.cloud.ZkStateReader.BASE_URL_PROP;
-
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
 @SolrTestCaseJ4.SuppressSSL     // Currently unknown why SSL does not work with this test
+@LuceneTestCase.Nightly
 public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
   public static final String HDFS_REPO_SOLR_XML = "<solr>\n" +
       "\n" +
@@ -103,7 +98,7 @@ public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
     hdfsUri = HdfsTestUtil.getURI(dfsCluster);
     try {
       URI uri = new URI(hdfsUri);
@@ -133,7 +128,7 @@ public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
     useFactory("solr.StandardDirectoryFactory");
 
     configureCluster(1)// nodes
-    .addConfig("conf1", TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
+    .addConfig("conf1", SolrTestUtil.TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
     .withSolrXml(HDFS_REPO_SOLR_XML)
     .configure();
     
@@ -161,7 +156,7 @@ public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
 
   @Test
   public void test() throws Exception {
-    CloudSolrClient solrClient = cluster.getSolrClient();
+    CloudHttp2SolrClient solrClient = cluster.getSolrClient();
     String collectionName = "HdfsBackupRestore";
     CollectionAdminRequest.Create create =
         CollectionAdminRequest.createCollection(collectionName, "conf1", 1, 1);
@@ -175,14 +170,14 @@ public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
     assertEquals(1, shard.getReplicas().size());
     Replica replica = shard.getReplicas().iterator().next();
 
-    String replicaBaseUrl = replica.getStr(BASE_URL_PROP);
-    String coreName = replica.getStr(ZkStateReader.CORE_NAME_PROP);
+    String replicaBaseUrl = replica.getBaseUrl();
+    String coreName = replica.getName();
     String backupName = TestUtil.randomSimpleString(random(), 1, 5);
 
     boolean testViaReplicationHandler = random().nextBoolean();
     String baseUrl = cluster.getJettySolrRunners().get(0).getBaseUrl().toString();
 
-    try (HttpSolrClient masterClient = getHttpSolrClient(replicaBaseUrl)) {
+    try (Http2SolrClient masterClient = SolrTestCaseJ4.getHttpSolrClient(replicaBaseUrl)) {
       // Create a backup.
       if (testViaReplicationHandler) {
         log.info("Running Backup via replication handler");
@@ -218,7 +213,7 @@ public class TestHdfsBackupRestoreCore extends SolrCloudTestCase {
             masterClient.add(collectionName, doc);
           }
           //Purposely not calling commit once in a while. There can be some docs which are not committed
-          if (usually()) {
+          if (LuceneTestCase.usually()) {
             masterClient.commit(collectionName);
           }
         }
