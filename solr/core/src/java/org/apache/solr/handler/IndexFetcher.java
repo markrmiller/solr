@@ -1850,7 +1850,7 @@ public class IndexFetcher {
             }
 
             @Override public void onFailure(Throwable throwable, int code) {
-              log.error("Exception fetching file", throwable);
+              log.error("Exception fetching file code={}", code, throwable);
 
               if (code == 403 || code == 500 || code == 503) {
                 // try again

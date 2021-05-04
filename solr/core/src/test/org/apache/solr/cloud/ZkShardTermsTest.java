@@ -21,6 +21,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -267,12 +268,12 @@ public class ZkShardTermsTest extends SolrCloudTestCase {
     };
     replicaTerms.addListener("replica", watcher);
     replicaTerms.registerTerm("replica");
-    waitFor(1, count::get);
+    waitForCounts(1, count::get);
     leaderTerms.ensureTermsIsHigher("leader", Collections.singleton("replica"));
     replicaTerms.setTermEqualsToLeader("replica");
-    waitFor(2, count::get);
+    waitForCounts(2, count::get);
     replicaTerms.setTermEqualsToLeader("replica");
-    waitFor(3, count::get);
+    waitForCounts(3, count::get);
 
     leaderTerms.close();
     replicaTerms.close();
@@ -350,13 +351,22 @@ public class ZkShardTermsTest extends SolrCloudTestCase {
     replicaTerms.close();
   }
 
-  private <T> void waitFor(T expected, Supplier<T> supplier) throws InterruptedException {
+  private static <T> void waitFor(T expected, Supplier<T> supplier) throws InterruptedException {
     TimeOut timeOut = new TimeOut(10, TimeUnit.SECONDS, new TimeSource.CurrentTimeSource());
     while (!timeOut.hasTimedOut()) {
       if (expected == supplier.get()) return;
       Thread.sleep(10);
     }
     assertEquals(expected, supplier.get());
+  }
+
+  private static <T> void waitForCounts(Integer expected, Supplier<Integer> supplier) throws InterruptedException {
+    TimeOut timeOut = new TimeOut(10, TimeUnit.SECONDS, new TimeSource.CurrentTimeSource());
+    while (!timeOut.hasTimedOut()) {
+      if (expected == supplier.get()) return;
+      Thread.sleep(10);
+    }
+    assertTrue(Comparator.<Integer>naturalOrder().compare(expected, supplier.get()) <= 0);
   }
 
 }
