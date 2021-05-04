@@ -945,39 +945,6 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     return false;
   }
 
-  protected List<SolrCmdDistributor.Node> getReplicaNodesForLeader(String shardId, String leaderName) {
-    if (log.isDebugEnabled()) log.debug("leader is {}", leaderName);
-    List<Replica> replicas = clusterState.getCollection(collection).getSlice(shardId).getReplicas(EnumSet.of(Replica.Type.NRT, Replica.Type.TLOG));
-    if (leaderName != null) {
-      replicas.removeIf((replica) -> replica.getName().equals(leaderName));
-    }
-    if (replicas.isEmpty()) {
-      return null;
-    }
-
-    // check for test param that lets us miss replicas
-    String[] skipList = req.getParams().getParams(TEST_DISTRIB_SKIP_SERVERS);
-    Set<String> skipListSet = null;
-    if (skipList != null) {
-      skipListSet = new HashSet<>(skipList.length);
-      skipListSet.addAll(Arrays.asList(skipList));
-      log.info("test.distrib.skip.servers was found and contains:{}", skipListSet);
-    }
-
-    List<SolrCmdDistributor.Node> nodes = new ArrayList<>(replicas.size());
-    skippedCoreNodeNames = new HashSet<>();
-    ZkShardTerms zkShardTerms;
-    try {
-      zkShardTerms = zkController.getShardTerms(collection, shardId);
-    } catch (Exception e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    }
-    for (Replica replica : replicas) {
-      nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
-    }
-    return nodes;
-  }
-
   protected List<SolrCmdDistributor.Node> getReplicaNodesForForCommit(String shardId, String leaderName) {
     if (log.isDebugEnabled()) log.debug("leader is {}", leaderName);
     List<Replica> replicas = clusterState.getCollection(collection).getSlice(shardId).getReplicas(EnumSet.of(Replica.Type.NRT, Replica.Type.TLOG));

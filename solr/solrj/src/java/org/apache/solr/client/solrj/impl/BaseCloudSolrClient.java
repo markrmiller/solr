@@ -166,6 +166,10 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       }
     }
 
+    public void removeAll(Set<String> collections) {
+      collections.forEach(s -> super.remove(s));
+    }
+
   }
 
   /**
@@ -1135,12 +1139,12 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         }
       });
 
-      if (theUrlList.isEmpty() && request.getBasePath() == null) {
+      if (theUrlList.isEmpty()) {
         if (collectionNames.size() == 0 || liveNodes.size() == 0) {
           collectionStateCache.keySet().removeAll(collectionNames);
           throw new SolrException(SolrException.ErrorCode.INVALID_STATE, "Could not find a healthy node to handle the request, collection names: " + collectionNames + " live nodes=" + liveNodes);
         }
-
+        collectionStateCache.removeAll(collectionNames);
         // MRM TODO: url scheme check
         theUrlList.add(Utils.getBaseUrlForNodeName(liveNodes.iterator().next(),
             getClusterStateProvider().getClusterProperty(ZkStateReader.URL_SCHEME,"http")) + '/' + collectionNames.iterator().next());
