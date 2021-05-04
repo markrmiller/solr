@@ -184,12 +184,7 @@ public class DocBuilder {
       dataImporter.store(DataImporter.STATUS_MSGS, statusMessages);
       config = dataImporter.getConfig();
       final AtomicLong startTime = new AtomicLong(System.nanoTime());
-      statusMessages.put(TIME_ELAPSED, new Object() {
-        @Override
-        public String toString() {
-          return getTimeElapsedSince(startTime.get());
-        }
-      });
+      statusMessages.put(TIME_ELAPSED, new MyObject(startTime));
 
       statusMessages.put(DataImporter.MSG.TOTAL_QUERIES_EXECUTED,
               importStatistics.queryCount);
@@ -218,7 +213,7 @@ public class DocBuilder {
       for (EntityProcessorWrapper epw : epwList) {
         if (entities != null && !entities.contains(epw.getEntity().getName()))
           continue;
-        lastIndexTimeProps.put(epw.getEntity().getName() + "." + LAST_INDEX_KEY, propWriter.getCurrentTimestamp());
+        lastIndexTimeProps.put(epw.getEntity().getName() + "." + LAST_INDEX_KEY, DIHProperties.getCurrentTimestamp());
         currentEntityProcessorWrapper = epw;
         String delQuery = epw.getEntity().getAllAttributes().get("preImportDeleteQuery");
         if (dataImporter.getStatus() == DataImporter.Status.RUNNING_DELTA_DUMP) {
@@ -285,7 +280,7 @@ public class DocBuilder {
       }
     }
   }
-  private void closeEntityProcessorWrappers(List<EntityProcessorWrapper> epwList) {
+  private static void closeEntityProcessorWrappers(List<EntityProcessorWrapper> epwList) {
     for(EntityProcessorWrapper epw : epwList) {
       epw.close();
       if(epw.getDatasource()!=null) {
@@ -403,7 +398,7 @@ public class DocBuilder {
     statusMessages.put(msg, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(new Date()));
   }
 
-  private void resetEntity(EntityProcessorWrapper epw) {
+  private static void resetEntity(EntityProcessorWrapper epw) {
     epw.setInitialized(false);
     for (EntityProcessorWrapper child : epw.getChildren()) {
       resetEntity(child);
@@ -648,7 +643,6 @@ public class DocBuilder {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void addFields(Entity entity, DocWrapper doc,
                          Map<String, Object> arow, VariableResolver vr) {
     for (Map.Entry<String, Object> entry : arow.entrySet()) {
@@ -693,7 +687,7 @@ public class DocBuilder {
     }
   }
 
-  private void addFieldToDoc(Object value, String name, boolean multiValued, DocWrapper doc) {
+  private static void addFieldToDoc(Object value, String name, boolean multiValued, DocWrapper doc) {
     if (value instanceof Collection) {
       @SuppressWarnings({"rawtypes"})
       Collection collection = (Collection) value;
@@ -743,7 +737,7 @@ public class DocBuilder {
     return epw;
   }
 
-  private String findMatchingPkColumn(String pk, Map<String, Object> row) {
+  private static String findMatchingPkColumn(String pk, Map<String,Object> row) {
     if (row.containsKey(pk)) {
       throw new IllegalArgumentException(String.format(Locale.ROOT,
           "deltaQuery returned a row with null for primary key %s", pk));
@@ -846,9 +840,7 @@ public class DocBuilder {
 
       // Remove deleted rows from the delta rows
       String deletedRowPk = pkValue.toString();
-      if (deltaSet.containsKey(deletedRowPk)) {
-        deltaSet.remove(deletedRowPk);
-      }
+      deltaSet.remove(deletedRowPk);
 
       importStatistics.rowsCount.incrementAndGet();
       // check for abort
@@ -935,7 +927,7 @@ public class DocBuilder {
     return reqParams;
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @SuppressWarnings({"rawtypes"})
   static Class loadClass(String name, SolrCore core) throws ClassNotFoundException {
     try {
       return core != null ?
@@ -1001,4 +993,17 @@ public class DocBuilder {
 
   public static final String LAST_INDEX_TIME = "last_index_time";
   public static final String INDEX_START_TIME = "index_start_time";
+
+  private static class MyObject {
+    private final AtomicLong startTime;
+
+    public MyObject(AtomicLong startTime) {
+      this.startTime = startTime;
+    }
+
+    @Override
+    public String toString() {
+      return getTimeElapsedSince(startTime.get());
+    }
+  }
 }

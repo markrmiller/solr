@@ -189,7 +189,7 @@ abstract class GraphEdgeCollector extends SimpleCollector implements Collector {
     /**
      * Build an automaton to represent the frontier query
      */
-    private Automaton buildAutomaton(BytesRefHash termBytesHash) {
+    private static Automaton buildAutomaton(BytesRefHash termBytesHash) {
       // need top pass a sorted set of terms to the autn builder (maybe a better way to avoid this?)
       final TreeSet<BytesRef> terms = new TreeSet<BytesRef>();
       for (int i = 0; i < termBytesHash.size(); i++) {

@@ -35,8 +35,8 @@
     <dependency org="org.apache.httpcomponents" name="httpcore" rev="${/org.apache.httpcomponents/httpcore}" conf="compile"/>
     <dependency org="commons-io" name="commons-io" rev="${/commons-io/commons-io}" conf="compile"/>
     <dependency org="org.apache.commons" name="commons-math3" rev="${/org.apache.commons/commons-math3}" conf="compile"/>
-    <dependency org="org.codehaus.woodstox" name="woodstox-core-asl" rev="${/org.codehaus.woodstox/woodstox-core-asl}" conf="compile"/>
     <dependency org="org.codehaus.woodstox" name="stax2-api" rev="${/org.codehaus.woodstox/stax2-api}" conf="compile"/>
+    <dependency org="com.fasterxml.woodstox" name="woodstox-core" rev="${/com.fasterxml.woodstox/woodstox-core}" conf="compile"/>
     <dependency org="org.slf4j" name="slf4j-api" rev="${/org.slf4j/slf4j-api}" conf="compile"/>
     <dependency org="org.slf4j" name="jcl-over-slf4j" rev="${/org.slf4j/jcl-over-slf4j}" conf="compile"/>
 
@@ -66,6 +66,7 @@
     <dependency org="org.mockito" name="mockito-core" rev="${/org.mockito/mockito-core}" conf="test"/>
     <dependency org="net.bytebuddy" name="byte-buddy" rev="${/net.bytebuddy/byte-buddy}" conf="test"/>
     <dependency org="org.objenesis" name="objenesis" rev="${/org.objenesis/objenesis}" conf="test"/>
+    <dependency org="org.awaitility" name="awaitility" rev="${/org.awaitility/awaitility}" conf="test"/>
 
 
     <exclude org="*" ext="*" matcher="regexp" type="${ivy.exclude.types}"/>

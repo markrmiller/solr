@@ -139,4 +139,14 @@ public class MultiDestinationAuditLogger extends AuditLoggerPlugin implements Re
       }
     });
   }
+
+  @Override
+  public String getName() {
+    return "MultiDestinationAuditLogger";
+  }
+
+  @Override
+  public boolean isCallerThreadAllowed() {
+    return true;
+  }
 }

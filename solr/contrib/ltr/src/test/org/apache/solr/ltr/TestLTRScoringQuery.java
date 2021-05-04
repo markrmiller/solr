@@ -41,6 +41,7 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCase;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.ltr.feature.Feature;
@@ -55,39 +56,38 @@ import org.junit.Test;
 
 public class TestLTRScoringQuery extends SolrTestCase {
 
-  public final static SolrResourceLoader solrResourceLoader = new SolrResourceLoader();
-
   private IndexSearcher getSearcher(IndexReader r) {
-    final IndexSearcher searcher = newSearcher(r, false, false);
+    final IndexSearcher searcher = LuceneTestCase.newSearcher(r, false, false);
     return searcher;
   }
 
-  private static List<Feature> makeFeatures(int[] featureIds) {
-    final List<Feature> features = new ArrayList<>();
-    for (final int i : featureIds) {
-      Map<String,Object> params = new HashMap<String,Object>();
-      params.put("value", i);
-      final Feature f = Feature.getInstance(solrResourceLoader,
-          ValueFeature.class.getName(),
-          "f" + i, params);
-      f.setIndex(i);
-      features.add(f);
+  private static List<Feature> makeFeatures(int[] featureIds) throws IOException {
+    try (SolrResourceLoader solrResourceLoader = new SolrResourceLoader()) {
+      final List<Feature> features = new ArrayList<>();
+      for (final int i : featureIds) {
+        Map<String,Object> params = new HashMap<String,Object>();
+        params.put("value", i);
+        final Feature f = Feature.getInstance(solrResourceLoader, ValueFeature.class.getName(), "f" + i, params);
+        f.setIndex(i);
+        features.add(f);
+      }
+
+      return features;
     }
-    return features;
   }
 
-  private static List<Feature> makeFilterFeatures(int[] featureIds) {
-    final List<Feature> features = new ArrayList<>();
-    for (final int i : featureIds) {
-      Map<String,Object> params = new HashMap<String,Object>();
-      params.put("value", i);
-      final Feature f = Feature.getInstance(solrResourceLoader,
-          ValueFeature.class.getName(),
-          "f" + i, params);
-      f.setIndex(i);
-      features.add(f);
+  private static List<Feature> makeFilterFeatures(int[] featureIds) throws IOException {
+    try (SolrResourceLoader solrResourceLoader = new SolrResourceLoader()) {
+      final List<Feature> features = new ArrayList<>();
+      for (final int i : featureIds) {
+        Map<String,Object> params = new HashMap<String,Object>();
+        params.put("value", i);
+        final Feature f = Feature.getInstance(solrResourceLoader, ValueFeature.class.getName(), "f" + i, params);
+        f.setIndex(i);
+        features.add(f);
+      }
+      return features;
     }
-    return features;
   }
 
   private LTRScoringQuery.ModelWeight performQuery(TopDocs hits,
@@ -116,7 +116,7 @@ public class TestLTRScoringQuery extends SolrTestCase {
   }
 
   @Test
-  public void testLTRScoringQueryEquality() throws ModelException {
+  public void testLTRScoringQueryEquality() throws ModelException, IOException {
     final List<Feature> features = makeFeatures(new int[] {0, 1, 2});
     final List<Normalizer> norms =
         new ArrayList<Normalizer>(
@@ -173,20 +173,20 @@ public class TestLTRScoringQuery extends SolrTestCase {
 
   @Test
   public void testLTRScoringQuery() throws IOException, ModelException {
-    final Directory dir = newDirectory();
+    final Directory dir = LuceneTestCase.newDirectory();
     final RandomIndexWriter w = new RandomIndexWriter(random(), dir);
 
     Document doc = new Document();
-    doc.add(newStringField("id", "0", Field.Store.YES));
-    doc.add(newTextField("field", "wizard the the the the the oz",
+    doc.add(LuceneTestCase.newStringField("id", "0", Field.Store.YES));
+    doc.add(LuceneTestCase.newTextField("field", "wizard the the the the the oz",
         Field.Store.NO));
     doc.add(new FloatDocValuesField("final-score", 1.0f));
 
     w.addDocument(doc);
     doc = new Document();
-    doc.add(newStringField("id", "1", Field.Store.YES));
+    doc.add(LuceneTestCase.newStringField("id", "1", Field.Store.YES));
     // 1 extra token, but wizard and oz are close;
-    doc.add(newTextField("field", "wizard oz the the the the the the",
+    doc.add(LuceneTestCase.newTextField("field", "wizard oz the the the the the the",
         Field.Store.NO));
     doc.add(new FloatDocValuesField("final-score", 2.0f));
     w.addDocument(doc);
@@ -270,23 +270,7 @@ public class TestLTRScoringQuery extends SolrTestCase {
 
     // test normalizers
     features = makeFilterFeatures(mixPositions);
-    final Normalizer norm = new Normalizer() {
-
-      @Override
-      public float normalize(float value) {
-        return 42.42f;
-      }
-
-      @Override
-      public LinkedHashMap<String,Object> paramsToMap() {
-        return null;
-      }
-
-      @Override
-      protected void validate() throws NormalizerException {
-      }
-
-    };
+    final Normalizer norm = new MyNormalizer();
     norms =
         new ArrayList<Normalizer>(
             Collections.nCopies(features.size(),norm));
@@ -307,4 +291,21 @@ public class TestLTRScoringQuery extends SolrTestCase {
 
   }
 
+  private static class MyNormalizer extends Normalizer {
+
+    @Override
+    public float normalize(float value) {
+      return 42.42f;
+    }
+
+    @Override
+    public LinkedHashMap<String,Object> paramsToMap() {
+      return null;
+    }
+
+    @Override
+    protected void validate() throws NormalizerException {
+    }
+
+  }
 }

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.search.suggest.InputIterator;
 import org.apache.lucene.search.suggest.Lookup;
@@ -39,11 +40,11 @@ import org.apache.lucene.util.RamUsageEstimator;
  * @see TSTAutocomplete
  */
 public class TSTLookup extends Lookup {
-  TernaryTreeNode root = new TernaryTreeNode();
-  TSTAutocomplete autocomplete = new TSTAutocomplete();
+  volatile TernaryTreeNode root = new TernaryTreeNode();
+  final TSTAutocomplete autocomplete = new TSTAutocomplete();
 
   /** Number of entries the lookup was built with */
-  private long count = 0;
+  private AtomicLong count = new AtomicLong();
 
   private final Directory tempDir;
   private final String tempFileNamePrefix;
@@ -109,7 +110,7 @@ public class TSTLookup extends Lookup {
   };
 
   @Override
-  public void build(InputIterator iterator) throws IOException {
+  public synchronized void build(InputIterator iterator) throws IOException {
     if (iterator.hasPayloads()) {
       throw new IllegalArgumentException("this suggester doesn't support payloads");
     }
@@ -120,7 +121,7 @@ public class TSTLookup extends Lookup {
 
     // make sure it's sorted and the comparator uses UTF16 sort order
     iterator = new SortedInputIterator(tempDir, tempFileNamePrefix, iterator, utf8SortedAsUTF16SortOrder);
-    count = 0;
+    count.set(0);
     ArrayList<String> tokens = new ArrayList<>();
     ArrayList<Number> vals = new ArrayList<>();
     BytesRef spare;
@@ -129,7 +130,7 @@ public class TSTLookup extends Lookup {
       charsSpare.copyUTF8Bytes(spare);
       tokens.add(charsSpare.toString());
       vals.add(Long.valueOf(iterator.weight()));
-      count++;
+      count.incrementAndGet();
     }
     autocomplete.balancedTree(tokens.toArray(), vals.toArray(), 0, tokens.size() - 1, root);
   }
@@ -263,14 +264,14 @@ public class TSTLookup extends Lookup {
 
   @Override
   public synchronized boolean store(DataOutput output) throws IOException {
-    output.writeVLong(count);
+    output.writeVLong(count.incrementAndGet());
     writeRecursively(output, root);
     return true;
   }
 
   @Override
   public synchronized boolean load(DataInput input) throws IOException {
-    count = input.readVLong();
+    count.set(input.readVLong());
     root = new TernaryTreeNode();
     readRecursively(input, root);
     return true;
@@ -288,6 +289,6 @@ public class TSTLookup extends Lookup {
   
   @Override
   public long getCount() {
-    return count;
+    return count.get();
   }
 }

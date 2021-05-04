@@ -55,7 +55,7 @@ public class Entity {
     if (modName == null) {
       throw new DataImportHandlerException(SEVERE, "Entity must have a name.");
     }
-    if (modName.indexOf(".") != -1) {
+    if (modName.indexOf('.') != -1) {
       throw new DataImportHandlerException(SEVERE,
           "Entity name must not have period (.): '" + modName);
     }

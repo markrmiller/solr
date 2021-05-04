@@ -82,7 +82,7 @@ public class StoredFieldsShardRequestFactory implements ShardRequestFactory {
     return shardRequests;
   }
 
-  private void mapShardToDocs(HashMap<String, Set<ShardDoc>> shardMap, ScoreDoc[] scoreDocs) {
+  private static void mapShardToDocs(HashMap<String,Set<ShardDoc>> shardMap, ScoreDoc[] scoreDocs) {
     for (ScoreDoc scoreDoc : scoreDocs) {
       ShardDoc solrDoc = (ShardDoc) scoreDoc;
       Set<ShardDoc> shardDocs = shardMap.get(solrDoc.shard);

@@ -89,7 +89,7 @@ public class MultiMapSolrParams extends SolrParams {
   /** Returns a MultiMap view of the SolrParams.  A new map will be created if newCopy==true */
   public static Map<String,String[]> asMultiMap(SolrParams params, boolean newCopy) {
     if (params instanceof MultiMapSolrParams) {
-      Map<String,String[]> map = ((MultiMapSolrParams)params).getMap();
+      Map<String,String[]> map = ((MultiMapSolrParams) params).map;
       if (newCopy) {
         return new HashMap<>(map);
       }
@@ -101,7 +101,7 @@ public class MultiMapSolrParams extends SolrParams {
       }
       return map;
     } else {
-      Map<String,String[]> map = new HashMap<>();
+      Map<String,String[]> map = new HashMap<>(32);
       for (Map.Entry<String, String[]> pair : params) {
         map.put(pair.getKey(), pair.getValue());
       }

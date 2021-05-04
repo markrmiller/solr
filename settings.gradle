@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-rootProject.name = 'solr-root'
+rootProject.name = "lucene-solr"
 
 include "lucene:analysis:common"
 include "lucene:analysis:icu"
@@ -70,3 +70,7 @@ include "solr:solr-ref-guide"
 include "solr:example"
 
 include "solr:packaging"
+include "solr:docker"
+
+include "solr:benchmark"
+

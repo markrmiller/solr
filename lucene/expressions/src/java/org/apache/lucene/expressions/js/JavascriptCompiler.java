@@ -635,9 +635,10 @@ public final class JavascriptCompiler {
   }
 
   static String normalizeQuotes(String text) {
-    StringBuilder out = new StringBuilder(text.length());
+    final int length = text.length();
+    StringBuilder out = new StringBuilder(length);
     boolean inDoubleQuotes = false;
-    for (int i = 0; i < text.length(); ++i) {
+    for (int i = 0; i < length; ++i) {
       char c = text.charAt(i);
       if (c == '\\') {
         c = text.charAt(++i);
@@ -665,8 +666,10 @@ public final class JavascriptCompiler {
 
   static int findSingleQuoteStringEnd(String text, int start) {
     ++start; // skip beginning
-    while (text.charAt(start) != '\'') {
-      if (text.charAt(start) == '\\') {
+    while (true) {
+      char c = text.charAt(start);
+      if (!(c != '\'')) break;
+      if (c == '\\') {
         ++start; // blindly consume escape value
       }
       ++start;

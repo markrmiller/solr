@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.solr.SolrTestCaseUtil;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.handler.dataimport.JdbcDataSource.ResultSetIterator;
 import org.junit.After;
@@ -60,6 +62,7 @@ import static org.mockito.Mockito.when;
  *
  * @since solr 1.3
  */
+@Ignore
 public class TestJdbcDataSource extends AbstractDataImportHandlerTestCase {
   private Driver driver;
   private DataSource dataSource;
@@ -75,7 +78,7 @@ public class TestJdbcDataSource extends AbstractDataImportHandlerTestCase {
   String sysProp = System.getProperty("java.naming.factory.initial");
 
   @BeforeClass
-  public static void beforeClass() {
+  public static void beforeTestJdbcDataSource() {
     assumeWorkingMockito();
   }
   
@@ -210,8 +213,7 @@ public class TestJdbcDataSource extends AbstractDataImportHandlerTestCase {
     SQLException sqlException = new SQLException("fake");
     when(dataSource.getConnection()).thenThrow(sqlException);
 
-    SQLException ex = expectThrows(SQLException.class,
-        () -> jdbcDataSource.createConnectionFactory(context, props).call());
+    SQLException ex = SolrTestCaseUtil.expectThrows(SQLException.class, () -> jdbcDataSource.createConnectionFactory(context, props).call());
     assertSame(sqlException, ex);
 
     verify(dataSource).getConnection();
@@ -227,8 +229,7 @@ public class TestJdbcDataSource extends AbstractDataImportHandlerTestCase {
     when(dataSource.getConnection()).thenReturn(connection);
     doThrow(sqlException).when(connection).setAutoCommit(false);
 
-    DataImportHandlerException ex = expectThrows(DataImportHandlerException.class,
-        () -> jdbcDataSource.createConnectionFactory(context, props).call());
+    DataImportHandlerException ex = SolrTestCaseUtil.expectThrows(DataImportHandlerException.class, () -> jdbcDataSource.createConnectionFactory(context, props).call());
     assertSame(sqlException, ex.getCause());
 
     verify(dataSource).getConnection();
@@ -251,8 +252,7 @@ public class TestJdbcDataSource extends AbstractDataImportHandlerTestCase {
         .thenReturn(statement);
     when(statement.execute("query")).thenThrow(sqlException);
 
-    DataImportHandlerException ex = expectThrows(DataImportHandlerException.class,
-        () -> jdbcDataSource.getData("query"));
+    DataImportHandlerException ex = SolrTestCaseUtil.expectThrows(DataImportHandlerException.class, () -> jdbcDataSource.getData("query"));
     assertSame(sqlException, ex.getCause());
 
     verify(dataSource).getConnection();
@@ -596,7 +596,7 @@ public class TestJdbcDataSource extends AbstractDataImportHandlerTestCase {
   }
   
   private String createEncryptionKeyFile() throws IOException {
-    File tmpdir = createTempDir().toFile();
+    File tmpdir = SolrTestUtil.createTempDir().toFile();
     byte[] content = "secret".getBytes(StandardCharsets.UTF_8);
     createFile(tmpdir, "enckeyfile.txt", content, false);
     return new File(tmpdir, "enckeyfile.txt").getAbsolutePath();

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.ltr.TestRerankBase;
 import org.apache.solr.ltr.feature.Feature;
@@ -37,8 +38,11 @@ import org.apache.solr.ltr.norm.Normalizer;
 import org.apache.solr.ltr.store.FeatureStore;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@LuceneTestCase.Nightly
+@Ignore // MRM TODO:
 public class TestModelManagerPersistence extends TestRerankBase {
 
   @Before
@@ -201,7 +205,7 @@ public class TestModelManagerPersistence extends TestRerankBase {
         "/features/==[]");
   }
 
-  private static void doWrapperModelPersistenceChecks(String modelName,
+  private void doWrapperModelPersistenceChecks(String modelName,
       String featureStoreName, String baseModelFileName) throws Exception {
     // note that the wrapper and the wrapped model always have the same name
     assertJQ(ManagedModelStore.REST_END_POINT,

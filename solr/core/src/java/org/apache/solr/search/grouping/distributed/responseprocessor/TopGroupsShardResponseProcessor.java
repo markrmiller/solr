@@ -97,8 +97,8 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
 
         if (srsp.getException() != null) {
           Throwable t = srsp.getException();
-          if (t instanceof SolrServerException && ((SolrServerException) t).getCause() != null) {
-            t = ((SolrServerException) t).getCause();
+          if (t instanceof SolrServerException && t.getCause() != null) {
+            t = t.getCause();
           }
           individualShardInfo.add("error", t.toString());
           StringWriter trace = new StringWriter();
@@ -157,7 +157,6 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
         continue;
       }
 
-      @SuppressWarnings({"rawtypes"})
       TopGroups<BytesRef>[] topGroupsArr = new TopGroups[topGroups.size()];
       int docsPerGroup = docsPerGroupDefault;
       if (docsPerGroup < 0) {
@@ -199,10 +198,10 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
       final TopDocs mergedTopDocs;
       if (withinGroupSort.equals(Sort.RELEVANCE)) {
         mergedTopDocs = TopDocs.merge(
-            start, topN, topDocs.toArray(new TopDocs[topDocs.size()]));
+            start, topN, topDocs.toArray(new TopDocs[0]));
       } else {
         mergedTopDocs = TopDocs.merge(
-            withinGroupSort, start, topN, topDocs.toArray(new TopFieldDocs[topDocs.size()]));
+            withinGroupSort, start, topN, topDocs.toArray(new TopFieldDocs[0]));
       }
       rb.mergedQueryCommandResults.put(entry.getKey(), new QueryCommandResult(mergedTopDocs, mergedMatches, maxScore));
     }
@@ -214,7 +213,7 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
    * @param rb the response builder
    */
   static void fillResultIds(ResponseBuilder rb) {
-    Map<Object, ShardDoc> resultIds = new HashMap<>();
+    Map<Object, ShardDoc> resultIds = new HashMap<>(32);
     int i = 0;
     for (TopGroups<BytesRef> topGroups : rb.mergedTopGroups.values()) {
       for (GroupDocs<BytesRef> group : topGroups.groups) {

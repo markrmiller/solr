@@ -59,8 +59,7 @@ public class MMapDirectoryFactory extends StandardDirectoryFactory {
     preload = params.getBool("preload", false); //default turn-off
   }
 
-  @Override
-  protected Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
+  @Override public Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
     // we pass NoLockFactory, because the real lock factory is set later by injectLockFactory:
     MMapDirectory mapDirectory = new MMapDirectory(new File(path).toPath(), lockFactory, maxChunk);
     try {

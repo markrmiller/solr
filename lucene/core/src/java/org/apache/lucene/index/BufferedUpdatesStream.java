@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.util.Accountable;
@@ -61,6 +62,8 @@ final class BufferedUpdatesStream implements Accountable {
   private final AtomicLong bytesUsed = new AtomicLong();
   private final AtomicInteger numTerms = new AtomicInteger();
 
+  final ReentrantLock busl = new ReentrantLock(true);
+
   BufferedUpdatesStream(InfoStream infoStream) {
     this.infoStream = infoStream;
     this.finishedSegments = new FinishedSegments(infoStream);
@@ -68,40 +71,56 @@ final class BufferedUpdatesStream implements Accountable {
 
   // Appends a new packet of buffered deletes to the stream,
   // setting its generation:
-  synchronized long push(FrozenBufferedUpdates packet) {
-    /*
-     * The insert operation must be atomic. If we let threads increment the gen
-     * and push the packet afterwards we risk that packets are out of order.
-     * With DWPT this is possible if two or more flushes are racing for pushing
-     * updates. If the pushed packets get our of order would loose documents
-     * since deletes are applied to the wrong segments.
-     */
-    packet.setDelGen(nextGen++);
-    assert packet.any();
-    assert checkDeleteStats();
+  long push(FrozenBufferedUpdates packet) {
+    busl.lock();
+    try {
+      /*
+       * The insert operation must be atomic. If we let threads increment the gen
+       * and push the packet afterwards we risk that packets are out of order.
+       * With DWPT this is possible if two or more flushes are racing for pushing
+       * updates. If the pushed packets get our of order would loose documents
+       * since deletes are applied to the wrong segments.
+       */
+      packet.setDelGen(nextGen++);
+      assert packet.any();
+      assert checkDeleteStats();
 
-    updates.add(packet);
-    numTerms.addAndGet(packet.numTermDeletes);
-    bytesUsed.addAndGet(packet.bytesUsed);
-    if (infoStream.isEnabled("BD")) {
-      infoStream.message("BD", String.format(Locale.ROOT, "push new packet (%s), packetCount=%d, bytesUsed=%.3f MB", packet, updates.size(), bytesUsed.get()/1024./1024.));
+      updates.add(packet);
+      numTerms.addAndGet(packet.numTermDeletes);
+      bytesUsed.addAndGet(packet.bytesUsed);
+      if (infoStream.isEnabled("BD")) {
+        infoStream.message("BD",
+            String.format(Locale.ROOT, "push new packet (%s), packetCount=%d, bytesUsed=%.3f MB", packet, updates.size(), bytesUsed.get() / 1024. / 1024.));
+      }
+      assert checkDeleteStats();
+
+      return packet.delGen();
+    } finally {
+      busl.unlock();
     }
-    assert checkDeleteStats();
-
-    return packet.delGen();
   }
 
-  synchronized int getPendingUpdatesCount() {
-    return updates.size();
+  int getPendingUpdatesCount() {
+    busl.lock();
+    try {
+      return updates.size();
+    } finally {
+      busl.unlock();
+    }
   }
 
   /** Only used by IW.rollback */
-  synchronized void clear() {
-    updates.clear();
-    nextGen = 1;
-    finishedSegments.clear();
-    numTerms.set(0);
-    bytesUsed.set(0);
+  void clear() {
+    busl.lock();
+    try {
+      updates.clear();
+      nextGen = 1;
+      finishedSegments.clear();
+      numTerms.set(0);
+      bytesUsed.set(0);
+    } finally {
+      busl.unlock();
+    }
   }
 
   boolean any() {
@@ -135,10 +154,13 @@ final class BufferedUpdatesStream implements Accountable {
    *  by indexing threads, to finish.  Returns true if there were any 
    *  new deletes or updates.  This is called for refresh, commit. */
   void waitApplyAll(IndexWriter writer) throws IOException {
-    assert Thread.holdsLock(writer) == false;
+    assert writer.lockHeld() == false;
     Set<FrozenBufferedUpdates> waitFor;
-    synchronized (this) {
+    busl.lock();
+    try {
       waitFor = new HashSet<>(updates);
+    } finally {
+      busl.unlock();
     }
 
     waitApply(waitFor, writer);
@@ -157,21 +179,26 @@ final class BufferedUpdatesStream implements Accountable {
    *  delGen.  We track the completed delGens and record the maximum delGen for which all prior
    *  delGens, inclusive, are completed, so that it's safe for doc values updates to apply and write. */
 
-  synchronized void finished(FrozenBufferedUpdates packet) {
-    // TODO: would be a bit more memory efficient to track this per-segment, so when each segment writes it writes all packets finished for
-    // it, rather than only recording here, across all segments.  But, more complex code, and more CPU, and maybe not so much impact in
-    // practice?
-    assert packet.applied.getCount() == 1: "packet=" + packet;
+  void finished(FrozenBufferedUpdates packet) {
+    busl.lock();
+    try {
+      // TODO: would be a bit more memory efficient to track this per-segment, so when each segment writes it writes all packets finished for
+      // it, rather than only recording here, across all segments.  But, more complex code, and more CPU, and maybe not so much impact in
+      // practice?
+      assert packet.applied.getCount() == 1 : "packet=" + packet;
 
-    packet.applied.countDown();
+      packet.applied.countDown();
 
-    updates.remove(packet);
-    numTerms.addAndGet(-packet.numTermDeletes);
-    assert numTerms.get() >= 0: "numTerms=" + numTerms + " packet=" + packet;
-    
-    bytesUsed.addAndGet(-packet.bytesUsed);
+      updates.remove(packet);
+      numTerms.addAndGet(-packet.numTermDeletes);
+      assert numTerms.get() >= 0 : "numTerms=" + numTerms + " packet=" + packet;
 
-    finishedSegment(packet.delGen());
+      bytesUsed.addAndGet(-packet.bytesUsed);
+
+      finishedSegment(packet.delGen());
+    } finally {
+      busl.unlock();
+    }
   }
 
   /** All frozen packets up to and including this del gen are guaranteed to be finished. */
@@ -189,7 +216,8 @@ final class BufferedUpdatesStream implements Accountable {
     }
 
     Set<FrozenBufferedUpdates> waitFor = new HashSet<>();
-    synchronized (this) {
+    busl.lock();
+    try {
       for (FrozenBufferedUpdates packet : updates) {
         if (packet.delGen() <= maxDelGen) {
           // We must wait for this packet before finishing the merge because its
@@ -197,6 +225,8 @@ final class BufferedUpdatesStream implements Accountable {
           waitFor.add(packet);
         }
       }
+    } finally {
+      busl.unlock();
     }
 
     if (infoStream.isEnabled("BD")) {
@@ -250,8 +280,13 @@ final class BufferedUpdatesStream implements Accountable {
     }
   }
 
-  synchronized long getNextGen() {
-    return nextGen++;
+  long getNextGen() {
+    busl.lock();
+    try {
+      return nextGen++;
+    } finally {
+      busl.unlock();
+    }
   }
 
   /** Holds all per-segment internal state used while resolving deletions. */
@@ -312,36 +347,58 @@ final class BufferedUpdatesStream implements Accountable {
 
     private final InfoStream infoStream;
 
+    private final ReentrantLock lock = new ReentrantLock(true);
+
     FinishedSegments(InfoStream infoStream) {
       this.infoStream = infoStream;
     }
 
-    synchronized void clear() {
-      finishedDelGens.clear();
-      completedDelGen = 0;
-    }
-
-    synchronized boolean stillRunning(long delGen) {
-      return delGen > completedDelGen && finishedDelGens.contains(delGen) == false;
-    }
-
-    synchronized long getCompletedDelGen() {
-      return completedDelGen;
-    }
-
-    synchronized void finishedSegment(long delGen) {
-      finishedDelGens.add(delGen);
-      while (true) {
-        if (finishedDelGens.contains(completedDelGen + 1)) {
-          finishedDelGens.remove(completedDelGen + 1);
-          completedDelGen++;
-        } else {
-          break;
-        }
+    void clear() {
+      lock.lock();
+      try {
+        finishedDelGens.clear();
+        completedDelGen = 0;
+      } finally {
+        lock.unlock();
       }
+    }
 
-      if (infoStream.isEnabled("BD")) {
-        infoStream.message("BD", "finished packet delGen=" + delGen + " now completedDelGen=" + completedDelGen);
+    boolean stillRunning(long delGen) {
+      lock.lock();
+      try {
+        return delGen > completedDelGen && finishedDelGens.contains(delGen) == false;
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    long getCompletedDelGen() {
+      lock.lock();
+      try {
+        return completedDelGen;
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    void finishedSegment(long delGen) {
+      lock.lock();
+      try {
+        finishedDelGens.add(delGen);
+        while (true) {
+          if (finishedDelGens.contains(completedDelGen + 1)) {
+            finishedDelGens.remove(completedDelGen + 1);
+            completedDelGen++;
+          } else {
+            break;
+          }
+        }
+
+        if (infoStream.isEnabled("BD")) {
+          infoStream.message("BD", "finished packet delGen=" + delGen + " now completedDelGen=" + completedDelGen);
+        }
+      } finally {
+        lock.unlock();
       }
     }
   }

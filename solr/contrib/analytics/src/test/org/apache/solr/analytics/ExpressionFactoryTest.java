@@ -20,20 +20,24 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.analytics.function.ReductionCollectionManager;
 import org.apache.solr.analytics.value.constant.ConstantValue;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.schema.IndexSchema;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 public class ExpressionFactoryTest extends SolrTestCaseJ4 {
 
   private static IndexSchema indexSchema;
 
-  @BeforeClass
-  public static void createSchemaAndFields() throws Exception {
+  @Before
+  @Override
+  public void setUp() throws Exception {
+    super.setUp();
     initCore("solrconfig-analytics.xml","schema-analytics.xml");
     assertU(adoc("id", "1",
         "int_i", "1",
@@ -53,11 +57,15 @@ public class ExpressionFactoryTest extends SolrTestCaseJ4 {
     ));
     assertU(commit());
 
-    indexSchema = h.getCore().getLatestSchema();
+    SolrCore core = h.getCore();
+    indexSchema = core.getLatestSchema();
+    core.close();
   }
 
-  @AfterClass
-  public static void cleanUp() throws Exception {
+  @After
+  public void tearDown() throws Exception {
+    deleteCore();
+    super.tearDown();
     indexSchema = null;
   }
 
@@ -68,6 +76,7 @@ public class ExpressionFactoryTest extends SolrTestCaseJ4 {
   }
 
   @Test
+  @LuceneTestCase.Nightly
   public void userDefinedVariableFunctionTest() {
     ExpressionFactory fact = getExpressionFactory();
 
@@ -171,6 +180,7 @@ public class ExpressionFactoryTest extends SolrTestCaseJ4 {
   }
 
   @Test
+  @LuceneTestCase.Nightly
   public void reductionManagerCreationTest() {
     ExpressionFactory fact = getExpressionFactory();
 

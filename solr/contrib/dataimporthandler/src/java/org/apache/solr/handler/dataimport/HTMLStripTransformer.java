@@ -69,7 +69,7 @@ public class HTMLStripTransformer extends Transformer {
     return row;
   }
 
-  private Object stripHTML(String value, String column) {
+  private static Object stripHTML(String value, String column) {
     StringBuilder out = new StringBuilder();
     StringReader strReader = new StringReader(value);
     try {

@@ -25,6 +25,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.index.DocValuesType;
@@ -83,6 +84,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
   public static final String RAW_SIZE_SAMPLING_PERCENT_PARAM = "rawSizeSamplingPercent";
 
   private static final List<String> FI_LEGEND;
+  private static final Pattern COMPILE = Pattern.compile("\\n");
 
   static {
     FI_LEGEND = Arrays.asList(
@@ -108,7 +110,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
 
   private static final double GB = 1024.0 * 1024.0 * 1024.0;
 
-  private void getSegmentsInfo(SolrQueryRequest req, SolrQueryResponse rsp)
+  private static void getSegmentsInfo(SolrQueryRequest req, SolrQueryResponse rsp)
       throws Exception {
     boolean withFieldInfo = req.getParams().getBool(FIELD_INFO_PARAM, false);
     boolean withCoreInfo = req.getParams().getBool(CORE_INFO_PARAM, false);
@@ -155,7 +157,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
           String iwConfigStr = iw.getConfig().toString();
           SimpleOrderedMap<Object> iwConfig = new SimpleOrderedMap<>();
           // meh ...
-          String[] lines = iwConfigStr.split("\\n");
+          String[] lines = COMPILE.split(iwConfigStr);
           for (String line : lines) {
             String[] parts = line.split("=");
             if (parts.length < 2) {
@@ -217,8 +219,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
     }
   }
 
-  private SimpleOrderedMap<Object> getSegmentInfo(
-      SegmentCommitInfo segmentCommitInfo, boolean withSizeInfo, boolean withFieldInfos,
+  private static SimpleOrderedMap<Object> getSegmentInfo(SegmentCommitInfo segmentCommitInfo, boolean withSizeInfo, boolean withFieldInfos,
       List<LeafReaderContext> leafContexts, IndexSchema schema) throws IOException {
     SimpleOrderedMap<Object> segmentInfoMap = new SimpleOrderedMap<>();
 
@@ -228,7 +229,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
     segmentInfoMap.add("hasFieldUpdates", segmentCommitInfo.hasFieldUpdates());
     segmentInfoMap.add("sizeInBytes", segmentCommitInfo.sizeInBytes());
     segmentInfoMap.add("size", segmentCommitInfo.info.maxDoc());
-    Long timestamp = Long.parseLong(segmentCommitInfo.info.getDiagnostics()
+    long timestamp = Long.parseLong(segmentCommitInfo.info.getDiagnostics()
         .get("timestamp"));
     segmentInfoMap.add("age", new Date(timestamp));
     segmentInfoMap.add("source",
@@ -315,7 +316,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
     return segmentInfoMap;
   }
 
-  private void accountableToMap(Accountable accountable, BiConsumer<String, Object> consumer) {
+  private static void accountableToMap(Accountable accountable, BiConsumer<String,Object> consumer) {
     Collection<Accountable> children = accountable.getChildResources();
     if (children != null && !children.isEmpty()) {
       LinkedHashMap<String, Object> map = new LinkedHashMap<>();
@@ -329,7 +330,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
     }
   }
 
-  private SimpleOrderedMap<Object> getFieldInfo(SegmentReader reader, FieldInfo fi, IndexSchema schema) {
+  private static SimpleOrderedMap<Object> getFieldInfo(SegmentReader reader, FieldInfo fi, IndexSchema schema) {
     SimpleOrderedMap<Object> fieldFlags = new SimpleOrderedMap<>();
     StringBuilder flags = new StringBuilder();
     IndexOptions opts = fi.getIndexOptions();
@@ -425,7 +426,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
       if (sf.storeTermVector() != fi.hasVectors()) {
         nonCompliant.add("termVectors", "schema=" + sf.storeTermVector() + ", segment=" + fi.hasVectors());
       }
-      if (sf.storeOffsetsWithPositions() != (fi.getIndexOptions() == IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS)) {
+      if (sf.storeOffsetsWithPositions() != (fi.getIndexOptions() == DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS)) {
         nonCompliant.add("storeOffsetsWithPositions", "schema=" + sf.storeOffsetsWithPositions() + ", segment=" + fi.getIndexOptions());
       }
 
@@ -440,7 +441,7 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
   }
 
   // returns a map of currently running merges, and populates a list of candidate segments for merge
-  private SimpleOrderedMap<Object> getMergeInformation(SolrQueryRequest req, SegmentInfos infos, List<String> mergeCandidates) throws IOException {
+  private static SimpleOrderedMap<Object> getMergeInformation(SolrQueryRequest req, SegmentInfos infos, List<String> mergeCandidates) throws IOException {
     SimpleOrderedMap<Object> result = new SimpleOrderedMap<>();
     RefCounted<IndexWriter> refCounted = req.getCore().getSolrCoreState().getIndexWriter(req.getCore());
     try {

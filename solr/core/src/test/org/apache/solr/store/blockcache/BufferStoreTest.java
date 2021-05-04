@@ -16,41 +16,43 @@
  */
 package org.apache.solr.store.blockcache;
 
-import java.math.BigDecimal;
-import java.util.Map;
-
+import com.codahale.metrics.Gauge;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCase;
-import org.apache.solr.metrics.MetricsMap;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.SolrMetricsContext;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 public class BufferStoreTest extends SolrTestCase {
   private final static int blockSize = 1024;
 
   private Metrics metrics;
-  private MetricsMap metricsMap;
 
   private Store store;
+  private Gauge metricsMap;
 
   @Before
-  public void setup() {
+  public void setup() throws Exception {
+    super.setUp();
     metrics = new Metrics();
     SolrMetricManager metricManager = new SolrMetricManager();
     String registry = TestUtil.randomSimpleString(random(), 2, 10);
     String scope = TestUtil.randomSimpleString(random(), 2, 10);
-    SolrMetricsContext solrMetricsContext = new SolrMetricsContext(metricManager, registry, "foo");
+    SolrMetricsContext solrMetricsContext = new SolrMetricsContext(metricManager, registry, "foo", true);
     metrics.initializeMetrics(solrMetricsContext, scope);
-    metricsMap = (MetricsMap) ((SolrMetricManager.GaugeWrapper)metricManager.registry(registry).getMetrics().get("CACHE." + scope + ".hdfsBlockCache")).getGauge();
+    metricsMap = ((Gauge)metricManager.registry(registry).getMetrics().get("CACHE." + scope + ".hdfsBlockCache"));
     BufferStore.initNewBuffer(blockSize, blockSize, metrics);
     store = BufferStore.instance(blockSize);
   }
 
   @After
-  public void clearBufferStores() {
+  public void tearDown() throws Exception {
+    super.tearDown();
     BufferStore.clearBufferStores();
   }
   
@@ -94,7 +96,7 @@ public class BufferStoreTest extends SolrTestCase {
    *          whether buffers should have been lost since the last call
    */
   private void assertGaugeMetricsChanged(boolean allocated, boolean lost) {
-    Map<String,Object> stats = metricsMap.getValue();
+    Map<String,Object> stats = (Map<String,Object>) metricsMap.getValue();
 
     assertEquals("Buffer allocation metric not updating correctly.",
         allocated, isMetricPositive(stats, "buffercache.allocations"));

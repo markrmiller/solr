@@ -23,27 +23,22 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.store.Lock;
 import org.apache.lucene.store.LockObtainFailedException;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.hdfs.HdfsTestUtil;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
-@Nightly
+@LuceneTestCase.Nightly
 public class HdfsLockFactoryTest extends SolrTestCaseJ4 {
   
   private static MiniDFSCluster dfsCluster;
 
   @BeforeClass
   public static void beforeClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
 
   @AfterClass

@@ -19,6 +19,7 @@ package org.apache.solr.handler.dataimport;
 import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * <p> Escapes values in SQL queries.  It escapes the value of the given expression 
@@ -26,6 +27,8 @@ import java.util.List;
  * for double-quotes </p>
  */
 public class SqlEscapingEvaluator extends Evaluator {
+  private static final Pattern COMPILE = Pattern.compile("\"");
+
   @Override
   public String evaluate(String expression, Context context) {
     List<Object> l = parseParams(expression, context.getVariableResolver());
@@ -36,6 +39,6 @@ public class SqlEscapingEvaluator extends Evaluator {
     // escape single quote with two single quotes, double quote
     // with two doule quotes, and backslash with double backslash.
     // See:  http://dev.mysql.com/doc/refman/4.1/en/mysql-real-escape-string.html
-    return s.replaceAll("'", "''").replaceAll("\"", "\"\"").replaceAll("\\\\", "\\\\\\\\");
+    return COMPILE.matcher(s.replaceAll("'", "''")).replaceAll("\"\"").replaceAll("\\\\", "\\\\\\\\");
   }
 }

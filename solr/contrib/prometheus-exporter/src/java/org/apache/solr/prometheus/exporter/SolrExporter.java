@@ -30,7 +30,7 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.core.XmlConfigFile;
@@ -39,7 +39,6 @@ import org.apache.solr.prometheus.collector.SchedulerMetricsCollector;
 import org.apache.solr.prometheus.scraper.SolrCloudScraper;
 import org.apache.solr.prometheus.scraper.SolrScraper;
 import org.apache.solr.prometheus.scraper.SolrStandaloneScraper;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +49,7 @@ public class SolrExporter {
   private static final String[] ARG_PORT_FLAGS = {"-p", "--port"};
   private static final String ARG_PORT_METAVAR = "PORT";
   private static final String ARG_PORT_DEST = "port";
-  private static final int ARG_PORT_DEFAULT = 9983;
+  private static final int ARG_PORT_DEFAULT = 8989;
   private static final String ARG_PORT_HELP = "Specify the solr-exporter HTTP listen port; default is " + ARG_PORT_DEFAULT + ".";
 
   private static final String[] ARG_BASE_URL_FLAGS = {"-b", "--baseurl"};
@@ -68,7 +67,7 @@ public class SolrExporter {
   private static final String[] ARG_CONFIG_FLAGS = {"-f", "--config-file"};
   private static final String ARG_CONFIG_METAVAR = "CONFIG";
   private static final String ARG_CONFIG_DEST = "configFile";
-  private static final String ARG_CONFIG_DEFAULT = "./conf/solr-exporter-config.xml";
+  private static final String ARG_CONFIG_DEFAULT = "solr-exporter-config.xml";
   private static final String ARG_CONFIG_HELP = "Specify the configuration file; the default is " + ARG_CONFIG_DEFAULT + ".";
 
   private static final String[] ARG_SCRAPE_INTERVAL_FLAGS = {"-s", "--scrape-interval"};
@@ -103,13 +102,9 @@ public class SolrExporter {
       MetricsConfiguration metricsConfiguration) {
     this.port = port;
 
-    this.metricCollectorExecutor = ExecutorUtil.newMDCAwareFixedThreadPool(
-        numberThreads,
-        new SolrNamedThreadFactory("solr-exporter-collectors"));
+    this.metricCollectorExecutor = ParWork.getExecutorService("metricCollectorExecutor", numberThreads, false);
 
-    this.requestExecutor = ExecutorUtil.newMDCAwareFixedThreadPool(
-        numberThreads,
-        new SolrNamedThreadFactory("solr-exporter-requests"));
+    this.requestExecutor = ParWork.getExecutorService("requestExecutor", numberThreads, false);
 
     this.solrScraper = createScraper(scrapeConfiguration, metricsConfiguration.getSettings());
     this.metricsCollector = new MetricsCollectorFactory(metricCollectorExecutor, scrapeInterval, solrScraper, metricsConfiguration).create();
@@ -145,7 +140,7 @@ public class SolrExporter {
     switch (configuration.getType()) {
       case STANDALONE:
         return new SolrStandaloneScraper(
-            factory.createStandaloneSolrClient(configuration.getSolrHost().get()), requestExecutor);
+            SolrClientFactory.createStandaloneSolrClient(configuration.getSolrHost().get()), requestExecutor);
       case CLOUD:
         return new SolrCloudScraper(
             factory.createCloudSolrClient(configuration.getZookeeperConnectionString().get()), requestExecutor, factory);
@@ -187,22 +182,29 @@ public class SolrExporter {
 
       SolrScrapeConfiguration scrapeConfiguration = null;
 
-      if (!res.getString(ARG_ZK_HOST_DEST).equals("")) {
+      if (!res.getString(ARG_ZK_HOST_DEST).isEmpty()) {
         scrapeConfiguration = SolrScrapeConfiguration.solrCloud(res.getString(ARG_ZK_HOST_DEST));
-      } else if (!res.getString(ARG_BASE_URL_DEST).equals("")) {
+      } else if (!res.getString(ARG_BASE_URL_DEST).isEmpty()) {
         scrapeConfiguration = SolrScrapeConfiguration.standalone(res.getString(ARG_BASE_URL_DEST));
       }
 
       if (scrapeConfiguration == null) {
         log.error("Must provide either {} or {}", ARG_BASE_URL_FLAGS, ARG_ZK_HOST_FLAGS);
       }
+      String configDest = res.getString(ARG_CONFIG_DEST);
+
+      if (configDest == null) {
+        throw new IllegalArgumentException("No config dest found for " + ARG_CONFIG_DEST);
+      }
+
+      MetricsConfiguration mc = loadMetricsConfiguration(Paths.get(configDest));
+
 
       SolrExporter solrExporter = new SolrExporter(
           res.getInt(ARG_PORT_DEST),
           res.getInt(ARG_NUM_THREADS_DEST),
           res.getInt(ARG_SCRAPE_INTERVAL_DEST),
-          scrapeConfiguration,
-          loadMetricsConfiguration(Paths.get(res.getString(ARG_CONFIG_DEST))));
+          scrapeConfiguration, mc);
 
       log.info("Starting Solr Prometheus Exporting");
       solrExporter.start();
@@ -216,7 +218,7 @@ public class SolrExporter {
 
   private static MetricsConfiguration loadMetricsConfiguration(Path configPath) {
     try (SolrResourceLoader loader = new SolrResourceLoader(configPath.getParent())) {
-      XmlConfigFile config = new XmlConfigFile(loader, configPath.getFileName().toString(), null, null);
+      XmlConfigFile config = new XmlConfigFile(loader, configPath.getFileName().toString(), null, null, null);
       return MetricsConfiguration.from(config);
     } catch (Exception e) {
       log.error("Could not load scrape configuration from {}", configPath.toAbsolutePath());

@@ -58,7 +58,7 @@ public class GroupedEndResultTransformer implements EndResultTransformer {
     SortSpec withinGroupSortSpec = rb.getGroupingSpec().getWithinGroupSortSpec();
     for (Map.Entry<String, ?> entry : result.entrySet()) {
       Object value = entry.getValue();
-      if (TopGroups.class.isInstance(value)) {
+      if (value instanceof TopGroups) {
         @SuppressWarnings("unchecked")
         TopGroups<BytesRef> topGroups = (TopGroups<BytesRef>) value;
         NamedList<Object> command = new SimpleOrderedMap<>();
@@ -100,7 +100,7 @@ public class GroupedEndResultTransformer implements EndResultTransformer {
         }
         command.add("groups", groups);
         commands.add(entry.getKey(), command);
-      } else if (QueryCommandResult.class.isInstance(value)) {
+      } else if (value instanceof QueryCommandResult) {
         QueryCommandResult queryCommandResult = (QueryCommandResult) value;
         NamedList<Object> command = new SimpleOrderedMap<>();
         command.add("matches", queryCommandResult.getMatches());

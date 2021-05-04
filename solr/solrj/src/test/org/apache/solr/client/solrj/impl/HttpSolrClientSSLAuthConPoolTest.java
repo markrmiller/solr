@@ -17,25 +17,24 @@
 package org.apache.solr.client.solrj.impl;
 
 
-import java.net.URL;
 import java.util.Arrays;
 
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestCase;
 import org.apache.solr.util.RandomizeSSL;
-import org.junit.BeforeClass;
-
+import org.junit.Before;
 @RandomizeSSL(1.0)
-
+@SolrTestCase.AlwaysUseSSL
+@LuceneTestCase.Nightly
 public class HttpSolrClientSSLAuthConPoolTest extends HttpSolrClientConPoolTest {
 
-    @BeforeClass
-    public static void checkUrls() throws Exception {
-      URL[] urls = new URL[] {
-          jetty.getBaseUrl(), yetty.getBaseUrl() 
-      };
-      for (URL u : urls) {
-        assertEquals("expect https urls ","https", u.getProtocol());
-      }
-      assertFalse("expect different urls "+Arrays.toString(urls),
-              urls[0].equals(urls[1]));
+  @Before
+  public void setUp() throws Exception {
+    super.setUp();
+    String[] urls = new String[] {jetty.getBaseUrl(), yetty.getBaseUrl()};
+    for (String u : urls) {
+      assertTrue("expect https urls ", u.startsWith("https"));
     }
+    assertFalse("expect different urls " + Arrays.toString(urls), urls[0].equals(urls[1]));
+  }
 }

@@ -62,9 +62,10 @@ public class BinaryUpdateRequestHandlerTest extends SolrTestCaseJ4 {
       ContentStreamBase.ByteArrayStream cs = new ContentStreamBase.ByteArrayStream(baos.toByteArray(), null, "application/javabin");
       csl.load(req, rsp, cs, p);
       AddUpdateCommand add = p.addCommands.get(0);
-      System.out.println(add.solrDoc);
+
       assertEquals(false, add.overwrite);
       assertEquals(100, add.commitWithin);
     }
+    p.close();
   }
 }

@@ -18,6 +18,7 @@ package org.apache.solr.handler.dataimport;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,12 +60,10 @@ public class DateFormatEvaluator extends Evaluator {
     for (Locale locale : Locale.getAvailableLocales()) {
       availableLocales.put(locale.toString(), locale);
     }
-    for (String tz : TimeZone.getAvailableIDs()) {
-      availableTimezones.add(tz);
-    }
+    availableTimezones.addAll(Arrays.asList(TimeZone.getAvailableIDs()));
   }
   
-  private SimpleDateFormat getDateFormat(String pattern, TimeZone timezone, Locale locale) {
+  private static SimpleDateFormat getDateFormat(String pattern, TimeZone timezone, Locale locale) {
     final SimpleDateFormat sdf = new SimpleDateFormat(pattern, locale);
     sdf.setTimeZone(timezone);
     return sdf;
@@ -131,7 +130,7 @@ public class DateFormatEvaluator extends Evaluator {
    * @lucene.experimental this API is experimental and subject to change
    * @return the result of evaluating a string
    */
-  protected Date evaluateWrapper(VariableWrapper variableWrapper, Locale locale, TimeZone tz) {
+  protected static Date evaluateWrapper(VariableWrapper variableWrapper, Locale locale, TimeZone tz) {
     Date date = null;
     Object variableval = resolveWrapper(variableWrapper,locale,tz);
     if (variableval instanceof Date) {
@@ -152,7 +151,7 @@ public class DateFormatEvaluator extends Evaluator {
    * @lucene.experimental
    * @return the result of evaluating a string
    */
-  protected Date evaluateString(String datemathfmt, Locale locale, TimeZone tz) {
+  protected static Date evaluateString(String datemathfmt, Locale locale, TimeZone tz) {
     // note: DMP does not use the locale but perhaps a subclass might use it, for e.g. parsing a date in a custom
     // string that doesn't necessarily have date math?
     //TODO refactor DateMathParser.parseMath a bit to have a static method for this logic.
@@ -173,7 +172,7 @@ public class DateFormatEvaluator extends Evaluator {
    * @lucene.experimental
    * @return the result of resolving the variable wrapper
    */
-  protected Object resolveWrapper(VariableWrapper variableWrapper, Locale locale, TimeZone tz) {
+  protected static Object resolveWrapper(VariableWrapper variableWrapper, Locale locale, TimeZone tz) {
     return variableWrapper.resolve();
   }
 

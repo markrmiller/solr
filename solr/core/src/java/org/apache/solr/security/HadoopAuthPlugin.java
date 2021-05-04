@@ -201,27 +201,7 @@ public class HadoopAuthPlugin extends AuthenticationPlugin {
       servletContext.setAttribute(DELEGATION_TOKEN_ZK_CLIENT, controller.getZkClient());
     }
 
-    FilterConfig conf = new FilterConfig() {
-      @Override
-      public ServletContext getServletContext() {
-        return servletContext;
-      }
-
-      @Override
-      public Enumeration<String> getInitParameterNames() {
-        return Collections.enumeration(params.keySet());
-      }
-
-      @Override
-      public String getInitParameter(String param) {
-        return params.get(param);
-      }
-
-      @Override
-      public String getFilterName() {
-        return "HadoopAuthFilter";
-      }
-    };
+    FilterConfig conf = new MyFilterConfig(servletContext, params);
 
     return conf;
   }
@@ -301,6 +281,36 @@ public class HadoopAuthPlugin extends AuthenticationPlugin {
   public void close() throws IOException {
     if (authFilter != null) {
       authFilter.destroy();
+    }
+  }
+
+  private static class MyFilterConfig implements FilterConfig {
+    private final ServletContext servletContext;
+    private final Map<String,String> params;
+
+    public MyFilterConfig(ServletContext servletContext, Map<String,String> params) {
+      this.servletContext = servletContext;
+      this.params = params;
+    }
+
+    @Override
+    public ServletContext getServletContext() {
+      return servletContext;
+    }
+
+    @Override
+    public Enumeration<String> getInitParameterNames() {
+      return Collections.enumeration(params.keySet());
+    }
+
+    @Override
+    public String getInitParameter(String param) {
+      return params.get(param);
+    }
+
+    @Override
+    public String getFilterName() {
+      return "HadoopAuthFilter";
     }
   }
 }

@@ -101,11 +101,11 @@ public class Metrics extends SolrCacheBase implements SolrInfoBean {
 
       previous = now;
 
-    });
+    }, false );
     solrMetricsContext.gauge(metricsMap, true, getName(), getCategory().toString(), scope);
   }
 
-  private float getPerSecond(long value, double seconds) {
+  private static float getPerSecond(long value, double seconds) {
     return (float) (value / seconds);
   }
 

@@ -128,8 +128,7 @@ public class RegexTransformer extends Transformer {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  private List<String> readBySplit(String splitBy, String value) {
+  private static List<String> readBySplit(String splitBy, String value) {
     String[] vals = value.split(splitBy);
     List<String> l = new ArrayList<>(Arrays.asList(vals));
     return l;

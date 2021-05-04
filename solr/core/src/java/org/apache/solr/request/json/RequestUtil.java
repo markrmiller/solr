@@ -255,8 +255,8 @@ public class RequestUtil {
       int existingSize = existing==null ? 0 : existing.length;
       int jsonSize = lst==null ? 1 : lst.size();
       String[] newval = new String[ existingSize + jsonSize ];
-      for (int i=0; i<existingSize; i++) {
-        newval[i] = existing[i];
+      if (existingSize > 0) {
+        System.arraycopy(existing, 0, newval, 0, existingSize);
       }
       if (lst != null) {
         for (int i = 0; i < jsonSize; i++) {

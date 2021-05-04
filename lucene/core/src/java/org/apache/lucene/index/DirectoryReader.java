@@ -261,8 +261,8 @@ public abstract class DirectoryReader extends BaseCompositeReader<LeafReader> {
     final long currentGen = latest.getGeneration();
 
     commits.add(new StandardDirectoryReader.ReaderCommit(null, latest, dir));
-
-    for(int i=0;i<files.length;i++) {
+    int sz = files.length;
+    for(int i=0;i<sz;i++) {
 
       final String fileName = files[i];
 

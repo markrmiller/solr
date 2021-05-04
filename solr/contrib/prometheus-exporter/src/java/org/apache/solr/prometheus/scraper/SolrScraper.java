@@ -90,7 +90,7 @@ public abstract class SolrScraper implements Closeable {
     }
   }
 
-  protected MetricSamples request(SolrClient client, MetricsQuery query) throws IOException {
+  protected static MetricSamples request(SolrClient client, MetricsQuery query) throws IOException {
     MetricSamples samples = new MetricSamples();
 
     QueryRequest queryRequest = new QueryRequest(query.getParameters());

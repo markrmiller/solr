@@ -28,7 +28,6 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.util.FastWriter;
 import org.apache.solr.common.util.TextWriter;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.schema.IndexSchema;
@@ -42,7 +41,7 @@ import org.apache.solr.search.ReturnFields;
  */
 public abstract class TextResponseWriter implements TextWriter {
 
-  protected final FastWriter writer;
+  protected final Writer writer;
   protected final IndexSchema schema;
   protected final SolrQueryRequest req;
   protected final SolrQueryResponse rsp;
@@ -57,12 +56,12 @@ public abstract class TextResponseWriter implements TextWriter {
 
 
   public TextResponseWriter(Writer writer, SolrQueryRequest req, SolrQueryResponse rsp) {
-    this.writer = writer == null ? null: FastWriter.wrap(writer);
+    this.writer = writer;
     this.schema = req.getSchema();
     this.req = req;
     this.rsp = rsp;
     String indent = req.getParams().get("indent");
-    if (null == indent || !("off".equals(indent) || "false".equals(indent))){
+    if (!("off".equals(indent) || "false".equals(indent))){
       doIndent=true;
     }
     returnFields = rsp.getReturnFields();
@@ -70,7 +69,7 @@ public abstract class TextResponseWriter implements TextWriter {
   }
   //only for test purposes
    TextResponseWriter(Writer writer, boolean indent) {
-    this.writer = writer == null ? null: FastWriter.wrap(writer);
+    this.writer = writer;
     this.schema = null;
     this.req = null;
     this.rsp = null;
@@ -80,7 +79,7 @@ public abstract class TextResponseWriter implements TextWriter {
 
   /** done with this ResponseWriter... make sure any buffers are flushed to writer */
   public void close() throws IOException {
-    if(writer != null) writer.flushBuffer();
+    if(writer != null) writer.flush();
   }
 
   @Override

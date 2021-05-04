@@ -57,7 +57,7 @@ public abstract class CustomBufferedIndexInput extends IndexInput {
     this.store = BufferStore.instance(bufferSize);
   }
   
-  private void checkBufferSize(int bufferSize) {
+  private static void checkBufferSize(int bufferSize) {
     if (bufferSize <= 0) throw new IllegalArgumentException(
         "bufferSize must be greater than 0 (got " + bufferSize + ")");
   }
@@ -73,9 +73,10 @@ public abstract class CustomBufferedIndexInput extends IndexInput {
     
     if (len <= (bufferLength - bufferPosition)) {
       // the buffer contains enough data to satisfy this request
-      if (len > 0) // to allow b to be null if len is 0...
-      System.arraycopy(buffer, bufferPosition, b, offset, len);
-      bufferPosition += len;
+      if (len > 0) { // to allow b to be null if len is 0...
+        System.arraycopy(buffer, bufferPosition, b, offset, len);
+        bufferPosition += len;
+      }
     } else {
       // the buffer does not have enough data. First serve all we've got.
       int available = bufferLength - bufferPosition;
@@ -180,7 +181,7 @@ public abstract class CustomBufferedIndexInput extends IndexInput {
     long start = bufferStart + bufferPosition;
     long end = start + bufferSize;
     if (end > length()) // don't read past EOF
-    end = length();
+      end = length();
     int newLength = (int) (end - start);
     if (newLength <= 0) throw new EOFException("read past EOF: " + this);
     

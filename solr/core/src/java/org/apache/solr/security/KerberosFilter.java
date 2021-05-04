@@ -92,25 +92,7 @@ public class KerberosFilter extends AuthenticationFilter {
       RuleBasedAuthorizationPlugin ruleBased = (RuleBasedAuthorizationPlugin) authzPlugin;
       if (request.getHeader(KerberosPlugin.ORIGINAL_USER_PRINCIPAL_HEADER) != null &&
           ruleBased.doesUserHavePermission(request.getUserPrincipal(), PermissionNameProvider.Name.ALL)) {
-        request = new HttpServletRequestWrapper(request) {
-          @Override
-          public Principal getUserPrincipal() {
-            String originalUserPrincipal = originalRequest.getHeader(KerberosPlugin.ORIGINAL_USER_PRINCIPAL_HEADER);
-            if (log.isInfoEnabled()) {
-              log.info("Substituting user principal from {} to {}.", originalRequest.getUserPrincipal(), originalUserPrincipal);
-            }
-            return new Principal() {
-              @Override
-              public String getName() {
-                return originalUserPrincipal;
-              }
-              @Override
-              public String toString() {
-                return originalUserPrincipal;
-              }
-            };
-          }
-        };
+        request = new MyHttpServletRequestWrapper(request, originalRequest);
       }
     }
     return request;
@@ -122,5 +104,41 @@ public class KerberosFilter extends AuthenticationFilter {
     // A hack until HADOOP-15681 get committed
     Locale.setDefault(Locale.US);
     super.doFilter(request, response, filterChain);
+  }
+
+  private static class MyHttpServletRequestWrapper extends HttpServletRequestWrapper {
+    private final HttpServletRequest originalRequest;
+
+    public MyHttpServletRequestWrapper(HttpServletRequest request, HttpServletRequest originalRequest) {
+      super(request);
+      this.originalRequest = originalRequest;
+    }
+
+    @Override
+    public Principal getUserPrincipal() {
+      String originalUserPrincipal = originalRequest.getHeader(KerberosPlugin.ORIGINAL_USER_PRINCIPAL_HEADER);
+      if (log.isInfoEnabled()) {
+        log.info("Substituting user principal from {} to {}.", originalRequest.getUserPrincipal(), originalUserPrincipal);
+      }
+      return new MyPrincipal(originalUserPrincipal);
+    }
+
+    private static class MyPrincipal implements Principal {
+      private final String originalUserPrincipal;
+
+      public MyPrincipal(String originalUserPrincipal) {
+        this.originalUserPrincipal = originalUserPrincipal;
+      }
+
+      @Override
+      public String getName() {
+        return originalUserPrincipal;
+      }
+
+      @Override
+      public String toString() {
+        return originalUserPrincipal;
+      }
+    }
   }
 }

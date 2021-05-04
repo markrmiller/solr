@@ -195,7 +195,7 @@ public class SimplePropertiesWriter extends DIHProperties {
    * We'll send everything back as Strings as this class has
    * already converted them.
    */
-  protected Map<String,Object> propertiesToMap(Properties p) {
+  protected static Map<String,Object> propertiesToMap(Properties p) {
     Map<String,Object> theMap = new HashMap<>();
     for(Map.Entry<Object,Object> entry : p.entrySet()) {
       String key = entry.getKey().toString();

@@ -114,7 +114,7 @@ public interface AnalyticsValueStream {
                          funcName,
                          Arrays.stream(params).
                                 map(param -> param.getExpressionStr()).
-                                reduce((a, b) -> a + "," + b).orElseGet(() -> ""));
+                                reduce((a, b) -> a + "," + b).orElse(""));
   }
 
   /**

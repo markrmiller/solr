@@ -269,13 +269,18 @@ public class Tuple implements Cloneable, MapWriter {
   }
 
   public Tuple clone() {
-    Tuple clone = new Tuple();
+    Tuple clone = null;
+    try {
+      clone = (Tuple) super.clone();
+    } catch (CloneNotSupportedException e) {
+      throw new RuntimeException(e);
+    }
     clone.fields.putAll(fields);
     return clone;
   }
   
   public void merge(Tuple other) {
-    fields.putAll(other.getFields());
+    fields.putAll(other.fields);
   }
 
   @Override

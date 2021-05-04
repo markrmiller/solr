@@ -424,7 +424,7 @@ public class AnalyticsRequestParser {
   }
 
   private static EnumSet<FacetRangeInclude> constructInclude(List<String> includes) throws SolrException {
-    return FacetRangeInclude.parseParam(includes.toArray(new String[includes.size()]));
+    return FacetRangeInclude.parseParam(includes.toArray(new String[0]));
   }
 
   private static EnumSet<FacetRangeOther> constructOthers(List<String> othersRequest, String facetName) throws SolrException {

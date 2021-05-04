@@ -27,7 +27,7 @@ import org.apache.solr.common.SolrException;
 public class ObjectUtil {
 
   public static class ConflictHandler {
-    protected boolean isList(Map<String,Object> container, List<String> path, String key, Object current, Object previous) {
+    protected static boolean isList(Map<String,Object> container, List<String> path, String key, Object current, Object previous) {
       return key!=null && ("fields".equals(key) || "filter".equals(key));
     }
 
@@ -69,14 +69,14 @@ public class ObjectUtil {
       }
     }
 
-    protected Object makeList(Object current, Object previous) {
+    protected static Object makeList(Object current, Object previous) {
       ArrayList lst = new ArrayList();
       append(lst, previous);   // make the original value(s) come first
       append(lst, current);
       return lst;
     }
 
-    protected void append(List lst, Object current) {
+    protected static void append(List lst, Object current) {
       if (current instanceof Collection) {
         lst.addAll((Collection)current);
       } else {

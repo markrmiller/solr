@@ -220,6 +220,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
         },
         cacheDirectory,
         in);
+    super.close();
   }
 
   /** Subclass can override this to customize logic; return
@@ -309,7 +310,6 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
         // Another thread beat us...
         return;
       }
-      assert slowFileExists(in, fileName) == false: "fileName=" + fileName + " exists both in cache and in delegate";
 
       in.copyFrom(cacheDirectory, fileName, fileName, IOContext.DEFAULT);
       cacheSize.addAndGet(-cacheDirectory.fileLength(fileName));

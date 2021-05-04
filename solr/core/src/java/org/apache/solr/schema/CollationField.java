@@ -149,7 +149,7 @@ public class CollationField extends FieldType {
    * Create a locale from language, with optional country and variant.
    * Then return the appropriate collator for the locale.
    */
-  private Collator createFromLocale(String language, String country, String variant) {
+  private static Collator createFromLocale(String language, String country, String variant) {
     Locale locale;
     
     if (language != null && country == null && variant != null)
@@ -169,7 +169,7 @@ public class CollationField extends FieldType {
    * Read custom rules from a file, and create a RuleBasedCollator
    * The file cannot support comments, as # might be in the rules!
    */
-  private Collator createFromRules(String fileName, ResourceLoader loader) {
+  private static Collator createFromRules(String fileName, ResourceLoader loader) {
     InputStream input = null;
     try {
      input = loader.openResource(fileName);

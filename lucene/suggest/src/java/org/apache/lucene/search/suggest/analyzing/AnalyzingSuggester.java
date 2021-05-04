@@ -401,7 +401,7 @@ public class AnalyzingSuggester extends Lookup implements Accountable {
   }
 
   @Override
-  public void build(InputIterator iterator) throws IOException {
+  public synchronized void build(InputIterator iterator) throws IOException {
     if (iterator.hasContexts()) {
       throw new IllegalArgumentException("this suggester doesn't support contexts");
     }
@@ -421,7 +421,7 @@ public class AnalyzingSuggester extends Lookup implements Accountable {
     String tempSortedFileName = null;
 
     count = 0;
-    byte buffer[] = new byte[8];
+    byte[] buffer = new byte[8];
     try {
       ByteArrayDataOutput output = new ByteArrayDataOutput(buffer);
 

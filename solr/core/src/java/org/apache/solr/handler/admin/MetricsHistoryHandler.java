@@ -19,18 +19,16 @@ package org.apache.solr.handler.admin;
 import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -38,11 +36,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -57,33 +55,30 @@ import org.apache.solr.api.Api;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
+import org.apache.solr.client.solrj.cloud.ReplicaInfo;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
-import org.apache.solr.client.solrj.cloud.autoscaling.ReplicaInfo;
-import org.apache.solr.client.solrj.cloud.autoscaling.Variable;
-import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
-import org.apache.solr.client.solrj.impl.HttpClientUtil;
-import org.apache.solr.cloud.LeaderElector;
+import org.apache.solr.client.solrj.impl.SolrClientNodeStateProvider;
 import org.apache.solr.cloud.Overseer;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.Base64;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.TimeSource;
-import org.apache.solr.common.util.Utils;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.metrics.SolrMetricManager;
 import org.apache.solr.metrics.rrd.SolrRrdBackendFactory;
@@ -91,8 +86,7 @@ import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.security.AuthorizationContext;
 import org.apache.solr.security.PermissionNameProvider;
-import org.apache.solr.common.util.SolrNamedThreadFactory;
-import org.apache.zookeeper.KeeperException;
+import org.jctools.maps.NonBlockingHashMap;
 import org.rrd4j.ConsolFun;
 import org.rrd4j.DsType;
 import org.rrd4j.core.ArcDef;
@@ -110,7 +104,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.stream.Collectors.toMap;
-import static org.apache.solr.common.params.CommonParams.ID;
 
 /**
  * Collects metrics from all nodes in the system on a regular basis in a background thread.
@@ -137,7 +130,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
 
     DEFAULT_NODE_GAUGES.add("CONTAINER.fs.coreRoot.usableSpace");
 
-    DEFAULT_CORE_GAUGES.add(Variable.Type.CORE_IDX.metricsAttribute);
+    DEFAULT_CORE_GAUGES.add(SolrClientNodeStateProvider.Variable.CORE_IDX.metricsAttribute);
 
     DEFAULT_CORE_COUNTERS.add("QUERY./select.requests");
     DEFAULT_CORE_COUNTERS.add("UPDATE./update.requests");
@@ -162,22 +155,25 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
   private final SolrCloudManager cloudManager;
   private final TimeSource timeSource;
   private final int collectPeriod;
-  private final Map<String, List<String>> counters = new HashMap<>();
-  private final Map<String, List<String>> gauges = new HashMap<>();
+  private final Map<String, List<String>> counters = new ConcurrentHashMap<>(128);
+  private final Map<String, List<String>> gauges = new ConcurrentHashMap<>(128);
   private final String overseerUrlScheme;
 
-  private final Map<String, RrdDb> knownDbs = new ConcurrentHashMap<>();
+  private final Map<String, RrdDb> knownDbs = new ConcurrentHashMap<>(16);
+  private final Overseer overseer;
+  private ScheduledFuture<?> scheduledFuture;
 
   private ScheduledThreadPoolExecutor collectService;
   private boolean logMissingCollection = true;
   private boolean enable;
   private boolean enableReplicas;
   private boolean enableNodes;
-  private String versionString;
+  private volatile String versionString;
 
   public MetricsHistoryHandler(String nodeName, MetricsHandler metricsHandler,
-        SolrClient solrClient, SolrCloudManager cloudManager, Map<String, Object> pluginArgs) {
-
+      SolrClient solrClient, SolrCloudManager cloudManager,
+      Map<String,Object> pluginArgs, Overseer overseer) {
+    this.overseer = overseer;
     Map<String, Object> args = new HashMap<>();
     // init from optional solr.xml config
     if (pluginArgs != null) {
@@ -230,19 +226,24 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
 
     if (enable) {
       collectService = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(1,
-          new SolrNamedThreadFactory("MetricsHistoryHandler"));
+          new SolrNamedThreadFactory("MetricsHistoryHandler", true));
       collectService.setRemoveOnCancelPolicy(true);
       collectService.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-      collectService.scheduleWithFixedDelay(() -> collectMetrics(),
+      collectService.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+      scheduledFuture = collectService.scheduleWithFixedDelay(() -> collectMetrics(),
           timeSource.convertDelay(TimeUnit.SECONDS, collectPeriod, TimeUnit.MILLISECONDS),
           timeSource.convertDelay(TimeUnit.SECONDS, collectPeriod, TimeUnit.MILLISECONDS),
           TimeUnit.MILLISECONDS);
       checkSystemCollection();
     }
+    assert ObjectReleaseTracker.getInstance().track(this);
   }
 
   // check that .system exists
   public void checkSystemCollection() {
+    if (overseer == null || !overseer.getCoreContainer().getZkController().isOverseerLeader()) {
+      return;
+    }
     if (cloudManager != null) {
       try {
         if (cloudManager.isClosed() || Thread.interrupted()) {
@@ -261,7 +262,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         } else {
           boolean ready = false;
           for (Replica r : systemColl.getReplicas()) {
-            if (r.isActive(clusterState.getLiveNodes())) {
+            if (r.isActive(cloudManager.getClusterStateProvider().getLiveNodes())) {
               ready = true;
               break;
             }
@@ -273,6 +274,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
           }
         }
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         if (logMissingCollection) {
           log.warn("Error getting cluster state, keeping metrics history in memory", e);
         }
@@ -288,6 +290,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         factory.setPersistent(true);
         logMissingCollection = true;
       } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
         if (logMissingCollection) {
           log.info("No {} collection, keeping metrics history in memory.", CollectionAdminParams.SYSTEM_COLL);
         }
@@ -312,59 +315,11 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     return factory;
   }
 
-  private String getOverseerLeader() {
-    // non-ZK node has no Overseer
-    if (cloudManager == null) {
-      return null;
-    }
-    ZkNodeProps props = null;
-    try {
-      VersionedData data = cloudManager.getDistribStateManager().getData(
-          Overseer.OVERSEER_ELECT + "/leader");
-      if (data != null && data.getData() != null) {
-        props = ZkNodeProps.load(data.getData());
-      }
-    } catch (KeeperException | IOException | NoSuchElementException e) {
-      log.warn("Could not obtain overseer's address, skipping.", e);
-      return null;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return null;
-    }
-    if (props == null) {
-      return null;
-    }
-    String oid = props.getStr(ID);
-    if (oid == null) {
-      return null;
-    }
-    String nodeName = null;
-    try {
-      nodeName = LeaderElector.getNodeName(oid);
-    } catch (Exception e) {
-      log.warn("Unknown format of leader id, skipping: {}", oid, e);
-      return null;
-    }
-    return nodeName;
-  }
-
-  private boolean amIOverseerLeader() {
-    return amIOverseerLeader(null);
-  }
-
-  private boolean amIOverseerLeader(String leader) {
-    if (leader == null) {
-      leader = getOverseerLeader();
-    }
-    if (leader == null) {
-      return false;
-    } else {
-      return nodeName.equals(leader);
-    }
-  }
 
   private void collectMetrics() {
-    log.debug("-- collectMetrics");
+    if (log.isDebugEnabled()) {
+      log.debug("-- collectMetrics");
+    }
     // Make sure we are a solr server thread, so we can use PKI auth, SOLR-12860
     // This is a workaround since we could not instrument the ScheduledThreadPoolExecutor in ExecutorUtils
     ExecutorUtil.setServerThreadFlag(true);
@@ -394,7 +349,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
       if (Thread.interrupted()) {
         return;
       }
-      log.debug("--  collecting local {}...", group);
+      if (log.isDebugEnabled()) log.debug("--  collecting local {}...", group);
       ModifiableSolrParams params = new ModifiableSolrParams();
       params.add(MetricsHandler.GROUP_PARAM, group.toString());
       params.add(MetricsHandler.COMPACT_PARAM, "true");
@@ -409,37 +364,55 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         });
         NamedList nl = (NamedList)result.get();
         if (nl != null) {
-          for (Iterator<Map.Entry<String, Object>> it = nl.iterator(); it.hasNext(); ) {
-            Map.Entry<String, Object> entry = it.next();
-            String registry = entry.getKey();
-            if (group != Group.core) { // add nodeName suffix
-              registry = registry + "." + nodeName;
-            }
+          try (ParWork worker = new ParWork(this, false)) {
+            for (Iterator<Map.Entry<String, Object>> it = nl.iterator(); it.hasNext(); ) {
+              Map.Entry<String, Object> entry = it.next();
+              String key = entry.getKey();
 
-            RrdDb db = getOrCreateDb(registry, group);
-            if (db == null) {
-              continue;
-            }
-            // set the timestamp
-            Sample s = db.createSample(TimeUnit.SECONDS.convert(timeSource.getEpochTimeNs(), TimeUnit.NANOSECONDS));
-            NamedList<Object> values = (NamedList<Object>)entry.getValue();
-            AtomicBoolean dirty = new AtomicBoolean(false);
-            counters.get(group.toString()).forEach(c -> {
-              Number val = (Number)values.get(c);
-              if (val != null) {
-                dirty.set(true);
-                s.setValue(c, val.doubleValue());
-              }
-            });
-            gauges.get(group.toString()).forEach(c -> {
-              Number val = (Number)values.get(c);
-              if (val != null) {
-                dirty.set(true);
-                s.setValue(c, val.doubleValue());
-              }
-            });
-            if (dirty.get()) {
-              s.update();
+              worker.collect("metrics", () -> {
+                String registry = key;
+                if (group != Group.core) { // add nodeName suffix
+                  registry = registry + "." + nodeName;
+                }
+                RrdDb db = getOrCreateDb(registry, group);
+                if (db == null) {
+                  return;
+                }
+                // set the timestamp
+                Sample s = null;
+                try {
+                  s = db.createSample(TimeUnit.SECONDS.convert(timeSource.getEpochTimeNs(), TimeUnit.NANOSECONDS));
+                } catch (IOException e) {
+                  log.warn("Exception retrieving local metrics for group {}: {}", group, e);
+                  return;
+                }
+                NamedList<Object> values = (NamedList<Object>) entry.getValue();
+                AtomicBoolean dirty = new AtomicBoolean(false);
+                Sample finalS = s;
+                counters.get(group.toString()).forEach(c -> {
+                  Number val = (Number) values.get(c);
+                  if (val != null) {
+                    dirty.set(true);
+                    finalS.setValue(c, val.doubleValue());
+                  }
+                });
+                Sample finalS1 = s;
+                gauges.get(group.toString()).forEach(c -> {
+                  Number val = (Number) values.get(c);
+                  if (val != null) {
+                    dirty.set(true);
+                    finalS1.setValue(c, val.doubleValue());
+                  }
+                });
+                if (dirty.get()) {
+                  try {
+                    s.update();
+                  } catch (IOException e) {
+                    log.warn("Exception retrieving local metrics for group {}: {}", group, e);
+                  }
+                }
+              });
+
             }
           }
         }
@@ -450,7 +423,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
   }
 
   private void collectGlobalMetrics() {
-    if (!amIOverseerLeader()) {
+    if (overseer == null || !overseer.getCoreContainer().getZkController().isOverseerLeader()) {
       return;
     }
     Set<String> nodes = new HashSet<>(cloudManager.getClusterStateProvider().getLiveNodes());
@@ -480,7 +453,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     // adding all partial values. At some point it may be necessary to implement
     // other aggregation functions.
     // group : registry : name : value
-    Map<Group, Map<String, Map<String, Number>>> totals = new HashMap<>();
+    Map<Group, Map<String, Map<String, Number>>> totals = new EnumMap<>(Group.class);
 
     // collect and aggregate per-collection totals
     for (String node : nodes) {
@@ -505,21 +478,23 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         });
       });
       // add node-level stats
-      Map<String, Object> nodeValues = nodeStateProvider.getNodeValues(node, nodeTags);
-      for (Group g : Arrays.asList(Group.node, Group.jvm)) {
-        String registry = SolrMetricManager.getRegistryName(g);
-        Map<String, Number> perReg = totals
-            .computeIfAbsent(g, gr -> new HashMap<>())
-            .computeIfAbsent(registry, r -> new HashMap<>());
-        Set<String> names = new HashSet<>();
-        names.addAll(counters.get(g.toString()));
-        names.addAll(gauges.get(g.toString()));
-        names.forEach(name -> {
-          String tag = "metrics:" + registry + ":" + name;
-          double value = ((Number)nodeValues.getOrDefault(tag, 0.0)).doubleValue();
-          DoubleAdder adder = (DoubleAdder)perReg.computeIfAbsent(name, t -> new DoubleAdder());
-          adder.add(value);
-        });
+      try {
+        Map<String,Object> nodeValues = nodeStateProvider.getNodeValues(node, nodeTags);
+        for (Group g : Arrays.asList(Group.node, Group.jvm)) {
+          String registry = SolrMetricManager.getRegistryName(g);
+          Map<String,Number> perReg = totals.computeIfAbsent(g, gr -> new HashMap<>()).computeIfAbsent(registry, r -> new HashMap<>());
+          Set<String> names = new HashSet<>();
+          names.addAll(counters.get(g.toString()));
+          names.addAll(gauges.get(g.toString()));
+          names.forEach(name -> {
+            String tag = "metrics:" + registry + ":" + name;
+            double value = ((Number) nodeValues.getOrDefault(tag, 0.0)).doubleValue();
+            DoubleAdder adder = (DoubleAdder) perReg.computeIfAbsent(name, t -> new DoubleAdder());
+            adder.add(value);
+          });
+        }
+      } catch (Exception e) {
+        log.error("Exception getting node level stats", e);
       }
     }
 
@@ -534,16 +509,18 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     try {
       ClusterState state = cloudManager.getClusterStateProvider().getClusterState();
       state.forEachCollection(coll -> {
-        String registry = SolrMetricManager.getRegistryName(Group.collection, coll.getName());
+        DocCollection docColl = coll.join();
+        String docCollName = docColl.getName();
+        String registry = SolrMetricManager.getRegistryName(Group.collection, docCollName);
         Map<String, Number> perReg = totals
             .computeIfAbsent(Group.collection, g -> new HashMap<>())
             .computeIfAbsent(registry, r -> new HashMap<>());
-        Slice[] slices = coll.getActiveSlicesArr();
-        perReg.put(NUM_SHARDS_KEY, slices.length);
+        Collection<Slice> slices = docColl.getActiveSlices();
+        perReg.put(NUM_SHARDS_KEY, slices.size());
         DoubleAdder numActiveReplicas = new DoubleAdder();
         for (Slice s : slices) {
           s.forEach(r -> {
-            if (r.isActive(state.getLiveNodes())) {
+            if (r.isActive( cloudManager.getClusterStateProvider().getLiveNodes())) {
               numActiveReplicas.add(1.0);
             }
           });
@@ -615,13 +592,13 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     for (Group g : groups) {
       // use NaN when more than 1 sample is missing
       counters.get(g.toString()).forEach(name ->
-          def.addDatasource(name, DsType.COUNTER, collectPeriod * 2, Double.NaN, Double.NaN));
+          def.addDatasource(name, DsType.COUNTER, collectPeriod * 2L, Double.NaN, Double.NaN));
       gauges.get(g.toString()).forEach(name ->
-          def.addDatasource(name, DsType.GAUGE, collectPeriod * 2, Double.NaN, Double.NaN));
+          def.addDatasource(name, DsType.GAUGE, collectPeriod * 2L, Double.NaN, Double.NaN));
     }
     if (groups.contains(Group.node)) {
       // add nomNodes gauge
-      def.addDatasource(NUM_NODES_KEY, DsType.GAUGE, collectPeriod * 2, Double.NaN, Double.NaN);
+      def.addDatasource(NUM_NODES_KEY, DsType.GAUGE, collectPeriod * 2L, Double.NaN, Double.NaN);
     }
 
     // add archives
@@ -640,10 +617,10 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     RrdDb db = knownDbs.computeIfAbsent(registry, r -> {
       RrdDef def = createDef(r, group);
       try {
-        RrdDb newDb = new RrdDb(def, factory);
+        RrdDb newDb = RrdDb.getBuilder().setRrdDef(def).setBackendFactory(factory).build();
         return newDb;
-      } catch (IOException e) {
-        log.warn("Can't create RrdDb for registry {}, group {}: {}", registry, group, e);
+      } catch (Exception e) {
+        log.warn("Can't create RrdDb for registry {}, group {}", registry, group, e);
         return null;
       }
     });
@@ -655,23 +632,17 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     if (log.isDebugEnabled()) {
       log.debug("Closing {}", hashCode());
     }
+
     if (collectService != null) {
-      boolean shutdown = false;
-      while (!shutdown) {
-        try {
-          // Wait a while for existing tasks to terminate
-          collectService.shutdownNow();
-          shutdown = collectService.awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException ie) {
-          // Preserve interrupt status
-          Thread.currentThread().interrupt();
-        }
-      }
+      scheduledFuture.cancel(false);
+      collectService.shutdownNow();
     }
-    if (factory != null) {
-      factory.close();
+
+    try (ParWork closer = new ParWork(this)) {
+      closer.collect(knownDbs.values());
     }
-    knownDbs.clear();
+    IOUtils.closeQuietly(factory);
+    assert ObjectReleaseTracker.getInstance().release(this);
   }
 
   public enum Cmd {
@@ -744,7 +715,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         }
         if (factory.exists(name)) {
           // get a throwaway copy (safe to close and discard)
-          RrdDb db = new RrdDb(URI_PREFIX + name, true, factory);
+          RrdDb db = RrdDb.getBuilder().setPath(URI_PREFIX + name).setReadOnly(true).setBackendFactory(factory).setUsePool(true).build();
           SimpleOrderedMap<Object> data = new SimpleOrderedMap<>();
           data.add("data", getDbData(db, dsNames, format, req.getParams()));
           data.add("lastModified", db.getLastUpdateTime());
@@ -760,7 +731,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
         }
         if (factory.exists(name)) {
           // get a throwaway copy (safe to close and discard)
-          RrdDb db = RrdDb.getBuilder().setBackendFactory(factory).setReadOnly(true).setPath(new URI(URI_PREFIX + name)).build();
+          RrdDb db = RrdDb.getBuilder().setBackendFactory(factory).setReadOnly(true).setPath(new URI(URI_PREFIX + name)).setUsePool(true).build();
           SimpleOrderedMap<Object> status = new SimpleOrderedMap<>();
           status.add("status", getDbStatus(db));
           status.add("node", nodeName);
@@ -783,14 +754,14 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     }
     // when using in-memory DBs non-overseer node has no access to overseer DBs - in this case
     // forward the request to Overseer leader if available
-    if (!factory.isPersistent()) {
-      String leader = getOverseerLeader();
-      if (leader != null && !amIOverseerLeader(leader)) {
-        // get & merge remote response
-        NamedList<Object> remoteRes = handleRemoteRequest(leader, req);
-        mergeRemoteRes(rsp, remoteRes);
-      }
-    }
+    //    if (!factory.isPersistent()) {
+    //      String leader = getOverseerLeader();
+    //      if (leader != null && !amIOverseerLeader(leader)) {
+    //        // get & merge remote response
+    //        NamedList<Object> remoteRes = handleRemoteRequest(leader, req);
+    //        mergeRemoteRes(rsp, remoteRes);
+    //      }
+    //    }
     SimpleOrderedMap<Object> apiState = new SimpleOrderedMap<>();
     apiState.add("enableReplicas", enableReplicas);
     apiState.add("enableNodes", enableNodes);
@@ -802,36 +773,8 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     rsp.getResponseHeader().add("zkConnected", cloudManager != null);
   }
 
-  @SuppressWarnings({"unchecked"})
-  private NamedList<Object> handleRemoteRequest(String nodeName, SolrQueryRequest req) {
-    String baseUrl = Utils.getBaseUrlForNodeName(nodeName, overseerUrlScheme);
-    String url;
-    try {
-      URL u = new URL(baseUrl);
-      u = new URL(u.getProtocol(), u.getHost(), u.getPort(), "/api/cluster/metrics/history");
-      url = u.toString();
-    } catch (MalformedURLException e) {
-      log.warn("Invalid Overseer url '{}', unable to fetch remote metrics history", baseUrl, e);
-      return null;
-    }
-    // always use javabin
-    ModifiableSolrParams params = new ModifiableSolrParams(req.getParams());
-    params.set(CommonParams.WT, "javabin");
-    url = url + "?" + params.toString();
-    try {
-      byte[] data = cloudManager.httpRequest(url, SolrRequest.METHOD.GET, null, null, HttpClientUtil.DEFAULT_CONNECT_TIMEOUT, true);
-      // response is always a NamedList
-      try (JavaBinCodec codec = new JavaBinCodec()) {
-        return (NamedList<Object>)codec.unmarshal(new ByteArrayInputStream(data));
-      }
-    } catch (IOException e) {
-      log.warn("Exception forwarding request to Overseer at {}", url, e);
-      return null;
-    }
-  }
-
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private void mergeRemoteRes(SolrQueryResponse rsp, NamedList<Object> remoteRes) {
+  private static void mergeRemoteRes(SolrQueryResponse rsp, NamedList<Object> remoteRes) {
     if (remoteRes == null || remoteRes.get("metrics") == null) {
       return;
     }
@@ -840,7 +783,7 @@ public class MetricsHistoryHandler extends RequestHandlerBase implements Permiss
     remoteMetrics.forEach((k, v) -> localMetrics.add(k, v));
   }
 
-  private NamedList<Object> getDbStatus(RrdDb db) throws IOException {
+  private static NamedList<Object> getDbStatus(RrdDb db) throws IOException {
     NamedList<Object> res = new SimpleOrderedMap<>();
     res.add("lastModified", db.getLastUpdateTime());
     RrdDef def = db.getRrdDef();

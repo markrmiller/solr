@@ -146,8 +146,7 @@ public class DIHCacheSupport {
     }
   }
   
-  private Map<String,Object> getNextFromCache(String query,
-      Iterator<Map<String,Object>> rowIterator) {
+  private static Map<String,Object> getNextFromCache(String query, Iterator<Map<String,Object>> rowIterator) {
     try {
       if (rowIterator == null) return null;
       if (rowIterator.hasNext()) return rowIterator.next();

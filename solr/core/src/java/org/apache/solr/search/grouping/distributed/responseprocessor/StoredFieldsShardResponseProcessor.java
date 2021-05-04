@@ -41,7 +41,7 @@ public class StoredFieldsShardResponseProcessor implements ShardResponseProcesso
     for (SolrDocument doc : docs) {
       Object id = doc.getFieldValue(uniqueIdFieldName).toString();
       ShardDoc shardDoc = rb.resultIds.get(id);
-      FieldDoc fieldDoc = (FieldDoc) shardDoc;
+      FieldDoc fieldDoc = shardDoc;
       if (shardDoc != null) {
         if (returnScores && !Float.isNaN(fieldDoc.score)) {
             doc.setField("score", fieldDoc.score);

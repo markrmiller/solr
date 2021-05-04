@@ -18,12 +18,14 @@ package org.apache.solr.handler.clustering;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
@@ -68,6 +70,7 @@ public class ClusteringComponent extends SearchComponent implements SolrCoreAwar
    * register this component with SearchHandler.
    */
   public static final String COMPONENT_NAME = "clustering";
+  private static final Pattern COMPILE = Pattern.compile("[,\\s]+");
 
   /**
    * Declaration-order list of search clustering engines.
@@ -99,8 +102,8 @@ public class ClusteringComponent extends SearchComponent implements SolrCoreAwar
    * The optional param "ids" is populated with the lucene document id
    * for each SolrDocument.
    *
-   * @param docs The {@link org.apache.solr.search.DocList} to convert
-   * @param searcher The {@link org.apache.solr.search.SolrIndexSearcher} to use to load the docs from the Lucene index
+   * @param docs The {@link DocList} to convert
+   * @param searcher The {@link SolrIndexSearcher} to use to load the docs from the Lucene index
    * @param fields The names of the Fields to load
    * @param ids A map to store the ids of the docs
    * @return The new {@link SolrDocumentList} containing all the loaded docs
@@ -262,14 +265,14 @@ public class ClusteringComponent extends SearchComponent implements SolrCoreAwar
     }
   }
 
-  private void checkAvailable(String name, ClusteringEngine engine) {
+  private static void checkAvailable(String name, ClusteringEngine engine) {
     if (!engine.isAvailable()) {
       throw new SolrException(ErrorCode.SERVER_ERROR, 
           "Clustering engine declared, but not available, check the logs: " + name);
     }
   }
 
-  private String getClusteringEngineName(ResponseBuilder rb){
+  private static String getClusteringEngineName(ResponseBuilder rb){
     return rb.req.getParams().get(ClusteringParams.ENGINE_NAME, ClusteringEngine.DEFAULT_ENGINE_NAME);
   }
 
@@ -297,19 +300,17 @@ public class ClusteringComponent extends SearchComponent implements SolrCoreAwar
         }
   
         StringBuilder sb = new StringBuilder();
-        String[] flparams = fl.split( "[,\\s]+" );
+        String[] flparams = COMPILE.split(fl);
         Set<String> flParamSet = new HashSet<>(flparams.length);
-        for (String flparam : flparams) {
-          // no need trim() because of split() by \s+
-          flParamSet.add(flparam);
-        }
+        // no need trim() because of split() by \s+
+        flParamSet.addAll(Arrays.asList(flparams));
         for (String aFieldToLoad : fields) {
           if (!flParamSet.contains(aFieldToLoad )) {
             sb.append(',').append(aFieldToLoad);
           }
         }
         if (sb.length() > 0) {
-          sreq.params.set(CommonParams.FL, fl + sb.toString());
+          sreq.params.set(CommonParams.FL, fl + sb);
         }
       } else {
         log.warn("No engine named: {}", name);

@@ -77,7 +77,8 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
     return refinement;
   }
   
-  private Map<String, Object> getRefinementSpecial(Context mcontext, Map<String, Object> refinement, Collection<String> tagsWithPartial, FacetBucket bucket, String label) {
+  private static Map<String, Object> getRefinementSpecial(Context mcontext, Map<String,Object> refinement, Collection<String> tagsWithPartial,
+      FacetBucket bucket, String label) {
     if (null == bucket) {
       return refinement;
     }

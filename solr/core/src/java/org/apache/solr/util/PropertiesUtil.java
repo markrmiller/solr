@@ -28,6 +28,20 @@ import java.util.Properties;
  * the DOM (they came from DomUtils) and it's really confusing to see them in something labeled DOM
  */
 public class PropertiesUtil {
+
+  // MRM TODO: experiment
+//  public final static ThreadLocal<StringBuilder> THREAD_LOCAL_StringBuilder = ThreadLocal.withInitial(() -> new StringBuilder(256));
+//  public final static ThreadLocal<ArrayList> THREAD_LOCAL_fragments = new ThreadLocal<>(){
+//    protected ArrayList initialValue() {
+//      return new ArrayList();
+//    }
+//  };
+//  public final static ThreadLocal<ArrayList> THREAD_LOCAL_propertyRefs = new ThreadLocal<>(){
+//    protected ArrayList initialValue() {
+//      return new ArrayList();
+//    }
+//  };
+
   /*
   * This method borrowed from Ant's PropertyHelper.replaceProperties:
   *   http://svn.apache.org/repos/asf/ant/core/trunk/src/main/org/apache/tools/ant/PropertyHelper.java
@@ -41,7 +55,7 @@ public class PropertiesUtil {
     List<String> propertyRefs = new ArrayList<>();
     parsePropertyString(value, fragments, propertyRefs);
 
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(32);
     Iterator<String> i = fragments.iterator();
     Iterator<String> j = propertyRefs.iterator();
 
@@ -78,7 +92,7 @@ public class PropertiesUtil {
     int prev = 0;
     int pos;
     //search for the next instance of $ from the 'prev' position
-    while ((pos = value.indexOf("$", prev)) >= 0) {
+    while ((pos = value.indexOf('$', prev)) >= 0) {
 
       //if there was any text before this, add it as a fragment
       //TODO, this check could be modified to go if pos>prev;
@@ -136,6 +150,9 @@ public class PropertiesUtil {
    * @return an integer version of the passed in value
    */
   public static Integer toInteger(String value, Integer defValue) {
+    if (value == null || value.trim().length() == 0) {
+      return defValue;
+    }
     try {
       return Integer.parseInt(value);
     }

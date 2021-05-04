@@ -24,6 +24,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.GroupParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.handler.component.ShardRequest;
 import org.apache.solr.schema.FieldType;
@@ -62,7 +63,7 @@ public class TopGroupsShardRequestFactory implements ShardRequestFactory {
     }
   }
 
-  private ShardRequest[] createRequestForSpecificShards(ResponseBuilder rb) {
+  private static ShardRequest[] createRequestForSpecificShards(ResponseBuilder rb) {
     // Determine all unique shards to query for TopGroups
     Set<String> uniqueShards = new HashSet<>();
     for (Map<SearchGroup<BytesRef>, Set<String>> groupsToShard : rb.searchGroupToShards.values()) {
@@ -71,14 +72,14 @@ public class TopGroupsShardRequestFactory implements ShardRequestFactory {
       }
     }
 
-    return createRequest(rb, uniqueShards.toArray(new String[uniqueShards.size()]));
+    return createRequest(rb, uniqueShards.toArray(Utils.EMPTY_STRINGS));
   }
 
-  private ShardRequest[] createRequestForAllShards(ResponseBuilder rb) {
+  private static ShardRequest[] createRequestForAllShards(ResponseBuilder rb) {
     return createRequest(rb, ShardRequest.ALL_SHARDS);
   }
 
-  private ShardRequest[] createRequest(ResponseBuilder rb, String[] shards)
+  private static ShardRequest[] createRequest(ResponseBuilder rb, String[] shards)
   {
     ShardRequest sreq = new ShardRequest();
     sreq.shards = shards;

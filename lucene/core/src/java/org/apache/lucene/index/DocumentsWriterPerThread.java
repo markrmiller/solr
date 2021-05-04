@@ -174,7 +174,7 @@ final class DocumentsWriterPerThread {
   private final LiveIndexWriterConfig indexWriterConfig;
   private final boolean enableTestPoints;
   private final int indexVersionCreated;
-  private final ReentrantLock lock = new ReentrantLock();
+  private final ReentrantLock lock = new ReentrantLock(true);
   private int[] deleteDocIDs = new int[0];
   private int numDeletedDocIds = 0;
 

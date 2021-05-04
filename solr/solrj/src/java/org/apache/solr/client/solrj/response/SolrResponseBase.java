@@ -70,9 +70,12 @@ public class SolrResponseBase extends SolrResponse implements MapWriter
   public int getStatus() {
     NamedList header = getResponseHeader();
     if (header != null) {
-        return (Integer) header.get("status");
-    }
-    else {
+       Object obj = header.get("status");
+       if (obj == null) {
+         return 0;
+       }
+       return (Integer) obj;
+    } else {
         return 0;
     }
   }

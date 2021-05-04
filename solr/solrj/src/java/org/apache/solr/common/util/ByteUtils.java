@@ -89,7 +89,7 @@ public class ByteUtils {
 
     int upto = resultOffset;
     for(int i=offset;i<end;i++) {
-      final int code = (int) s.charAt(i);
+      final int code = s.charAt(i);
 
       if (code < 0x80)
         result[upto++] = (byte) code;
@@ -104,7 +104,7 @@ public class ByteUtils {
         // surrogate pair
         // confirm valid high surrogate
         if (code < 0xDC00 && (i < end-1)) {
-          int utf32 = (int) s.charAt(i+1);
+          int utf32 = s.charAt(i+1);
           // confirm valid low surrogate and write pair
           if (utf32 >= 0xDC00 && utf32 <= 0xDFFF) {
             utf32 = ((code - 0xD7C0) << 10) + (utf32 & 0x3FF);
@@ -138,7 +138,7 @@ public class ByteUtils {
 
     int upto = 0, totalBytes = 0;
     for(int i=offset;i<end;i++) {
-      final int code = (int) s.charAt(i);
+      final int code = s.charAt(i);
 
       if (upto > scratch.length - 4)  {
         // a code point may take upto 4 bytes and we don't have enough space, so reset
@@ -161,7 +161,7 @@ public class ByteUtils {
         // surrogate pair
         // confirm valid high surrogate
         if (code < 0xDC00 && (i < end-1)) {
-          int utf32 = (int) s.charAt(i+1);
+          int utf32 = s.charAt(i+1);
           // confirm valid low surrogate and write pair
           if (utf32 >= 0xDC00 && utf32 <= 0xDFFF) {
             utf32 = ((code - 0xD7C0) << 10) + (utf32 & 0x3FF);
@@ -197,7 +197,7 @@ public class ByteUtils {
 
     int res = 0;
     for (int i = offset; i < end; i++) {
-      final int code = (int) s.charAt(i);
+      final int code = s.charAt(i);
 
       if (code < 0x80)
         res++;
@@ -209,7 +209,7 @@ public class ByteUtils {
         // surrogate pair
         // confirm valid high surrogate
         if (code < 0xDC00 && (i < end - 1)) {
-          int utf32 = (int) s.charAt(i + 1);
+          int utf32 = s.charAt(i + 1);
           // confirm valid low surrogate and write pair
           if (utf32 >= 0xDC00 && utf32 <= 0xDFFF) {
             i++;

@@ -45,6 +45,7 @@ import org.apache.solr.client.solrj.response.SolrResponseBase;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.util.plugin.SolrCoreAware;
@@ -96,7 +97,7 @@ public class VelocityResponseWriter implements QueryResponseWriter, SolrCoreAwar
 
   @Override
   public void init(NamedList args) {
-    log.warn("VelocityResponseWriter is deprecated. This may be removed in future Solr releases. Please SOLR-14065.");
+    CoreContainer.deprecationLog.warn("VelocityResponseWriter is deprecated. This may be removed in future Solr releases. Please SOLR-14065.");
     fileResourceLoaderBaseDir = null;
     String templateBaseDir = (String) args.get(TEMPLATE_BASE_DIR);
 
@@ -412,7 +413,7 @@ public class VelocityResponseWriter implements QueryResponseWriter, SolrCoreAwar
     return engine;
   }
 
-  private Template getTemplate(VelocityEngine engine, SolrQueryRequest request) throws IOException {
+  private static Template getTemplate(VelocityEngine engine, SolrQueryRequest request) throws IOException {
     Template template;
 
     String templateName = request.getParams().get(TEMPLATE);
@@ -435,7 +436,7 @@ public class VelocityResponseWriter implements QueryResponseWriter, SolrCoreAwar
     return template;
   }
 
-  private String getJSONWrap(String xmlResult) {  // maybe noggit or Solr's JSON utilities can make this cleaner?
+  private static String getJSONWrap(String xmlResult) {  // maybe noggit or Solr's JSON utilities can make this cleaner?
     // escape the double quotes and backslashes
     String replace1 = xmlResult.replaceAll("\\\\", "\\\\\\\\");
     replace1 = replace1.replaceAll("\\n", "\\\\n");

@@ -26,8 +26,6 @@ import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.solr.legacy.LegacyNumericUtils;
 import org.apache.lucene.queries.function.FunctionValues;
 import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.queries.function.docvalues.LongDocValues;
-import org.apache.lucene.queries.function.valuesource.SortedSetFieldSource;
 import org.apache.lucene.search.SortedSetSelector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.mutable.MutableValue;
@@ -57,8 +55,8 @@ public class TrieLongField extends TrieField implements LongValueFieldType {
     try {
       if (val instanceof CharSequence) return Long.parseLong(val.toString());
     } catch (NumberFormatException e) {
-      Double v = Double.parseDouble((String)val);
-      return v.longValue();
+      double v = Double.parseDouble((String)val);
+      return v;
     }
     return super.toNativeType(val);
   }
@@ -66,69 +64,83 @@ public class TrieLongField extends TrieField implements LongValueFieldType {
   @Override
   protected ValueSource getSingleValueSource(SortedSetSelector.Type choice, SchemaField f) {
     
-    return new SortedSetFieldSource(f.getName(), choice) {
+    return new SortedSetFieldSource(f, choice);
+  }
+
+  private static class SortedSetFieldSource extends org.apache.lucene.queries.function.valuesource.SortedSetFieldSource {
+    public SortedSetFieldSource(SchemaField f, SortedSetSelector.Type choice) {
+      super(f.getName(), choice);
+    }
+
+    @Override
+    public FunctionValues getValues(Map context, LeafReaderContext readerContext) throws IOException {
+      org.apache.lucene.queries.function.valuesource.SortedSetFieldSource thisAsSortedSetFieldSource = this; // needed for nested anon class ref
+
+      SortedSetDocValues sortedSet = DocValues.getSortedSet(readerContext.reader(), field);
+      SortedDocValues view = SortedSetSelector.wrap(sortedSet, selector);
+
+      return new LongDocValues(thisAsSortedSetFieldSource, view);
+    }
+
+    private static class LongDocValues extends org.apache.lucene.queries.function.docvalues.LongDocValues {
+      private final SortedDocValues view;
+      private int lastDocID;
+
+      public LongDocValues(org.apache.lucene.queries.function.valuesource.SortedSetFieldSource thisAsSortedSetFieldSource, SortedDocValues view) {
+        super(thisAsSortedSetFieldSource);
+        this.view = view;
+      }
+
+      private boolean setDoc(int docID) throws IOException {
+        if (docID < lastDocID) {
+          throw new IllegalArgumentException("docs out of order: lastDocID=" + lastDocID + " docID=" + docID);
+        }
+        if (docID > view.docID()) {
+          lastDocID = docID;
+          return docID == view.advance(docID);
+        } else {
+          return docID == view.docID();
+        }
+      }
+
       @Override
-      public FunctionValues getValues(Map context, LeafReaderContext readerContext) throws IOException {
-        SortedSetFieldSource thisAsSortedSetFieldSource = this; // needed for nested anon class ref
-        
-        SortedSetDocValues sortedSet = DocValues.getSortedSet(readerContext.reader(), field);
-        SortedDocValues view = SortedSetSelector.wrap(sortedSet, selector);
-        
-        return new LongDocValues(thisAsSortedSetFieldSource) {
-          private int lastDocID;
+      public long longVal(int doc) throws IOException {
+        if (setDoc(doc)) {
+          BytesRef bytes = view.binaryValue();
+          assert bytes.length > 0;
+          return LegacyNumericUtils.prefixCodedToLong(bytes);
+        } else {
+          return 0L;
+        }
+      }
 
-          private boolean setDoc(int docID) throws IOException {
-            if (docID < lastDocID) {
-              throw new IllegalArgumentException("docs out of order: lastDocID=" + lastDocID + " docID=" + docID);
-            }
-            if (docID > view.docID()) {
-              lastDocID = docID;
-              return docID == view.advance(docID);
-            } else {
-              return docID == view.docID();
-            }
+      @Override
+      public boolean exists(int doc) throws IOException {
+        return setDoc(doc);
+      }
+
+      @Override
+      public ValueFiller getValueFiller() {
+        return new ValueFiller() {
+          private final MutableValueLong mval = new MutableValueLong();
+
+          @Override
+          public MutableValue getValue() {
+            return mval;
           }
 
           @Override
-          public long longVal(int doc) throws IOException {
+          public void fillValue(int doc) throws IOException {
             if (setDoc(doc)) {
-              BytesRef bytes = view.binaryValue();
-              assert bytes.length > 0;
-              return LegacyNumericUtils.prefixCodedToLong(bytes);
+              mval.exists = true;
+              mval.value = LegacyNumericUtils.prefixCodedToLong(view.binaryValue());
             } else {
-              return 0L;
+              mval.exists = false;
+              mval.value = 0L;
             }
-          }
-
-          @Override
-          public boolean exists(int doc) throws IOException {
-            return setDoc(doc);
-          }
-
-          @Override
-          public ValueFiller getValueFiller() {
-            return new ValueFiller() {
-              private final MutableValueLong mval = new MutableValueLong();
-              
-              @Override
-              public MutableValue getValue() {
-                return mval;
-              }
-              
-              @Override
-              public void fillValue(int doc) throws IOException {
-                if (setDoc(doc)) {
-                  mval.exists = true;
-                  mval.value = LegacyNumericUtils.prefixCodedToLong(view.binaryValue());
-                } else {
-                  mval.exists = false;
-                  mval.value = 0L;
-                }
-              }
-            };
           }
         };
       }
-    };
+    }
   }
 }

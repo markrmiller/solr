@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 package org.apache.solr.core;
+import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 
-import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,20 +32,7 @@ public abstract class EphemeralDirectoryFactory extends CachingDirectoryFactory 
   @Override
   public boolean exists(String path) throws IOException {
     String fullPath = normalize(path);
-    synchronized (this) {
-      final CacheValue cacheValue = byPathCache.get(fullPath);
-      if (null == cacheValue) {
-        return false;
-      }
-      final Directory directory = cacheValue.directory;
-      if (null == directory) {
-        return false;
-      }
-      if (0 < directory.listAll().length) {
-        return true;
-      } 
-      return false;
-    }
+    return byPathCache.containsKey(fullPath);
   }
   
   public boolean isPersistent() {
@@ -54,14 +41,15 @@ public abstract class EphemeralDirectoryFactory extends CachingDirectoryFactory 
   
   @Override
   public boolean isAbsolute(String path) {
-    return true;
+    // back compat
+    return new File(path).isAbsolute();
   }
   
   
-  @Override
-  public void remove(Directory dir) throws IOException {
-    // ram dir does not persist its dir anywhere
-  }
+//  @Override
+//  public void remove(Directory dir) throws IOException {
+//    // ram dir does not persist its dir anywhere
+//  }
   
   @Override
   public void remove(String path) throws IOException {

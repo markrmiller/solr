@@ -16,30 +16,25 @@
  */
 package org.apache.solr.cloud.hdfs;
 
-import java.io.IOException;
-
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.ChaosMonkeyNothingIsSafeTest;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import java.io.IOException;
 
 @Slow
-@Nightly
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@LuceneTestCase.Nightly
 public class HdfsChaosMonkeyNothingIsSafeTest extends ChaosMonkeyNothingIsSafeTest {
   private static MiniDFSCluster dfsCluster;
   
   @BeforeClass
   public static void setupClass() throws Exception {
     System.setProperty("solr.hdfs.blockcache.global", "true"); // always use global cache, this test can create a lot of directories
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
   
   @AfterClass

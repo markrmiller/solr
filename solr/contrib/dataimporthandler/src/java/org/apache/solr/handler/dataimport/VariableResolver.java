@@ -176,8 +176,7 @@ public class VariableResolver {
     }   
   }
   
-  private CurrentLevel currentLevelMap(String[] keyParts,
-      Map<String,Object> currentLevel, boolean includeLastLevel) {
+  private static CurrentLevel currentLevelMap(String[] keyParts, Map<String,Object> currentLevel, boolean includeLastLevel) {
     int j = includeLastLevel ? keyParts.length : keyParts.length - 1;
     for (int i = 0; i < j; i++) {
       Object o = currentLevel.get(keyParts[i]);

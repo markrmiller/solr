@@ -44,7 +44,9 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
  * limitations under the License.
  */
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -68,8 +70,8 @@ public class TestSubQueryTransformer extends SolrTestCaseJ4 {
   public static void beforeTests() throws Exception {
     System.setProperty("enable.update.log", "false");
     initCore("solrconfig-basic.xml", "schema-docValuesJoin.xml");
-    peopleMultiplier = atLeast(1);
-    deptMultiplier = atLeast(1);
+    peopleMultiplier = SolrTestUtil.atLeast(1);
+    deptMultiplier = SolrTestUtil.atLeast(1);
     
     int id=0;
     for (int p=0; p < peopleMultiplier; p++){
@@ -94,7 +96,7 @@ public class TestSubQueryTransformer extends SolrTestCaseJ4 {
                                                          "dept_i", "0",
                                                          "dept_is", "0")));
       
-      if (rarely()) {
+      if (LuceneTestCase.rarely()) {
         assertU(commit("softCommit", "true"));
       }
     }
@@ -113,7 +115,7 @@ public class TestSubQueryTransformer extends SolrTestCaseJ4 {
            "dept_id_s", "Support", "text_t","These guys help customers","salary_i_dv", "800",
                                     "dept_id_i", "3")));
       
-      if (rarely()) {
+      if (LuceneTestCase.rarely()) {
         assertU(commit("softCommit", "true"));
       }
     }
@@ -186,7 +188,7 @@ public class TestSubQueryTransformer extends SolrTestCaseJ4 {
   @Test
   public void testRowsStartForSubqueryAndScores() throws Exception {
     
-    String johnDeptsIds = h.query(req(new String[]{"q","{!join from=dept_ss_dv to=dept_id_s}name_s:john", 
+    String johnDeptsIds = query(req(new String[]{"q","{!join from=dept_ss_dv to=dept_id_s}name_s:john",
         "wt","csv",
         "csv.header","false",
         "fl","id",
@@ -244,7 +246,7 @@ public class TestSubQueryTransformer extends SolrTestCaseJ4 {
     for (String dept : new String[] {"Engineering", "Support"}) { //dept_id_s_dv">Engineering
       
       ArrayList<Object> deptWorkers = Collections.list(
-          new StringTokenizer( h.query(req(
+          new StringTokenizer(query(req(
               "q","dept_ss_dv:"+dept ,//dept_id_i_dv
              "wt","csv",
              "csv.header","false",

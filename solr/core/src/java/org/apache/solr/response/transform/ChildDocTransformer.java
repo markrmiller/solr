@@ -180,7 +180,7 @@ class ChildDocTransformer extends DocTransformer {
     } catch (IOException e) {
       //TODO DWS: reconsider this unusual error handling approach; shouldn't we rethrow?
       log.warn("Could not fetch child documents", e);
-      rootDoc.put(getName(), "Could not fetch child documents");
+      rootDoc.put(name, "Could not fetch child documents");
     }
   }
 

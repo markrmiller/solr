@@ -19,28 +19,48 @@ package org.apache.solr.cloud;
 import java.util.Set;
 
 import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.DocCollectionWatcher;
 import org.apache.solr.common.cloud.ZkStateReader;
 
 // does not yet mock zkclient at all
 public class MockZkStateReader extends ZkStateReader {
 
-  private Set<String> collections;
+  private final Set<String> liveNodes;
+  private final ClusterState clusterState;
 
-  public MockZkStateReader(ClusterState clusterState, Set<String> collections) {
+  public MockZkStateReader(ClusterState clusterState, Set<String> liveNodes) {
     super(new MockSolrZkClient());
+
     this.clusterState = clusterState;
-    this.collections = collections;
+    this.liveNodes = liveNodes;
   }
-  
-  public Set<String> getAllCollections(){
-    return collections;
+
+  public ClusterState getClusterState() {
+    return clusterState;
+  }
+
+
+  public Set<String> getLiveNodes() {
+    return liveNodes;
   }
 
   @Override
-  public void registerDocCollectionWatcher(String collection, DocCollectionWatcher stateWatcher) {
+  public void registerDocCollectionWatcher(String collection, DocCollectionWatcher docCollectionWatcher) {
     // the doc collection will never be changed by this mock
     // so we just call onStateChanged once with the existing DocCollection object an return
-    stateWatcher.onStateChanged(clusterState.getCollectionOrNull(collection));
+    docCollectionWatcher.onStateChanged(clusterState.getCollection(collection));
+  }
+
+  public DocCollection getCollectionOrNull(String collection) {
+    DocCollection coll = clusterState.getCollectionOrNull(collection);
+    if (coll == null) return null;
+    return coll;
+  }
+
+  public DocCollection getCollection(String collection) {
+    DocCollection coll = clusterState.getCollectionOrNull(collection);
+    if (coll == null) throw new IllegalArgumentException();
+    return coll;
   }
 }

@@ -27,8 +27,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -40,8 +38,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Class that provides utility functions for checking disk problem
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class DiskChecker {
   public static final Object SOLR_HACK_FOR_CLASS_VERIFICATION = new Object();
 

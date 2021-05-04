@@ -189,7 +189,7 @@ public class ICUCollationField extends FieldType {
    * Create a locale from localeID.
    * Then return the appropriate collator for the locale.
    */
-  private Collator createFromLocale(String localeID) {
+  private static Collator createFromLocale(String localeID) {
     return Collator.getInstance(new ULocale(localeID));
   }
   

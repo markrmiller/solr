@@ -87,6 +87,7 @@ import org.apache.lucene.search.LRUQueryCache;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryCache;
 import org.apache.lucene.search.QueryCachingPolicy;
+import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.store.BaseDirectoryWrapper;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
@@ -591,10 +592,10 @@ public abstract class LuceneTestCase extends Assert {
    * Max 10mb of static data stored in a test suite class after the suite is complete.
    * Prevents static data structures leaking and causing OOMs in subsequent tests.
    */
-  private final static long STATIC_LEAK_THRESHOLD = 10 * 1024 * 1024;
+  private final static long STATIC_LEAK_THRESHOLD = 600; // MRM TODO: I dropped this down hard and enabled it again
 
   /** By-name list of ignored types like loggers etc. */
-  private final static Set<String> STATIC_LEAK_IGNORED_TYPES = Set.of(
+  public final static Set<String> STATIC_LEAK_IGNORED_TYPES = Set.of(
       "org.slf4j.Logger",
       "org.apache.solr.SolrLogFormatter",
       "java.io.File", // Solr sometimes refers to this in a static way, but it has a "java.nio.fs.Path" inside
@@ -617,7 +618,7 @@ public abstract class LuceneTestCase extends Assert {
       .around(new TestRuleLimitSysouts(suiteFailureMarker))
       .around(tempFilesCleanupRule = new TestRuleTemporaryFilesCleanup(suiteFailureMarker));
     // TODO LUCENE-7595: Java 9 does not allow to look into runtime classes, so we have to fix the RAM usage checker!
-    if (!Constants.JRE_IS_MINIMUM_JAVA9) {
+    //if (!Constants.JRE_IS_MINIMUM_JAVA9) {  MRM TODO: did not appear to work with the Java 11 I used at the time on my mac
       r = r.around(new StaticFieldsInvariantRule(STATIC_LEAK_THRESHOLD, true) {
         @Override
         protected boolean accept(java.lang.reflect.Field field) {
@@ -632,7 +633,7 @@ public abstract class LuceneTestCase extends Assert {
           return super.accept(field);
         }
       });
-    }
+    //}
     classRules = r.around(new NoClassHooksShadowingRule())
       .around(new NoInstanceHooksOverridesRule() {
         @Override
@@ -686,12 +687,12 @@ public abstract class LuceneTestCase extends Assert {
 
   private static final Map<String,FieldType> fieldToType = new HashMap<String,FieldType>();
 
-  enum LiveIWCFlushMode {BY_RAM, BY_DOCS, EITHER};
+  public enum LiveIWCFlushMode {BY_RAM, BY_DOCS, EITHER}; // MRM TODO:
 
   /** Set by TestRuleSetupAndRestoreClassEnv */
   static LiveIWCFlushMode liveIWCFlushMode;
 
-  static void setLiveIWCFlushMode(LiveIWCFlushMode flushMode) {
+  public static void setLiveIWCFlushMode(LiveIWCFlushMode flushMode) {
     liveIWCFlushMode = flushMode;
   }
 
@@ -935,7 +936,9 @@ public abstract class LuceneTestCase extends Assert {
   /** create a new index writer config with random defaults using the specified random */
   public static IndexWriterConfig newIndexWriterConfig(Random r, Analyzer a) {
     IndexWriterConfig c = new IndexWriterConfig(a);
-    c.setSimilarity(classEnvRule.similarity);
+    if (classEnvRule.similarity != null) {
+      c.setSimilarity(classEnvRule.similarity); // TODO: get sim from our classEnvRule instead of LuceneTestCase's
+    }
     if (VERBOSE) {
       // Even though TestRuleSetupAndRestoreClassEnv calls
       // InfoStream.setDefault, we do it again here so that
@@ -1062,9 +1065,11 @@ public abstract class LuceneTestCase extends Assert {
       return new MockRandomMergePolicy(r);
     } else if (r.nextBoolean()) {
       return newTieredMergePolicy(r);
-    } else if (rarely(r) ) { 
-      return newAlcoholicMergePolicy(r, classEnvRule.timeZone);
     }
+    // MRM TODO: need time stuff setup correctly with our SolrTestCase.classEnvRule, not LuceneTestCase
+//    else if (rarely(r) ) {
+//      return newAlcoholicMergePolicy(r, classEnvRule.timeZone);
+//    }
     return newLogMergePolicy(r);
   }
 
@@ -1227,7 +1232,7 @@ public abstract class LuceneTestCase extends Assert {
         ConcurrentMergeScheduler cms = (ConcurrentMergeScheduler) ms;
         int maxThreadCount = TestUtil.nextInt(r, 1, 4);
         int maxMergeCount = TestUtil.nextInt(r, maxThreadCount, maxThreadCount + 4);
-        boolean enableAutoIOThrottle = random().nextBoolean();
+        boolean enableAutoIOThrottle = r.nextBoolean();
         if (enableAutoIOThrottle) {
           cms.enableAutoIOThrottle();
         } else {
@@ -1271,7 +1276,7 @@ public abstract class LuceneTestCase extends Assert {
           tmp.setSegmentsPerTier(TestUtil.nextInt(r, 10, 50));
         }
         configureRandom(r, tmp);
-        tmp.setDeletesPctAllowed(20 + random().nextDouble() * 30);
+        tmp.setDeletesPctAllowed(20 + r.nextDouble() * 30);
       }
       didChange = true;
     }
@@ -1927,7 +1932,11 @@ public abstract class LuceneTestCase extends Assert {
       } else {
         ret = random.nextBoolean() ? new IndexSearcher(r) : new IndexSearcher(r.getContext());
       }
-      ret.setSimilarity(classEnvRule.similarity);
+      if (classEnvRule.similarity != null) {
+        ret.setSimilarity(classEnvRule.similarity);
+      } else {
+        ret.setSimilarity(new BM25Similarity());
+      }
       return ret;
     } else {
       int threads = 0;
@@ -1967,7 +1976,12 @@ public abstract class LuceneTestCase extends Assert {
             ? new IndexSearcher(r, ex)
             : new IndexSearcher(r.getContext(), ex);
       }
-      ret.setSimilarity(classEnvRule.similarity);
+
+      if (classEnvRule.similarity != null) {
+        ret.setSimilarity(classEnvRule.similarity);
+      } else {
+        ret.setSimilarity(new BM25Similarity());
+      }
       ret.setQueryCachingPolicy(MAYBE_CACHE_POLICY);
       return ret;
     }

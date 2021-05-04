@@ -28,11 +28,9 @@ import java.util.HashSet;
 import java.util.Scanner;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.util.IOUtils;
@@ -40,7 +38,11 @@ import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.analytics.util.AnalyticsResponseHeadings;
 import org.apache.solr.analytics.util.MedianCalculator;
 import org.apache.solr.analytics.util.OrdinalCalculator;
+import org.apache.solr.common.util.Utils;
+import org.apache.solr.core.SolrCore;
+import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.rest.schema.FieldTypeXmlAdapter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.w3c.dom.Document;
@@ -75,27 +77,22 @@ public class LegacyAbstractAnalyticsTest extends SolrTestCaseJ4 {
   }
 
   static private Document doc;
-  static private XPathFactory xPathFact;
 
   static private String rawResponse;
 
   @BeforeClass
   public static void beforeClassAbstractAnalysis() {
-    xPathFact = XPathFactory.newInstance();
   }
 
   @AfterClass
   public static void afterClassAbstractAnalysis() {
-    xPathFact = null;
     doc = null;
     rawResponse = null;
     defaults.clear();
   }
 
   public static void setResponse(String response) throws ParserConfigurationException, IOException, SAXException {
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    factory.setNamespaceAware(true); // never forget this!
-    DocumentBuilder builder = factory.newDocumentBuilder();
+    DocumentBuilder builder = FieldTypeXmlAdapter.getDocumentBuilder();
     doc = builder.parse(new InputSource(new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8))));
     rawResponse = response;
   }
@@ -112,22 +109,32 @@ public class LegacyAbstractAnalyticsTest extends SolrTestCaseJ4 {
     // This is a little fragile in that it demands the elements have the same name as type, i.e. when looking for a
     // VAL_TYPE.DOUBLE, the element in question is <double name="blah">47.0</double>.
     sb.append("/").append(type.toString()).append("[@name='").append(name).append("']");
-    String val = xPathFact.newXPath().compile(sb.toString()).evaluate(doc, XPathConstants.STRING).toString();
-    try {
-      switch (type) {
-        case INTEGER: return Integer.parseInt(val);
-        case DOUBLE:  return Double.parseDouble(val);
-        case FLOAT:   return Float.parseFloat(val);
-        case LONG:    return Long.parseLong(val);
-        case STRING:  assertTrue(rawResponse, val != null && val.length() > 0 ); return val;
-        case DATE:    assertTrue(rawResponse, val != null && val.length() > 0 ); return val;
+    try (SolrCore core = h.getCore()) {
+      String val = SolrResourceLoader.getXPath().compile(sb.toString()).evaluate(doc, XPathConstants.STRING).toString();
+      try {
+        switch (type) {
+          case INTEGER:
+            return Integer.parseInt(val);
+          case DOUBLE:
+            return Double.parseDouble(val);
+          case FLOAT:
+            return Float.parseFloat(val);
+          case LONG:
+            return Long.parseLong(val);
+          case STRING:
+            assertTrue(rawResponse, val != null && val.length() > 0);
+            return val;
+          case DATE:
+            assertTrue(rawResponse, val != null && val.length() > 0);
+            return val;
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+        fail("Caught exception in getStatResult, xPath = " + sb.toString() + " \nraw data: " + rawResponse);
       }
-    } catch (Exception e) {
-      e.printStackTrace();
-      fail("Caught exception in getStatResult, xPath = " + sb.toString() + " \nraw data: " + rawResponse);
+      fail("Unknown type used in getStatResult");
+      return null; // Really can't get here, but the compiler thinks we can!
     }
-    fail("Unknown type used in getStatResult");
-    return null; // Really can't get here, but the compiler thinks we can!
   }
 
 
@@ -206,7 +213,9 @@ public class LegacyAbstractAnalyticsTest extends SolrTestCaseJ4 {
   }
 
   public static SolrQueryRequest request(String...args){
-    return SolrTestCaseJ4.req( ObjectArrays.concat(BASEPARMS, args,String.class) );
+    SolrQueryRequest req = SolrTestCaseJ4.req(ObjectArrays.concat(BASEPARMS, args, String.class));
+    req.close();
+    return req;
   }
 
   public static SolrQueryRequest request(String[] args, String... additional){
@@ -216,20 +225,20 @@ public class LegacyAbstractAnalyticsTest extends SolrTestCaseJ4 {
   public static String[] fileToStringArr(Class<?> clazz, String fileName) throws FileNotFoundException {
     InputStream in = clazz.getResourceAsStream("/solr/analytics/legacy/" + fileName);
     if (in == null) throw new FileNotFoundException("Resource not found: " + fileName);
-    Scanner file = new Scanner(in, "UTF-8");
+    Scanner file = new Scanner(in, StandardCharsets.UTF_8);
     try {
       ArrayList<String> strList = new ArrayList<>();
       while (file.hasNextLine()) {
         String line = file.nextLine();
         line = line.trim();
-        if( StringUtils.isBlank(line) || line.startsWith("#")){
+        if( StringUtils.isBlank(line) || !line.isEmpty() && line.charAt(0) == '#'){
           continue;
         }
         String[] param = line.split("=");
         strList.add(param[0]);
         strList.add(param[1]);
       }
-      return strList.toArray(new String[0]);
+      return strList.toArray(Utils.EMPTY_STRINGS);
     } finally {
       IOUtils.closeWhileHandlingException(file, in);
     }

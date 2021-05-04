@@ -17,13 +17,14 @@
 package org.apache.solr.update;
 
 import org.apache.solr.common.util.FastOutputStream;
+import org.apache.solr.common.util.TranLogOutputStream;
 
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
 /** @lucene.internal */
-public class MemOutputStream extends FastOutputStream {
+public class MemOutputStream extends TranLogOutputStream {
   public List<byte[]> buffers = new LinkedList<>();
   public MemOutputStream(byte[] tempBuffer) {
     super(null, tempBuffer, 0);

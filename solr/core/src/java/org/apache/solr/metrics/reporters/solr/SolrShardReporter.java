@@ -137,7 +137,7 @@ public class SolrShardReporter extends SolrCoreReporter {
       return;
     }
     // our id is coreNodeName
-    String id = core.getCoreDescriptor().getCloudDescriptor().getCoreNodeName();
+    String id = core.getCoreDescriptor().getName();
     // target registry is the leaderRegistryName
     String groupId = core.getCoreMetricManager().getLeaderRegistryName();
     if (groupId == null) {
@@ -154,7 +154,7 @@ public class SolrShardReporter extends SolrCoreReporter {
         .cloudClient(false) // we want to send reports specifically to a selected leader instance
         .skipAggregateValues(true) // we don't want to transport details of aggregates
         .skipHistograms(true) // we don't want to transport histograms
-        .build(core.getCoreContainer().getSolrClientCache(), new LeaderUrlSupplier(core));
+        .build(core.getCoreContainer().getZkController().getZkStateReader(), core.getCoreContainer().getSolrClientCache(), new LeaderUrlSupplier(core));
 
     reporter.start(period, TimeUnit.SECONDS);
   }
@@ -174,7 +174,8 @@ public class SolrShardReporter extends SolrCoreReporter {
       }
       ClusterState state = core.getCoreContainer().getZkController().getClusterState();
       DocCollection collection = state.getCollection(core.getCoreDescriptor().getCollectionName());
-      Replica replica = collection.getLeader(core.getCoreDescriptor().getCloudDescriptor().getShardId());
+      Replica replica = collection.getLeader(core.getCoreDescriptor().getCloudDescriptor().getShardId(), core.getCoreContainer().getZkController().zkStateReader
+          .getLiveNodes());
       if (replica == null) {
         log.warn("No leader for {}/{}", collection.getName(), core.getCoreDescriptor().getCloudDescriptor().getShardId());
         return null;

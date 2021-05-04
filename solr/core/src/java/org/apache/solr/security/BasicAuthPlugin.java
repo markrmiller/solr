@@ -109,7 +109,7 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
     throw new SolrException(ErrorCode.BAD_REQUEST, "This cannot be edited");
   }
 
-  protected AuthenticationProvider getAuthenticationProvider(Map<String, Object> pluginConfig) {
+  protected static AuthenticationProvider getAuthenticationProvider(Map<String,Object> pluginConfig) {
     Sha256AuthenticationProvider provider = new Sha256AuthenticationProvider();
     provider.init(pluginConfig);
     return provider;
@@ -117,7 +117,8 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
 
   private void authenticationFailure(HttpServletResponse response, boolean isAjaxRequest, String message) throws IOException {
     getPromptHeaders(isAjaxRequest).forEach(response::setHeader);
-    response.sendError(401, message);
+    response.setStatus(401);
+    response.getWriter().write(message);
   }
 
   @Override
@@ -134,7 +135,7 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
           if (st.hasMoreTokens()) {
             try {
               String credentials = new String(Base64.decodeBase64(st.nextToken()), StandardCharsets.UTF_8);
-              int p = credentials.indexOf(":");
+              int p = credentials.indexOf(':');
               if (p != -1) {
                 final String username = credentials.substring(0, p).trim();
                 String pwd = credentials.substring(p + 1).trim();
@@ -263,12 +264,12 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
    * @param request the servlet request
    * @return true if the request is AJAX request
    */
-  private boolean isAjaxRequest(HttpServletRequest request) {
+  private static boolean isAjaxRequest(HttpServletRequest request) {
     return "XMLHttpRequest".equalsIgnoreCase(request.getHeader(X_REQUESTED_WITH_HEADER));
   }
   
   @Contract(threading = ThreadingBehavior.IMMUTABLE)
-  private class BasicAuthUserPrincipal implements Principal, Serializable {
+  private static class BasicAuthUserPrincipal implements Principal, Serializable {
     private String username;
     private final String password;
 

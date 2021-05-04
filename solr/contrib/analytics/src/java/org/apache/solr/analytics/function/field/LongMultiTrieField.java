@@ -64,9 +64,7 @@ public class LongMultiTrieField extends AnalyticsField implements CastingLongVal
 
   private void resizeValues() {
     long[] newValues = new long[values.length*2];
-    for (int i = 0; i < count; ++i) {
-      newValues[i] = values[i];
-    }
+    if (count >= 0) System.arraycopy(values, 0, newValues, 0, count);
     values = newValues;
   }
 

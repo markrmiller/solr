@@ -104,7 +104,7 @@ public class DateRangeField extends AbstractSpatialPrefixTreeFieldType<NumberRan
     }
   }
 
-  private Calendar parseCalendar(String str) {
+  private static Calendar parseCalendar(String str) {
     if (str.startsWith("NOW") || str.lastIndexOf('Z') >= 0) { //  ? but not if Z is last char ?   Ehh, whatever.
       //use Solr standard date format parsing rules:
       //TODO add DMP utility to return ZonedDateTime alternative, then set cal fields manually, which is faster?
@@ -124,7 +124,7 @@ public class DateRangeField extends AbstractSpatialPrefixTreeFieldType<NumberRan
   }
 
   /** For easy compatibility with {@link DateMathParser#parseMath(Date, String)}. */
-  public Date parseMath(Date now, String rawval) {
+  public static Date parseMath(Date now, String rawval) {
     return DateMathParser.parseMath(now, rawval);
   }
 
@@ -146,12 +146,7 @@ public class DateRangeField extends AbstractSpatialPrefixTreeFieldType<NumberRan
   protected Query getSpecializedRangeQuery(QParser parser, SchemaField field, String startStr, String endStr, boolean minInclusive, boolean maxInclusive) {
     if (parser == null) {//null when invoked by SimpleFacets.  But getQueryFromSpatialArgs expects to get localParams.
       final SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
-      parser = new QParser("", null, requestInfo.getReq().getParams(), requestInfo.getReq()) {
-        @Override
-        public Query parse() throws SyntaxError {
-          throw new IllegalStateException();
-        }
-      };
+      parser = new QSolrParser(requestInfo);
     }
 
     Calendar startCal;
@@ -177,4 +172,14 @@ public class DateRangeField extends AbstractSpatialPrefixTreeFieldType<NumberRan
     return getQueryFromSpatialArgs(parser, field, spatialArgs);
   }
 
+  private static class QSolrParser extends org.apache.solr.search.QParser {
+    public QSolrParser(SolrRequestInfo requestInfo) {
+      super("", null, requestInfo.getReq().getParams(), requestInfo.getReq());
+    }
+
+    @Override
+    public Query parse() throws SyntaxError {
+      throw new IllegalStateException();
+    }
+  }
 }

@@ -37,7 +37,7 @@ public class UrlEvaluator extends Evaluator {
     String s = l.get(0).toString();
 
     try {
-      return URLEncoder.encode(s.toString(), "UTF-8");
+      return URLEncoder.encode(s, "UTF-8");
     } catch (Exception e) {
       wrapAndThrow(SEVERE, e, "Unable to encode expression: " + expression + " with value: " + s);
       return null;

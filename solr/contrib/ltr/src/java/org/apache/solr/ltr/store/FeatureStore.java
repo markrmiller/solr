@@ -18,8 +18,9 @@ package org.apache.solr.ltr.store;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.solr.ltr.feature.Feature;
 import org.apache.solr.ltr.feature.FeatureException;
@@ -29,7 +30,7 @@ public class FeatureStore {
   /** the name of the default feature store **/
   public static final String DEFAULT_FEATURE_STORE_NAME = "_DEFAULT_";
 
-  private final LinkedHashMap<String,Feature> store = new LinkedHashMap<>(); // LinkedHashMap because we need predictable iteration order
+  private final Map<String,Feature> store = new ConcurrentSkipListMap<>(); // LinkedHashMap because we need predictable iteration order
   private final String name;
 
   public FeatureStore(String name) {

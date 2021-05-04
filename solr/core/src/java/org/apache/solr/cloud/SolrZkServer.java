@@ -16,15 +16,7 @@
  */
 package org.apache.solr.cloud;
 
-import org.apache.solr.common.SolrException;
-import org.apache.zookeeper.server.ServerConfig;
-import org.apache.zookeeper.server.ZooKeeperServerMain;
-import org.apache.zookeeper.server.quorum.QuorumPeer;
-import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
-import org.apache.zookeeper.server.quorum.QuorumPeerMain;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -38,10 +30,21 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.apache.solr.common.ParWork;
+import org.apache.solr.common.SolrException;
+import org.apache.zookeeper.server.ServerConfig;
+import org.apache.zookeeper.server.ZooKeeperServerMain;
+import org.apache.zookeeper.server.quorum.QuorumPeer;
+import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
+import org.apache.zookeeper.server.quorum.QuorumPeerMain;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class SolrZkServer {
+
+public class SolrZkServer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  // MRM TODO: use the new jetty based stuff instead of this deprecated stuff
   public static final String ZK_WHITELIST_PROPERTY = "zookeeper.4lw.commands.whitelist";
 
   String zkRun;
@@ -104,13 +107,12 @@ public class SolrZkServer {
   public void start() {
     if (zkRun == null) return;
 
-    if (System.getProperty(ZK_WHITELIST_PROPERTY) == null) {
-      System.setProperty(ZK_WHITELIST_PROPERTY, "ruok, mntr, conf");
-    }
     zkThread = new Thread() {
       @Override
       public void run() {
         try {
+          System.setProperty(ZK_WHITELIST_PROPERTY, "*");
+
           if (zkProps.getServers().size() > 1) {
             QuorumPeerMain zkServer = new QuorumPeerMain();
             zkServer.runFromConfig(zkProps);
@@ -122,6 +124,7 @@ public class SolrZkServer {
           }
           log.info("ZooKeeper Server exited.");
         } catch (Exception e) {
+          ParWork.propagateInterrupt(e);
           log.error("ZooKeeper Server ERROR", e);
           throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
         }
@@ -142,14 +145,9 @@ public class SolrZkServer {
 
     zkThread.setDaemon(true);
     zkThread.start();
-    try {
-      Thread.sleep(500); // pause for ZooKeeper to start
-    } catch (Exception e) {
-      log.error("STARTING ZOOKEEPER", e);
-    }
   }
 
-  public void stop() {
+  public void close() {
     if (zkRun == null) return;
     zkThread.interrupt();
   }
@@ -271,10 +269,10 @@ class SolrZkServerProps extends QuorumPeerConfig {
     boolean multiple = false;
     int port = 0;
     for (QuorumPeer.QuorumServer server : slist.values()) {
-      if (server.addr.getHostName().equals(myHost)) {
+      if (server.addr.getOne().getHostName().equals(myHost)) {
         multiple = me!=null;
         me = server.id;
-        port = server.addr.getPort();
+        port = server.addr.getOne().getPort();
       }
     }
 
@@ -294,7 +292,7 @@ class SolrZkServerProps extends QuorumPeerConfig {
     for (QuorumPeer.QuorumServer server : slist.values()) {
       if (server.addr.equals(thisAddr)) {
         if (clientPortAddress == null || clientPortAddress.getPort() <= 0)
-          setClientPort(server.addr.getPort() - 1);
+          setClientPort(server.addr.getOne().getPort() - 1);
         return server.id;
       }
     }

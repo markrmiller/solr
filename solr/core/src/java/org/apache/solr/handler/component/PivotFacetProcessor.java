@@ -431,7 +431,7 @@ public class PivotFacetProcessor extends SimpleFacets
   private ParsedParams getParsedParams(SolrParams params, DocSet docs, FacetComponent.FacetBase facet) {
     SolrParams wrapped = SolrParams.wrapDefaults(facet.localParams, global);
     SolrParams required = new RequiredSolrParams(params);
-    return new ParsedParams(facet.localParams, wrapped, required, facet.facetOn, docs, facet.getKey(), facet.getTags(), -1);
+    return new ParsedParams(facet.localParams, wrapped, required, facet.facetOn, docs, facet.getKey(), facet.getTags(), 3);
   }
 
   private int getMinCountForField(String fieldname){

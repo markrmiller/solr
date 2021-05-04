@@ -283,7 +283,7 @@ public abstract class FacetRangeGenerator<T extends Comparable<T>> {
     }
     @Override
     public Integer parseAndAddGap(Integer value, String gap) {
-      return value.intValue() + Integer.valueOf(gap).intValue();
+      return value + Integer.parseInt(gap);
     }
   }
 
@@ -296,7 +296,7 @@ public abstract class FacetRangeGenerator<T extends Comparable<T>> {
     }
     @Override
     public Long parseAndAddGap(Long value, String gap) {
-      return value.longValue() + Long.valueOf(gap).longValue();
+      return value + Long.parseLong(gap);
     }
   }
 

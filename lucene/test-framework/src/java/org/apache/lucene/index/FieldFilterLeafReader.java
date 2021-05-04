@@ -29,7 +29,8 @@ import org.apache.lucene.util.FilterIterator;
  * of fields from the underlying wrapped reader.
  */
 public final class FieldFilterLeafReader extends FilterLeafReader {
-  
+
+  public static final FieldInfo[] EMPTY_FIELD_INFO = new FieldInfo[0];
   private final Set<String> fields;
   private final boolean negate;
   private final FieldInfos fieldInfos;
@@ -38,13 +39,13 @@ public final class FieldFilterLeafReader extends FilterLeafReader {
     super(in);
     this.fields = fields;
     this.negate = negate;
-    ArrayList<FieldInfo> filteredInfos = new ArrayList<>();
+    ArrayList<FieldInfo> filteredInfos = new ArrayList<>(in.getFieldInfos().size());
     for (FieldInfo fi : in.getFieldInfos()) {
       if (hasField(fi.name)) {
         filteredInfos.add(fi);
       }
     }
-    fieldInfos = new FieldInfos(filteredInfos.toArray(new FieldInfo[filteredInfos.size()]));
+    fieldInfos = new FieldInfos(filteredInfos.toArray(EMPTY_FIELD_INFO));
   }
   
   boolean hasField(String field) {

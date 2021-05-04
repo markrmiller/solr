@@ -31,9 +31,11 @@ import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.IOUtils;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -45,13 +47,15 @@ import org.slf4j.LoggerFactory;
 /**
  * End-to-end test of SolrEntityProcessor. "Real" test using embedded Solr
  */
+@LuceneTestCase.Nightly
 public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTestCase {
   
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   private static final String SOLR_CONFIG = "dataimport-solrconfig.xml";
   private static final String SOLR_SCHEMA = "dataimport-schema.xml";
-  private static final String SOURCE_CONF_DIR = "dih" + File.separator + "solr" + File.separator + "collection1" + File.separator + "conf" + File.separator;
+  private static final String SOURCE_CONF_DIR = "dih" + File.separator + "solr" + File.separator + "collection1" + File.separator + "conf"
+      + File.separator;
   private static final String ROOT_DIR = "dih" + File.separator + "solr" + File.separator;
 
   private static final String DEAD_SOLR_SERVER = "http://" + DEAD_HOST_1 + "/solr";
@@ -104,13 +108,13 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
   //TODO: fix this test to close its directories
   static String savedFactory;
   @BeforeClass
-  public static void beforeClass() {
+  public static void beforeTestSolrEntityProcessorEndToEnd() {
     savedFactory = System.getProperty("solr.DirectoryFactory");
     System.setProperty("solr.directoryFactory", "solr.StandardDirectoryFactory");
   }
   
   @AfterClass
-  public static void afterClass() {
+  public static void afterTestSolrEntityProcessorEndToEnd() {
     if (savedFactory == null) {
       System.clearProperty("solr.directoryFactory");
     } else {
@@ -306,7 +310,7 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
       sidl.add(sd);
     }
 
-    try (HttpSolrClient solrServer = getHttpSolrClient(getSourceUrl(), 15000, 30000)) {
+    try (Http2SolrClient solrServer = getHttpSolrClient(getSourceUrl(), 15000, 30000)) {
       solrServer.add(sidl);
       solrServer.commit(true, true);
     }
@@ -338,7 +342,7 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
     }
 
     public void setUp() throws Exception {
-      homeDir = createTempDir().toFile();
+      homeDir = SolrTestUtil.createTempDir().toFile();
       dataDir = new File(homeDir + "/collection1", "data");
       confDir = new File(homeDir + "/collection1", "conf");
       
@@ -346,14 +350,14 @@ public class TestSolrEntityProcessorEndToEnd extends AbstractDataImportHandlerTe
       dataDir.mkdirs();
       confDir.mkdirs();
 
-      FileUtils.copyFile(getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
+      FileUtils.copyFile(SolrTestUtil.getFile(getSolrXmlFile()), new File(homeDir, "solr.xml"));
       File f = new File(confDir, "solrconfig.xml");
-      FileUtils.copyFile(getFile(getSolrConfigFile()), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(getSolrConfigFile()), f);
       f = new File(confDir, "schema.xml");
       
-      FileUtils.copyFile(getFile(getSchemaFile()), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(getSchemaFile()), f);
       f = new File(confDir, "data-config.xml");
-      FileUtils.copyFile(getFile(SOURCE_CONF_DIR + "dataconfig-contentstream.xml"), f);
+      FileUtils.copyFile(SolrTestUtil.getFile(SOURCE_CONF_DIR + "dataconfig-contentstream.xml"), f);
 
       Files.createFile(confDir.toPath().resolve("../core.properties"));
     }

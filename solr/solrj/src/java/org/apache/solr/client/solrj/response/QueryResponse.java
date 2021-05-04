@@ -41,7 +41,7 @@ import org.apache.solr.common.util.SimpleOrderedMap;
 public class QueryResponse extends SolrResponseBase 
 {
   // Direct pointers to known types
-  private NamedList<Object> _header = null;
+  private volatile NamedList<Object> _header = null;
   private SolrDocumentList _results = null;
   private NamedList<ArrayList> _sortvalues = null;
   private NamedList<Object> _facetInfo = null;
@@ -212,7 +212,7 @@ public class QueryResponse extends SolrResponseBase
     _fieldStatsInfo = extractFieldStatsInfo(info);
   }
 
-  private Map<String, FieldStatsInfo> extractFieldStatsInfo(NamedList<Object> info) {
+  private static Map<String, FieldStatsInfo> extractFieldStatsInfo(NamedList<Object> info) {
     if( info != null ) {
        Map<String, FieldStatsInfo> fieldStatsInfoMap = new TreeMap<>();
       NamedList<NamedList<Object>> ff = (NamedList<NamedList<Object>>) info.get( "stats_fields" );
@@ -266,7 +266,7 @@ public class QueryResponse extends SolrResponseBase
         }
 
         if (oGroups != null) {
-          Integer iMatches = (Integer) oMatches;
+          int iMatches = (Integer) oMatches;
           ArrayList<Object> groupsArr = (ArrayList<Object>) oGroups;
           GroupCommand groupedCommand;
           if (oNGroups != null) {
@@ -286,7 +286,7 @@ public class QueryResponse extends SolrResponseBase
 
           _groupResponse.add(groupedCommand);
         } else if (queryCommand != null) {
-          Integer iMatches = (Integer) oMatches;
+          int iMatches = (Integer) oMatches;
           GroupCommand groupCommand;
           if (oNGroups != null) {
             Integer iNGroups = (Integer) oNGroups;
@@ -379,7 +379,7 @@ public class QueryResponse extends SolrResponseBase
     }
   }
 
-  private List<RangeFacet> extractRangeFacets(NamedList<NamedList<Object>> rf) {
+  private static List<RangeFacet> extractRangeFacets(NamedList<NamedList<Object>> rf) {
     List<RangeFacet> facetRanges = new ArrayList<>( rf.size() );
 
     for (Map.Entry<String, NamedList<Object>> facet : rf) {
@@ -429,7 +429,7 @@ public class QueryResponse extends SolrResponseBase
     return facetRanges;
   }
 
-  protected List<PivotField> readPivots( List<NamedList> list )
+  protected static List<PivotField> readPivots(List<NamedList> list)
   {
     ArrayList<PivotField> values = new ArrayList<>( list.size() );
     for( NamedList nl : list ) {

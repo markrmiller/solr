@@ -113,7 +113,7 @@ public class AnalyticsHandler extends RequestHandlerBase implements SolrCoreAwar
    * @throws SyntaxError if there is a syntax error in the queries
    * @throws IOException if an error occurs while searching the index
    */
-  private DocSet getDocuments(SolrQueryRequest req) throws SyntaxError, IOException {
+  private static DocSet getDocuments(SolrQueryRequest req) throws SyntaxError, IOException {
     SolrParams params = req.getParams();
     ArrayList<Query> queries = new ArrayList<>();
 
@@ -148,7 +148,7 @@ public class AnalyticsHandler extends RequestHandlerBase implements SolrCoreAwar
     return NAME;
   }
 
-  public String getSource() {
+  public static String getSource() {
     return null;
   }
 }

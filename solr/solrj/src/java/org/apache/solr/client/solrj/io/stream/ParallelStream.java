@@ -32,6 +32,7 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExpression;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionNamedParameter;
 import org.apache.solr.client.solrj.io.stream.expr.StreamExpressionValue;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.params.ModifiableSolrParams;
 
 import static org.apache.solr.common.params.CommonParams.DISTRIB;
@@ -47,37 +48,33 @@ public class ParallelStream extends CloudSolrStream implements Expressible {
 
   private TupleStream tupleStream;
   private int workers;
-  private transient StreamFactory streamFactory;
+  private transient volatile StreamFactory streamFactory;
 
-  public ParallelStream(String zkHost,
-                        String collection,
-                        TupleStream tupleStream,
-                        int workers,
-                        StreamComparator comp) throws IOException {
-    init(zkHost,collection,tupleStream,workers,comp);
+  public ParallelStream(String zkHost, String collection, TupleStream tupleStream, int workers, StreamComparator comp)
+      throws IOException {
+    this(zkHost, collection, tupleStream, null, workers, comp, null);
   }
 
-
-  public ParallelStream(String zkHost,
-                        String collection,
-                        String expressionString,
-                        int workers,
-                        StreamComparator comp) throws IOException {
-    TupleStream tStream = this.streamFactory.constructStream(expressionString);
-    init(zkHost,collection, tStream, workers,comp);
+  public ParallelStream(String zkHost, String collection, int workers, StreamComparator comp, StreamFactory factory)
+      throws IOException {
+    this(zkHost, collection, null, null, workers, comp, factory);
   }
 
-  public void setStreamFactory(StreamFactory streamFactory) {
-    this.streamFactory = streamFactory;
+  private ParallelStream(String zkHost, String collection, TupleStream tupleStream, String expressionString, int workers, StreamComparator comp,
+      StreamFactory factory) throws IOException {
+    if (tupleStream == null) {
+      tupleStream = factory.constructStream(expressionString);
+    }
+    init(zkHost, collection, tupleStream, workers, comp);
   }
 
   public ParallelStream(StreamExpression expression, StreamFactory factory) throws IOException {
     // grab all parameters out
-    String collectionName = factory.getValueOperand(expression, 0);
-    StreamExpressionNamedParameter workersParam = factory.getNamedOperand(expression, "workers");
+    String collectionName = StreamFactory.getValueOperand(expression, 0);
+    StreamExpressionNamedParameter workersParam = StreamFactory.getNamedOperand(expression, "workers");
     List<StreamExpression> streamExpressions = factory.getExpressionOperandsRepresentingTypes(expression, Expressible.class, TupleStream.class);
-    StreamExpressionNamedParameter sortExpression = factory.getNamedOperand(expression, SORT);
-    StreamExpressionNamedParameter zkHostExpression = factory.getNamedOperand(expression, "zkHost");
+    StreamExpressionNamedParameter sortExpression = StreamFactory.getNamedOperand(expression, SORT);
+    StreamExpressionNamedParameter zkHostExpression = StreamFactory.getNamedOperand(expression, "zkHost");
     
     // validate expression contains only what we want.
 
@@ -133,7 +130,7 @@ public class ParallelStream extends CloudSolrStream implements Expressible {
     
     // We've got all the required items    
     TupleStream stream = factory.constructStream(streamExpressions.get(0));
-    StreamComparator comp = factory.constructComparator(((StreamExpressionValue)sortExpression.getParameter()).getValue(), FieldComparator.class);
+    StreamComparator comp = StreamFactory.constructComparator(((StreamExpressionValue)sortExpression.getParameter()).getValue(), FieldComparator.class);
     streamFactory = factory;
     init(zkHost,collectionName,stream,workersInt,comp);
   }
@@ -267,6 +264,7 @@ public class ParallelStream extends CloudSolrStream implements Expressible {
       assert(solrStreams.size() == workers);
 
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       throw new IOException(e);
     }
   }

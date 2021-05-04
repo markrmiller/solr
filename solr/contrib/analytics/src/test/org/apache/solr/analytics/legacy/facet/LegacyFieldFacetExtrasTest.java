@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -43,7 +44,7 @@ public class LegacyFieldFacetExtrasTest extends LegacyAbstractAnalyticsFacetTest
   static ArrayList<ArrayList<Integer>> intStringTestStart;
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeLegacyFieldFacetExtrasTest() throws Exception {
     initCore("solrconfig-analytics.xml","schema-analytics.xml");
     h.update("<delete><query>*:*</query></delete>");
 
@@ -102,6 +103,14 @@ public class LegacyFieldFacetExtrasTest extends LegacyAbstractAnalyticsFacetTest
 
     assertU(commit());
     setResponse(h.query(request(fileToStringArr(LegacyFieldFacetExtrasTest.class, fileName))));
+  }
+
+  @AfterClass
+  public static void afterLegacyFieldFacetExtrasTest() {
+    intLongTestStart = null;
+    intFloatTestStart = null;
+    intDoubleTestStart = null;
+    intStringTestStart = null;
   }
 
   @Test

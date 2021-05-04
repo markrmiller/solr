@@ -16,47 +16,44 @@
  */
 package org.apache.solr.cloud.hdfs;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.lucene.util.IOUtils;
-import org.apache.lucene.util.LuceneTestCase.Nightly;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.cloud.BasicDistributedZkTest;
 import org.apache.solr.cloud.StoppableIndexingThread;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.HdfsDirectoryFactory;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.filestore.NRTCachingDirectory;
 import org.apache.solr.store.blockcache.BlockCache;
 import org.apache.solr.store.blockcache.BlockDirectory;
 import org.apache.solr.store.blockcache.BlockDirectoryCache;
 import org.apache.solr.store.blockcache.Cache;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.apache.solr.util.RefCounted;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Future;
+
 @Slow
-@Nightly
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@LuceneTestCase.Nightly
 public class HdfsWriteToMultipleCollectionsTest extends BasicDistributedZkTest {
   private static final String ACOLLECTION = "acollection";
   private static MiniDFSCluster dfsCluster;
@@ -64,7 +61,7 @@ public class HdfsWriteToMultipleCollectionsTest extends BasicDistributedZkTest {
   @BeforeClass
   public static void setupClass() throws Exception {
     schemaString = "schema15.xml";      // we need a string id
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
   
   @AfterClass
@@ -97,28 +94,29 @@ public class HdfsWriteToMultipleCollectionsTest extends BasicDistributedZkTest {
     int docCount = random().nextInt(1313) + 1;
     int cnt = random().nextInt(4) + 1;
     for (int i = 0; i < cnt; i++) {
-      createCollection(ACOLLECTION + i, "conf1", 2, 2, 9);
+      createCollection(ACOLLECTION + i, "_default", 2, 2, 9);
     }
-    for (int i = 0; i < cnt; i++) {
-      waitForRecoveriesToFinish(ACOLLECTION + i, false);
-    }
+
     List<CloudSolrClient> cloudClients = new ArrayList<>();
     List<StoppableIndexingThread> threads = new ArrayList<>();
+    List<Future> futures = new ArrayList<>();
     for (int i = 0; i < cnt; i++) {
       CloudSolrClient client = getCloudSolrClient(zkServer.getZkAddress());
       client.setDefaultCollection(ACOLLECTION + i);
       cloudClients.add(client);
       StoppableIndexingThread indexThread = new StoppableIndexingThread(null, client, "1", true, docCount, 1, true);
       threads.add(indexThread);
-      indexThread.start();
+      Future<?> future = ParWork.submit("StoppableIndexingThread", indexThread);
+      futures.add(future);
     }
     
     int addCnt = 0;
     for (StoppableIndexingThread thread : threads) {
-      thread.join();
       addCnt += thread.getNumAdds() - thread.getNumDeletes();
     }
-   
+    for (Future future : futures) {
+      future.get();
+    }
     long collectionsCount = 0;
     for (CloudSolrClient client : cloudClients) {
       client.commit();
@@ -141,7 +139,7 @@ public class HdfsWriteToMultipleCollectionsTest extends BasicDistributedZkTest {
           assertTrue("Found: " + core.getDirectoryFactory().getClass().getName(), factory instanceof HdfsDirectoryFactory);
           Directory dir = factory.get(core.getDataDir(), null, null);
           try {
-            long dataDirSize = factory.size(dir);
+            long dataDirSize = DirectoryFactory.size(dir);
             Configuration conf = HdfsTestUtil.getClientConfiguration(dfsCluster);
             FileSystem fileSystem = FileSystem.newInstance(
                 new Path(core.getDataDir()).toUri(), conf);
@@ -149,7 +147,7 @@ public class HdfsWriteToMultipleCollectionsTest extends BasicDistributedZkTest {
                 new Path(core.getDataDir())).getLength();
             assertEquals(size, dataDirSize);
           } finally {
-            core.getDirectoryFactory().release(dir);
+//        /    core.getDirectoryFactory().release(dir);
           }
           
           RefCounted<IndexWriter> iwRef = core.getUpdateHandler()

@@ -51,9 +51,7 @@ public class TemplateTransformer extends Transformer {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private Map<String ,List<String>> templateVsVars = new HashMap<>();
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public Object transformRow(Map<String, Object> row, Context context) {
+  @Override public Object transformRow(Map<String, Object> row, Context context) {
 
 
     VariableResolver resolver = context.getVariableResolver();
@@ -95,7 +93,7 @@ public class TemplateTransformer extends Transformer {
   }
 
   @SuppressWarnings({"unchecked"})
-  private void addToRow(String key, Map<String, Object> row, Object value) {
+  private static void addToRow(String key, Map<String,Object> row, Object value) {
     Object prevVal = row.get(key);
     if (prevVal != null) {
       if (prevVal instanceof List) {

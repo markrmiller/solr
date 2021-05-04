@@ -36,5 +36,5 @@ public abstract class DataInputInputStream extends InputStream implements DataIn
   /**If possible, read ByteBuffer directly from the underlying buffer
    * @param sz the size of the buffer to be read
    */
-  public ByteBuffer readDirectByteBuffer(int sz){return null;};
+  public static ByteBuffer readDirectByteBuffer(int sz){return null;};
 }

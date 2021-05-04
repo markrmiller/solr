@@ -649,9 +649,7 @@ public class ExpressionFactory {
         // check to see if the parameter is a variable length parameter
         if (paramStr.equals(varLengthParamName)) {
           // Add every variable length parameter value, since there are a variable amount
-          for (String paramName : varLengthParamValues) {
-            paramsList.add(paramName);
-          }
+          paramsList.addAll(Arrays.asList(varLengthParamValues));
         } else {
           paramsList.add(paramStr);
         }
@@ -696,7 +694,7 @@ public class ExpressionFactory {
         // Returned from a level of nested parentheses
         parenCount--;
         if (parenCount < 0) {
-          throw new SolrException(ErrorCode.BAD_REQUEST,"The following expression has extra end parens: " + param.toString());
+          throw new SolrException(ErrorCode.BAD_REQUEST,"The following expression has extra end parens: " + param);
         }
         if (inForEach) {
           if (param.charAt(param.length()-1) == variableForEachParam &&
@@ -728,7 +726,7 @@ public class ExpressionFactory {
       if (c == '\\') {
         // Escaping or escaped backslash
         if (!quoteOn) {
-          throw new SolrException(ErrorCode.BAD_REQUEST,"The following expression has escaped characters outside of quotation marks: " + expression.toString());
+          throw new SolrException(ErrorCode.BAD_REQUEST,"The following expression has escaped characters outside of quotation marks: " + expression);
         }
         if (escaped) {
           escaped = false;
@@ -739,7 +737,7 @@ public class ExpressionFactory {
           }
         }
       } else if (escaped) {
-        throw new SolrException(ErrorCode.BAD_REQUEST,"Invalid escape character '" + c + "' used in the following expression: " + expression.toString());
+        throw new SolrException(ErrorCode.BAD_REQUEST,"Invalid escape character '" + c + "' used in the following expression: " + expression);
       }
       if (c == variableForEachSep && !quoteOn && varLengthParamName != null) {
         int varStart = param.length()-varLengthParamName.length();
@@ -760,19 +758,17 @@ public class ExpressionFactory {
       throw new SolrException(ErrorCode.BAD_REQUEST,"Empty parameter in expression: " + expression);
     }
     if (parenCount > 0) {
-      throw new SolrException(ErrorCode.BAD_REQUEST,"The following expression needs more end parens: " + param.toString());
+      throw new SolrException(ErrorCode.BAD_REQUEST,"The following expression needs more end parens: " + param);
     }
     if (quoteOn) {
       throw new SolrException(ErrorCode.BAD_REQUEST,"Misplaced quotation marks in expression: " + expression);
     }
     if (paramStr.equals(varLengthParamName)) {
-      for (String paramName : varLengthParamValues) {
-        paramsList.add(paramName);
-      }
+      paramsList.addAll(Arrays.asList(varLengthParamValues));
     } else {
       paramsList.add(paramStr);
     }
-    return paramsList.toArray(new String[paramsList.size()]);
+    return paramsList.toArray(new String[0]);
   }
 
   /**

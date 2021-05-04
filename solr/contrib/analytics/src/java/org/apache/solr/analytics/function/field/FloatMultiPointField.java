@@ -74,7 +74,7 @@ public class FloatMultiPointField extends AnalyticsField implements CastingFloat
   }
   @Override
   public void streamDoubles(DoubleConsumer cons) {
-    streamFloats(value -> cons.accept((double)value));
+    streamFloats(value -> cons.accept(value));
   }
   @Override
   public void streamStrings(Consumer<String> cons) {

@@ -16,7 +16,6 @@
  */
 package org.apache.solr.response;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -62,14 +61,6 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     }
   }
 
-  private static void serialize(SolrQueryResponse response,Resolver resolver, String f) throws IOException {
-    try (JavaBinCodec jbc = new JavaBinCodec(resolver); FileOutputStream fos = new FileOutputStream(f)) {
-      jbc.setWritableDocFields(resolver).marshal(response.getValues(), fos);
-      fos.flush();
-    }
-
-  }
-
   @Override
   public void write(Writer writer, SolrQueryRequest request, SolrQueryResponse response) throws IOException {
     throw new RuntimeException("This is a binary writer , Cannot write to a characterstream");
@@ -111,15 +102,15 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
           returnFields = res.getReturnFields();
         }
 //        if (useUtf8CharSeq) {
-        ResultContext.READASBYTES.set(fieldName -> {
-          SchemaField fld = res.getRequest().getSchema().getFieldOrNull(fieldName);
-          return fld != null && fld.getType().isUtf8Field();
-        });
+//        ResultContext.READASBYTES.set(fieldName -> {
+//          SchemaField fld = res.getRequest().getSchema().getFieldOrNull(fieldName);
+//          return fld != null && fld.getType().isUtf8Field();
+//        });
 
         try {
           writeResults(res, codec);
         } finally {
-          ResultContext.READASBYTES.remove();
+//          ResultContext.READASBYTES.remove();
         }
         returnFields = orig;
 
@@ -154,7 +145,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
       return returnFields.wantsAllFields();
     }
 
-    protected void writeResultsBody( ResultContext res, JavaBinCodec codec ) throws IOException {
+    protected static void writeResultsBody(ResultContext res, JavaBinCodec codec) throws IOException {
       codec.writeTag(JavaBinCodec.ARR, res.getDocList().size());
       Iterator<SolrDocument> docStreamer = res.getProcessedDocuments();
       while (docStreamer.hasNext()) {
@@ -166,7 +157,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     public void writeResults(ResultContext ctx, JavaBinCodec codec) throws IOException {
       codec.writeTag(JavaBinCodec.SOLRDOCLST);
       List<Object> l = new ArrayList<>(4);
-      l.add((long) ctx.getDocList().matches());
+      l.add(ctx.getDocList().matches());
       l.add((long) ctx.getDocList().offset());
       
       Float maxScore = null;
@@ -259,17 +250,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public Iterator<Entry<String, Object>> iterator() {
       Iterator<Entry<String, Object>> it = _fields.entrySet().iterator();
-      return new Iterator<Entry<String, Object>>() {
-        @Override
-        public boolean hasNext() {
-          return it.hasNext();
-        }
-
-        @Override
-        public Entry<String, Object> next() {
-          return convertCharSeq(it.next());
-        }
-      };
+      return new EntryIterator(it);
     }
 
 
@@ -283,7 +264,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public Object getFirstValue(String name) {
       Object v = _fields.get(name);
-      if (v == null || !(v instanceof Collection)) return convertCharSeq(v);
+      if (!(v instanceof Collection)) return convertCharSeq(v);
       Collection c = (Collection) v;
       if (c.size() > 0) {
         return convertCharSeq(c.iterator().next());
@@ -303,6 +284,24 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public void forEach(Consumer<? super Entry<String, Object>> action) {
       super.forEach(action);
+    }
+
+    private static class EntryIterator implements Iterator<Entry<String, Object>> {
+      private final Iterator<Entry<String,Object>> it;
+
+      public EntryIterator(Iterator<Entry<String,Object>> it) {
+        this.it = it;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return it.hasNext();
+      }
+
+      @Override
+      public Entry<String, Object> next() {
+        return convertCharSeq(it.next());
+      }
     }
   }
 

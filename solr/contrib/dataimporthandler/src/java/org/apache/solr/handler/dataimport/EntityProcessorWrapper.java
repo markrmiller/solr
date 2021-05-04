@@ -256,7 +256,7 @@ public class EntityProcessorWrapper extends EntityProcessor {
 
   }
 
-  private boolean checkStopTransform(@SuppressWarnings({"rawtypes"})Map oMap) {
+  private static boolean checkStopTransform(@SuppressWarnings({"rawtypes"}) Map oMap) {
     return oMap.get("$stopTransform") != null
             && Boolean.parseBoolean(oMap.get("$stopTransform").toString());
   }

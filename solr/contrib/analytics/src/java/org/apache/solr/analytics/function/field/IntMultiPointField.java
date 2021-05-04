@@ -75,7 +75,7 @@ public class IntMultiPointField extends AnalyticsField implements CastingIntValu
   }
   @Override
   public void streamLongs(LongConsumer cons) {
-    streamInts(value -> cons.accept((long)value));
+    streamInts(value -> cons.accept(value));
   }
   @Override
   public void streamFloats(FloatConsumer cons) {
@@ -83,7 +83,7 @@ public class IntMultiPointField extends AnalyticsField implements CastingIntValu
   }
   @Override
   public void streamDoubles(DoubleConsumer cons) {
-    streamInts(value -> cons.accept((double)value));
+    streamInts(value -> cons.accept(value));
   }
   @Override
   public void streamStrings(Consumer<String> cons) {

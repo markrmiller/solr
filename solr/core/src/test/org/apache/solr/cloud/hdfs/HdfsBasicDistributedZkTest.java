@@ -16,29 +16,24 @@
  */
 package org.apache.solr.cloud.hdfs;
 
-import java.io.IOException;
-
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.cloud.BasicDistributedZkTest;
-import org.apache.solr.util.BadHdfsThreadsFilter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
-import com.carrotsearch.randomizedtesting.annotations.Nightly;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import java.io.IOException;
 
 @Slow
-@Nightly
-@ThreadLeakFilters(defaultFilters = true, filters = {
-    BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
-})
+@LuceneTestCase.Nightly
 public class HdfsBasicDistributedZkTest extends BasicDistributedZkTest {
   private static MiniDFSCluster dfsCluster;
   
   @BeforeClass
   public static void setupClass() throws Exception {
-    dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
+    dfsCluster = HdfsTestUtil.setupClass(SolrTestUtil.createTempDir().toFile().getAbsolutePath());
   }
 
   @Override

@@ -30,16 +30,19 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.ByteArrayUtf8CharSequence;
 import org.apache.solr.common.util.ByteUtils;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.response.BinaryResponseWriter.Resolver;
 import org.apache.solr.search.SolrReturnFields;
 import org.apache.solr.util.SimplePostTool;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 
 /**
  * Test for BinaryResponseWriter
@@ -50,10 +53,15 @@ import org.junit.BeforeClass;
 public class TestBinaryResponseWriter extends SolrTestCaseJ4 {
 
   
-  @BeforeClass
-  public static void beforeClass() throws Exception {
+  @Before
+  public void beforeClass() throws Exception {
     System.setProperty("enable.update.log", "false"); // schema12 doesn't support _version_
     initCore("solrconfig.xml", "schema12.xml");
+  }
+
+  @After
+  public void afterClass() throws Exception {
+    deleteCore();
   }
 
   public void testBytesRefWriting() {
@@ -84,7 +92,7 @@ public class TestBinaryResponseWriter extends SolrTestCaseJ4 {
     byte[] bytes1 = new byte[1024];
     int len1 = ByteUtils.UTF16toUTF8(input, 0, input.length(), bytes1, 0);
     BytesRef bytesref = new BytesRef(input);
-    System.out.println();
+    //System.out.println();
     assertEquals(len1, bytesref.length);
     for (int i = 0; i < len1; i++) {
       assertEquals(input + " not matching char at :" + i, bytesref.bytes[i], bytes1[i]);
@@ -95,26 +103,33 @@ public class TestBinaryResponseWriter extends SolrTestCaseJ4 {
    * Tests known types implementation by asserting correct encoding/decoding of UUIDField
    */
   public void testUUID() throws Exception {
-    String s = UUID.randomUUID().toString().toLowerCase(Locale.ROOT);
-    assertU(adoc("id", "101", "uuid", s));
-    assertU(commit());
-    LocalSolrQueryRequest req = lrf.makeRequest("q", "*:*");
-    SolrQueryResponse rsp = h.queryAndResponse(req.getParams().get(CommonParams.QT), req);
-    BinaryQueryResponseWriter writer = (BinaryQueryResponseWriter) h.getCore().getQueryResponseWriter("javabin");
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    writer.write(baos, req, rsp);
-    NamedList res;
-    try (JavaBinCodec jbc = new JavaBinCodec()) {
-      res = (NamedList) jbc.unmarshal(new ByteArrayInputStream(baos.toByteArray()));
-    } 
-    SolrDocumentList docs = (SolrDocumentList) res.get("response");
-    for (Object doc : docs) {
-      SolrDocument document = (SolrDocument) doc;
-      assertEquals("Returned object must be a string", "java.lang.String", document.getFieldValue("uuid").getClass().getName());
-      assertEquals("Wrong UUID string returned", s, document.getFieldValue("uuid"));
-    }
+    try (SolrCore core = h.getCore()) {
+      String s = UUID.randomUUID().toString().toLowerCase(Locale.ROOT);
+      assertU(adoc("id", "101", "uuid", s));
+      assertU(commit());
+      LocalSolrQueryRequest req = lrf.makeRequest("q", "*:*");
+      SolrQueryResponse rsp = h.queryAndResponse(req.getParams().get(CommonParams.QT), req);
+      BinaryQueryResponseWriter writer = (BinaryQueryResponseWriter) core.getQueryResponseWriter("javabin");
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      writer.write(baos, req, rsp);
+      NamedList res;
+      try (JavaBinCodec jbc = new JavaBinCodec()) {
+        res = (NamedList) jbc.unmarshal(new ByteArrayInputStream(baos.toByteArray()));
+      }
+      SolrDocumentList docs = (SolrDocumentList) res.get("response");
+      for (Object doc : docs) {
+        SolrDocument document = (SolrDocument) doc;
+        assertEquals("Returned object must be a string", "java.lang.String", document.getFieldValue("uuid").getClass().getName());
+        assertEquals("Wrong UUID string returned", s, document.getFieldValue("uuid"));
+      }
 
-    req.close();
+      req.close();
+    } catch (Throwable throwable) {
+      if (throwable instanceof  Exception) {
+        throw (Exception) throwable;
+      }
+      throw new SolrException(SolrException.ErrorCode.UNKNOWN, throwable);
+    }
   }
 
   public void testResolverSolrDocumentPartialFields() throws Exception {

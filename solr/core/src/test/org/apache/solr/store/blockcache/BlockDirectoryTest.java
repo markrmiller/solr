@@ -18,6 +18,7 @@ package org.apache.solr.store.blockcache;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import java.util.Random;
 
@@ -31,12 +32,16 @@ import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.MergeInfo;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // commented out on: 24-Dec-2018 @LuceneTestCase.BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // 12-Jun-2018
 public class BlockDirectoryTest extends SolrTestCaseJ4 {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static class MapperCache implements Cache {
     public Map<String, byte[]> map = Caffeine.newBuilder()
@@ -108,7 +113,7 @@ public class BlockDirectoryTest extends SolrTestCaseJ4 {
   @Before
   public void setUp() throws Exception {
     super.setUp();
-    file = createTempDir().toFile();
+    file = SolrTestUtil.createTempDir().toFile();
     FSDirectory dir = FSDirectory.open(new File(file, "base").toPath());
     mapperCache = new MapperCache();
 
@@ -168,31 +173,31 @@ public class BlockDirectoryTest extends SolrTestCaseJ4 {
 
     int i = 0;
     try {
-      for (; i < 10; i++) {
+      for (; i < (TEST_NIGHTLY ? 10 : 2); i++) {
         Directory fsDir = FSDirectory.open(new File(file, "normal").toPath());
         String name = getName();
         createFile(name, fsDir, directory);
         assertInputsEquals(name, fsDir, directory);
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      log.error("", e);
       fail("Test failed on pass [" + i + "]");
     }
     long t2 = System.nanoTime();
-    System.out.println("Total time is " + ((t2 - t1)/1000000) + "ms");
+    //System.out.println("Total time is " + ((t2 - t1)/1000000) + "ms");
   }
 
   @Test
   public void testRandomAccessWritesLargeCache() throws IOException {
     mapperCache.map = Caffeine.newBuilder()
-        .maximumSize(10_000)
+        .maximumSize(TEST_NIGHTLY ? 10_000 : 100)
         .<String, byte[]>build()
         .asMap();
     testRandomAccessWrites();
   }
 
   private void assertInputsEquals(String name, Directory fsDir, Directory hdfs) throws IOException {
-    int reads = random.nextInt(MAX_NUMBER_OF_READS);
+    int reads = random.nextInt(TEST_NIGHTLY ? MAX_NUMBER_OF_READS : 500);
     IndexInput fsInput = fsDir.openInput(name, new IOContext());
     IndexInput hdfsInput = hdfs.openInput(name, new IOContext());
     assertEquals(fsInput.length(), hdfsInput.length());
@@ -232,7 +237,7 @@ public class BlockDirectoryTest extends SolrTestCaseJ4 {
   }
 
   private void createFile(String name, Directory fsDir, Directory hdfs) throws IOException {
-    int writes = random.nextInt(MAX_NUMBER_OF_WRITES);
+    int writes = random.nextInt(TEST_NIGHTLY ? MAX_NUMBER_OF_WRITES : 100);
     int fileLength = random.nextInt(MAX_FILE_SIZE - MIN_FILE_SIZE) + MIN_FILE_SIZE;
     IndexOutput fsOutput = fsDir.createOutput(name, IOContext.DEFAULT);
     IndexOutput hdfsOutput = hdfs.createOutput(name, IOContext.DEFAULT);

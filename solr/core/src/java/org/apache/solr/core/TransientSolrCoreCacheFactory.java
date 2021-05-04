@@ -21,6 +21,8 @@ import java.util.Collections;
 import java.util.Locale;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.solr.common.ParWork;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.plugin.PluginInfoInitialized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,14 +52,16 @@ public abstract class TransientSolrCoreCacheFactory {
 
     try {
       // According to the docs, this returns a TransientSolrCoreCacheFactory with the default c'tor
-      TransientSolrCoreCacheFactory tccf = loader.findClass(info.className, TransientSolrCoreCacheFactory.class).getConstructor().newInstance(); 
+      TransientSolrCoreCacheFactory tccf = loader.findClass(info.className, TransientSolrCoreCacheFactory.class,
+              Utils.getSolrSubPackage(TransientSolrCoreCache.class.getPackageName())).getConstructor().newInstance();
       
       // OK, now we call it's init method.
       if (PluginInfoInitialized.class.isAssignableFrom(tccf.getClass()))
-        PluginInfoInitialized.class.cast(tccf).init(info);
-      tccf.setCoreContainer(coreContainer);
+        ((PluginInfoInitialized) tccf).init(info);
+      tccf.coreContainer = coreContainer;
       return tccf;
     } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
       // Many things could cuse this, bad solrconfig, mis-typed class name, whatever. However, this should not
       // keep the enclosing coreContainer from instantiating, so log an error and continue.
       log.error(String.format(Locale.ROOT, "Error instantiating TransientSolrCoreCacheFactory class [%s]: %s",

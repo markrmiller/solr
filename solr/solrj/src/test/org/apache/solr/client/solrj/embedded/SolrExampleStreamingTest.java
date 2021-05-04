@@ -16,6 +16,12 @@
  */
 package org.apache.solr.client.solrj.embedded;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrExampleTests;
@@ -26,26 +32,16 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.BeforeClass;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
-
 /**
  * 
  *
  * @since solr 1.3
  */
 @Slow
+@LuceneTestCase.Nightly
 public class SolrExampleStreamingTest extends SolrExampleTests {
 
-  @BeforeClass
-  public static void beforeTest() throws Exception {
-    createAndStartJetty(legacyExampleCollection1SolrHome());
-  }
-
-  @Override
-  public SolrClient createNewSolrClient()
+  public SolrClient createNewSolrClient(JettySolrRunner jetty)
   {
     try {
       // setup the server...

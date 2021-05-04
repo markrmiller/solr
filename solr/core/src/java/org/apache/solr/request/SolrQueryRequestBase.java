@@ -19,7 +19,6 @@ package org.apache.solr.request;
 import java.io.Closeable;
 import java.security.Principal;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +35,7 @@ import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.util.RTimerTree;
 import org.apache.solr.util.RefCounted;
-
+import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * Base implementation of <code>SolrQueryRequest</code> that provides some
@@ -55,10 +54,10 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
   protected final SolrCore core;
   protected final SolrParams origParams;
   protected volatile IndexSchema schema;
-  protected SolrParams params;
-  protected Map<Object,Object> context;
-  protected Iterable<ContentStream> streams;
-  protected Map<String,Object> json;
+  protected volatile SolrParams params;
+  protected volatile Map<Object,Object> context;
+  protected volatile Iterable<ContentStream> streams;
+  protected volatile Map<String,Object> json;
 
   private final RTimerTree requestTimer;
   protected final long startTime;
@@ -78,8 +77,7 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
 
   @Override
   public Map<Object,Object> getContext() {
-    // SolrQueryRequest as a whole isn't thread safe, and this isn't either.
-    if (context==null) context = new HashMap<>();
+    if (context==null) context = new NonBlockingHashMap<>();
     return context;
   }
 
@@ -141,7 +139,7 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
 
   @Override
   public void updateSchemaToLatest() {
-    schema = core.getLatestSchema();
+    this.schema = core.getLatestSchema();
   }
 
   /**
@@ -207,11 +205,11 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
 
   }
 
-  protected ValidatingJsonMap getSpec() {
+  protected static ValidatingJsonMap getSpec() {
     return null;
   }
 
-  protected Map<String, JsonSchemaValidator> getValidators(){
+  protected Map<Object, JsonSchemaValidator> getValidators(){
     return Collections.EMPTY_MAP;
   }
 }

@@ -80,12 +80,12 @@ public class StreamExpression implements StreamExpressionParameter {
   public String toString(){
     StringBuilder sb = new StringBuilder(this.functionName);
     
-    sb.append("(");
+    sb.append('(');
     for(int idx = 0; idx < parameters.size(); ++idx){
-      if(0 != idx){ sb.append(","); }
+      if(0 != idx){ sb.append(','); }
       sb.append(parameters.get(idx));
     }
-    sb.append(")");
+    sb.append(')');
     
     return sb.toString();
   }

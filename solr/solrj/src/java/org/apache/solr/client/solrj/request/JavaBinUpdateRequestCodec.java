@@ -52,10 +52,12 @@ import static org.apache.solr.common.util.ByteArrayUtf8CharSequence.convertCharS
  * @since solr 1.4
  */
 public class JavaBinUpdateRequestCodec {
-  private boolean readStringAsCharSeq = false;
+  private AtomicBoolean readStringAsCharSeq = new AtomicBoolean(false);
+
+  private final AtomicBoolean seenOuterMostDocIterator = new AtomicBoolean(false);
 
   public JavaBinUpdateRequestCodec setReadStringAsCharSeq(boolean flag) {
-    this.readStringAsCharSeq = flag;
+    this.readStringAsCharSeq.set(flag);
     return this;
 
   }
@@ -71,7 +73,7 @@ public class JavaBinUpdateRequestCodec {
    *
    * @throws IOException in case of an exception during marshalling or writing to the stream
    */
-  public void marshal(UpdateRequest updateRequest, OutputStream os) throws IOException {
+  public static void marshal(UpdateRequest updateRequest, OutputStream os) throws IOException {
     NamedList nl = new NamedList();
     NamedList params = solrParamsToNamedList(updateRequest.getParams());
     if (updateRequest.getCommitWithin() != -1) {
@@ -123,7 +125,7 @@ public class JavaBinUpdateRequestCodec {
     Map<String,Map<String,Object>> delByIdMap;
     List<String> delByQ;
     final NamedList[] namedList = new NamedList[1];
-    try (JavaBinCodec codec = new StreamingCodec(namedList, updateRequest, handler)) {
+    try (JavaBinCodec codec = new StreamingCodec(namedList, updateRequest, handler, seenOuterMostDocIterator, readStringAsCharSeq)) {
       codec.unmarshal(is);
     }
 
@@ -161,10 +163,11 @@ public class JavaBinUpdateRequestCodec {
         Map<String,Object> params = entry.getValue();
         if (params != null) {
           Long version = (Long) params.get(UpdateRequest.VER);
-          if (params.containsKey(ShardParams._ROUTE_))
+          if (params.containsKey(ShardParams._ROUTE_)) {
             updateRequest.deleteById(entry.getKey(), (String) params.get(ShardParams._ROUTE_));
-          else
-          updateRequest.deleteById(entry.getKey(), version);
+          } else {
+            updateRequest.deleteById(entry.getKey(), version);
+          }
         } else {
           updateRequest.deleteById(entry.getKey());
         }
@@ -181,7 +184,7 @@ public class JavaBinUpdateRequestCodec {
   }
 
 
-  private NamedList solrParamsToNamedList(SolrParams params) {
+  private static NamedList solrParamsToNamedList(SolrParams params) {
     if (params == null) return new NamedList();
     return params.toNamedList();
   }
@@ -190,7 +193,7 @@ public class JavaBinUpdateRequestCodec {
     void update(SolrInputDocument document, UpdateRequest req, Integer commitWithin, Boolean override);
   }
 
-  static class MaskCharSequenceSolrInputDoc extends SolrInputDocument {
+  public static class MaskCharSequenceSolrInputDoc extends SolrInputDocument {
     public MaskCharSequenceSolrInputDoc(Map<String, SolrInputField> fields) {
       super(fields);
     }
@@ -202,21 +205,21 @@ public class JavaBinUpdateRequestCodec {
 
   }
 
-  class StreamingCodec extends JavaBinCodec {
+  static class StreamingCodec extends JavaBinCodec {
 
     private final NamedList[] namedList;
     private final UpdateRequest updateRequest;
     private final StreamingUpdateHandler handler;
-    // NOTE: this only works because this is an anonymous inner class
-    // which will only ever be used on a single stream -- if this class
-    // is ever refactored, this will not work.
-    private boolean seenOuterMostDocIterator;
+    private final AtomicBoolean seenOuterMostDocIterator;
+    private final AtomicBoolean readStringAsCharSeq;
 
-    public StreamingCodec(NamedList[] namedList, UpdateRequest updateRequest, StreamingUpdateHandler handler) {
+    public StreamingCodec(NamedList[] namedList, UpdateRequest updateRequest, StreamingUpdateHandler handler, AtomicBoolean readStringAsCharSeq, AtomicBoolean seenOuterMostDocIterator) {
       this.namedList = namedList;
       this.updateRequest = updateRequest;
       this.handler = handler;
-      seenOuterMostDocIterator = false;
+      this.seenOuterMostDocIterator = seenOuterMostDocIterator;
+      this.seenOuterMostDocIterator.set(false);
+      this.readStringAsCharSeq = readStringAsCharSeq;
     }
 
     @Override
@@ -239,7 +242,7 @@ public class JavaBinUpdateRequestCodec {
       return nl;
     }
 
-    private SolrInputDocument listToSolrInputDocument(List<NamedList> namedList) {
+    private static SolrInputDocument listToSolrInputDocument(List<NamedList> namedList) {
       SolrInputDocument doc = new SolrInputDocument();
       for (int i = 0; i < namedList.size(); i++) {
         NamedList nl = namedList.get(i);
@@ -273,11 +276,11 @@ public class JavaBinUpdateRequestCodec {
     @Override
     public List readIterator(DataInputInputStream fis) throws IOException {
       // default behavior for reading any regular Iterator in the stream
-      if (seenOuterMostDocIterator) return super.readIterator(fis);
+      if (seenOuterMostDocIterator.get()) return super.readIterator(fis);
 
       // special treatment for first outermost Iterator
       // (the list of documents)
-      seenOuterMostDocIterator = true;
+      seenOuterMostDocIterator.set(true);
       return readOuterMostDocIterator(fis);
     }
 
@@ -291,7 +294,7 @@ public class JavaBinUpdateRequestCodec {
       Integer commitWithin = null;
       Boolean overwrite = null;
       Object o = null;
-      super.readStringAsCharSeq = JavaBinUpdateRequestCodec.this.readStringAsCharSeq;
+      super.readStringAsCharSeq.set(readStringAsCharSeq.get());
       try {
         while (true) {
           if (o == null) {
@@ -333,7 +336,7 @@ public class JavaBinUpdateRequestCodec {
         }
         return Collections.EMPTY_LIST;
       } finally {
-        super.readStringAsCharSeq = false;
+        super.readStringAsCharSeq.set(false);
 
       }
     }

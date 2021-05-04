@@ -83,31 +83,7 @@ class SolrResourceLocator implements IResourceLocator {
 
     log.info("Loaded Solr resource: {}", resourceName);
 
-    final IResource foundResource = new IResource() {
-      @Override
-      public InputStream open() {
-        return new ByteArrayInputStream(asBytes);
-      }
-
-      @Override
-      public int hashCode() {
-        // In case multiple resources are found they will be deduped, but we don't use it in Solr,
-        // so simply rely on instance equivalence.
-        return super.hashCode();
-      }
-      
-      @Override
-      public boolean equals(Object obj) {
-        // In case multiple resources are found they will be deduped, but we don't use it in Solr,
-        // so simply rely on instance equivalence.
-        return super.equals(obj);
-      }
-
-      @Override
-      public String toString() {
-        return "Solr config resource: " + resourceName;
-      }
-    };
+    final IResource foundResource = new FoundIResource(asBytes, resourceName);
 
     return new IResource[] { foundResource };
   }
@@ -138,5 +114,39 @@ class SolrResourceLocator implements IResourceLocator {
     
     return "SolrResourceLocator, " + configDir
         + "Carrot2 relative lexicalResourcesDir=" + carrot2ResourcesDir;
+  }
+
+  private static class FoundIResource implements IResource {
+    private final byte[] asBytes;
+    private final String resourceName;
+
+    public FoundIResource(byte[] asBytes, String resourceName) {
+      this.asBytes = asBytes;
+      this.resourceName = resourceName;
+    }
+
+    @Override
+    public InputStream open() {
+      return new ByteArrayInputStream(asBytes);
+    }
+
+    @Override
+    public int hashCode() {
+      // In case multiple resources are found they will be deduped, but we don't use it in Solr,
+      // so simply rely on instance equivalence.
+      return super.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      // In case multiple resources are found they will be deduped, but we don't use it in Solr,
+      // so simply rely on instance equivalence.
+      return super.equals(obj);
+    }
+
+    @Override
+    public String toString() {
+      return "Solr config resource: " + resourceName;
+    }
   }
 }
