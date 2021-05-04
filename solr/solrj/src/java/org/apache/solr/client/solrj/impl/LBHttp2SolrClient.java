@@ -26,14 +26,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.request.IsUpdateRequest;
 import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.MDC;
 
-import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
 /**
  * LBHttp2SolrClient or "LoadBalanced LBHttp2SolrClient" is a load balancing wrapper around
  * {@link Http2SolrClient}. This is useful when you
@@ -106,7 +104,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
 
   public Cancellable asyncReq(Req req, AsyncListener<Rsp> asyncListener) {
     Rsp rsp = new Rsp();
-    boolean isNonRetryable = req.request instanceof IsUpdateRequest || ADMIN_PATHS.contains(req.request.getPath());
+    boolean isNonRetryable = false;
     ServerIterator it = new ServerIterator(req, zombieServers);
     asyncListener.onStart();
     final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -172,9 +170,8 @@ public class LBHttp2SolrClient extends LBSolrClient {
     rsp.server = baseUrl;
     req.getRequest().setBasePath(baseUrl);
 
-    return ((Http2SolrClient)getClient(baseUrl)).asyncRequest(req.getRequest(), null, new AsyncListener<>() {
-      @Override
-      public void onSuccess(NamedList<Object> result, int statusCode) {
+    return ((Http2SolrClient) getClient(baseUrl)).asyncRequest(req.getRequest(), null, new AsyncListener<>() {
+      @Override public void onSuccess(NamedList<Object> result, int statusCode) {
         rsp.rsp = result;
         if (isZombie) {
           zombieServers.remove(baseUrl);
@@ -182,16 +179,15 @@ public class LBHttp2SolrClient extends LBSolrClient {
         listener.onSuccess(rsp);
       }
 
-      @Override
-      public void onFailure(Throwable oe, int code) {
+      @Override public void onFailure(Throwable oe, int code) {
         try {
           throw (Exception) oe;
         } catch (BaseHttpSolrClient.RemoteExecutionException e) {
           listener.onFailure(e, false);
         } catch (SolrException e) {
-          // we retry on 404 or 403 or 503 or 500
+          // we retry on 404 or 403 or 502, 503 or 500
           // unless it's an update - then we only retry on connect exception
-          if (!isNonRetryable && (RETRY_CODES.contains(e.code()) || e.getMessage().contains("Connection refused") || e.getMessage().contains("Protocol family unavailable"))) {
+          if (!isNonRetryable && (RETRY_CODES.contains(e.code()))) {
             listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
           } else {
             // Server is alive but the request was likely malformed or invalid
@@ -218,7 +214,15 @@ public class LBHttp2SolrClient extends LBSolrClient {
             listener.onFailure(e, false);
           }
         } catch (Exception e) {
-          listener.onFailure(new SolrServerException(e), false);
+
+          // we retry on 404 or 403 or 502, 503 or 500
+          // unless it's an update - then we only retry on connect exception
+          if (!isNonRetryable && (RETRY_CODES.contains(code))) {
+            listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
+          } else {
+            listener.onFailure(new SolrServerException(e), false);
+          }
+
         }
       }
     });

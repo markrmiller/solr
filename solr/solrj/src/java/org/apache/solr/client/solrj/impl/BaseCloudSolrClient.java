@@ -1140,7 +1140,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       });
 
       if (theUrlList.isEmpty()) {
-        if (collectionNames.size() == 0 || liveNodes.size() == 0) {
+        if (collectionNames.size() == 0 || liveNodes.size() == 0 || request.getBasePath() != null) {
           collectionStateCache.keySet().removeAll(collectionNames);
           throw new SolrException(SolrException.ErrorCode.INVALID_STATE, "Could not find a healthy node to handle the request, collection names: " + collectionNames + " live nodes=" + liveNodes);
         }

@@ -125,6 +125,8 @@ dependencies {
     exclude group: "com.google.errorprone", module: "error_prone_annotations"
   })
 
+  implementation 'com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru'
+
   implementation 'com.github.zafarkhaja:java-semver'
   implementation 'com.google.re2j:re2j'
 

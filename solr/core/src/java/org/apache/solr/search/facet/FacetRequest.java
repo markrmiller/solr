@@ -21,7 +21,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
+import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
@@ -126,8 +129,8 @@ public abstract class FacetRequest {
   }
 
 
-  protected Map<String,AggValueSource> facetStats;  // per-bucket statistics
-  protected Map<String,FacetRequest> subFacets;     // per-bucket sub-facets
+  protected volatile Map<String,AggValueSource> facetStats;  // per-bucket statistics
+  protected volatile Map<String,FacetRequest> subFacets;     // per-bucket sub-facets
   protected boolean processEmpty;
   protected Domain domain;
 
@@ -326,8 +329,8 @@ public abstract class FacetRequest {
   }
 
   public FacetRequest() {
-    facetStats = new LinkedHashMap<>();
-    subFacets = new LinkedHashMap<>();
+    facetStats = new ConcurrentLinkedHashMap.Builder().initialCapacity(16).maximumWeightedCapacity(1000).build();
+    subFacets = new ConcurrentLinkedHashMap.Builder().initialCapacity(16).maximumWeightedCapacity(1000).build();
   }
 
   public Map<String, AggValueSource> getFacetStats() {

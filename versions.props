@@ -121,3 +121,4 @@ io.prometheus:simpleclient_servlet=0.0.23
 org.jctools:jctools-core=3.3.0
 org.agrona:agrona-agent=1.10.0
 com.netflix.concurrency-limits:*=0.3.6
+com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru=1.4.2

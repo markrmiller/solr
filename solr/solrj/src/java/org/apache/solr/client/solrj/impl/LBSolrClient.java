@@ -66,7 +66,7 @@ public abstract class LBSolrClient extends SolrClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // defaults
-  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 503, 0, 527));
+  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503, 0));
   private static final int CHECK_INTERVAL = 15 * 1000; //15 seconds between checks
   private static final int NONSTANDARD_PING_LIMIT = 10;  // number of times we'll ping dead servers not in the server list
   public static final ServerWrapper[] EMPTY_SERVER_WRAPPER = new ServerWrapper[0];

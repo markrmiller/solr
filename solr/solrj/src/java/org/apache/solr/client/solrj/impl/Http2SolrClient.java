@@ -16,6 +16,9 @@
  */
 package org.apache.solr.client.solrj.impl;
 
+import org.agrona.ExpandableDirectByteBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
 import org.apache.http.entity.ContentType;
@@ -75,6 +78,7 @@ import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http2.ErrorCode;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.HttpClientTransportOverHTTP2;
+import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.util.Fields;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
@@ -413,11 +417,11 @@ public class Http2SolrClient extends SolrClient {
 
     String basePath = baseUrl;
 
-    if (basePath != null && !(!basePath.isEmpty() && basePath.charAt(basePath.length() - 1) == '/'))
-      basePath += "/";
+   // if (basePath != null && !(!basePath.isEmpty() && basePath.charAt(basePath.length() - 1) == '/'))
+   //   basePath += "/";
 
-    if (collection != null && basePath != null && !basePath.isEmpty())
-      basePath += "/" + collection;
+    //if (collection != null && basePath != null && !basePath.isEmpty())
+     // basePath += "/" + collection;
 
     OutputStreamContentProvider provider = new OutputStreamContentProvider();
     Request postRequest = httpClient
@@ -493,14 +497,14 @@ public class Http2SolrClient extends SolrClient {
         ParWork.submitIO("Http2SolrClientAsync", () -> {
           try {
             if (result.isSucceeded()) {
-
+              InputStream is = getContentAsInputStream();
+              NamedList<Object> body = processErrorsAndResponse(solrRequest, parser, result.getResponse(), result.getFailure(), is);
               if (response.getStatus() == 200) {
-                InputStream is = getContentAsInputStream();
-                NamedList<Object> body = processErrorsAndResponse(solrRequest, parser, result.getResponse(), result.getFailure(), is);
+
 
                 asyncListener.onSuccess(body, response.getStatus());
               } else {
-                asyncListener.onFailure(new RemoteSolrException(req.getPath(), response.getStatus(), "", result.getResponseFailure()), response.getStatus());
+                asyncListener.onSuccess(body, response.getStatus());
               }
             } else {
 
@@ -511,11 +515,19 @@ public class Http2SolrClient extends SolrClient {
               } else {
                 log.error("request failure", failure);
               }
-
-              if (SolrException.getRootCause(failure) == CANCELLED_EXCEPTION) {
-                asyncListener.onFailure(failure, ErrorCode.CANCEL_STREAM_ERROR.code);
-                return;
-              }
+//              Throwable root = SolrException.getRootCause(failure);
+//              if (response.getStatus() == ErrorCode.CANCEL_STREAM_ERROR.code) {
+//                InputStream is = getContentAsInputStream();
+//                NamedList<Object> body;
+//                try {
+//                  body = processErrorsAndResponse(solrRequest, parser, result.getResponse(), result.getFailure(), is);
+//                } catch (Exception e) {
+//                  log.warn("Could not parse response stream", e);
+//                  body = new NamedList<>();
+//                }
+//                asyncListener.onSuccess(body, ErrorCode.CANCEL_STREAM_ERROR.code);
+//                return;
+//              }
 
               int status = response.getStatus();
 
@@ -558,7 +570,8 @@ public class Http2SolrClient extends SolrClient {
         if (e != CANCELLED_EXCEPTION) {
           asyncListener.onFailure(e, -1);
         } else {
-          asyncListener.onFailure(e, ErrorCode.CANCEL_STREAM_ERROR.code);
+          NamedList<Object> body = new NamedList<>();
+          asyncListener.onSuccess(body, ErrorCode.CANCEL_STREAM_ERROR.code);
         }
       } finally {
         if (tracking) {
@@ -798,13 +811,14 @@ public class Http2SolrClient extends SolrClient {
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
+        MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
+        ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer);
 
-        contentWriter.write(baos);
-
-        baos.close();
-
-        BytesContentProvider bcp = new BytesContentProvider(contentWriter.getContentType(), baos.toByteArray());
+        contentWriter.write(outStream);
+        ByteBuffer buffer = outStream.buffer().byteBuffer();
+        buffer.position(outStream.offset());
+        buffer.limit(outStream.position());
+        ByteBufferContentProvider bcp = new ByteBufferContentProvider(contentWriter.getContentType(), buffer);
         //OutputStreamContentProvider provider = new OutputStreamContentProvider();
 
         return req.content(bcp);

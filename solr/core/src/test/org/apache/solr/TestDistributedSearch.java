@@ -222,7 +222,6 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
 
     handle.put("highlighting", UNORDERED);
     handle.put("response", UNORDERED);
-    handle.put("warnings", SKIP);
 
     handle.put("maxScore", SKIPVAL);
     query("q","quick");

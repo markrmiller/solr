@@ -44,7 +44,7 @@ public final class QueryResponseWriterUtil {
    */
   public static ExpandableDirectBufferOutputStream writeQueryResponse(QueryResponseWriter responseWriter, SolrQueryRequest solrRequest,
       SolrQueryResponse solrResponse, String contentType) throws IOException {
-    MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(8192);
+    MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
     ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer);
     if (responseWriter instanceof BinaryQueryResponseWriter) {
       BinaryQueryResponseWriter binWriter = (BinaryQueryResponseWriter) responseWriter;
