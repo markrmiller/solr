@@ -98,6 +98,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
     UpdateLog.testing_logReplayHook = null;
     UpdateLog.testing_logReplayFinishHook = null;
     TestInjection.skipIndexWriterCommitOnClose = false;
+    System.clearProperty("solr.skipCommitOnClose");
     deleteCore();
   }
 
@@ -1150,7 +1151,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
     UpdateLog.testing_logReplayFinishHook = () -> logReplayFinish.release();
 
 
-    SolrQueryRequest req = req();
+   // SolrQueryRequest req = req();
 
     try {
       String v1 = getNextVersion();
@@ -1177,7 +1178,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
       UpdateLog.testing_logReplayHook = null;
       UpdateLog.testing_logReplayFinishHook = null;
 
-      req.close();
+     // req.close();
     }
   }
   
