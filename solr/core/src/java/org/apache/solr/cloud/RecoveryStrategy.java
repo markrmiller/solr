@@ -196,7 +196,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
     try {
       if (prevSendPreRecoveryRequest != null) {
-        prevSendPreRecoveryRequest.cancel();
+       // prevSendPreRecoveryRequest.cancel();
       }
       prevSendPreRecoveryRequest = null;
     } catch (Exception e) {
@@ -982,7 +982,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
       //prevSendPreRecoveryRequest = null;
       boolean success = latch.await(10, TimeUnit.SECONDS);
       if (!success) {
-       // prevSendPreRecoveryRequest.cancel();
+        prevSendPreRecoveryRequest.cancel();
         prevSendPreRecoveryRequest = null;
         log.error("timeout waiting for prep recovery");
         return false;

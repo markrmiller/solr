@@ -140,7 +140,12 @@ public class LeaderElector implements Closeable {
       final String holdElectionPath = context.electionPath + ELECTION_NODE;
       List<String> seqs;
 
-      seqs = zkClient.getChildren(holdElectionPath, null, true);
+      try {
+        seqs = zkClient.getChildren(holdElectionPath, null, true);
+      } catch (KeeperException.NoNodeException e) {
+        log.info("No election node found {}", holdElectionPath);
+        return false;
+      }
 
       sortSeqs(seqs);
 

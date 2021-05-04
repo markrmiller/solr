@@ -35,7 +35,6 @@ import org.apache.solr.client.solrj.request.V2Request;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.client.solrj.util.ClientUtils;
-import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.StringUtils;
@@ -55,8 +54,11 @@ import org.apache.solr.common.util.SysStats;
 import org.apache.solr.common.util.Utils;
 import org.eclipse.jetty.client.ConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.HttpClientTransport;
 import org.eclipse.jetty.client.HttpDestination;
+import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.MultiplexConnectionPool;
+import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.ProtocolHandlers;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
@@ -77,11 +79,9 @@ import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.http2.ErrorCode;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.HttpClientTransportOverHTTP2;
 import org.eclipse.jetty.io.ClientConnector;
-import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.util.Fields;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
@@ -91,7 +91,6 @@ import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -102,6 +101,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -247,6 +247,7 @@ public class Http2SolrClient extends SolrClient {
     //httpClientExecutor.setLowThreadsThreshold(-1);
     // section SolrQTP
     SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads);
+    httpClientExecutor.setStopTimeout(500);
         // SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads, new MPMCQueue.RunnableBlockingQueue());
 //    try {
 //      httpClientExecutor.start();
@@ -255,13 +256,12 @@ public class Http2SolrClient extends SolrClient {
 //    }
     SecurityManager s = System.getSecurityManager();
     ThreadGroup group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
-     ScheduledExecutorScheduler scheduler = new ScheduledExecutorScheduler("http2client-scheduler", true, null, group);
+    ScheduledExecutorScheduler scheduler = new ScheduledExecutorScheduler("http2client-scheduler", true, null, group);
 
     if (builder.useHttp1_1) {
       if (log.isTraceEnabled()) log.trace("Create Http2SolrClient with HTTP/1.1 transport");
       ClientConnector clientConnector = new ClientConnector();
       clientConnector.setSslContextFactory(sslContextFactory);
-
       SolrHttpClientTransportOverHTTP transport = new SolrHttpClientTransportOverHTTP(clientConnector);
       httpClient = new SolrInternalHttpClient(transport);
     } else {
@@ -285,6 +285,8 @@ public class Http2SolrClient extends SolrClient {
         clientConnector.setSslContextFactory(sslContextFactory);
         http2client = new HTTP2Client(clientConnector);
       }
+
+
       http2client.setSelectors(1);
       http2client.setMaxConcurrentPushedStreams(512);
       http2client.setInputBufferSize(4096);
@@ -311,7 +313,8 @@ public class Http2SolrClient extends SolrClient {
       httpClient.setIdleTimeout(builder.idleTimeout);
       httpClient.setConnectTimeout(5000);
       httpClient.setTCPNoDelay(true);
-      //httpClient.setStopTimeout(0);
+
+
      // httpClient.setRemoveIdleDestinations(true);
       httpClient.setAddressResolutionTimeout(3000);
       if (builder.connectionTimeout != null) httpClient.setConnectTimeout(builder.connectionTimeout);
@@ -344,16 +347,17 @@ public class Http2SolrClient extends SolrClient {
         try {
 
           httpClient.stop();
+          try {
+            ((LifeCycle) httpClient.getExecutor()).stop();
+          } catch (Exception e) {
+            log.error("Exception closing httpClient scheduler", e);
+          }
         //  httpClient.getScheduler().stop();
         } catch (Exception e) {
           log.error("Exception closing httpClient", e);
         }
 
-        try {
-          ((LifeCycle) httpClient.getExecutor()).stop();
-        } catch (Exception e) {
-          log.error("Exception closing httpClient scheduler", e);
-        }
+
 
       }
       if (log.isTraceEnabled()) log.trace("Done closing {}", this.getClass().getSimpleName());
@@ -512,7 +516,7 @@ public class Http2SolrClient extends SolrClient {
           try {
             if (result.isSucceeded()) {
               InputStream is = getContentAsInputStream();
-              NamedList<Object> body = processErrorsAndResponse(solrRequest, parser, result.getResponse(), result.getFailure(), is);
+              NamedList<Object> body = processErrorsAndResponse(req, solrRequest, parser, result.getResponse(), result.getFailure(), is);
               if (response.getStatus() == 200) {
 
 
@@ -676,7 +680,7 @@ public class Http2SolrClient extends SolrClient {
     }
     Response res = result.get();
 
-    return processErrorsAndResponse(solrRequest, parser, res, res.getRequest().getAbortCause(), listener.getContentAsInputStream());
+    return processErrorsAndResponse(req, solrRequest, parser, res, res.getRequest().getAbortCause(), listener.getContentAsInputStream());
   }
 
   private static ContentType getContentType(Response response) {
@@ -918,7 +922,20 @@ public class Http2SolrClient extends SolrClient {
   private static final List<String> errPath = Arrays.asList("metadata", "error-class");
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private NamedList<Object> processErrorsAndResponse(SolrRequest solrRequest, final ResponseParser processor, Response response, Throwable failure, InputStream is) {
+  private NamedList<Object> processErrorsAndResponse(Request req, SolrRequest solrRequest, final ResponseParser processor, Response response, Throwable failure, InputStream is) {
+    if (failure instanceof ClosedChannelException) {
+      HttpClientTransport transport = httpClient.getTransport();
+      Origin origin = transport.newOrigin((HttpRequest)req);
+      HttpDestination dest = ((SolrInternalHttpClient)httpClient).getDestination(origin);
+      if (dest != null) {
+        ((SolrInternalHttpClient) httpClient).removeDestination(dest);
+        dest.close();
+       // httpClient.getTransport().getConnectionPoolFactory().newConnectionPool(dest);
+      }
+      req.abort(failure);
+      org.apache.solr.common.util.IOUtils.closeQuietly(is);
+      throw new RemoteSolrException(req.getHost() + " " + req.getPath(), response.getStatus(), "Connection has been closed", failure);
+    }
 
     String remoteHost = solrRequest.getBasePath();
     if (remoteHost == null) {
@@ -1005,7 +1022,7 @@ public class Http2SolrClient extends SolrClient {
       if (remoteHost == null) {
         remoteHost = serverBaseUrl;
       }
-      throw new RemoteSolrException(remoteHost, 527, "Exception try to process response", e);
+      throw new RemoteSolrException(remoteHost, httpStatus, "Exception try to process response", e);
     }
 
     // log.error("rsp:{}", rsp);
@@ -1531,6 +1548,7 @@ public class Http2SolrClient extends SolrClient {
       MultiplexConnectionPool mulitplexPool = new MultiplexConnectionPool(destination, pool, destination, maxQueuedRequestsPerDest);
       mulitplexPool.setMaxMultiplex(512);
       mulitplexPool.setMaximizeConnections(false);
+
     //  mulitplexPool.preCreateConnections(12);
       return mulitplexPool;
     }

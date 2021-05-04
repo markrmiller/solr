@@ -1487,6 +1487,7 @@ public class IndexFetcher {
         cancellable.cancel();
       }
     });
+
     fileFetchRequests.clear();
   }
 
@@ -1641,7 +1642,7 @@ public class IndexFetcher {
             // quietly
             log.debug("IOException ensure stream is fully read", e);
           }
-          IOUtils.closeQuietly(is);
+         // IOUtils.closeQuietly(is);
         }
 
       } catch (Exception e) {
@@ -1802,7 +1803,9 @@ public class IndexFetcher {
           req.setMethod(SolrRequest.METHOD.POST);
           req.setResponseParser(new InputStreamResponseParser(FILE_STREAM));
           //response =
-
+          if (stop || abort) {
+            throw new AlreadyClosedException();
+          }
           Cancellable resp = solrClient.asyncRequestRaw(req, null, new AsyncListener<>() {
             @Override public void onSuccess(InputStream is, int code) {
               log.debug("success for file index fetch {}", code);
@@ -1828,7 +1831,8 @@ public class IndexFetcher {
           return new DataInputStream(is);
         } catch (Exception e) {
           //close stream on error
-          IOUtils.closeQuietly(is);
+          //IOUtils.closeQuietly(is);
+
           throw new IOException("Could not download file '" + fileName + "'", e);
         }
       }

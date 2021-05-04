@@ -148,6 +148,7 @@ import java.io.Writer;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -821,8 +822,10 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       initIndexReaderFactory();
 
       // Create the index if it doesn't exist.
-      if ((!coreContainer.isZooKeeperAware() || newCore) && !directoryFactory.exists(getNewIndexDir())) {
+      String indexDir = getNewIndexDir();
+      if ((!coreContainer.isZooKeeperAware() || newCore) && !directoryFactory.exists(indexDir)) {
         log.debug("{}Solr index directory doesn't exist. Creating new index...", logid);
+        Files.createDirectories(Paths.get(indexDir));
         RefCounted<IndexWriter> writer = solrCoreState.getIndexWriter(this, true);
         IndexWriter iw = writer.get();
         try {

@@ -564,9 +564,9 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         ExecutorUtil.setServerThreadFlag(null);
       }
     } catch(Exception e) {
-//      if (!servletResponse.isCommitted()) {
-//        consumeInputFully(servletRequest, servletResponse);
-//      }
+      if (!servletResponse.isCommitted()) {
+        consumeInputFully(servletRequest, servletResponse);
+      }
 
       if (!servletResponse.isCommitted() && !ASYNC) {
         sendException(e, call, servletRequest, servletResponse);

@@ -59,16 +59,14 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
   private static final int nodeCount = 5;
   private static final String configName = "solrCloudCollectionConfig";
 
-  @Override
-  public void setUp() throws Exception {
+  @Override public void setUp() throws Exception {
     System.setProperty("solr.skipCommitOnClose", "false");
     useFactory(null);
     configureCluster(nodeCount).addConfig(configName, SolrTestUtil.configset("cloud-minimal")).configure();
     super.setUp();
   }
-  
-  @Override
-  public void tearDown() throws Exception {
+
+  @Override public void tearDown() throws Exception {
     cluster.getZkServer().writeZkMonLayout("afterTest");
     cluster.shutdown();
     cluster = null;
@@ -77,21 +75,16 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
 
   private void createCollection(String collectionName, String createNodeSet, boolean waitForState) throws Exception {
     if (random().nextBoolean()) { // process asynchronously
-      CollectionAdminRequest.Create req = CollectionAdminRequest.createCollection(collectionName, configName, numShards, numReplicas).setMaxShardsPerNode(maxShardsPerNode)
-          .setCreateNodeSet(createNodeSet);
-          req.processAndWait(cluster.getSolrClient(), 10);
-    }
-    else {
-      CollectionAdminRequest.createCollection(collectionName, configName, numShards, numReplicas)
-          .setMaxShardsPerNode(maxShardsPerNode)
-          .setCreateNodeSet(createNodeSet)
-          .process(cluster.getSolrClient());
+      CollectionAdminRequest.Create req = CollectionAdminRequest.createCollection(collectionName, configName, numShards, numReplicas)
+          .setMaxShardsPerNode(maxShardsPerNode).setCreateNodeSet(createNodeSet);
+      req.processAndWait(cluster.getSolrClient(), 10);
+    } else {
+      CollectionAdminRequest.createCollection(collectionName, configName, numShards, numReplicas).setMaxShardsPerNode(maxShardsPerNode)
+          .setCreateNodeSet(createNodeSet).process(cluster.getSolrClient());
     }
   }
 
-
-  @Test
-  public void testDeleteUnknownCollection() throws Exception {
+  @Test public void testDeleteUnknownCollection() throws Exception {
     //  deleting an unknown collection should not be slow
     try {
       CollectionAdminRequest.deleteCollection("foobar432").process(cluster.getSolrClient());
@@ -101,8 +94,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     }
   }
 
-  @Test
-  @LuceneTestCase.Nightly // slow
+  @Test @LuceneTestCase.Nightly // slow
   public void testCollectionCreateSearchDelete() throws Exception {
 
     final CloudHttp2SolrClient client = cluster.getSolrClient();
@@ -117,7 +109,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
 
     // shut down a server
     JettySolrRunner stoppedServer = cluster.stopJettySolrRunner(0);
-    
+
     assertTrue(stoppedServer.isStopped());
     assertEquals(nodeCount - 1, cluster.getJettySolrRunners().size());
 
@@ -207,9 +199,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     CollectionAdminRequest.deleteCollection(collectionName).process(client);
   }
 
-  @Test
-  @LuceneTestCase.Nightly
-  public void testStopAllStartAll() throws Exception {
+  @Test @LuceneTestCase.Nightly public void testStopAllStartAll() throws Exception {
 
     final String collectionName = "testStopAllStartAllCollection";
     final CloudHttp2SolrClient client = cluster.getSolrClient();
@@ -308,4 +298,4 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     // re-query collection
     assertEquals(numDocs, client.query(collectionName, query).getResults().getNumFound());
   }
-  }
+}

@@ -272,10 +272,10 @@ public class JettySolrRunner implements Closeable {
 //    classlist.addBefore(
 //        "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
 //        "org.eclipse.jetty.annotations.AnnotationConfiguration");
-
-    server.setStopTimeout(1000); // will wait gracefully for stoptime / 2, then interrupts
-
     server.setStopAtShutdown(true);
+    server.setStopTimeout(5000); // will wait gracefully for stoptime / 2, then interrupts
+
+
 
     long idleTimeout = TimeUnit.SECONDS.toMillis(30);
 

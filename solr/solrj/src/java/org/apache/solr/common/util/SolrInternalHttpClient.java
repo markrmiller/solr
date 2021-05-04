@@ -51,7 +51,12 @@ public class SolrInternalHttpClient extends HttpClient {
     });
   }
 
-  protected boolean removeDestination(HttpDestination destination) {
+  public HttpDestination getDestination(Origin origin) {
+    return dests.get(origin);
+  }
+
+
+  public boolean removeDestination(HttpDestination destination) {
     removeBean(destination);
     return dests.remove(destination.getOrigin(), destination);
   }
