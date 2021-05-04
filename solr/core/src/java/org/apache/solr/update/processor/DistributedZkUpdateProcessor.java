@@ -976,19 +976,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     if (replicas.isEmpty()) {
       return null;
     }
-
-    // check for test param that lets us miss replicas
-    String[] skipList = req.getParams().getParams(TEST_DISTRIB_SKIP_SERVERS);
-    Set<String> skipListSet = null;
-    if (skipList != null) {
-      skipListSet = new HashSet<>(skipList.length);
-      skipListSet.addAll(Arrays.asList(skipList));
-      log.info("test.distrib.skip.servers was found and contains:{}", skipListSet);
+    assert zkController != null;
+    if (nodes == null) {
+      nodes = new ArrayList<>(replicas.size());
     }
-
-    List<SolrCmdDistributor.Node> nodes = new ArrayList<>(replicas.size());
-    skippedCoreNodeNames = new HashSet<>();
-
     for (Replica replica : replicas) {
       nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
     }

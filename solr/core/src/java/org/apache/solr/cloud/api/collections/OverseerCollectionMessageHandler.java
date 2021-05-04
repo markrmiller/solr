@@ -686,7 +686,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   }
 
   Map<String, Replica> waitToSeeReplicasInState(String collectionName, Collection<String> coreUrls, boolean requireActive) {
-    log.info("wait to see {} in clusterstate {}", coreUrls, zkStateReader.getClusterState().getCollection(collectionName));
+    log.info("wait to see {} in clusterstate {}", coreUrls, zkStateReader.getCollectionOrNull(collectionName));
     assert coreUrls.size() > 0;
 
     AtomicReference<Map<String, Replica>> result = new AtomicReference<>();

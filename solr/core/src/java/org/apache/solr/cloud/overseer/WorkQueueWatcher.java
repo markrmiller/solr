@@ -13,7 +13,6 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.zookeeper.AddWatchMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
-import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,7 +230,7 @@ public class WorkQueueWatcher extends QueueWatcher {
           for (String collection : collections) {
             ClusterState cs = overseer.getZkStateWriter().getClusterstate(collection);
             if (cs != null) {
-              DocCollection docCollection = cs.getCollection(collection);
+              DocCollection docCollection = cs.getCollectionOrNull(collection);
               if (docCollection != null) {
                 List<Replica> replicas = docCollection.getReplicas();
                 for (Replica replica : replicas) {
@@ -257,8 +256,8 @@ public class WorkQueueWatcher extends QueueWatcher {
     }
   }
 
-  private void processStateUpdateReplica(boolean onStart, boolean weAreReplacement, Set<Integer> collIds, Map<Integer,Map<Integer,Integer>> replicaStates,
-      ZkNodeProps message) {
+  private static void processStateUpdateReplica(boolean onStart, boolean weAreReplacement, Set<Integer> collIds,
+      Map<Integer,Map<Integer,Integer>> replicaStates, ZkNodeProps message) {
     for (Map.Entry<String,Object> theEntry : message.getProperties().entrySet()) {
       Map.Entry<String,Object> entry = theEntry;
       log.debug("process state update entry {}", entry);
@@ -276,7 +275,7 @@ public class WorkQueueWatcher extends QueueWatcher {
         Integer state = ((Long) entry.getValue()).intValue();
         int collId = Integer.parseInt(id.substring(0, id.indexOf('-')));
 
-        Map<Integer,Integer> updates = replicaStates.computeIfAbsent(collId, k -> new NonBlockingHashMap<>());
+        Map<Integer,Integer> updates = replicaStates.computeIfAbsent(collId, k -> new ConcurrentHashMap<>());
         collIds.add(collId);
         Integer replicaId = Integer.parseInt(id.substring(id.indexOf('-') + 1));
         log.debug("add state update id={} {} for collection {}", replicaId, state, collId);

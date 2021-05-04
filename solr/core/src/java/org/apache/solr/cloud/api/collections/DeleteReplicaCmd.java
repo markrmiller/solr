@@ -162,7 +162,11 @@ public class DeleteReplicaCmd implements Cmd {
       collectionName = extCollectionName;
     }
 
-    DocCollection coll = clusterState.getCollection(collectionName);
+    DocCollection coll = clusterState.getCollectionOrNull(collectionName);
+    if (coll == null) {
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Invalid collection name for replica : " + replicaName + " in collection : " + collectionName);
+    }
+
     Slice slice = coll.getSlice(shard);
     if (slice == null) {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Invalid shard name : " + shard + " in collection : " + collectionName);
@@ -364,19 +368,6 @@ public class DeleteReplicaCmd implements Cmd {
     log.info("delete core {}", replicaName);
     Replica replica = slice.getReplica(replicaName);
     if (replica == null) {
-      try {
-        ocmh.zkStateReader.waitForState(collectionName, 1, TimeUnit.SECONDS, (liveNodes, collectionState) -> {
-          if (collectionState == null) {
-            return false;
-          }
-          return collectionState.getReplica(replicaName) != null;
-        });
-      } catch (InterruptedException e) {
-
-      } catch (TimeoutException e) {
-
-      }
-
       ArrayList<String> l = new ArrayList<>();
       for (Replica r : slice.getReplicas())
         l.add(r.getName());
