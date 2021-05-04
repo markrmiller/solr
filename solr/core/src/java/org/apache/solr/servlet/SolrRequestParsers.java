@@ -17,6 +17,7 @@
 package org.apache.solr.servlet;
 
 import javax.servlet.MultipartConfigElement;
+import javax.servlet.ReadListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.Part;
 import java.io.ByteArrayOutputStream;
@@ -40,11 +41,16 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.ExpandableDirectByteBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
+import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.lucene.util.IOUtils;
 import org.apache.solr.api.V2HttpCall;
-import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
@@ -54,6 +60,7 @@ import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.FastInputStream;
+import org.apache.solr.common.util.SolrQTP;
 import org.apache.solr.core.RequestHandlers;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
@@ -61,9 +68,9 @@ import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.util.RTimerTree;
 import org.apache.solr.util.tracing.GlobalTracer;
-import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.server.MultiParts;
+import org.eclipse.jetty.server.HttpInput;
+import org.eclipse.jetty.server.MultiPartFormInputStream;
 import org.eclipse.jetty.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,10 +114,11 @@ public class SolrRequestParsers {
   public static final String SIMPLE = "simple";
   public static final String STANDARD = "standard";
 
-  private final Charset CHARSET_US_ASCII = Charset.forName("US-ASCII");
+  private final static Charset CHARSET_US_ASCII = Charset.forName("US-ASCII");
 
   public static final String INPUT_ENCODING_KEY = "ie";
-  private final byte[] INPUT_ENCODING_BYTES = INPUT_ENCODING_KEY.getBytes(CHARSET_US_ASCII);
+  private final static byte[] INPUT_ENCODING_BYTES = INPUT_ENCODING_KEY.getBytes(CHARSET_US_ASCII);
+  private final ByteBuffer INPUT_ENCODING_BUFFER =  ByteBuffer.wrap(INPUT_ENCODING_BYTES);
 
   public final static String REQUEST_TIMER_SERVLET_ATTRIBUTE = "org.apache.solr.RequestTimer";
 
@@ -277,9 +285,27 @@ public class SolrRequestParsers {
    * Given a url-encoded query string (UTF-8), map it into solr params
    */
   public MultiMapSolrParams parseQueryString(String queryString) {
-    Map<String,String[]> map = new HashMap<>();
+    Map<String,String[]> map = new ConcurrentHashMap<>();
     parseQueryString(queryString, map);
     return new MultiMapSolrParams(map);
+  }
+  
+  public final static ThreadLocal<ExpandableDirectBufferOutputStream> keyLocal = ThreadLocal.withInitial(() -> {
+    MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(16);
+    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    return keyStream;
+  });
+
+  public final static ThreadLocal<ExpandableDirectBufferOutputStream> valLocal = ThreadLocal.withInitial(() -> {
+    MutableDirectBuffer expandableBuffer2 = new ExpandableDirectByteBuffer(16);
+    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(expandableBuffer2);
+    return valueStream;
+  });
+
+
+  static {
+    SolrQTP.registerThreadLocal(keyLocal);
+    SolrQTP.registerThreadLocal(valLocal);
   }
 
   public static boolean isFormData(HttpServletRequest req) {
@@ -325,47 +351,41 @@ public class SolrRequestParsers {
    */
   long parseFormDataContent(final InputStream postContent, final long maxLen, Charset charset, final Map<String,String[]> map, boolean supportCharsetParam) throws IOException {
     CharsetDecoder charsetDecoder = supportCharsetParam ? null : getCharsetDecoder(charset);
-    final LinkedList<Object> buffer = supportCharsetParam ? new LinkedList<>() : null;
+  //  final LinkedList<Object> buffer = supportCharsetParam ? new LinkedList<>() : null;
     long len = 0L, keyPos = 0L, valuePos = 0L;
-    final ByteArrayOutputStream keyStream = new ByteArrayOutputStream(), valueStream = new ByteArrayOutputStream();
-    ByteArrayOutputStream currentStream = keyStream;
+
+    //MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
+    ExpandableDirectBufferOutputStream keyStream = keyLocal.get();
+    ExpandableDirectBufferOutputStream valueStream = valLocal.get();
+
+    if (charsetDecoder == null) {
+      charsetDecoder = getCharsetDecoder(StandardCharsets.UTF_8);
+    }
+   //final ByteArrayOutputStream keyStream = new ByteArrayOutputStream(), valueStream = new ByteArrayOutputStream(
+    // );
+    ExpandableDirectBufferOutputStream currentStream = keyStream;
     for (; ; ) {
       int b = postContent.read();
       switch (b) {
         case -1: // end of stream
         case '&': // separator
-          if (keyStream.size() > 0) {
-            final byte[] keyBytes = keyStream.toByteArray(), valueBytes = valueStream.toByteArray();
-            if (Arrays.equals(keyBytes, INPUT_ENCODING_BYTES)) {
-              // we found a charset declaration in the raw bytes
-              if (charsetDecoder != null) {
-                throw new SolrException(ErrorCode.BAD_REQUEST, supportCharsetParam ?
-                    ("Query string invalid: duplicate '" + INPUT_ENCODING_KEY + "' (input encoding) key.") :
-                    ("Key '" + INPUT_ENCODING_KEY + "' (input encoding) cannot " + "be used in POSTed application/x-www-form-urlencoded form data. "
-                        + "To set the input encoding of POSTed form data, use the " + "'Content-Type' header and provide a charset!"));
-              }
-              // decode the charset from raw bytes
-              charset = Charset.forName(decodeChars(valueBytes, keyPos, getCharsetDecoder(CHARSET_US_ASCII)));
-              charsetDecoder = getCharsetDecoder(charset);
-              // finally decode all buffered tokens
-              decodeBuffer(buffer, map, charsetDecoder);
-            } else if (charsetDecoder == null) {
-              // we have no charset decoder until now, buffer the keys / values for later processing:
-              buffer.add(keyBytes);
-              buffer.add(keyPos);
-              buffer.add(valueBytes);
-              buffer.add(valuePos);
-            } else {
-              // we already have a charsetDecoder, so we can directly decode without buffering:
-              final String key = decodeChars(keyBytes, keyPos, charsetDecoder), value = decodeChars(valueBytes, valuePos, charsetDecoder);
-              MultiMapSolrParams.addParam(key.trim(), value, map);
-            }
-          } else if (valueStream.size() > 0) {
-            throw new SolrException(ErrorCode.BAD_REQUEST, "application/x-www-form-urlencoded invalid: missing key");
-          }
-          keyStream.reset();
-          valueStream.reset();
+          final ByteBuffer keyBytes = keyStream.buffer().byteBuffer().asReadOnlyBuffer(), valueBytes = valueStream.buffer().byteBuffer().asReadOnlyBuffer();
+          keyBytes.position(0);
+          keyBytes.limit(keyStream.position());
+          valueBytes.position(0);
+          valueBytes.limit(valueStream.position());
+          // we already have a charsetDecoder, so we can directly decode without buffering:
+          final String key = decodeChars(keyBytes, keyPos, charsetDecoder), value = decodeChars(valueBytes, valuePos, charsetDecoder);
+          MultiMapSolrParams.addParam(key.trim(), value, map);
+
           keyPos = valuePos = len + 1;
+          MutableDirectBuffer expandableBuffer1 = keyStream.buffer();
+          expandableBuffer1.byteBuffer().clear();
+          MutableDirectBuffer expandableBuffer2 = valueStream.buffer();
+          expandableBuffer2.byteBuffer().clear();
+          keyStream.wrap(expandableBuffer1, 0);
+          valueStream.wrap(expandableBuffer2, 0);
+
           currentStream = keyStream;
           break;
         case '+': // space replacement
@@ -396,11 +416,7 @@ public class SolrRequestParsers {
         throw new SolrException(ErrorCode.BAD_REQUEST, "application/x-www-form-urlencoded content exceeds upload limit of " + (maxLen / 1024L) + " KB");
       }
     }
-    // if we have not seen a charset declaration, decode the buffer now using the default one (UTF-8 or given via Content-Type):
-    if (buffer != null && !buffer.isEmpty()) {
-      assert charsetDecoder == null;
-      decodeBuffer(buffer, map, getCharsetDecoder(charset));
-    }
+
     return len;
   }
 
@@ -417,17 +433,26 @@ public class SolrRequestParsers {
     }
   }
 
+  private static String decodeChars(ByteBuffer bytes, long position, CharsetDecoder charsetDecoder) {
+    try {
+      return charsetDecoder.decode(bytes).toString();
+    } catch (CharacterCodingException cce) {
+      throw new SolrException(ErrorCode.BAD_REQUEST,
+          "URLDecoder: Invalid character encoding detected after position " + position + " of query string / form data (while parsing as " + charsetDecoder.charset().name() + ")");
+    }
+  }
+
   private static void decodeBuffer(final LinkedList<Object> input, final Map<String,String[]> map, CharsetDecoder charsetDecoder) {
     for (final Iterator<Object> it = input.iterator(); it.hasNext(); ) {
-      final byte[] keyBytes = (byte[]) it.next();
+      final Object keyBytes = it.next();
       it.remove();
       final Long keyPos = (Long) it.next();
       it.remove();
-      final byte[] valueBytes = (byte[]) it.next();
+      final Object valueBytes = it.next();
       it.remove();
       final Long valuePos = (Long) it.next();
       it.remove();
-      MultiMapSolrParams.addParam(decodeChars(keyBytes, keyPos, charsetDecoder).trim(), decodeChars(valueBytes, valuePos, charsetDecoder), map);
+      MultiMapSolrParams.addParam(decodeChars((ByteBuffer) keyBytes, keyPos, charsetDecoder).trim(), decodeChars((ByteBuffer) valueBytes, valuePos, charsetDecoder), map);
     }
   }
 
@@ -564,7 +589,7 @@ public class SolrRequestParsers {
         throw new SolrException(ErrorCode.BAD_REQUEST, "Not multipart content! " + req.getContentType());
       }
       // Magic way to tell Jetty dynamically we want multi-part processing.  "Request" here is a Jetty class
-      req.setAttribute(Request.MULTIPART_CONFIG_ELEMENT, multipartConfigElement);
+      req.setAttribute(Request.__MULTIPART_CONFIG_ELEMENT, multipartConfigElement);
 
       MultiMapSolrParams params = SolrRequestParsers.getInstance().parseQueryString(req.getQueryString());
 
@@ -584,7 +609,7 @@ public class SolrRequestParsers {
 
     static boolean isMultipart(HttpServletRequest req) {
       // Jetty utilities
-      return MimeTypes.Type.MULTIPART_FORM_DATA.is(HttpFields.valueParameters(req.getContentType(), null));
+      return MimeTypes.Type.MULTIPART_FORM_DATA.is(req.getContentType());
     }
 
     /**
@@ -610,30 +635,12 @@ public class SolrRequestParsers {
   /**
    * Clean up any tmp files created by MultiPartInputStream.
    */
-  static void cleanupMultipartFiles(MultiParts multiParts) {
+  static void cleanupMultipartFiles(MultiPartFormInputStream multiParts) {
     // See Jetty MultiPartCleanerListener from which we drew inspiration
 
     log.debug("Deleting multipart files");
 
-    Collection<Part> parts;
-    try {
-      parts = multiParts.getParts();
-    } catch (IOException e) {
-      log.warn("Errors deleting multipart tmp files", e);
-      return;
-    }
-    try (ParWork work = new ParWork("", true)) {
-      for (Part part : parts) {
-        work.collect("", () -> {
-          try {
-            part.delete();
-          } catch (IOException e) {
-            log.warn("Errors deleting multipart tmp files", e);
-          }
-        });
-
-      }
-    }
+    multiParts.deleteParts();
   }
 
   /**
@@ -649,7 +656,7 @@ public class SolrRequestParsers {
     }
 
     public SolrParams parseParamsAndFillStreams(HttpServletRequest req, ArrayList<ContentStream> streams, InputStream in) throws Exception {
-      final Map<String,String[]> map = new HashMap<>();
+      final Map<String,String[]> map = new ConcurrentHashMap<>();
 
       // also add possible URL parameters and include into the map (parsed using UTF-8):
       final String qs = req.getQueryString();
@@ -668,11 +675,11 @@ public class SolrRequestParsers {
       // get query String from request body, using the charset given in content-type:
       final String cs = ContentStreamBase.getCharsetFromContentType(req.getContentType());
       final Charset charset = (cs == null) ? StandardCharsets.UTF_8 : Charset.forName(cs);
-      FastInputStream fin = null;
+      InputStream is = null;
       try {
-        fin = FastInputStream.wrap(in == null ? req.getInputStream() : in);
+        is = in == null ? req.getInputStream() : in;
 
-        final long bytesRead = SolrRequestParsers.getInstance().parseFormDataContent(fin, maxLength, charset, map, false);
+        final long bytesRead = SolrRequestParsers.getInstance().parseFormDataContent(is, maxLength, charset, map, false);
         if (bytesRead == 0L && totalLength > 0L) {
           throw new IncompatibleSolrException();
         }
@@ -680,14 +687,6 @@ public class SolrRequestParsers {
         throw new SolrException(ErrorCode.BAD_REQUEST, ioe);
       } catch (IllegalStateException ise) {
         throw (SolrException) new IncompatibleSolrException().initCause(ise);
-      } finally {
-        if (fin != null) {
-          while (true) {
-            final int read = fin.read();
-            if (read == -1) break;
-          }
-        }
-        //IOUtils.closeWhileHandlingException(fin);
       }
 
       return new MultiMapSolrParams(map);
@@ -764,10 +763,15 @@ public class SolrRequestParsers {
         String userAgent = req.getHeader("User-Agent");
         boolean isCurl = userAgent != null && userAgent.startsWith("curl/");
 
-        FastInputStream input = FastInputStream.wrap(req.getInputStream());
+        InputStream input;
+        if (isCurl) {
+          input = FastInputStream.wrap(req.getInputStream());
+        } else {
+          input = req.getInputStream();
+        }
 
         if (isCurl) {
-          SolrParams params = autodetect(req, streams, input);
+          SolrParams params = autodetect(req, streams, (FastInputStream) input);
           if (params != null) return params;
         }
 
@@ -827,7 +831,7 @@ public class SolrRequestParsers {
         }
         streams.add(new InputStreamContentStream(in, detectedContentType, size));
 
-        final Map<String,String[]> map = new HashMap<>();
+        final Map<String,String[]> map = new ConcurrentHashMap<>();
         // also add possible URL parameters and include into the map (parsed using UTF-8):
         final String qs = req.getQueryString();
         if (qs != null) {

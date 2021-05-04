@@ -16,27 +16,28 @@
  */
 package org.apache.solr.common.util;
 
-import java.io.Closeable;
 import java.io.DataInput;
 import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 
-/**
- * An abstract DataInput that extends InputStream
+/** Single threaded buffered InputStream
+ *  Internal Solr use only, subject to change.
  */
-public interface DataInputInputStream extends DataInput, Closeable {
+public class SolrInputStream extends DataInputStream implements DataInputInputStream, DataInput {
 
-  /**If possible, read UTF8 bytes directly from the underlying buffer
-   *
-   * @param utf8 the utf8 ubject to read into
-   * @param len length of the utf8 stream
-   * @return whether it is possible to do a direct read or not
-   */
-  public default boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len){return false;}
+  public SolrInputStream(InputStream in) {
+    super(in);
+  }
 
-  /**If possible, read ByteBuffer directly from the underlying buffer
-   * @param sz the size of the buffer to be read
-   */
-  public static ByteBuffer readDirectByteBuffer(int sz){return null;};
+  @Override
+  public boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len) {
+    return false;
+  }
+
+  public static SolrInputStream wrap(InputStream in) {
+    return (in instanceof SolrInputStream) ? (SolrInputStream)in : new SolrInputStream(in);
+  }
+
 }

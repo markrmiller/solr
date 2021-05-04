@@ -43,6 +43,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
@@ -297,6 +298,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
                 ParWork.propagateInterrupt(e);
                 log.error("Error consuming and closing http response stream.", e);
               }
+              //IOUtils.closeQuietly(rspBody);
               notifyQueueAndRunnersIfEmptyQueue();
             }
           }

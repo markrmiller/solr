@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.SysStats;
 import org.apache.solr.logging.LogWatcherConfig;
 import org.apache.solr.update.UpdateShardHandlerConfig;
 
@@ -281,7 +282,7 @@ public class NodeConfig {
     private LogWatcherConfig logWatcherConfig = new LogWatcherConfig(true, null, null, 50);
     private CloudConfig cloudConfig;
     private int coreLoadThreads = DEFAULT_CORE_LOAD_THREADS;
-    private int replayUpdatesThreads = Runtime.getRuntime().availableProcessors();
+    private int replayUpdatesThreads = Math.max(4, SysStats.PROC_COUNT / 2);
     @Deprecated
     //Remove in 7.0 and put it all in the transientCache element in solrconfig.xml
     private int transientCacheSize = DEFAULT_TRANSIENT_CACHE_SIZE;

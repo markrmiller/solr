@@ -766,7 +766,7 @@ public class SolrQueuedThreadPool extends ContainerLifeCycle implements ThreadFa
 
       setMinThreads(0);
       setIdleTimeout(1);
-      setStopTimeout(1);
+
       // Signal the Runner threads that we are stopping
       int threads = _counts.getAndSetHi(Integer.MIN_VALUE);
 

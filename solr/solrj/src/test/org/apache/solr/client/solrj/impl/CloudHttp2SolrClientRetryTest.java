@@ -77,7 +77,7 @@ public class CloudHttp2SolrClientRetryTest extends SolrCloudTestCase {
 
       TestInjection.failUpdateRequests = "true:100";
       try {
-        LuceneTestCase.expectThrows(BaseHttpSolrClient.RemoteSolrException.class,
+        LuceneTestCase.expectThrows(Exception.class,
             "Expected an exception on the client when failure is injected during updates", () -> {
               UpdateRequest req = new UpdateRequest();
               req.add(new SolrInputDocument("id", "2"));

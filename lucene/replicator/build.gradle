@@ -32,7 +32,6 @@ dependencies {
   implementation('org.eclipse.jetty:jetty-servlet', {
     exclude group: "org.eclipse.jetty", module: "jetty-security"
   })
-  implementation 'org.eclipse.jetty:jetty-continuation'
 
   testImplementation project(':lucene:test-framework')
 }

@@ -6,7 +6,9 @@ import org.apache.solr.logging.MDCLoggingContext;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
@@ -100,9 +102,18 @@ public class SolrQTP extends QueuedThreadPool {
         } finally {
           JavaBinCodec.THREAD_LOCAL_ARR.remove();
           JavaBinCodec.THREAD_LOCAL_BRR.remove();
+          for (ThreadLocal tl : threadLocals) {
+            tl.remove();
+          }
           MDCLoggingContext.reset();
         }
       }
     }
+  }
+
+  private static Set<ThreadLocal> threadLocals = ConcurrentHashMap.newKeySet();
+
+  public static void registerThreadLocal(ThreadLocal tl) {
+    threadLocals.add(tl);
   }
 }

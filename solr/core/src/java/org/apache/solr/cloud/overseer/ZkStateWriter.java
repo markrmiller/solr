@@ -734,6 +734,16 @@ public class ZkStateWriter {
 
       if (collection == null) {
         log.info("could not find id for collection id={} collections={}", collId, getCollections());
+        if (tryCnt < 5) {
+          ParWork.submitIO("writeStateRetry", () -> {
+            try {
+              Thread.sleep(500);
+            } catch (InterruptedException e) {
+
+            }
+            writeStateUpdatesInternal(Collections.singleton(collId), tryCnt + 1);
+          });
+        }
         continue;
       }
 

@@ -18,6 +18,7 @@ import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JsonSchemaValidator;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -46,6 +47,7 @@ import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.client.util.InputStreamContentProvider;
+import org.eclipse.jetty.client.util.InputStreamRequestContent;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
@@ -355,14 +357,6 @@ public abstract class SolrCall {
       QueryResponseWriter responseWriter, Method reqMethod)
       throws IOException {
     try {
-      // make sure request is fully read before
-      ServletInputStream is = req.getInputStream();
-      while (true) {
-        final int read = is.read();
-        if (read == -1) break;
-      }
-
-
       Map invalidStates = (Map) solrReq.getContext().get(BaseCloudSolrClient.STATE_VERSION);
       //This is the last item added to the response and the client would expect it that way.
       //If that assumption is changed , it would fail. This is done to avoid an O(n) scan on
@@ -801,8 +795,9 @@ public abstract class SolrCall {
       addProxyHeaders(req, proxyRequest);
 
       if (hasContent(req)) {
-        InputStreamContentProvider defferedContent = new InputStreamContentProvider(req.getInputStream(), 8192, false);
-        proxyRequest.content(defferedContent);
+        InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), req.getInputStream(), 8192);
+        //Response.AsyncContentListener content2 = new Response.AsyncContentListener();
+        proxyRequest.body(defferedContent);
       }
 
 
@@ -851,7 +846,7 @@ public abstract class SolrCall {
 
   protected static void copyRequestHeaders(@Nonnull HttpServletRequest clientRequest, Request proxyRequest) {
     // First clear possibly existing headers, as we are going to copy those from the client request.
-    proxyRequest.getHeaders().clear();
+    proxyRequest = proxyRequest.headers(httpFields -> httpFields.clear());
 
     Set<String> headersToRemove = findConnectionHeaders(clientRequest);
 

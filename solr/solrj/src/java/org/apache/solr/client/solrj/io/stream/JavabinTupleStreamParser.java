@@ -18,6 +18,8 @@
 package org.apache.solr.client.solrj.io.stream;
 
 
+import java.io.Closeable;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -32,7 +34,7 @@ import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JavaBinCodec;
 
 public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStreamParser {
-  final FastInputStream fis;
+  final DataInputInputStream fis;
   private int arraySize = Integer.MAX_VALUE;
   private boolean onlyJsonTypes = false;
   int objectSize;
@@ -183,7 +185,12 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
 
   @Override
   public void close() throws IOException {
-    while (fis.read() != -1) {}
-    IOUtils.closeQuietly(fis);
+    try {
+      while (fis.readInt() != -1) {
+      }
+    } catch (EOFException e) {
+      // okay
+    }
+    IOUtils.closeQuietly((Closeable) fis);
   }
 }

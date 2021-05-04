@@ -44,7 +44,6 @@ dependencies {
   api 'io.dropwizard.metrics:metrics-jvm'
   api 'io.dropwizard.metrics:metrics-jmx'
 
-  api 'org.eclipse.jetty:jetty-continuation'
   api 'org.eclipse.jetty:jetty-deploy'
   api 'org.eclipse.jetty:jetty-http'
   api 'org.eclipse.jetty:jetty-io'

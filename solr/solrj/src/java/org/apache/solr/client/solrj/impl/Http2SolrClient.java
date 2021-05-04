@@ -20,6 +20,7 @@ import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
 import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.ResponseParser;
@@ -64,6 +65,7 @@ import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.client.http.HttpClientTransportOverHTTP;
 import org.eclipse.jetty.client.util.BufferingResponseListener;
 import org.eclipse.jetty.client.util.ByteBufferContentProvider;
+import org.eclipse.jetty.client.util.ByteBufferRequestContent;
 import org.eclipse.jetty.client.util.BytesContentProvider;
 import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.client.util.InputStreamContentProvider;
@@ -78,10 +80,12 @@ import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http2.ErrorCode;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.HttpClientTransportOverHTTP2;
+import org.eclipse.jetty.io.ClientConnector;
 import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.util.Fields;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
+import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.slf4j.Logger;
@@ -233,7 +237,7 @@ public class Http2SolrClient extends SolrClient {
       sslContextFactory = builder.sslConfig.createClientContextFactory();
     }
     // MRM TODO: - look at config again as well
-    int minThreads = Integer.getInteger("solr.minHttp2ClientThreads", 12);
+    int minThreads = Integer.getInteger("solr.minHttp2ClientThreads", 6);
 
     minThreads = Math.min(builder.maxThreadPoolSize, minThreads);
 
@@ -255,9 +259,11 @@ public class Http2SolrClient extends SolrClient {
 
     if (builder.useHttp1_1) {
       if (log.isTraceEnabled()) log.trace("Create Http2SolrClient with HTTP/1.1 transport");
+      ClientConnector clientConnector = new ClientConnector();
+      clientConnector.setSslContextFactory(sslContextFactory);
 
-      SolrHttpClientTransportOverHTTP transport = new SolrHttpClientTransportOverHTTP(2);
-      httpClient = new SolrInternalHttpClient(transport, sslContextFactory);
+      SolrHttpClientTransportOverHTTP transport = new SolrHttpClientTransportOverHTTP(clientConnector);
+      httpClient = new SolrInternalHttpClient(transport);
     } else {
       if (log.isTraceEnabled()) log.trace("Create Http2SolrClient with HTTP/2 transport");
 //
@@ -270,34 +276,42 @@ public class Http2SolrClient extends SolrClient {
 //
 //            log.debug("create http2solrclient {}", this);
 //          }
-
-      HTTP2Client http2client = new HTTP2Client();
-      http2client.setSelectors(2);
+      HttpClientTransportOverHTTP2 transport;
+      HTTP2Client http2client;
+      if (sslContextFactory == null) {
+        http2client = new HTTP2Client();
+      } else {
+        ClientConnector clientConnector = new ClientConnector();
+        clientConnector.setSslContextFactory(sslContextFactory);
+        http2client = new HTTP2Client(clientConnector);
+      }
+      http2client.setSelectors(1);
       http2client.setMaxConcurrentPushedStreams(512);
-      http2client.setInputBufferSize(8192);
-
-      HttpClientTransportOverHTTP2 transport = new HttpClientTransportOverHTTP2(http2client);
+      http2client.setInputBufferSize(4096);
+      transport = new HttpClientTransportOverHTTP2(http2client);
       transport.setConnectionPoolFactory(new MyFactory(builder.maxConnectionsPerHost, builder.maxRequestsQueuedPerDestination));
-      httpClient = new SolrInternalHttpClient(transport, sslContextFactory);
+
+      httpClient = new SolrInternalHttpClient(transport);
     }
 
     try {
       httpClient.setScheduler(scheduler);
      // httpClient.manage(scheduler);
       httpClient.setExecutor(httpClientExecutor);
-      httpClient.manage(httpClientExecutor);
+     // httpClient.manage(httpClientExecutor);
+
       httpClient.setStrictEventOrdering(strictEventOrdering);
        httpClient.setSocketAddressResolver(new SocketAddressResolver.Sync());
       httpClient.setConnectBlocking(false);
       httpClient.setFollowRedirects(false);
       if (builder.maxConnectionsPerHost != null) httpClient.setMaxConnectionsPerDestination(builder.maxConnectionsPerHost);
       httpClient.setMaxRequestsQueuedPerDestination(builder.maxRequestsQueuedPerDestination);
-      httpClient.setRequestBufferSize(8192);
+      httpClient.setRequestBufferSize(4092);
       httpClient.setUserAgentField(new HttpField(HttpHeader.USER_AGENT, AGENT));
       httpClient.setIdleTimeout(builder.idleTimeout);
       httpClient.setConnectTimeout(5000);
       httpClient.setTCPNoDelay(true);
-      httpClient.setStopTimeout(0);
+      //httpClient.setStopTimeout(0);
      // httpClient.setRemoveIdleDestinations(true);
       httpClient.setAddressResolutionTimeout(3000);
       if (builder.connectionTimeout != null) httpClient.setConnectTimeout(builder.connectionTimeout);
@@ -335,11 +349,11 @@ public class Http2SolrClient extends SolrClient {
           log.error("Exception closing httpClient", e);
         }
 
-//        try {
-//          ((LifeCycle) httpClient.getExecutor()).stop();
-//        } catch (Exception e) {
-//          log.error("Exception closing httpClient scheduler", e);
-//        }
+        try {
+          ((LifeCycle) httpClient.getExecutor()).stop();
+        } catch (Exception e) {
+          log.error("Exception closing httpClient scheduler", e);
+        }
 
       }
       if (log.isTraceEnabled()) log.trace("Done closing {}", this.getClass().getSimpleName());
@@ -394,7 +408,7 @@ public class Http2SolrClient extends SolrClient {
       if (isXml) {
         write("</stream>".getBytes(FALLBACK_CHARSET));
       }
-      this.outProvider.getOutputStream().close();
+     // this.outProvider.getOutputStream().close();
     }
 
     //TODO this class should be hidden
@@ -429,7 +443,7 @@ public class Http2SolrClient extends SolrClient {
             + requestParams.toQueryString())
         .method(HttpMethod.POST)
         .header(HttpHeader.CONTENT_TYPE, contentType)
-        .content(provider).onRequestCommit(result -> provider.close());
+        .content(provider);
     headers.forEach(postRequest::header);
 
     decorateRequest(postRequest, updateRequest);
@@ -570,8 +584,7 @@ public class Http2SolrClient extends SolrClient {
         if (e != CANCELLED_EXCEPTION) {
           asyncListener.onFailure(e, -1);
         } else {
-          NamedList<Object> body = new NamedList<>();
-          asyncListener.onSuccess(body, ErrorCode.CANCEL_STREAM_ERROR.code);
+          asyncListener.onFailure(e, 0);
         }
       } finally {
         if (tracking) {
@@ -645,7 +658,7 @@ public class Http2SolrClient extends SolrClient {
        if (response.getStatus() == 200) {
          // no processor specified, return raw stream
          NamedList<Object> rsp = new NamedList<>(1);
-         rsp.add("stream", listener.getInputStream());
+         rsp.add("stream", new CloseShieldInputStream(listener.getInputStream()));
          return rsp;
        }
        throw new SolrServerException("Request failed with status " + response.getStatus());
@@ -810,7 +823,6 @@ public class Http2SolrClient extends SolrClient {
         }
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
-
         MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
         ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer);
 
@@ -818,10 +830,9 @@ public class Http2SolrClient extends SolrClient {
         ByteBuffer buffer = outStream.buffer().byteBuffer();
         buffer.position(outStream.offset());
         buffer.limit(outStream.position());
-        ByteBufferContentProvider bcp = new ByteBufferContentProvider(contentWriter.getContentType(), buffer);
-        //OutputStreamContentProvider provider = new OutputStreamContentProvider();
+        ByteBufferRequestContent bcp = new ByteBufferRequestContent(contentWriter.getContentType(), buffer);
 
-        return req.content(bcp);
+        return req.body(bcp);
       } else if (streams == null || isMultipart) {
         // send server list and request list as query string params
         ModifiableSolrParams queryParams = calculateQueryParams(this.queryParams, wparams);
@@ -838,7 +849,7 @@ public class Http2SolrClient extends SolrClient {
         ContentStream contentStream = streams.iterator().next();
         InputStreamContentProvider provider = new InputStreamContentProvider(contentStream.getStream());
 
-        Request req = httpClient.newRequest(url + wparams.toQueryString()).method(method).content(provider, contentStream.getContentType()).onRequestCommit(result -> provider.close());
+        Request req = httpClient.newRequest(url + wparams.toQueryString()).method(method).content(provider, contentStream.getContentType());
         for (Map.Entry<String,String> entry : headers.entrySet()) {
           req = req.header(entry.getKey(), entry.getValue());
         }
@@ -873,7 +884,7 @@ public class Http2SolrClient extends SolrClient {
           if (name == null) {
             name = "";
           }
-          HttpFields fields = new HttpFields();
+          HttpFields.Mutable fields = HttpFields.build(1);
           fields.add(HttpHeader.CONTENT_TYPE, contentType);
           content.addFilePart(name, contentStream.getName(), new InputStreamContentProvider(contentStream.getStream()), fields);
         }
@@ -908,175 +919,156 @@ public class Http2SolrClient extends SolrClient {
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   private NamedList<Object> processErrorsAndResponse(SolrRequest solrRequest, final ResponseParser processor, Response response, Throwable failure, InputStream is) {
-    try {
 
-      String remoteHost = solrRequest.getBasePath();
+    String remoteHost = solrRequest.getBasePath();
+    if (remoteHost == null) {
+      remoteHost = serverBaseUrl;
+    }
+
+    //      Throwable requestFailure = response.getRequestFailure();
+    //      if (requestFailure != null) {
+    //        throw new RemoteSolrException(remoteHost, 0, "Request failure: " + requestFailure.getMessage(), requestFailure);
+    //      }
+
+    if (response == null) {
+      throw new SolrException(SolrException.ErrorCode.UNKNOWN, "Unknown failure, no response");
+    }
+
+    boolean isV2Api = isV2ApiRequest(solrRequest);
+
+    ContentType contentType = getContentType(response);
+    String mimeType = null;
+    String encoding = null;
+    if (contentType != null) {
+      mimeType = contentType.getMimeType();
+      encoding = contentType.getCharset() != null ? contentType.getCharset().name() : null;
+    }
+
+    String procCt = processor.getContentType();
+    if (procCt != null && mimeType != null) {
+      String procMimeType = ContentType.parse(procCt).getMimeType().trim().toLowerCase(Locale.ROOT);
+
+      if (!procMimeType.equalsIgnoreCase(mimeType)) {
+        // unexpected mime type
+        String msg = "Expected mime type " + procMimeType + " but got " + mimeType + ".";
+        String exceptionEncoding = FALLBACK_CHARSET.name();
+        if (is != null) {
+          try {
+            msg = msg + " text=" + IOUtils.toString(is, exceptionEncoding);
+          } catch (Exception e) {
+            try {
+              throw new RemoteSolrException(remoteHost, response.getStatus(), "Could not parse response with encoding " + exceptionEncoding, e);
+            } catch (Exception e1) {
+              log.warn("", e1);
+            }
+          }
+        }
+        throw new RemoteSolrException(remoteHost, response.getStatus(), msg, null);
+      }
+    }
+
+    NamedList<Object> rsp;
+    int httpStatus = -1;
+
+    try {
+      httpStatus = response.getStatus();
+    } catch (Exception e) {
+      log.warn("", e);
+    }
+
+    if (httpStatus == 404) {
+
+      throw new RemoteSolrException(remoteHost, httpStatus, "not found: " + httpStatus + ", message:" + response.getReason(), failure);
+    }
+
+    if (is == null) {
+      throw new RemoteSolrException(remoteHost, response.getStatus(), "No content returned", failure);
+    }
+
+    try {
+      rsp = processor.processResponse(is, encoding);
+    } catch (Exception e) {
+      try {
+        //
+        if (response.getStatus() == 200) {
+          return new NamedList<>();
+        }
+
+        if (remoteHost == null) {
+          remoteHost = serverBaseUrl;
+        }
+        throw new RemoteSolrException(remoteHost, httpStatus, response.getReason(), failure);
+      } catch (Exception e1) {
+        log.warn("", e1);
+      }
+
+      if (remoteHost == null) {
+        remoteHost = serverBaseUrl;
+      }
+      throw new RemoteSolrException(remoteHost, 527, "Exception try to process response", e);
+    }
+
+    // log.error("rsp:{}", rsp);
+
+    Object error = rsp == null ? null : rsp.get("error");
+
+    Object err = rsp == null ? null : rsp.get("error");
+    if (error != null && (isV2Api || String.valueOf(getObjectByPath(err, true, errPath)).endsWith("ExceptionWithErrObject"))) {
+      throw RemoteExecutionException.create(remoteHost, rsp);
+    }
+
+    if (error instanceof NamedList && ((NamedList<?>) error).get("metadata") == null) {
+      throw RemoteExecutionException.create(remoteHost, rsp);
+    }
+
+    if (httpStatus != HttpStatus.SC_OK && !isV2Api) {
+      NamedList<String> metadata = null;
+      String reason = null;
+      try {
+        if (error != null) {
+          reason = (String) Utils.getObjectByPath(error, false, Collections.singletonList("msg"));
+          if (reason == null) {
+            reason = (String) Utils.getObjectByPath(error, false, Collections.singletonList("trace"));
+          }
+          Object metadataObj = Utils.getObjectByPath(error, false, Collections.singletonList("metadata"));
+          if (metadataObj instanceof NamedList) {
+            metadata = (NamedList<String>) metadataObj;
+          } else if (metadataObj instanceof List) {
+            // NamedList parsed as List convert to NamedList again
+            List<Object> list = (List<Object>) metadataObj;
+            final int size = list.size();
+            metadata = new NamedList<>(size / 2);
+            for (int i = 0; i < size; i += 2) {
+              metadata.add((String) list.get(i), (String) list.get(i + 1));
+            }
+          } else if (metadataObj instanceof Map) {
+            metadata = new NamedList((Map) metadataObj);
+          }
+          List details = (ArrayList) Utils.getObjectByPath(error, false, Collections.singletonList("details"));
+          if (details != null) {
+            reason = reason + " " + details;
+          }
+
+        }
+      } catch (Exception ex) {
+        log.warn("Exception parsing error response", ex);
+      }
+      if (reason == null) {
+        String msg = response.getReason() + "\n\n" + "request: " + response.getRequest().getMethod();
+        reason = URLDecoder.decode(msg, FALLBACK_CHARSET);
+      }
+      log.error("rsp {}", rsp);
+
       if (remoteHost == null) {
         remoteHost = serverBaseUrl;
       }
 
-
-
-//      Throwable requestFailure = response.getRequestFailure();
-//      if (requestFailure != null) {
-//        throw new RemoteSolrException(remoteHost, 0, "Request failure: " + requestFailure.getMessage(), requestFailure);
-//      }
-
-      if (response == null) {
-        throw new SolrException(SolrException.ErrorCode.UNKNOWN, "Unknown failure, no response");
-      }
-
-      boolean isV2Api = isV2ApiRequest(solrRequest);
-
-      ContentType contentType = getContentType(response);
-      String mimeType = null;
-      String encoding = null;
-      if (contentType != null) {
-        mimeType = contentType.getMimeType();
-        encoding = contentType.getCharset() != null ? contentType.getCharset().name() : null;
-      }
-
-      String procCt = processor.getContentType();
-      if (procCt != null && mimeType != null) {
-        String procMimeType = ContentType.parse(procCt).getMimeType().trim().toLowerCase(Locale.ROOT);
-
-        if (!procMimeType.equalsIgnoreCase(mimeType)) {
-          // unexpected mime type
-          String msg = "Expected mime type " + procMimeType + " but got " + mimeType + ".";
-          String exceptionEncoding = FALLBACK_CHARSET.name();
-          if (is != null) {
-            try {
-              msg = msg + " text=" + IOUtils.toString(is, exceptionEncoding);
-            } catch (Exception e) {
-              try {
-                throw new RemoteSolrException(remoteHost, response.getStatus(), "Could not parse response with encoding " + exceptionEncoding, e);
-              } catch (Exception e1) {
-                log.warn("", e1);
-              }
-            }
-          }
-          throw new RemoteSolrException(remoteHost, response.getStatus(), msg, null);
-        }
-      }
-
-      NamedList<Object> rsp;
-      int httpStatus = -1;
-
-      try {
-        httpStatus = response.getStatus();
-      } catch (Exception e) {
-        log.warn("", e);
-      }
-
-      if (httpStatus == 404) {
-
-        throw new RemoteSolrException(remoteHost, httpStatus, "not found: " + httpStatus + ", message:" + response.getReason(), failure);
-      }
-
-      if (is == null) {
-        throw new RemoteSolrException(remoteHost, response.getStatus(), "No content returned", failure);
-      }
-
-
-      try {
-        rsp = processor.processResponse(is, encoding);
-      } catch (Exception e) {
-        try {
-//
-//          if (httpStatus == 200) {
-//            return new NamedList<>();
-//          }
-
-          if (remoteHost == null) {
-            remoteHost = serverBaseUrl;
-          }
-          throw new RemoteSolrException(remoteHost, httpStatus, response.getReason(), failure);
-        } catch (Exception e1) {
-          log.warn("", e1);
-        }
-
-        if (remoteHost == null) {
-          remoteHost = serverBaseUrl;
-        }
-        throw new RemoteSolrException(remoteHost, 527, "Exception try to process response", e);
-      }
-
-      // log.error("rsp:{}", rsp);
-
-      Object error = rsp == null ? null : rsp.get("error");
-
-      Object err = rsp == null ? null : rsp.get("error");
-      if (error != null && (isV2Api || String.valueOf(getObjectByPath(err, true, errPath)).endsWith("ExceptionWithErrObject"))) {
-        throw RemoteExecutionException.create(remoteHost, rsp);
-      }
-
-      if (error instanceof NamedList && ((NamedList<?>) error).get("metadata") == null) {
-        throw RemoteExecutionException.create(remoteHost, rsp);
-      }
-
-      if (httpStatus != HttpStatus.SC_OK && !isV2Api) {
-        NamedList<String> metadata = null;
-        String reason = null;
-        try {
-          if (error != null) {
-            reason = (String) Utils.getObjectByPath(error, false, Collections.singletonList("msg"));
-            if (reason == null) {
-              reason = (String) Utils.getObjectByPath(error, false, Collections.singletonList("trace"));
-            }
-            Object metadataObj = Utils.getObjectByPath(error, false, Collections.singletonList("metadata"));
-            if (metadataObj instanceof NamedList) {
-              metadata = (NamedList<String>) metadataObj;
-            } else if (metadataObj instanceof List) {
-              // NamedList parsed as List convert to NamedList again
-              List<Object> list = (List<Object>) metadataObj;
-              final int size = list.size();
-              metadata = new NamedList<>(size / 2);
-              for (int i = 0; i < size; i += 2) {
-                metadata.add((String) list.get(i), (String) list.get(i + 1));
-              }
-            } else if (metadataObj instanceof Map) {
-              metadata = new NamedList((Map) metadataObj);
-            }
-            List details = (ArrayList) Utils.getObjectByPath(error, false, Collections.singletonList("details"));
-            if (details != null) {
-              reason = reason + " " + details;
-            }
-
-          }
-        } catch (Exception ex) {
-          log.warn("Exception parsing error response", ex);
-        }
-        if (reason == null) {
-          String msg = response.getReason() + "\n\n" + "request: " + response.getRequest().getMethod();
-          reason = URLDecoder.decode(msg, FALLBACK_CHARSET);
-        }
-        log.error("rsp {}", rsp);
-
-        if (remoteHost == null) {
-          remoteHost = serverBaseUrl;
-        }
-
-        RemoteSolrException rss = new RemoteSolrException(remoteHost, httpStatus, reason, failure);
-        if (metadata != null) rss.setMetadata(metadata);
-        throw rss;
-      }
-
-      return rsp;
-    } finally {
-      if (is != null) {
-        try {
-          while (true) {
-            final int read = is.read();
-            if (read == -1) break;
-          }
-        } catch (IOException e) {
-          // quietly
-          log.debug("IOException ensure stream is fully read", e);
-        }
-
-        org.apache.solr.common.util.IOUtils.closeQuietly(is);
-      }
+      RemoteSolrException rss = new RemoteSolrException(remoteHost, httpStatus, reason, failure);
+      if (metadata != null) rss.setMetadata(metadata);
+      throw rss;
     }
+
+    return rsp;
   }
 
   public void enableCloseLock() {
@@ -1149,7 +1141,7 @@ public class Http2SolrClient extends SolrClient {
 
   public static class Builder {
 
-    public static int DEFAULT_MAX_THREADS = Integer.getInteger("solr.maxHttp2ClientThreads", 32);
+    public static int DEFAULT_MAX_THREADS = Integer.getInteger("solr.maxHttp2ClientThreads", 16);
     private static final Integer DEFAULT_IDLE_TIME = Integer.getInteger("solr.http2solrclient.default.idletimeout", 120000);
     public int maxThreadPoolSize = DEFAULT_MAX_THREADS;
     public int maxRequestsQueuedPerDestination = 2048;
@@ -1318,24 +1310,31 @@ public class Http2SolrClient extends SolrClient {
     boolean sslCheckPeerName = checkPeerNameStr != null && !"false".equalsIgnoreCase(checkPeerNameStr);
 
     SslContextFactory.Client sslContextFactory = new SslContextFactory.Client(!sslCheckPeerName);
-
+    boolean sslset = false;
     if (null != System.getProperty("javax.net.ssl.keyStore")) {
+      sslset = true;
       sslContextFactory.setKeyStorePath
           (System.getProperty("javax.net.ssl.keyStore"));
     }
     if (null != System.getProperty("javax.net.ssl.keyStorePassword")) {
+      sslset = true;
       sslContextFactory.setKeyStorePassword
           (System.getProperty("javax.net.ssl.keyStorePassword"));
     }
     if (null != System.getProperty("javax.net.ssl.trustStore")) {
+      sslset = true;
       sslContextFactory.setTrustStorePath
           (System.getProperty("javax.net.ssl.trustStore"));
     }
     if (null != System.getProperty("javax.net.ssl.trustStorePassword")) {
+      sslset = true;
       sslContextFactory.setTrustStorePassword
           (System.getProperty("javax.net.ssl.trustStorePassword"));
     }
 
+    if (!sslset) {
+      return null;
+    }
     sslContextFactory.setEndpointIdentificationAlgorithm(System.getProperty("solr.jetty.ssl.verifyClientHostName", null));
 
     return sslContextFactory;
@@ -1472,6 +1471,10 @@ public class Http2SolrClient extends SolrClient {
       super(selectors);
     }
 
+    public SolrHttpClientTransportOverHTTP(ClientConnector connector) {
+      super(connector);
+    }
+
     public HttpClient getHttpClient() {
       return super.getHttpClient();
     }
@@ -1497,7 +1500,7 @@ public class Http2SolrClient extends SolrClient {
       try {
        // ParWork.submitIO("Http2SolrClientAsync", () -> {
           if (SolrException.getRootCause(failure) == CANCELLED_EXCEPTION) {
-            asyncListener.onFailure(failure, ErrorCode.CANCEL_STREAM_ERROR.code);
+            asyncListener.onFailure(failure, -1);
             return;
           }
 
@@ -1561,14 +1564,14 @@ public class Http2SolrClient extends SolrClient {
 
     @Override public void onComplete(Result res) {
 
-      log.info("on complete response={}", res);
+      log.debug("onComplete response={}", res);
       result.set(res.getResponse());
       latch.countDown();
     }
 
     @Override public void onSuccess(Response response) {
       super.onSuccess(response);
-      log.info("on onSuccess response={}", response);
+      log.debug("onSuccess response={}", response);
       result.set(response);
       latch.countDown();
     }

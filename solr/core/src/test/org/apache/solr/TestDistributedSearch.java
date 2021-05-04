@@ -193,6 +193,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     handle.clear();
     handle.put("timestamp", SKIPVAL);
     handle.put("_version_", SKIPVAL); // not a cloud test, but may use updateLog
+    handle.put("warnings", SKIP); // not a cloud test, but may use updateLog
 
     //Test common query parameters.
     validateCommonQueryParameters();

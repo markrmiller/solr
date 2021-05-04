@@ -290,7 +290,7 @@ public class JettySolrRunner implements Closeable {
     // the server as well as any client actions taken by this JVM in
     // talking to that server, but for the purposes of testing that should
     // be good enough
-    SslContextFactory sslContextFactory = SSLConfig.createContextFactory(config.sslConfig);
+    SslContextFactory.Server sslContextFactory = SSLConfig.createContextFactory(config.sslConfig);
 
     HttpConfiguration httpConfig = new HttpConfiguration();
     httpConfig.setRequestHeaderSize(16 << 10);
@@ -418,14 +418,11 @@ public class JettySolrRunner implements Closeable {
         root.addFilter(dispatchFilter, "*", EnumSet.of(DispatcherType.REQUEST));
       }
 
-
       root.addServlet(Servlet404.class, "/*");
 
       if (log.isDebugEnabled()) log.debug("Jetty loaded and ready to go");
 
-
-
-      server.addLifeCycleListener(new LifeCycle.Listener() {
+      server.addEventListener(new LifeCycle.Listener() {
 
         @Override
         public void lifeCycleStopping(LifeCycle arg0) {

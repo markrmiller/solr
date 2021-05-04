@@ -108,8 +108,6 @@ import org.apache.solr.util.configuration.SSLConfigurationsFactory;
 import org.apache.solr.util.tracing.GlobalTracer;
 import org.apache.zookeeper.KeeperException;
 import org.eclipse.jetty.server.HttpOutput;
-import org.eclipse.jetty.server.MultiParts;
-import org.eclipse.jetty.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -440,7 +438,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     Boolean passthrough = (Boolean) _request.getAttribute("PASSTHROUGH");
     if (passthrough != null && passthrough) {
-      chain.doFilter(_request, _response);
+      chain.doFilter(closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
       return;
     }
 
@@ -455,7 +453,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //            asyncContext.dispatch();
 //          } else {
             try {
-              chain.doFilter(_request, _response);
+              chain.doFilter(closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
             } catch (Exception e) {
               if (!_response.isCommitted()) {
                 sendException(e, null, (HttpServletRequest) _request,(HttpServletResponse) _response);
@@ -581,12 +579,12 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         if (span != null) span.finish();
         if (scope != null) scope.close();
         GlobalTracer.get().clearContext();
-        MultiParts multiParts = (MultiParts) servletRequest.getAttribute(Request.MULTIPARTS);
-        if (multiParts != null && multiParts.getContext() == servletRequest.getServletContext() && !multiParts.isEmpty()) {
-          ParWork.submitIO("multipartCleanup", () -> {
-            SolrRequestParsers.cleanupMultipartFiles(multiParts);
-          });
-        }
+//        MultiPartFormInputStream.MultiPart multiParts = (MultiPartFormInputStream.MultiPart) servletRequest.getAttribute(MultiPartFormInputStream.MultiPart);
+//        if (multiParts != null && multiParts.getContext() == servletRequest.getServletContext() && !multiParts.isEmpty()) {
+//          ParWork.submitIO("multipartCleanup", () -> {
+//            SolrRequestParsers.cleanupMultipartFiles(multiParts);
+//          });
+//        }
       } finally {
         if (result != Action.REMOTEQUERY && result != Action.PASSTHROUGH) {
           if (ASYNC && (!ASYNC_IO || exp != null)) {
@@ -866,10 +864,12 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       super(stream);
     }
 
+
+
     @Override
     public void close() {
       // don't allow close
-      log.error("close called on server inputstream", new UnsupportedOperationException());
+      log.debug("close called on server inputstream", new UnsupportedOperationException());
     }
   }
 
@@ -889,22 +889,22 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     @Override
     public void flushBuffer() {
       // no flush, commits response and messes up chunked encoding stuff
-      log.error("flush called", new UnsupportedOperationException());
+      log.debug("flush called", new UnsupportedOperationException());
     }
 
     @Override
     public void reset() {
       // no reset, commits response
-      log.error("reset called", new UnsupportedOperationException());
+      log.debug("reset called", new UnsupportedOperationException());
     }
 
     @Override
     public void sendError(int sc, String msg) throws IOException {
 
-      log.error("sendError called! {}:{}", sc, msg);
+      log.debug("sendError called! {}:{}", sc, msg);
 
-      response.setStatus(sc);
-      getWriter().write(msg);
+      //response.setStatus(sc);
+      //getWriter().write(msg);
     }
 
     @Override

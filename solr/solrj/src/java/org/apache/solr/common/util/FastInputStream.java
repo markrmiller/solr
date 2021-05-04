@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.util;
 
+import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -24,7 +25,7 @@ import java.io.InputStream;
 /** Single threaded buffered InputStream
  *  Internal Solr use only, subject to change.
  */
-public class FastInputStream extends DataInputInputStream {
+public class FastInputStream extends InputStream implements DataInputInputStream, DataInput {
 //  public final static ThreadLocal<byte[]> THREAD_LOCAL_BYTEARRAY= new ThreadLocal<>(){
 //    protected byte[] initialValue() {
 //      return new byte[8192];
@@ -48,8 +49,7 @@ public class FastInputStream extends DataInputInputStream {
     this.end = end;
   }
 
-  @Override
-  boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len) {
+  public boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len) {
     if (in != null || end < pos + len) return false;
     utf8.reset(buf, pos, len, null);
     pos = pos + len;

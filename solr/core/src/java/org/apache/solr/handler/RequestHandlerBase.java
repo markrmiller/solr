@@ -19,6 +19,8 @@ package org.apache.solr.handler;
 import java.io.Closeable;
 import java.lang.invoke.MethodHandles;
 import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Meter;
@@ -40,12 +42,14 @@ import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrInfoBean;
 import org.apache.solr.handler.admin.PrepRecoveryOp;
 import org.apache.solr.logging.MDCLoggingContext;
+import org.apache.solr.metrics.MetricsMap;
 import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.SolrPluginUtils;
+import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,10 +73,10 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
   private Meter numClientErrors = new Meter();
   private Meter numTimeouts = new Meter();
   private Counter requests = new Counter();
- // private final Map<String, Counter> shardPurposes = new ConcurrentHashMap<>();
+  private final Map<String, Counter> shardPurposes = new NonBlockingHashMap<>();
   private Timer requestTimes = new Timer();
-//  private Timer distribRequestTimes = new Timer();
-//  private Timer localRequestTimes = new Timer();
+  private Timer distribRequestTimes = new Timer();
+  private Timer localRequestTimes = new Timer();
   private Counter totalTime = new Counter();
   private Counter distribTotalTime = new Counter();
   private Counter localTotalTime = new Counter();
@@ -160,12 +164,12 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
     numTimeouts = solrMetricsContext.meter("timeouts", getCategory().toString(), scope);
     requests = solrMetricsContext.counter("requests", getCategory().toString(), scope);
     // MRM TODO:
-//    MetricsMap metricsMap = new MetricsMap((detail, map) ->
-//        shardPurposes.forEach((k, v) -> map.put(k, v.getCount())));
+    MetricsMap metricsMap = new MetricsMap((detail, map) ->
+                shardPurposes.forEach((k, v) -> map.put(k, v.getCount())));
     //solrMetricsContext.gauge(metricsMap, true, "shardRequests", getCategory().toString(), scope);
     requestTimes = solrMetricsContext.timer("requestTimes", getCategory().toString(), scope);
-//    distribRequestTimes = solrMetricsContext.timer("requestTimes", getCategory().toString(), scope, "distrib");
-//    localRequestTimes = solrMetricsContext.timer("requestTimes", getCategory().toString(), scope, "local");
+    distribRequestTimes = solrMetricsContext.timer("requestTimes", getCategory().toString(), scope, "distrib");
+    localRequestTimes = solrMetricsContext.timer("requestTimes", getCategory().toString(), scope, "local");
     totalTime = solrMetricsContext.counter("totalTime", getCategory().toString(), scope);
     distribTotalTime = solrMetricsContext.counter("totalTime", getCategory().toString(), scope, "distrib");
     localTotalTime = solrMetricsContext.counter("totalTime", getCategory().toString(), scope, "local");
@@ -208,7 +212,7 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
       }
       Timer.Context timer = requestTimes.time();
       //  @SuppressWarnings("resource")
-      //  Timer.Context dTimer = distrib ? distribRequestTimes.time() : localRequestTimes.time();
+      Timer.Context dTimer = distrib ? distribRequestTimes.time() : localRequestTimes.time();
       try {
         if (pluginInfo != null && pluginInfo.attributes.containsKey(USEPARAM)) req.getContext().put(USEPARAM, pluginInfo.attributes.get(USEPARAM));
         SolrPluginUtils.setDefaults(this, req, defaults, appends, invariants);
@@ -276,13 +280,13 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
           }
         }
       } finally {
-        //dTimer.stop();
+        dTimer.stop();
         long elapsed = timer.stop();
         totalTime.inc(elapsed);
         if (distrib) {
-          //distribTotalTime.inc(elapsed);
+          distribTotalTime.inc(elapsed);
         } else {
-          //localTotalTime.inc(elapsed);
+          localTotalTime.inc(elapsed);
         }
       }
     } finally {

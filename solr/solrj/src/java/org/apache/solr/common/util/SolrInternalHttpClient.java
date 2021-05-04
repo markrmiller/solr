@@ -37,8 +37,8 @@ public class SolrInternalHttpClient extends HttpClient {
 
   private final Map<Origin,HttpDestination> dests = new NonBlockingHashMap<>(128);
 
-  public SolrInternalHttpClient(HttpClientTransport transport, SslContextFactory sslContextFactory) {
-    super(transport, sslContextFactory);
+  public SolrInternalHttpClient(HttpClientTransport transport) {
+    super(transport);
     assert ObjectReleaseTracker.getInstance().track(this);
   }
 

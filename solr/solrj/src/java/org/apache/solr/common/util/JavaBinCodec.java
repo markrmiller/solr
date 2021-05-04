@@ -33,6 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.solr.common.util.ByteArrayUtf8CharSequence.convertCharSeq;
+
+import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -193,19 +196,30 @@ public class JavaBinCodec implements PushWriter {
     return readVal(dis);
   }
   public Object unmarshal(InputStream is) throws IOException {
-    FastInputStream dis = initRead(is);
+    DataInputInputStream dis = initRead(is);
     return readVal(dis);
   }
 
-  protected FastInputStream initRead(InputStream is) throws IOException {
+  protected DataInputInputStream initRead(InputStream is) throws IOException {
     assert !alreadyUnmarshalled;
-    FastInputStream dis = FastInputStream.wrap(is);
+    SolrInputStream dis = new SolrInputStream(is);
     return _init(dis);
   }
   protected FastInputStream initRead(byte[] buf) throws IOException {
     assert !alreadyUnmarshalled;
     FastInputStream dis = new FastInputStream(null, buf, 0, buf.length);
     return _init(dis);
+  }
+
+  protected DataInputInputStream _init(DataInputStream dis) throws IOException {
+    version = dis.readByte();
+    if (version != VERSION) {
+      throw new RuntimeException("Invalid version (expected " + VERSION +
+          ", but " + version + ") or the data in not in 'javabin' format");
+    }
+
+    alreadyUnmarshalled = true;
+    return new SolrInputStream(dis);
   }
 
   protected FastInputStream _init(FastInputStream dis) throws IOException {

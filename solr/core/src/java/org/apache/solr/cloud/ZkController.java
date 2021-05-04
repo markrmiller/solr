@@ -293,7 +293,7 @@ public class ZkController implements Closeable, Runnable {
         try {
           zkController.register(descriptor.getName(), descriptor, afterExpiration);
         } catch (AlreadyClosedException e) {
-          log.warn("Error registering core name={} afterExpireation={}", descriptor.getName(), afterExpiration, e);
+         // log.warn("Error registering core name={} afterExpireation={}", descriptor.getName(), afterExpiration, e);
         } catch (Exception e) {
           log.error("Error registering core name={} afterExpireation={}", descriptor.getName(), afterExpiration, e);
         }
