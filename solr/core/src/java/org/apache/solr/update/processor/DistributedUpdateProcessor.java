@@ -93,7 +93,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
   /**
    * Request forwarded to a leader of a different shard will be retried up to this amount of times by default
    */
-  static final int MAX_RETRIES_ON_FORWARD_DEAULT = Integer.getInteger("solr.retries.on.forward", 25);
+  static final int MAX_RETRIES_ON_FORWARD_DEAULT = Integer.getInteger("solr.retries.on.forward", 3);
   /**
    * Requests from leader to it's followers will be retried this amount of times by default
    */
@@ -110,7 +110,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
    *
    * @see DistributingUpdateProcessorFactory#DISTRIB_UPDATE_PARAM
    */
-  public static enum DistribPhase {
+  public enum DistribPhase {
     NONE, TOLEADER, FROMLEADER;
 
     public static DistribPhase parseParam(final String param) {

@@ -412,10 +412,12 @@ public class Http2SolrClient extends SolrClient {
     requestParams.set(CommonParams.VERSION, parser.getVersion());
 
     String basePath = baseUrl;
-    if (collection != null)
-      basePath += "/" + collection;
-    if (!(!basePath.isEmpty() && basePath.charAt(basePath.length() - 1) == '/'))
+
+    if (basePath != null && !(!basePath.isEmpty() && basePath.charAt(basePath.length() - 1) == '/'))
       basePath += "/";
+
+    if (collection != null && basePath != null && !basePath.isEmpty())
+      basePath += "/" + collection;
 
     OutputStreamContentProvider provider = new OutputStreamContentProvider();
     Request postRequest = httpClient
@@ -737,8 +739,11 @@ public class Http2SolrClient extends SolrClient {
     //TODO add invariantParams support
 
     String basePath = solrRequest.getBasePath() == null ? serverBaseUrl : solrRequest.getBasePath();
-    if (collection != null)
-      basePath += "/" + collection;
+    if (collection != null) {
+      if (solrRequest.getBasePath() == null) {
+        basePath += "/" + collection;
+      }
+    }
 
     if (solrRequest instanceof V2Request) {
       if (System.getProperty("solr.v2RealPath") == null) {

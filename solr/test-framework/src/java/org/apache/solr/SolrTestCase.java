@@ -159,7 +159,7 @@ public class SolrTestCase extends Assert {
 
   public static final boolean TEST_NIGHTLY = LuceneTestCase.TEST_NIGHTLY;
 
-  protected static TestRuleMarkFailure suiteFailureMarker;
+  protected static TestRuleMarkFailure suiteFailureMarker = new TestRuleMarkFailure();
 
   public static TestRuleThreadAndTestName threadAndTestNameRule;
 
@@ -170,8 +170,9 @@ public class SolrTestCase extends Assert {
 
   @ClassRule
   public static TestRule solrClassRules =
-      RuleChain.outerRule(new RevertDefaultThreadHandlerRule()).around(suiteFailureMarker = new TestRuleMarkFailure()).around(new SystemPropertiesRestoreRule())
-         .around(new NoClassHooksShadowingRule()).around(tempFilesCleanupRule = new TestRuleTemporaryFilesCleanup(suiteFailureMarker)).around(classEnvRule = new TestRuleSetupAndRestoreClassEnv());
+      RuleChain.outerRule(new RevertDefaultThreadHandlerRule()).around(new SystemPropertiesRestoreRule())
+         .around(new NoClassHooksShadowingRule()).around(tempFilesCleanupRule = new TestRuleTemporaryFilesCleanup(suiteFailureMarker)).
+          around(classEnvRule = new TestRuleSetupAndRestoreClassEnv()).around(suiteFailureMarker);
 //          .around(new StaticFieldsInvariantRule(STATIC_LEAK_THRESHOLD, true) {
 //    @Override
 //    protected boolean accept(java.lang.reflect.Field field) {

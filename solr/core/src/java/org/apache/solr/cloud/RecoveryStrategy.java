@@ -305,14 +305,11 @@ public class RecoveryStrategy implements Runnable, Closeable {
     ureq.setBasePath(leaderUrl);
     ureq.setParams(new ModifiableSolrParams());
     ureq.getParams().set(DistributedUpdateProcessor.COMMIT_END_POINT, "terminal");
-   // ureq.getParams().set("dist", false);
-    // ureq.getParams().set(UpdateParams.OPEN_SEARCHER, onlyLeaderIndexes);// Why do we need to open searcher if
-    // "onlyLeaderIndexes"?
-    ureq.getParams().set(UpdateParams.OPEN_SEARCHER, false);
+    ureq.getParams().set(UpdateParams.OPEN_SEARCHER, true); // opensearcher=true to ensure we have it for replicate
 
-    log.info("send commit to leader {} {}", leaderUrl, ureq.getParams());
+    log.debug("send commit to leader {} {}", leaderUrl, ureq.getParams());
     ureq.setAction(AbstractUpdateRequest.ACTION.COMMIT, false, false).process(recoveryOnlyClient);
-    log.info("done send commit to leader {}", leaderUrl);
+    log.debug("done send commit to leader {}", leaderUrl);
   }
 
   @Override
@@ -577,7 +574,6 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
     ulog = core.getUpdateHandler().getUpdateLog();
 
-
     // we temporary ignore peersync for tlog replicas
     if (firstTime) {
       firstTime = replicaType != Replica.Type.TLOG;
@@ -654,11 +650,11 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
     if (leaderElector != null && leaderElector.isLeader()) {
       log.warn("We are the leader, STOP recovery", new SolrException(ErrorCode.INVALID_STATE, "Leader in recovery"));
-//      ZkNodeProps zkNodes = ZkNodeProps
-//          .fromKeyVals(StatePublisher.OPERATION, OverseerAction.STATE.toLower(), ZkStateReader.CORE_NAME_PROP, core.getName(), "id",
-//              core.getCoreDescriptor().getCoreProperty("collId", null)+ "-" +  core.getCoreDescriptor().getCoreProperty("id", null),
-//              ZkStateReader.COLLECTION_PROP, core.getCoreDescriptor().getCollectionName(), ZkStateReader.STATE_PROP, Replica.State.LEADER);
-//      zkController.publish(zkNodes);
+      //      ZkNodeProps zkNodes = ZkNodeProps
+      //          .fromKeyVals(StatePublisher.OPERATION, OverseerAction.STATE.toLower(), ZkStateReader.CORE_NAME_PROP, core.getName(), "id",
+      //              core.getCoreDescriptor().getCoreProperty("collId", null)+ "-" +  core.getCoreDescriptor().getCoreProperty("id", null),
+      //              ZkStateReader.COLLECTION_PROP, core.getCoreDescriptor().getCollectionName(), ZkStateReader.STATE_PROP, Replica.State.LEADER);
+      //      zkController.publish(zkNodes);
       close = true;
       return false;
     }
@@ -693,9 +689,10 @@ public class RecoveryStrategy implements Runnable, Closeable {
               close = true;
               return false;
             }
-           // log.debug("Replaying updates buffered during PeerSync.");
-           // ulog.bufferUpdates();
-           // replay(core);
+            // log.debug("Replaying updates buffered during PeerSync.");
+            //ulog.bufferUpdates();
+            // exit buffering state
+            replay(core);
 
             // sync success
             successfulRecovery = true;
@@ -729,25 +726,25 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
           log.debug("Begin buffering updates. core=[{}]", coreName);
 
+          IndexFetcher.IndexFetchResult result = replicate(leader);
 
-            IndexFetcher.IndexFetchResult result = replicate(leader);
+          if (result.getSuccessful()) {
+            log.info("replication fetch reported as success");
 
-            if (result.getSuccessful()) {
-              log.info("replication fetch reported as success");
-            } else {
-              log.error("replication fetch reported as failed: {} {}", result.getMessage(), result, result.getException());
-              throw new SolrException(ErrorCode.SERVER_ERROR, "Replication fetch reported as failed");
-            }
+            replay(core);
+
+            log.info("Replication Recovery was successful.");
+            successfulRecovery = true;
+          } else {
+            log.error("replication fetch reported as failed: {} {}", result.getMessage(), result, result.getException());
+            successfulRecovery = false;
+          }
 
           if (isClosed() || core.isClosed() || core.getCoreContainer().isShutDown()) {
             log.info("Bailing on recovery due to close");
             close = true;
             return false;
           }
-            replay(core);
-
-            log.info("Replication Recovery was successful.");
-            successfulRecovery = true;
 
         } catch (InterruptedException | AlreadyClosedException | RejectedExecutionException e) {
           log.info("{} bailing on recovery", e.getClass().getSimpleName());
@@ -791,14 +788,11 @@ public class RecoveryStrategy implements Runnable, Closeable {
         log.info("Publishing as ACTIVE after successful recovery");
         zkController.publish(core.getCoreDescriptor(), Replica.State.ACTIVE);
         recoveryListener.recovered();
-        close = true;
-
         return true;
-
       } catch (AlreadyClosedException | RejectedExecutionException e) {
         log.error("Already closed");
-        successfulRecovery = false;
         close = true;
+        return false;
       } catch (Exception e) {
         log.error("Could not publish as ACTIVE after successful recovery", e);
         successfulRecovery = false;

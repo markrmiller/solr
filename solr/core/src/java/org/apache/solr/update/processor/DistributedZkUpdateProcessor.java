@@ -156,7 +156,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     Future<?> localCommitFuture = null;
 
     try {
-      leaderReplica = zkController.getZkStateReader().getLeaderRetry(collection, shardId, 3000);
+      leaderReplica = zkController.getZkStateReader().getLeaderRetry(collection, shardId, 500);
       isLeader = leaderReplica.getName().equals(desc.getName());
     } catch (Exception e) {
       isLeader = false;
@@ -192,28 +192,12 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       log.debug("processCommit - distrib commit isLeader={} commit_end_point={} replicaType={}", isLeader, req.getParams().get(COMMIT_END_POINT), replicaType);
     }
 
-    if (req.getParams().get(COMMIT_END_POINT, "").equals("leaders") && isLeader) {
+    if (req.getParams().get(COMMIT_END_POINT, "").equals("leaders")) {
 
       localCommitFuture = sendCommitToReplicasAndLocalCommit(cmd, leaderReplica == null ? null : leaderReplica.getName(), params);
     } else if (req.getParams().get(COMMIT_END_POINT) == null) {
       // zk
       List<SolrCmdDistributor.Node> useNodes = getCollectionUrls(collection, EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT));
-
-      if (isLeader) {
-        SolrCmdDistributor.Node removeNode = null;
-        for (SolrCmdDistributor.Node node : useNodes) {
-          if (node.getCoreName().equals(this.desc.getName())) {
-            removeNode = node;
-          }
-        }
-        if (removeNode != null) {
-          log.debug("remove leader node since we will do a local commit now {}", leaderReplica);
-          useNodes.remove(removeNode);
-        }
-
-        localCommitFuture = sendCommitToReplicasAndLocalCommit(cmd, leaderReplica != null ? leaderReplica.getName() : null, params);
-        if (log.isDebugEnabled()) log.debug("processCommit(CommitUpdateCommand) - end");
-      }
 
       params.set(DISTRIB_UPDATE_PARAM, DistribPhase.TOLEADER.toString());
       params.set(COMMIT_END_POINT, "leaders");
@@ -243,12 +227,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
   private Future<?> sendCommitToReplicasAndLocalCommit(CommitUpdateCommand cmd, String leaderName, ModifiableSolrParams params) throws IOException {
 
-    List<SolrCmdDistributor.Node> useNodes = getReplicaNodesForLeader(cloudDesc.getShardId(), leaderName);
-
+    List<SolrCmdDistributor.Node> useNodes = getReplicaNodesForForCommit(cloudDesc.getShardId(), leaderName);
 
     if (useNodes != null && useNodes.size() > 0) {
       if (log.isDebugEnabled()) log.debug("processCommit - Found the following replicas to send commit to {}", useNodes);
-
 
       params.set(DISTRIB_UPDATE_PARAM, DistribPhase.FROMLEADER.toString());
       params.set(COMMIT_END_POINT, "terminal");
@@ -257,16 +239,11 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       cmdDistrib.distribCommit(cmd, useNodes, new ModifiableSolrParams(params));
     }
 
-    if (leaderName != null) {
-
-      if (log.isDebugEnabled()) {
-        log.debug("processCommit - Do a local commit for leader");
-      }
-
-
-      doLocalCommit(cmd);
-
+    if (log.isDebugEnabled()) {
+      log.debug("processCommit - Do a local commit for leader");
     }
+
+    doLocalCommit(cmd);
 
     return CompletableFuture.completedFuture(null);
   }
@@ -841,7 +818,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
             log.debug("skip url:{} cause its term is less than leader", replica.getCoreUrl());
 
             skippedCoreNodeNames.add(replica.getName());
-          } else if (!zkController.getZkStateReader().getLiveNodes().contains(replica.getNodeName()) || (replica.getState() == Replica.State.DOWN)) {
+          } else if (!zkController.getZkStateReader().getLiveNodes().contains(replica.getNodeName()) || (replica.getState() == Replica.State.DOWN)
+              || (replica.getState() == Replica.State.RECOVERING || (replica.getState() == Replica.State.RECOVERY_FAILED))) {
             skippedCoreNodeNames.add(replica.getName());
           } else {
             nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId, maxRetriesToFollowers));
@@ -976,12 +954,48 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     if (replicas.isEmpty()) {
       return null;
     }
+
+    // check for test param that lets us miss replicas
+    String[] skipList = req.getParams().getParams(TEST_DISTRIB_SKIP_SERVERS);
+    Set<String> skipListSet = null;
+    if (skipList != null) {
+      skipListSet = new HashSet<>(skipList.length);
+      skipListSet.addAll(Arrays.asList(skipList));
+      log.info("test.distrib.skip.servers was found and contains:{}", skipListSet);
+    }
+
+    List<SolrCmdDistributor.Node> nodes = new ArrayList<>(replicas.size());
+    skippedCoreNodeNames = new HashSet<>();
+    ZkShardTerms zkShardTerms;
+    try {
+      zkShardTerms = zkController.getShardTerms(collection, shardId);
+    } catch (Exception e) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, e);
+    }
+    for (Replica replica : replicas) {
+      nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
+    }
+    return nodes;
+  }
+
+  protected List<SolrCmdDistributor.Node> getReplicaNodesForForCommit(String shardId, String leaderName) {
+    if (log.isDebugEnabled()) log.debug("leader is {}", leaderName);
+    List<Replica> replicas = clusterState.getCollection(collection).getSlice(shardId).getReplicas(EnumSet.of(Replica.Type.NRT, Replica.Type.TLOG));
+    if (leaderName != null) {
+      replicas.removeIf((replica) -> replica.getName().equals(leaderName));
+    }
+    if (replicas.isEmpty()) {
+      return null;
+    }
     assert zkController != null;
     if (nodes == null) {
       nodes = new ArrayList<>(replicas.size());
     }
     for (Replica replica : replicas) {
-      nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
+      if (zkController.zkStateReader.isNodeLive(replica.getNodeName()) &&
+          (replica.getState() == Replica.State.ACTIVE || replica.getState() == Replica.State.BUFFERING)) {
+        nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
+      }
     }
     return nodes;
   }

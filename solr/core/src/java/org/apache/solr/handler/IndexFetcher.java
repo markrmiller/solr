@@ -1681,8 +1681,8 @@ public class IndexFetcher {
       } finally {
         cleanup(null);
         //if cleanup succeeds . The file is downloaded fully
-        file.close();
         file.sync();
+        file.close();
       }
     }
 
