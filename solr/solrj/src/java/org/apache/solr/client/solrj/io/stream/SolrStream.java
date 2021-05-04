@@ -293,8 +293,13 @@ public class SolrStream extends TupleStream {
         return new JSONTupleStream(stream);
       }
     }catch (Exception e) {
-      if (stream != null) {
-        while (stream.read() != -1) {}
+      try {
+        if (stream != null) {
+          while (stream.read() != -1) {
+          }
+        }
+      } catch (IOException ioException) {
+
       }
       //IOUtils.closeQuietly(stream);
       throw new SolrException(SolrException.ErrorCode.UNKNOWN, "", e);

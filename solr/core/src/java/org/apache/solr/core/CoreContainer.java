@@ -1998,7 +1998,9 @@ public class CoreContainer implements Closeable {
     } finally {
       if (deleteInstanceDir && cd != null) {
         Path dir = cd.getInstanceDir();
-        IOUtils.deleteDirectory(dir);
+        while (Files.exists(dir)) {
+          IOUtils.deleteDirectory(dir);
+        }
       }
     }
   }

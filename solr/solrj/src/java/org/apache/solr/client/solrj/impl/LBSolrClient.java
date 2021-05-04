@@ -69,7 +69,7 @@ public abstract class LBSolrClient extends SolrClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // defaults
-  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503, 0, ErrorCode.CANCEL_STREAM_ERROR.code));
+  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503, 0, 527));
   private static final int CHECK_INTERVAL = 15 * 1000; //15 seconds between checks
   private static final int NONSTANDARD_PING_LIMIT = 10;  // number of times we'll ping dead servers not in the server list
   public static final ServerWrapper[] EMPTY_SERVER_WRAPPER = new ServerWrapper[0];
@@ -364,13 +364,13 @@ public abstract class LBSolrClient extends SolrClient {
   public Rsp request(Req req) throws SolrServerException, IOException {
     Rsp rsp = new Rsp();
     Exception ex = null;
-    boolean isNonRetryable = req.request instanceof IsUpdateRequest || ADMIN_PATHS.contains(req.request.getPath());
+
     ServerIterator serverIterator = new ServerIterator(req, zombieServers);
     String serverStr;
     while ((serverStr = serverIterator.nextOrError(ex)) != null) {
       try {
         MDC.put("LBSolrClient.url", serverStr);
-        ex = doRequest(serverStr, req, rsp, isNonRetryable, serverIterator.isServingZombieServer());
+        ex = doRequest(serverStr, req, rsp, false, serverIterator.isServingZombieServer());
         if (ex == null) {
           return rsp; // SUCCESS
         } else {

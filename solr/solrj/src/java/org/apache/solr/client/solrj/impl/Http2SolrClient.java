@@ -61,6 +61,7 @@ import org.eclipse.jetty.client.MultiplexConnectionPool;
 import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.ProtocolHandlers;
 import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Destination;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
@@ -247,7 +248,7 @@ public class Http2SolrClient extends SolrClient {
     //httpClientExecutor.setLowThreadsThreshold(-1);
     // section SolrQTP
     SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads);
-    httpClientExecutor.setStopTimeout(500);
+    httpClientExecutor.setStopTimeout(1);
         // SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads, new MPMCQueue.RunnableBlockingQueue());
 //    try {
 //      httpClientExecutor.start();
@@ -356,8 +357,6 @@ public class Http2SolrClient extends SolrClient {
         } catch (Exception e) {
           log.error("Exception closing httpClient", e);
         }
-
-
 
       }
       if (log.isTraceEnabled()) log.trace("Done closing {}", this.getClass().getSimpleName());
@@ -924,17 +923,28 @@ public class Http2SolrClient extends SolrClient {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private NamedList<Object> processErrorsAndResponse(Request req, SolrRequest solrRequest, final ResponseParser processor, Response response, Throwable failure, InputStream is) {
     if (failure instanceof ClosedChannelException) {
-      HttpClientTransport transport = httpClient.getTransport();
-      Origin origin = transport.newOrigin((HttpRequest)req);
-      HttpDestination dest = ((SolrInternalHttpClient)httpClient).getDestination(origin);
-      if (dest != null) {
-        ((SolrInternalHttpClient) httpClient).removeDestination(dest);
-        dest.close();
-       // httpClient.getTransport().getConnectionPoolFactory().newConnectionPool(dest);
-      }
-      req.abort(failure);
-      org.apache.solr.common.util.IOUtils.closeQuietly(is);
-      throw new RemoteSolrException(req.getHost() + " " + req.getPath(), response.getStatus(), "Connection has been closed", failure);
+     // HttpClientTransport transport = httpClient.getTransport();
+    //  Origin origin = transport.newOrigin((HttpRequest)req);
+
+
+      ((SolrInternalHttpClient) httpClient).getDestinationsMap().forEach((origin1, dest1) -> {
+        if (origin1.getAddress().equals(new Origin.Address(req.getHost(), req.getPort()))) {
+          dest1.close();
+        }
+
+      });
+
+
+//      HttpDestination dest = ((SolrInternalHttpClient)httpClient).getDestination(origin);
+//      if (dest != null) {
+//      //  ((SolrInternalHttpClient) httpClient).removeDestination(dest);
+//        dest.close();
+//       // httpClient.getTransport().getConnectionPoolFactory().newConnectionPool(dest);
+//      }
+     // req.abort(failure);
+     // dest.getConnectionPool().close();
+     // org.apache.solr.common.util.IOUtils.closeQuietly(is);
+      throw new RemoteSolrException(req.getHost() + " " + req.getPath(), 527, "Connection has been closed", failure);
     }
 
     String remoteHost = solrRequest.getBasePath();
@@ -1128,7 +1138,7 @@ public class Http2SolrClient extends SolrClient {
 
     @Override
     public InputStream getStream() {
-      return mysl.getInputStream();
+      return new CloseShieldInputStream(mysl.getInputStream());
     }
   }
 

@@ -195,7 +195,7 @@ public class IndexFetcher {
 
   private static final String INTERRUPT_RESPONSE_MESSAGE = "Interrupted while waiting for modify lock";
 
-  private final Map<String,Cancellable> fileFetchRequests = new NonBlockingHashMap<>();
+  private final Map<String,Cancellable> fileFetchRequests = new ConcurrentHashMap<>();
 
   public static class IndexFetchResult {
     private final String message;

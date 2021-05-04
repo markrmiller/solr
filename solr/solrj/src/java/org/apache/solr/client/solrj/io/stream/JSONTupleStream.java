@@ -92,7 +92,12 @@ public class JSONTupleStream implements TupleStreamParser {
   }
 
   public void close() throws IOException {
-    if (stream != null) while (stream.read() != -1) {}
+    try {
+      if (stream != null) while (stream.read() != -1) {
+      }
+    } catch (IOException ioException) {
+
+    }
     reader.close();
   }
 

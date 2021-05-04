@@ -1067,7 +1067,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
       ulog.applyBufferedUpdates();
       
       TimeOut timeout = new TimeOut(10, TimeUnit.SECONDS, TimeSource.NANO_TIME);
-      try ( SolrCore core = h.getCore()) {
+      try (SolrCore core = h.getCore()) {
         timeout.waitFor("Timeout waiting for finish replay updates", () -> core.getUpdateHandler().getUpdateLog().getState() == UpdateLog.State.ACTIVE);
       }
       
@@ -1087,7 +1087,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
       
       // Timeout for Q7 get replayed, because it was added on tlog, therefore it will be replayed on restart
       timeout = new TimeOut(10, TimeUnit.SECONDS, TimeSource.NANO_TIME);
-      try ( SolrCore core = h.getCore()) {
+      try (SolrCore core = h.getCore()) {
         timeout.waitFor("Timeout waiting for finish replay updates", () -> core.getUpdateHandler().getUpdateLog().getState() == UpdateLog.State.ACTIVE);
       }
       

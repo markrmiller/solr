@@ -21,7 +21,6 @@ import org.eclipse.jetty.client.HttpClientTransport;
 import org.eclipse.jetty.client.HttpDestination;
 import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.api.Destination;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +29,6 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class SolrInternalHttpClient extends HttpClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -53,6 +51,10 @@ public class SolrInternalHttpClient extends HttpClient {
 
   public HttpDestination getDestination(Origin origin) {
     return dests.get(origin);
+  }
+
+  public Map<Origin,HttpDestination> getDestinationsMap() {
+    return dests;
   }
 
 
