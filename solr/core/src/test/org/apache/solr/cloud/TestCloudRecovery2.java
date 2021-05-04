@@ -49,8 +49,6 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
     useFactory(null);
     System.setProperty("solr.ulog.numRecordsToKeep", "1000");
 
-
-
     configureCluster(3)
         .addConfig("config", SolrTestUtil.TEST_PATH().resolve("configsets").resolve("cloud-minimal").resolve("conf"))
         .configure();

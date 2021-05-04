@@ -32,6 +32,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.concurrent.TimeUnit;
+
 @LuceneTestCase.Nightly // MRM TODO: speed up
 public class SchemaApiFailureTest extends SolrCloudTestCase {
 
@@ -44,6 +46,7 @@ public class SchemaApiFailureTest extends SolrCloudTestCase {
     CollectionAdminRequest.createCollection(COLLECTION, 2, 1) // _default configset
         .setMaxShardsPerNode(2)
         .process(cluster.getSolrClient());
+    cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 1);
   }
 
   @AfterClass
