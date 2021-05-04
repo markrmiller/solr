@@ -40,6 +40,7 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricRegistry;
+import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
@@ -1136,6 +1137,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
   // make sure that log isn't needlessly replayed after a clean close
   @Test
   public void testCleanShutdown() throws Exception {
+    LuceneTestCase.assumeFalse("This test is behaving oddly on my macbook vs linux in a variety of envs", Constants.MAC_OS_X == true);
     TestInjection.skipIndexWriterCommitOnClose = false;
     final Semaphore logReplay = new Semaphore(0);
     final Semaphore logReplayFinish = new Semaphore(0);

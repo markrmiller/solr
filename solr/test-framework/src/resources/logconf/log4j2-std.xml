@@ -24,15 +24,15 @@
         </Console>
 
         <Console name="STDERR" target="SYSTEM_ERR" immediateFlush="false">
-            <PatternLayout pattern="%maxLen{%-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %m%notEmpty{
+            <PatternLayout pattern="%maxLen{%-4r %-5p (%t) [%X{node_name} %X{core} %X{trace_id}] %m%notEmpty{
         =>%ex{short}}}{10240}%n"/>
         </Console>
 
-        <File name="FILE_COLOR" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
+        <File name="FILE2" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
             <PatternLayout pattern="%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%maxLen{%t}{8})}{yellow,bold} [%style{%X{node_name} %X{core}}{cyan}] %style{%c}{cyan} %highlight{%m %notEmpty{%ex}}\n"/>
         </File>
         <File name="FILE" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
-            <PatternLayout pattern="%maxLen{%-4r %-5p (%t) [%X{node_name} %X{collection} %X{shard} %X{replica} %X{core} %X{trace_id}] %m%notEmpty{
+            <PatternLayout pattern="%maxLen{%-4r %-5p (%t) [%X{node_name} %X{core} %X{trace_id}] %m%notEmpty{
         =>%ex{short}}}{10240}%n"/>
         </File>
 
@@ -61,6 +61,7 @@
 
         <AsyncRoot level="INFO">
             <AppenderRef ref="FILE"/>
+            <AppenderRef ref="STDERR"/>
          </AsyncRoot>
      </Loggers>
  </Configuration>

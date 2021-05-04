@@ -116,7 +116,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
   }
 
   @Override
-  public synchronized String[] listAll() throws IOException {
+  public String[] listAll() throws IOException {
     String[] cFiles = cacheDirectory.listAll();
     String[] inFiles = in.listAll();
 
@@ -141,10 +141,10 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
   }
 
   @Override
-  public synchronized long fileLength(String name) throws IOException {
-    if (cacheDirectory.fileExists(name)) {
+  public long fileLength(String name) throws IOException {
+    try {
       return cacheDirectory.fileLength(name);
-    } else {
+    } catch (NoSuchFileException e) {
       return in.fileLength(name);
     }
   }
@@ -181,14 +181,14 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
       unCache(fileName);
     }
 
-    // MRM TODO: we should prob link this setting to tlog sync
+    // MRM TODO: we should prob link this setting to tlog sync? And replication?
     // with replicas, doesn't make a lot of sense to use, but without replicas
     // or in certain cases, you would want to enable both - otherwise the cost
     // is very high and a replica that goes out, by the time it comes back is generally
     // going to just be recovering from the new leader
-  //  if (Boolean.getBoolean("solr.nrtDirSync")) {
+    if (Boolean.getBoolean("solr.nrtDirSync")) {
       in.sync(fileNames);
-  //  }
+    }
   }
 
   @Override
@@ -224,7 +224,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
     // it for defensive reasons... or in case the app is
     // doing something custom (creating outputs directly w/o
     // using IndexWriter):
-    //if (Boolean.getBoolean("solr.nrtDirSync")) { // MRM TODO: - we rollback instead of close on IW, and this behavior is unwanted
+    //if (Boolean.getBoolean("solr.nrtDirSync")) { // MRM TODO:
       IOUtils.close(() -> {
         if (!closed.getAndSet(true)) {
           for (String fileName : cacheDirectory.listAll()) {

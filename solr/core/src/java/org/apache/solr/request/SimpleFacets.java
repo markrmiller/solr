@@ -179,7 +179,7 @@ public class SimpleFacets {
     String facetValue = param;
     String key = param;
     List<String> tags = Collections.emptyList();
-    int threads = 3;
+    int threads = 4;
 
     if (localParams == null) {
       SolrParams params = global;

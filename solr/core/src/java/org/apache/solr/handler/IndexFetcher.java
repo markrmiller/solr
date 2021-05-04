@@ -47,6 +47,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.common.util.SysStats;
 import org.apache.solr.core.CloseHook;
@@ -124,6 +125,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -170,6 +173,8 @@ public class IndexFetcher {
   private volatile DirectoryFileFetcher dirFileFetcher;
 
   private volatile LocalFsFileFetcher localFileFetcher;
+
+  private volatile ExecutorService fsyncService;
 
   private volatile boolean stop = false;
   private volatile boolean abort = false;
@@ -513,7 +518,8 @@ public class IndexFetcher {
       if (log.isDebugEnabled()) {
         log.debug("Number of files in latest index in master: {}", filesToDownload.size());
       }
-
+      // Create the sync service
+      fsyncService = Executors.newSingleThreadScheduledExecutor(new SolrNamedThreadFactory("fsyncService"));
       // use a synchronized list because the list is read by other threads (to show details)
       filesDownloaded = Collections.synchronizedList(new ArrayList<Map<String, Object>>());
       // if the generation of master is older than that of the slave , it means they are not compatible to be copied
@@ -628,6 +634,7 @@ public class IndexFetcher {
                                      // conf files.
             }
           } else if (!downloadFailed) {
+            terminateAndWaitFsyncService();
             if (isFullCopyNeeded) {
               successfulInstall = solrCore.modifyIndexProps(tmpIdxDirName);
               if (!successfulInstall) {
@@ -702,6 +709,7 @@ public class IndexFetcher {
               reloadCore);
           successfulInstall = fetchLatestIndex(true, reloadCore).getSuccessful();
         }
+        markReplicationStop();
         return successfulInstall ? IndexFetchResult.INDEX_FETCH_SUCCESS : IndexFetchResult.INDEX_FETCH_FAILURE;
       } catch (ReplicationHandlerException e) {
         log.error("User aborted Replication");
@@ -748,7 +756,9 @@ public class IndexFetcher {
       filesToDownload = null;
       dirFileFetcher = null;
       localFileFetcher = null;
-
+      if (fsyncService != null && !fsyncService.isShutdown()) fsyncService.shutdown();
+      fsyncService = null;
+      fsyncException = null;
       try {
         if (tmpIndexDir != null && deleteTmpIdxDir) {
           core.getDirectoryFactory().remove(tmpIndexDir);
@@ -780,6 +790,19 @@ public class IndexFetcher {
   }
 
   private volatile Exception fsyncException;
+
+  /**
+   * terminate the fsync service and wait for all the tasks to complete. If it is already terminated
+   */
+  private void terminateAndWaitFsyncService() throws Exception {
+    if (fsyncService.isTerminated()) return;
+    fsyncService.shutdown();
+     // give a long wait say 1 hr
+    fsyncService.awaitTermination(3600, TimeUnit.SECONDS);
+    // if any fsync failed, throw that exception back
+    Exception fsyncExceptionCopy = fsyncException;
+    if (fsyncExceptionCopy != null) throw fsyncExceptionCopy;
+  }
 
   /**
    * Helper method to record the last replication's details so that we can show them on the statistics page across
@@ -843,7 +866,6 @@ public class IndexFetcher {
           dir.sync(Collections.singleton(tmpFileName));
         } finally {
           IOUtils.closeQuietly(outFile);
-          IOUtils.closeQuietly(out);
         }
       }
       
@@ -906,7 +928,6 @@ public class IndexFetcher {
     RefCounted<SolrIndexSearcher> searcher = null;
     IndexCommit commitPoint;
     // must get the latest solrCore object because the one we have might be closed because of a reload
-    // todo stop keeping solrCore around
     try (SolrCore core = solrCore.getCoreContainer().getCore(solrCore.getName())) {
 // testing
 //      @SuppressWarnings({"rawtypes"}) SolrQueryRequest req = new LocalSolrQueryRequest(core, new ModifiableSolrParams());
@@ -1096,7 +1117,7 @@ public class IndexFetcher {
         }
       }
     } finally {
-      solrClient.waitForOutstandingRequests(1, TimeUnit.HOURS); // TODO:
+      solrClient.waitForOutstandingRequests(10, TimeUnit.HOURS); // TODO:
       fileFetchRequests.clear();
     }
     log.info("Bytes downloaded: {}, Bytes skipped downloading: {}", bytesDownloaded, bytesSkippedCopying);
@@ -1312,6 +1333,7 @@ public class IndexFetcher {
       success = true;
     } catch (IOException e) {
       SolrException.log(log, "Could not move file", e);
+      return false;
     }
     return success;
   }
@@ -1408,43 +1430,6 @@ public class IndexFetcher {
     }
   }
 
-  /**
-   * The tlog files are moved from the tmp dir to the tlog dir as an atomic filesystem operation.
-   * A backup of the old directory is maintained. If the directory move fails, it will try to revert back the original
-   * tlog directory.
-   */
-  private boolean copyTmpTlogFiles2Tlog(File tmpTlogDir) {
-    Path tlogDir = FileSystems.getDefault().getPath(solrCore.getUpdateHandler().getUpdateLog().getLogDir());
-    Path backupTlogDir = FileSystems.getDefault().getPath(tlogDir.getParent().toAbsolutePath().toString(), tmpTlogDir.getName());
-
-    try {
-      Files.move(tlogDir, backupTlogDir, StandardCopyOption.ATOMIC_MOVE);
-    } catch (IOException e) {
-      SolrException.log(log, "Unable to rename: " + tlogDir + " to: " + backupTlogDir, e);
-      return false;
-    }
-
-    Path src = FileSystems.getDefault().getPath(backupTlogDir.toAbsolutePath().toString(), tmpTlogDir.getName());
-    try {
-      Files.move(src, tlogDir, StandardCopyOption.ATOMIC_MOVE);
-    } catch (IOException e) {
-      SolrException.log(log, "Unable to rename: " + src + " to: " + tlogDir, e);
-
-      // In case of error, try to revert back the original tlog directory
-      try {
-        Files.move(backupTlogDir, tlogDir, StandardCopyOption.ATOMIC_MOVE);
-      } catch (IOException e2) {
-        // bad, we were not able to revert back the original tlog directory
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-            "Unable to rename: " + backupTlogDir + " to: " + tlogDir);
-      }
-
-      return false;
-    }
-
-    return true;
-  }
-
   private static String getDateAsStr(Date d) {
     return new SimpleDateFormat(SnapShooter.DATE_FMT, Locale.ROOT).format(d);
   }
@@ -1484,22 +1469,6 @@ public class IndexFetcher {
       }
     }
     return nameVsFile.isEmpty() ? Collections.EMPTY_LIST : nameVsFile.values();
-  }
-
-  /**
-   * This simulates File.delete exception-wise, since this class has some strange behavior with it.
-   * The only difference is it returns null on success, throws SecurityException on SecurityException,
-   * otherwise returns Throwable preventing deletion (instead of false), for additional information.
-   */
-  static Throwable delete(File file) {
-    try {
-      Files.delete(file.toPath());
-      return null;
-    } catch (SecurityException e) {
-      throw e;
-    } catch (Throwable other) {
-      return other;
-    }
   }
 
   static boolean delTree(File dir) {
@@ -1604,7 +1573,7 @@ public class IndexFetcher {
    */
   private class FileFetcher {
     private final FileInterface file;
-    protected boolean includeChecksum = false;
+    protected boolean includeChecksum = false; // we dont need adler, we have built in index checksums
     private final String fileName;
     private final String saveAs;
     private final String solrParamOutput;
@@ -1681,8 +1650,14 @@ public class IndexFetcher {
       } finally {
         cleanup(null);
         //if cleanup succeeds . The file is downloaded fully
-        file.sync();
-        file.close();
+        fsyncService.submit(() -> {
+          try {
+            file.sync();
+            file.close();
+          } catch (Exception e) {
+            fsyncException = e;
+          }
+        });
       }
     }
 
@@ -1729,7 +1704,7 @@ public class IndexFetcher {
           file.write(buf, packetSize);
 
           bytesDownloaded += packetSize;
-          log.info("Fetched and wrote {} bytes of file={} from replica={}", bytesDownloaded, fileName, masterUrl);
+          log.debug("Fetched and wrote {} bytes of file={} from replica={}", bytesDownloaded, fileName, masterUrl);
           //errorCount is always set to zero after a successful packet
           errorCount = 0;
           if (bytesDownloaded >= size) {
@@ -1759,24 +1734,6 @@ public class IndexFetcher {
     }
 
       /**
-       * The webcontainer flushes the data only after it fills the buffer size. So, all data has to be read as readFully()
-       * other wise it fails. So read everything as bytes and then extract an integer out of it
-       */
-      private int readInt ( byte[] b){
-        return (((b[0] & 0xff) << 24) | ((b[1] & 0xff) << 16) | ((b[2] & 0xff) << 8) | (b[3] & 0xff));
-
-      }
-
-      /**
-       * Same as above but to read longs from a byte array
-       */
-      private long readLong ( byte[] b){
-        return (((long) (b[0] & 0xff)) << 56) | (((long) (b[1] & 0xff)) << 48) | (((long) (b[2] & 0xff)) << 40) | (((long) (b[3] & 0xff)) << 32) | (
-            ((long) (b[4] & 0xff)) << 24) | ((b[5] & 0xff) << 16) | ((b[6] & 0xff) << 8) | ((b[7] & 0xff));
-
-      }
-
-      /**
        * cleanup everything
        * @param ex exception if failed
        */
@@ -1796,12 +1753,14 @@ public class IndexFetcher {
             log.error("Error deleting file: {}", this.saveAs, e);
           }
           //if the failure is due to a user abort it is returned normally else an exception is thrown
-          SolrException exp = new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-              "Unable to download " + fileName + " completely. Downloaded " + bytesDownloaded + "!=" + size);
-          if (ex != null) {
-            ex.addSuppressed(exp);
-          } else {
-            throw exp;
+          if (!(abort || stop)) {
+            SolrException exp = new SolrException(SolrException.ErrorCode.SERVER_ERROR,
+                "Unable to download " + fileName + " completely. Downloaded " + bytesDownloaded + "!=" + size);
+            if (ex != null) {
+              ex.addSuppressed(exp);
+            } else {
+              throw exp;
+            }
           }
         }
       }
