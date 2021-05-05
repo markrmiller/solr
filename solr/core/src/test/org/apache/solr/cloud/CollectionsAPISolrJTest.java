@@ -128,12 +128,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
       horridGc.stopHorridGC();
       horridGc.waitForThreads(15000);
     }
-  }
-
-
-  @After
-  public void afterTest() throws Exception {
-
+    shutdownCluster();
   }
 
   /**
