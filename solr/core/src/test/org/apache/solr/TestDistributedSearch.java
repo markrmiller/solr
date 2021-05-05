@@ -407,7 +407,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     query("q", "toyata", "fl", "id,lowerfilt", "spellcheck", true, "spellcheck.q", "toyata", "qt", "/spellCheckCompRH_Direct", "shards.qt", "/spellCheckCompRH_Direct");
 
     stress=0;  // turn off stress... we want to tex max combos in min time
-    for (int i=0; i<(TEST_NIGHTLY ? 25 : 5)*LuceneTestCase.RANDOM_MULTIPLIER; i++) {
+    for (int i=0; i<(TEST_NIGHTLY ? 12 : 5)*LuceneTestCase.RANDOM_MULTIPLIER; i++) {
       String f = fieldNames[random().nextInt(fieldNames.length)];
       if (random().nextBoolean()) f = t1;  // the text field is a really interesting one to facet on (and it's multi-valued too)
 

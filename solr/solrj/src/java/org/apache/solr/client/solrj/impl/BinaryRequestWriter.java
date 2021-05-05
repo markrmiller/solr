@@ -71,6 +71,7 @@ public class BinaryRequestWriter extends RequestWriter {
     if (request instanceof UpdateRequest) {
       UpdateRequest updateRequest = (UpdateRequest) request;
       new JavaBinUpdateRequestCodec().marshal(updateRequest, os);
+      os.flush();
     }
   }
   

@@ -42,7 +42,6 @@ public class TranLogOutputStream extends OutputStream implements DataOutput {
     this.pos = start;
   }
 
-
   public static FastOutputStream wrap(OutputStream sink) {
     return (sink instanceof FastOutputStream) ? (FastOutputStream)sink : new FastOutputStream(sink);
   }

@@ -76,7 +76,7 @@ public class OverseerModifyCollectionTest extends SolrCloudTestCase {
       cluster.getSolrClient().request(new GenericSolrRequest(POST, COLLECTIONS_HANDLER_PATH, p2));
     });
 
-    assertTrue(e.getMessage(), e.getMessage().contains("Can not find the specified config set"));
+    assertTrue(e.toString(), e.getMessage().contains("Can not find the specified config set"));
 
   }
   

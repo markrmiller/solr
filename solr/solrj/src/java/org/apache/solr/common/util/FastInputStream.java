@@ -252,8 +252,8 @@ public class FastInputStream extends InputStream implements DataInputInputStream
             | (((long)readUnsignedByte()) << 40)
             | (((long)readUnsignedByte()) << 32)
             | (((long)readUnsignedByte()) << 24)
-            | ((long) readUnsignedByte() << 16)
-            | ((long) readUnsignedByte() << 8)
+            | (readUnsignedByte() << 16)
+            | (readUnsignedByte() << 8)
             | (readUnsignedByte());
   }
 

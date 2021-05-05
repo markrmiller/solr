@@ -251,7 +251,7 @@ public class JettySolrRunner implements Closeable {
 
     //qtp = new SolrQueuedThreadPool("JettySolrRunner qtp");
     //qtp = new QueuedThreadPool(Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 200), 24);
-    QueuedThreadPool qtp = new SolrQTP("jetty", Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 18), 12);
+    QueuedThreadPool qtp = new SolrQTP("jetty", Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 36), 12);
 
     //qtp = new SolrQTP("jetty", Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 60), 8, new MPMCQueue.RunnableBlockingQueue());
     //ParWork.getQueue())
@@ -273,7 +273,7 @@ public class JettySolrRunner implements Closeable {
 //        "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
 //        "org.eclipse.jetty.annotations.AnnotationConfiguration");
     server.setStopAtShutdown(true);
-    server.setStopTimeout(1000); // will wait gracefully for stoptime / 2, then interrupts
+    server.setStopTimeout(500); // will wait gracefully for stoptime / 2, then interrupts
 
 
 
@@ -359,9 +359,9 @@ public class JettySolrRunner implements Closeable {
 
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, ParWork.getRootSharedIOExecutor(), null, null, 1, 1, httpFactory, h2);
+        connector = new ServerConnector(server, null, null, null, 1, 1, httpFactory, h2);
       } else {
-        connector = new ServerConnector(server, ParWork.getRootSharedIOExecutor(), null, null, 1, 1, ssl, alpn, httpFactory, h2);
+        connector = new ServerConnector(server, null, null, null, 1, 1, ssl, alpn, httpFactory, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());
       }
 

@@ -167,7 +167,7 @@ public class RecoveryZkTest extends SolrCloudTestCase {
         assertShardConsistency(state.getSlice("s1"), true);
         break;
 
-      } catch (AssertionError error) {
+      } catch (Exception | AssertionError error) {
         if (cnt++ > 10) {
           throw error;
         }

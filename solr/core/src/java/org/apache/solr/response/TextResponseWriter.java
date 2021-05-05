@@ -57,15 +57,17 @@ public abstract class TextResponseWriter implements TextWriter {
 
   public TextResponseWriter(Writer writer, SolrQueryRequest req, SolrQueryResponse rsp) {
     this.writer = writer;
-    this.schema = req.getSchema();
+    this.schema = req == null ? null : req.getSchema();
     this.req = req;
     this.rsp = rsp;
-    String indent = req.getParams().get("indent");
-    if (!("off".equals(indent) || "false".equals(indent))){
-      doIndent=true;
+    if (req != null) {
+      String indent = req.getParams().get("indent");
+      if (!("off".equals(indent) || "false".equals(indent))) {
+        doIndent = true;
+      }
     }
     returnFields = rsp.getReturnFields();
-    if (req.getParams().getBool(CommonParams.OMIT_HEADER, false)) rsp.removeResponseHeader();
+    if (req != null && req.getParams().getBool(CommonParams.OMIT_HEADER, false)) rsp.removeResponseHeader();
   }
   //only for test purposes
    TextResponseWriter(Writer writer, boolean indent) {

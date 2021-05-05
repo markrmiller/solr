@@ -132,11 +132,6 @@ public class SolrCmdDistributor implements Closeable {
   
   public void close() {
     this.closed = true;
-    try {
-      requestSolrClient.waitForOutstandingRequests(2, TimeUnit.MINUTES);
-    } catch (TimeoutException timeoutException) {
-      log.warn("timeout waiting for outstanding replica updates");
-    }
     requestSolrClient.close();
     assert ObjectReleaseTracker.getInstance().release(this);
   }
@@ -157,7 +152,7 @@ public class SolrCmdDistributor implements Closeable {
     if (isRetry) {
       // if it's a io exception exception, lets try again
       if (err.t instanceof SolrServerException) {
-        if (((SolrServerException) err.t).getRootCause() instanceof IOException  && !(((SolrServerException) err.t).getRootCause() instanceof ClosedChannelException)) {
+        if (((SolrServerException) err.t).getRootCause() instanceof IOException) {
           doRetry = true;
         }
       }
@@ -339,7 +334,7 @@ public class SolrCmdDistributor implements Closeable {
 
           @Override public void onFailure(Throwable t, int code) {
 
-            if (code == 200) {
+            if (t instanceof ClosedChannelException) {
               // we may get success but be told the peer is shutting down via exception
               if (log.isTraceEnabled()) {
                 log.trace("Success for distrib update {}", code);
@@ -443,6 +438,14 @@ public class SolrCmdDistributor implements Closeable {
 
       if (e == Http2SolrClient.CANCELLED_EXCEPTION) {
         log.info("Stream cancelled msg={}", e.getMessage());
+        return;
+      }
+
+      if (e instanceof ClosedChannelException) {
+        // we may get success but be told the peer is shutting down via exception
+        if (log.isTraceEnabled()) {
+          log.trace("Success for distrib update {}", e);
+        }
         return;
       }
 

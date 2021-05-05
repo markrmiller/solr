@@ -610,9 +610,13 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     }
   }
 
-  private static void sendException(Throwable exp, SolrCall call, HttpServletRequest request, HttpServletResponse response) throws IOException {
-      log.error("Solr ran into an unexpected problem.", exp);
-
+  public static void sendException(Throwable e, SolrCall call, HttpServletRequest request, HttpServletResponse response) throws IOException {
+      log.error("Solr ran into an unexpected problem.", e);
+    log.warn("Count not send client formatted error", e);
+    log.error("onError", e);
+//    response.setStatus(e instanceof SolrException ? ((SolrException) e).code() : 500);
+//    PrintWriter writer = new PrintWriter(response.getOutputStream()); // we don't close, the container will
+//    writer.write(e.getClass().getName() + ' ' + e.getMessage());
         try {
           SolrQueryResponse solrResponse = new SolrQueryResponse();
           SolrQueryRequest solrRequest = null;
@@ -644,24 +648,24 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           }
 
           int code = 500;
-          if (exp instanceof SolrException) {
-            code = ((SolrException) exp).code();
+          if (e instanceof SolrException) {
+            code = ((SolrException) e).code();
           }
           response.setStatus(Math.max(code, 1));
 
-          if (exp instanceof Exception) {
-            solrResponse.setException((Exception) exp);
+          if (e instanceof Exception) {
+            solrResponse.setException((Exception) e);
           } else {
-            solrResponse.setException(new SolrException(ErrorCode.SERVER_ERROR, exp));
+            solrResponse.setException(new SolrException(ErrorCode.SERVER_ERROR, e));
           }
 
           NamedList error = new NamedList();
-          ResponseUtils.getErrorInfo(exp, error, log);
+          ResponseUtils.getErrorInfo(e, error, log);
 
           NamedList header = new NamedList();
 
           NamedList info = new SimpleOrderedMap();
-          int statusCode = ResponseUtils.getErrorInfo(exp, info, log);
+          int statusCode = ResponseUtils.getErrorInfo(e, info, log);
           solrResponse.add("error", info);
           header.add("status", statusCode);
           solrResponse.addResponseHeader(header);
@@ -674,17 +678,17 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           buffer.position(outStream.offset());
           buffer.limit(outStream.position());
           out.sendContent(buffer);
-        } catch (Exception e) {
+        } catch (Exception ex) {
           log.warn("Count not send client formatted error", e);
-          log.error("onError", exp);
+          log.error("onError", ex);
           response.setStatus(e instanceof SolrException ? ((SolrException) e).code() : 500);
           PrintWriter writer = new PrintWriter(response.getOutputStream()); // we don't close, the container will
-          writer.write(exp.getClass().getName() + ' ' + exp.getMessage());
+          writer.write(ex.getClass().getName() + ' ' + ex.getMessage());
         }
 
 //        log.error("Solr ran into an unexpected problem.", exp);
 //        sendException(exp, null, response);
-//
+
   }
 
   // we make sure we read the full client request so that the client does

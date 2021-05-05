@@ -47,6 +47,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SolrInputStream;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.common.util.SysStats;
@@ -1634,22 +1635,31 @@ public class IndexFetcher {
 
           //if there is an error continue. But continue from the point where it got broken
         } finally {
-     //     IOUtils.closeQuietly(is);
+          if (is != null) {
+            while (true) {
+              try {
+                if (!(is.read() != -1)) break;
+              } catch (IOException e) {
+
+              }
+            }
+          }
         }
 
       } catch (Exception e) {
         log.error("Problem fetching file", e);
         throw e;
       } finally {
-//        if (is != null) {
-//          while (true) {
-//            try {
-//              if (!(is.read() != -1)) break;
-//            } catch (IOException e) {
-//
-//            }
-//          }
-//        }
+        if (is != null) {
+          while (true) {
+            try {
+              if (!(is.read() != -1)) break;
+            } catch (IOException e) {
+
+            }
+          }
+         // org.apache.solr.common.util.IOUtils.closeQuietly(is);
+        }
         cleanup(null);
         //if cleanup succeeds . The file is downloaded fully
         fsyncService.submit(() -> {
@@ -1682,14 +1692,14 @@ public class IndexFetcher {
           //TODO consider recoding the remaining logic to not use/need buf[]; instead use the internal buffer of fis
           if (buf.length < packetSize) {
             //This shouldn't happen since sender should use PACKET_SZ and we init the buf based on that too
-            buf = new byte[packetSize];
+            buf = new byte[(int)Math.min(this.size, ReplicationHandler.PACKET_SZ)];
           }
           if (checksum != null) {
             //read the checksum
             checkSumServer = fis.readLong();
           }
           //then read the packet of bytes
-          fis.readFully(buf, 0, packetSize);
+          fis.readFully(buf, 0, (int)Math.min(this.size, ReplicationHandler.PACKET_SZ));
           //compare the checksum as sent from the master
           if (includeChecksum) {
             checksum.reset();
@@ -1703,9 +1713,9 @@ public class IndexFetcher {
             }
           }
           //if everything is fine, write down the packet to the file
-          file.write(buf, packetSize);
+          file.write(buf, (int)Math.min(this.size, ReplicationHandler.PACKET_SZ));
 
-          bytesDownloaded += packetSize;
+          bytesDownloaded += (int)Math.min(this.size, ReplicationHandler.PACKET_SZ);
           log.debug("Fetched and wrote {} bytes of file={} from replica={}", bytesDownloaded, fileName, masterUrl);
           //errorCount is always set to zero after a successful packet
           errorCount = 0;
@@ -1754,6 +1764,13 @@ public class IndexFetcher {
           } catch (Exception e) {
             log.error("Error deleting file: {}", this.saveAs, e);
           }
+          Cancellable cancel = fileFetchRequests.get(fileName);
+          if (cancel != null) {
+
+          }
+
+
+
           //if the failure is due to a user abort it is returned normally else an exception is thrown
           if (!(abort || stop)) {
             SolrException exp = new SolrException(SolrException.ErrorCode.SERVER_ERROR,
@@ -1829,11 +1846,20 @@ public class IndexFetcher {
           if (useInternalCompression) {
             is = new InflaterInputStream(is);
           }
-          return new DataInputStream(is);
+          return new SolrInputStream(is);
         } catch (Exception e) {
           //close stream on error
           //IOUtils.closeQuietly(is);
+          if (is != null) {
+            while (true) {
+              try {
+                if (!(is.read() != -1)) break;
+              } catch (IOException e2) {
 
+              }
+            }
+            // org.apache.solr.common.util.IOUtils.closeQuietly(is);
+          }
           throw new IOException("Could not download file '" + fileName + "'", e);
         }
       }

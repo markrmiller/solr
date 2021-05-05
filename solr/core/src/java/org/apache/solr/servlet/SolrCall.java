@@ -150,12 +150,14 @@ public abstract class SolrCall {
   }
 
   protected static void sendError(Throwable ex, HttpServletResponse response) throws IOException {
+    log.error("ERROR", ex);
     SimpleOrderedMap info = new SimpleOrderedMap();
     int code = ResponseUtils.getErrorInfo(ex, info, log);
     sendError(code, info.toString(), response);
   }
 
   protected static void sendError(int code, String message, HttpServletResponse response) throws IOException {
+    log.error("ERROR", message);
     try {
       response.sendError(code, message);
     } catch (EOFException e) {
@@ -360,9 +362,9 @@ public abstract class SolrCall {
       QueryResponseWriter responseWriter, Method reqMethod)
       throws IOException {
     try {
-      if (!req.getInputStream().isFinished()) {
-        SolrDispatchFilter.consumeInputFully(req, response);
-      }
+//      if (!req.getInputStream().isFinished()) {
+//        SolrDispatchFilter.consumeInputFully(req, response);
+//      }
 
       Map invalidStates = (Map) solrReq.getContext().get(BaseCloudSolrClient.STATE_VERSION);
       //This is the last item added to the response and the client would expect it that way.
@@ -414,7 +416,8 @@ public abstract class SolrCall {
                 code = ((SolrException) t).code();
               }
               try {
-                response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
+              //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
+                SolrDispatchFilter.sendException(t, SolrCall.this, req, response);
               } catch (IOException ioException) {
                 log.warn("Exception sending error", t); // MRM TODO
               } finally {
@@ -814,29 +817,34 @@ public abstract class SolrCall {
       } else {
         AtomicReference<Throwable> failException = new AtomicReference<>();
         InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
-        InputStream is = listener.getInputStream();
+      //  InputStream is = listener.getInputStream();
         try {
           proxyRequest.send(listener);
 
+//          try {
+//            // wait for headers
+//            listener.get(30, TimeUnit.SECONDS);
+//          } catch (Exception e) {
+//            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
+//          }
+          InputStream is = null;
           try {
-            // wait for headers
-            listener.get(30, TimeUnit.SECONDS);
+            is = listener.getInputStream();
+            is.transferTo(response.getOutputStream());
           } catch (Exception e) {
-            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
+            sendError(e, response);
           }
-          is = listener.getInputStream();
-          is.transferTo(response.getOutputStream());
 
           if (failException.get() != null) {
             sendError(failException.get(), response);
           }
         } finally {
 
-          if (is != null) {
-            while (is.read() != -1) {
-
-            }
-          }
+//          if (is != null) {
+//            while (is.read() != -1) {
+//
+//            }
+//          }
         }
       }
     }

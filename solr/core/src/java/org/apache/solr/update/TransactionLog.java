@@ -872,7 +872,7 @@ public class TransactionLog implements Closeable {
       long sz;
       fosLock.lock();
       try {
-        fos.flushBuffer();
+        fos.flush();
         sz = fos.size();
         assert sz == channel.size() : "sz:" + sz + " ch:" + channel.size();
       } finally {

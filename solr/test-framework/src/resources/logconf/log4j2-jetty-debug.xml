@@ -42,10 +42,11 @@
         <AsyncLogger name="org.apache.zookeeper" level="WARN"/>
         <AsyncLogger name="org.apache.zookeeper.ClientCnxn" level="ERROR"/>
         <AsyncLogger name="org.apache.zookeeper.server.ZooKeeperCriticalThread" level="OFF"/>
-
+        <AsyncLogger name="org.apache.solr.servlet.SolrDispatchFilter" level="DEBUG"/>
         <AsyncLogger name="org.apache.hadoop" level="WARN"/>
         <AsyncLogger name="org.apache.directory" level="WARN"/>
         <AsyncLogger name="org.apache.solr.hadoop" level="WARN"/>
+        <AsyncLogger name="org.eclipse.jetty" level="DEBUG"/>
         <AsyncLogger name="org.eclipse.jetty" level="DEBUG"/>
         <AsyncLogger name="org.eclipse.jetty.util.thread.QueuedThreadPool" level="ERROR"/>
 

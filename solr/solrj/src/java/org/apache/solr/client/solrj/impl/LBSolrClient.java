@@ -70,7 +70,7 @@ public abstract class LBSolrClient extends SolrClient {
 
   // defaults
   protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503));
-  private static final int CHECK_INTERVAL = 5 * 1000; //15 seconds between checks
+  private static final int CHECK_INTERVAL = 30 * 1000; //30 seconds between checks
   private static final int NONSTANDARD_PING_LIMIT = 10;  // number of times we'll ping dead servers not in the server list
   public static final ServerWrapper[] EMPTY_SERVER_WRAPPER = new ServerWrapper[0];
 
