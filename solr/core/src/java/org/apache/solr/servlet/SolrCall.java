@@ -1,6 +1,7 @@
 package org.apache.solr.servlet;
 
 import org.agrona.io.ExpandableDirectBufferOutputStream;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.apache.solr.api.ApiBag;
@@ -359,6 +360,10 @@ public abstract class SolrCall {
       QueryResponseWriter responseWriter, Method reqMethod)
       throws IOException {
     try {
+      if (!req.getInputStream().isFinished()) {
+        SolrDispatchFilter.consumeInputFully(req, response);
+      }
+
       Map invalidStates = (Map) solrReq.getContext().get(BaseCloudSolrClient.STATE_VERSION);
       //This is the last item added to the response and the client would expect it that way.
       //If that assumption is changed , it would fail. This is done to avoid an O(n) scan on
@@ -797,7 +802,8 @@ public abstract class SolrCall {
       addProxyHeaders(req, proxyRequest);
 
       if (hasContent(req)) {
-        InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), req.getInputStream(), 8192);
+        ServletInputStream is = req.getInputStream();
+        InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), new CloseShieldInputStream(is), 8192);
         //Response.AsyncContentListener content2 = new Response.AsyncContentListener();
         proxyRequest.body(defferedContent);
       }
@@ -805,12 +811,12 @@ public abstract class SolrCall {
 
       if (SolrDispatchFilter.ASYNC) {
         proxyRequest.onResponseHeaders(new RemoteAsyncResponseListener(req, response)).send(new OnContentOutputListener(response, req));
-
       } else {
         AtomicReference<Throwable> failException = new AtomicReference<>();
         InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
+        InputStream is = listener.getInputStream();
         try {
-          proxyRequest.onRequestSuccess(request -> IOUtils.closeQuietly(listener.getInputStream())).send(listener);
+          proxyRequest.send(listener);
 
           try {
             // wait for headers
@@ -818,23 +824,19 @@ public abstract class SolrCall {
           } catch (Exception e) {
             throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
           }
-
-          listener.getInputStream().transferTo(response.getOutputStream());
+          is = listener.getInputStream();
+          is.transferTo(response.getOutputStream());
 
           if (failException.get() != null) {
             sendError(failException.get(), response);
           }
         } finally {
 
-//          if (is != null) {
-//            while (true) {
-//              try {
-//                if (!(is.read() != -1)) break;
-//              } catch (IOException e) {
-//
-//              }
-//            }
-//          }
+          if (is != null) {
+            while (is.read() != -1) {
+
+            }
+          }
         }
       }
     }

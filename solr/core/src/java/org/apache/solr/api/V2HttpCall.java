@@ -394,8 +394,6 @@ public class V2HttpCall extends SolrCall {
             QueryResponseWriter responseWriter = getResponseWriter(solrReq);
             if (invalidStates != null) solrReq.getContext().put(BaseCloudSolrClient.STATE_VERSION, invalidStates);
 
-             SolrDispatchFilter.consumeInputFully(req, response);
-
             writeResponse(solrReq, solrRsp, req, response, responseWriter, reqMethod);
           }
           return RETURN;

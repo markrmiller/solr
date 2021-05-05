@@ -33,53 +33,53 @@ import java.util.Map;
 public class SolrInternalHttpClient extends HttpClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final Map<Origin,HttpDestination> dests = new NonBlockingHashMap<>(128);
+ // private final Map<Origin,HttpDestination> dests = new NonBlockingHashMap<>(128);
 
   public SolrInternalHttpClient(HttpClientTransport transport) {
     super(transport);
     assert ObjectReleaseTracker.getInstance().track(this);
   }
 
-  public HttpDestination resolveDestination(Origin origin) {
-    return dests.computeIfAbsent(origin, o -> {
-      HttpDestination newDestination = getTransport().newHttpDestination(o);
-      addManaged(newDestination);
-      if (log.isDebugEnabled()) log.debug("Created {}", newDestination);
-      return newDestination;
-    });
-  }
+//  public HttpDestination resolveDestination(Origin origin) {
+//    return dests.computeIfAbsent(origin, o -> {
+//      HttpDestination newDestination = getTransport().newHttpDestination(o);
+//      addManaged(newDestination);
+//      if (log.isDebugEnabled()) log.debug("Created {}", newDestination);
+//      return newDestination;
+//    });
+//  }
+//
+//  public HttpDestination getDestination(Origin origin) {
+//    return dests.get(origin);
+//  }
+//
+//  public Map<Origin,HttpDestination> getDestinationsMap() {
+//    return dests;
+//  }
+//
+//
+//  public boolean removeDestination(HttpDestination destination) {
+//    removeBean(destination);
+//    return dests.remove(destination.getOrigin(), destination);
+//  }
+//
+//  public List<Destination> getDestinations() {
+//    return new ArrayList<>(dests.values());
+//  }
 
-  public HttpDestination getDestination(Origin origin) {
-    return dests.get(origin);
-  }
-
-  public Map<Origin,HttpDestination> getDestinationsMap() {
-    return dests;
-  }
-
-
-  public boolean removeDestination(HttpDestination destination) {
-    removeBean(destination);
-    return dests.remove(destination.getOrigin(), destination);
-  }
-
-  public List<Destination> getDestinations() {
-    return new ArrayList<>(dests.values());
-  }
-
-  @Override protected void doStop() throws Exception {
-    if (log.isDebugEnabled()) {
-      log.debug("Stopping {}", this.getClass().getSimpleName());
-    }
-    try {
-      super.doStop();
-      for (HttpDestination destination : dests.values()) {
-        destination.close();
-      }
-      dests.clear();
-    } finally {
-      assert ObjectReleaseTracker.getInstance().release(this);
-    }
-  }
+//  @Override protected void doStop() throws Exception {
+//    if (log.isDebugEnabled()) {
+//      log.debug("Stopping {}", this.getClass().getSimpleName());
+//    }
+//    try {
+//      super.doStop();
+//      for (HttpDestination destination : dests.values()) {
+//        destination.close();
+//      }
+//      dests.clear();
+//    } finally {
+//      assert ObjectReleaseTracker.getInstance().release(this);
+//    }
+//  }
 
 }

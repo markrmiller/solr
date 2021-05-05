@@ -565,9 +565,9 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         ExecutorUtil.setServerThreadFlag(null);
       }
     } catch(Exception e) {
-     // if (!servletResponse.isCommitted()) {
+      if (!servletRequest.getInputStream().isFinished()) {
         consumeInputFully(servletRequest, servletResponse);
-      //}
+      }
 
       if (!servletResponse.isCommitted() && !ASYNC) {
         sendException(e, call, servletRequest, servletResponse);
@@ -915,8 +915,9 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
       log.debug("sendError called! {}:{}", sc, msg);
 
-      //response.setStatus(sc);
-      //getWriter().write(msg);
+      response.setStatus(sc);
+      PrintWriter writer = new PrintWriter(response.getOutputStream()); // we don't close, the container will
+      writer.write(msg);
     }
 
     @Override

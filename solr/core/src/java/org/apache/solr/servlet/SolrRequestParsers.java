@@ -284,13 +284,13 @@ public class SolrRequestParsers {
   }
   
   public final static ThreadLocal<ExpandableDirectBufferOutputStream> keyLocal = ThreadLocal.withInitial(() -> {
-    MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(16);
+    MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(32);
     ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     return keyStream;
   });
 
   public final static ThreadLocal<ExpandableDirectBufferOutputStream> valLocal = ThreadLocal.withInitial(() -> {
-    MutableDirectBuffer expandableBuffer2 = new ExpandableDirectByteBuffer(16);
+    MutableDirectBuffer expandableBuffer2 = new ExpandableDirectByteBuffer(32);
     ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(expandableBuffer2);
     return valueStream;
   });

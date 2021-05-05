@@ -186,9 +186,9 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
     // or in certain cases, you would want to enable both - otherwise the cost
     // is very high and a replica that goes out, by the time it comes back is generally
     // going to just be recovering from the new leader
-    if (Boolean.getBoolean("solr.nrtDirSync")) {
+   // if (Boolean.getBoolean("solr.nrtDirSync")) {
       in.sync(fileNames);
-    }
+  //  }
   }
 
   @Override
