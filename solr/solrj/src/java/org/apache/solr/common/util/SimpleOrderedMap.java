@@ -58,7 +58,7 @@ public class SimpleOrderedMap<T> extends NamedList<T> {
    * @param nameValuePairs underlying List which should be used to implement a SimpleOrderedMap; modifying this List will affect the SimpleOrderedMap.
    * @lucene.internal
    */
-  private SimpleOrderedMap(List<Object> nameValuePairs) {
+  protected SimpleOrderedMap(List<Object> nameValuePairs) {
     super(nameValuePairs);
   }
   

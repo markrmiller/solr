@@ -383,95 +383,101 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
     List<ReplicaPosition> finalReplicaPositions = replicaPositions;
     response.asyncFinalRunner = new OverseerCollectionMessageHandler.Finalize() {
+
       @Override
       public AddReplicaCmd.Response call() {
         try {
-          shardRequestTracker.processResponses(results, shardHandler, false, null, Collections.emptySet());
-        } catch (KeeperException e) {
-          log.error("", e);
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-        } catch (InterruptedException e) {
-          ParWork.propagateInterrupt(e);
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-        }
-        //  MRM TODO: - put this in finalizer and finalizer after all calls to allow parallel and forward momentum ... MRM later on, huh?
-
-        AddReplicaCmd.Response response = new AddReplicaCmd.Response();
-
-        @SuppressWarnings({"rawtypes"}) boolean failure = results.get("failure") != null && ((SimpleOrderedMap) results.get("failure")).size() > 0;
-        if (failure) {
-          log.error("Failure creating collection {}", results.get("failure"));
-          //        // Let's cleanup as we hit an exception
-          //        // We shouldn't be passing 'results' here for the cleanup as the response would then contain 'success'
-          //        // element, which may be interpreted by the user as a positive ack
-          //        // MRM TODO: review
           try {
-            AddReplicaCmd.Response rsp = ocmh.cleanupCollection(collectionName, new NamedList<Object>());
-
-            response.clusterState = rsp.clusterState;
-            if (rsp.asyncFinalRunner != null) {
-              rsp.asyncFinalRunner.call();
-            }
-          } catch (Exception e) {
-            log.error("Exception trying to clean up collection after fail {}", collectionName);
+            shardRequestTracker.processResponses(results, shardHandler, false, null, Collections.emptySet());
+          } catch (KeeperException e) {
+            log.error("", e);
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+          } catch (InterruptedException e) {
+            ParWork.propagateInterrupt(e);
+            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
           }
-          if (log.isDebugEnabled()) log.debug("Cleaned up artifacts for failed create collection for [{}]", collectionName);
-          throw new SolrException(ErrorCode.BAD_REQUEST, "Underlying core creation failed while creating collection: " + collectionName + "\n" + results);
-        } else {
+          //  MRM TODO: - put this in finalizer and finalizer after all calls to allow parallel and forward momentum ... MRM later on, huh?
 
-          if (log.isDebugEnabled()) log.debug("createNodeSet={}", createNodeSet);
-          if (waitForFinalState && !ZkStateReader.CREATE_NODE_SET_EMPTY.equals(createNodeSet)) {
-            // MRM TODO: this is a bad to wait for final state all around - go back to passing the last written state.json version to the client on return
+          AddReplicaCmd.Response response = new AddReplicaCmd.Response();
+
+          @SuppressWarnings({"rawtypes"}) boolean failure = results.get("failure") != null && ((SimpleOrderedMap) results.get("failure")).size() > 0;
+          if (failure) {
+            log.error("Failure creating collection {}", results.get("failure"));
+            //        // Let's cleanup as we hit an exception
+            //        // We shouldn't be passing 'results' here for the cleanup as the response would then contain 'success'
+            //        // element, which may be interpreted by the user as a positive ack
+            //        // MRM TODO: review
             try {
-              zkStateReader.waitForState(collectionName, CREATE_COLLECTION_TIMEOUT, TimeUnit.SECONDS, (l, c) -> {
-                log.debug("notified cmd {}", c);
-                if (c == null) {
-                  return false;
-                }
-                for (String name : cores.keySet()) {
-                  log.debug("look for core {} {} {} {}", name, c.getReplica(name), c.getReplica(name).getState(),  c.getReplica(name).getState() != Replica.State.ACTIVE);
-                  if (c.getReplica(name) == null || c.getReplica(name).getState() != Replica.State.ACTIVE) {
-                    log.debug("not the right replica or state {}", c.getReplica(name));
-                    return false;
-                  }
-                }
-                Collection<Slice> slices = c.getSlices();
-                if (slices.size() < shardNames.size()) {
-                  log.debug("wrong number slices {} vs {}", slices.size(), shardNames.size());
-                  return false;
-                }
-                for (Slice slice : slices) {
-                  log.debug("slice {} leader={}", slice, slice.getLeader(l));
-                  if (slice.getLeader(l) == null || (slice.getLeader(l) != null && slice.getLeader(l).getState() != Replica.State.ACTIVE)) {
-                    log.debug("no leader found for slice {}", slice.getName());
-                    return false;
-                  }
-                }
-                log.debug("return true, everything active");
-                return true;
-              });
-            } catch (InterruptedException e) {
-              log.warn("Interrupted waiting for active replicas on collection creation collection={}", collectionName);
-              throw new SolrException(ErrorCode.SERVER_ERROR, e);
-            } catch (TimeoutException e) {
-              log.error("Timeout waiting for active replicas on collection creation collection={}", collectionName);
-              throw new SolrException(ErrorCode.SERVER_ERROR, e);
+              AddReplicaCmd.Response rsp = ocmh.cleanupCollection(collectionName, new NamedList<Object>());
+
+              response.clusterState = rsp.clusterState;
+              if (rsp.asyncFinalRunner != null) {
+                rsp.asyncFinalRunner.call();
+              }
+            } catch (Exception e) {
+              log.error("Exception trying to clean up collection after fail {}", collectionName);
             }
+            if (log.isDebugEnabled()) log.debug("Cleaned up artifacts for failed create collection for [{}]", collectionName);
+            throw new SolrException(ErrorCode.BAD_REQUEST, "Underlying core creation failed while creating collection: " + collectionName + "\n" + results);
+          } else {
+
+            if (log.isDebugEnabled()) log.debug("createNodeSet={}", createNodeSet);
+            if (waitForFinalState && !ZkStateReader.CREATE_NODE_SET_EMPTY.equals(createNodeSet)) {
+              // MRM TODO: this is a bad to wait for final state all around - go back to passing the last written state.json version to the client on return
+              try {
+                zkStateReader.waitForState(collectionName, CREATE_COLLECTION_TIMEOUT, TimeUnit.SECONDS, (l, c) -> {
+                  log.debug("notified cmd {}", c);
+                  if (c == null) {
+                    return false;
+                  }
+                  for (String name : cores.keySet()) {
+                    log.debug("look for core {} {} {} {}", name, c.getReplica(name), c.getReplica(name).getState(),
+                        c.getReplica(name).getState() != Replica.State.ACTIVE);
+                    if (c.getReplica(name) == null || c.getReplica(name).getState() != Replica.State.ACTIVE) {
+                      log.debug("not the right replica or state {}", c.getReplica(name));
+                      return false;
+                    }
+                  }
+                  Collection<Slice> slices = c.getSlices();
+                  if (slices.size() < shardNames.size()) {
+                    log.debug("wrong number slices {} vs {}", slices.size(), shardNames.size());
+                    return false;
+                  }
+                  for (Slice slice : slices) {
+                    log.debug("slice {} leader={}", slice, slice.getLeader(l));
+                    if (slice.getLeader(l) == null || (slice.getLeader(l) != null && slice.getLeader(l).getState() != Replica.State.ACTIVE)) {
+                      log.debug("no leader found for slice {}", slice.getName());
+                      return false;
+                    }
+                  }
+                  log.debug("return true, everything active");
+                  return true;
+                });
+              } catch (InterruptedException e) {
+                log.warn("Interrupted waiting for active replicas on collection creation collection={}", collectionName);
+                throw new SolrException(ErrorCode.SERVER_ERROR, e);
+              } catch (TimeoutException e) {
+                log.error("Timeout waiting for active replicas on collection creation collection={}", collectionName);
+                throw new SolrException(ErrorCode.SERVER_ERROR, e);
+              }
+            }
+
+            if (log.isDebugEnabled()) log.debug("Finished create command on all shards for collection: {}", collectionName);
+
+            // Emit a warning about production use of data driven functionality
+            boolean defaultConfigSetUsed = message.getStr(COLL_CONF) == null || message.getStr(COLL_CONF).equals(ConfigSetsHandlerApi.DEFAULT_CONFIGSET_NAME);
+            if (defaultConfigSetUsed) {
+              results.add("warning", "Using _default configset. Data driven schema functionality"
+                  + " is enabled by default, which is NOT RECOMMENDED for production use. To turn it off:" + " curl http://{host:port}/solr/" + collectionName
+                  + "/config -d '{\"set-user-property\": {\"update.autoCreateFields\":\"false\"}}'");
+            }
+
           }
 
-          if (log.isDebugEnabled()) log.debug("Finished create command on all shards for collection: {}", collectionName);
-
-          // Emit a warning about production use of data driven functionality
-          boolean defaultConfigSetUsed = message.getStr(COLL_CONF) == null || message.getStr(COLL_CONF).equals(ConfigSetsHandlerApi.DEFAULT_CONFIGSET_NAME);
-          if (defaultConfigSetUsed) {
-            results.add("warning",
-                "Using _default configset. Data driven schema functionality" + " is enabled by default, which is NOT RECOMMENDED for production use. To turn it off:" + " curl http://{host:port}/solr/"
-                    + collectionName + "/config -d '{\"set-user-property\": {\"update.autoCreateFields\":\"false\"}}'");
-          }
-
+          return response;
+        } finally {
+          shardHandler.cancelAll();
         }
-
-        return response;
       }
     };
 

@@ -132,11 +132,11 @@ public class SolrCmdDistributor implements Closeable {
   
   public void close() {
     this.closed = true;
-//    try {
-//      replicaSolrClient.waitForOutstandingRequests(2, TimeUnit.MINUTES);
-//    } catch (TimeoutException timeoutException) {
-//      log.warn("timeout waiting for outstanding replica updates");
-//    }
+    try {
+      requestSolrClient.waitForOutstandingRequests(2, TimeUnit.MINUTES);
+    } catch (TimeoutException timeoutException) {
+      log.warn("timeout waiting for outstanding replica updates");
+    }
     requestSolrClient.close();
     assert ObjectReleaseTracker.getInstance().release(this);
   }

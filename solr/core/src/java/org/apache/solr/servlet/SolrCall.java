@@ -5,6 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
+import org.apache.solr.client.solrj.impl.BaseHttpSolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Aliases;
@@ -77,6 +78,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -807,20 +809,32 @@ public abstract class SolrCall {
       } else {
         AtomicReference<Throwable> failException = new AtomicReference<>();
         InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
-
-        proxyRequest.send(listener);
-
         try {
-          // wait for headers
-          listener.get(30, TimeUnit.SECONDS);
-        } catch (Exception e) {
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-        }
+          proxyRequest.onRequestSuccess(request -> IOUtils.closeQuietly(listener.getInputStream())).send(listener);
 
-        listener.getInputStream().transferTo(response.getOutputStream());
+          try {
+            // wait for headers
+            listener.get(30, TimeUnit.SECONDS);
+          } catch (Exception e) {
+            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
+          }
 
-        if (failException.get() != null) {
-          sendError(failException.get(), response);
+          listener.getInputStream().transferTo(response.getOutputStream());
+
+          if (failException.get() != null) {
+            sendError(failException.get(), response);
+          }
+        } finally {
+
+//          if (is != null) {
+//            while (true) {
+//              try {
+//                if (!(is.read() != -1)) break;
+//              } catch (IOException e) {
+//
+//              }
+//            }
+//          }
         }
       }
     }

@@ -20,18 +20,22 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.channels.ClosedChannelException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.request.IsUpdateRequest;
+import org.apache.solr.client.solrj.request.IsUpdateRequest;
 import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
 import org.slf4j.MDC;
 
+import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
 /**
  * LBHttp2SolrClient or "LoadBalanced LBHttp2SolrClient" is a load balancing wrapper around
  * {@link Http2SolrClient}. This is useful when you
@@ -79,7 +83,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
     // MRM TODO: - should only be internal for us
     Http2SolrClient.Builder builder = new Http2SolrClient.Builder().withHttpClient(httpClient);
     if (markInternal) {
-      builder = builder.markInternalRequest();
+      builder = builder.maxOutstandingAsyncRequests(300).markInternalRequest(); // MRM TODO configurable
     }
     this.httpClient = builder.build();
   }
@@ -104,7 +108,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
 
   public Cancellable asyncReq(Req req, AsyncListener<Rsp> asyncListener) {
     Rsp rsp = new Rsp();
-    boolean isNonRetryable = false;
+    boolean isNonRetryable = req.request instanceof IsUpdateRequest || ADMIN_PATHS.contains(req.request.getPath());
     ServerIterator it = new ServerIterator(req, zombieServers);
     asyncListener.onStart();
     final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -187,7 +191,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
         } catch (SolrException e) {
           // we retry on 404 or 403 or 502, 503 or 500
           // unless it's an update - then we only retry on connect exception
-          if (!isNonRetryable && (RETRY_CODES.contains(e.code()))) {
+          if (!isNonRetryable && (RETRY_CODES.contains(e.code())) || e.getMessage().contains("Connection refused")) {
             listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
           } else {
             // Server is alive but the request was likely malformed or invalid
@@ -206,7 +210,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
           }
         } catch (SolrServerException e) {
           Throwable rootCause = e.getRootCause();
-          if (!isNonRetryable && rootCause instanceof IOException) {
+          if (!isNonRetryable && (rootCause instanceof IOException)) {
             listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
           } else if (isNonRetryable && rootCause instanceof ConnectException) {
             listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
@@ -214,15 +218,11 @@ public class LBHttp2SolrClient extends LBSolrClient {
             listener.onFailure(e, false);
           }
         } catch (Exception e) {
-
-          // we retry on 404 or 403 or 502, 503 or 500
-          // unless it's an update - then we only retry on connect exception
-          if (!isNonRetryable && (RETRY_CODES.contains(code))) {
+          if (e instanceof ClosedChannelException) {
             listener.onFailure((!isZombie) ? addZombie(baseUrl, e) : e, true);
           } else {
             listener.onFailure(new SolrServerException(e), false);
           }
-
         }
       }
     });

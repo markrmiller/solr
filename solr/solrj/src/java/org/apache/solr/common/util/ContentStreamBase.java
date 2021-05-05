@@ -33,14 +33,20 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.SolrRequest;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.impl.InputStreamResponseParser;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.common.ParWork;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.params.CommonParams;
 
 /**
  * Three concrete implementations for ContentStream - one for File/URL/String
@@ -152,14 +158,30 @@ public abstract class ContentStreamBase implements ContentStream
 
     @Override
     public InputStream getStream() throws IOException {
-      URLConnection conn = this.url.openConnection();
-      
-      contentType = conn.getContentType();
+      // MRM TODO: not streaming, but using http2
+     // URLConnection conn = this.url.openConnection();
+      Http2SolrClient client = new Http2SolrClient.Builder(url.toString()).build();
+      client.setParser(new InputStreamResponseParser(CommonParams.STREAM_CONTENTTYPE));
+
+
+      InputStream is = null;
+      Http2SolrClient.SimpleResponse resp = null;
+      try {
+       resp = Http2SolrClient.GET(url.toString());
+       is = new ByteArrayInputStream(resp.bytes);
+      } catch (InterruptedException e) {
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+      } catch (ExecutionException e) {
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+      } catch (TimeoutException timeoutException) {
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, timeoutException);
+      }
+      contentType = resp.contentType;
       name = url.toExternalForm();
-      size = conn.getContentLengthLong();
-      InputStream is = new CloseShieldInputStream(conn.getInputStream());
+      size = Long.valueOf(resp.bytes.length);
+
       String urlFile = url.getFile().toLowerCase(Locale.ROOT);
-      if( "gzip".equals(conn.getContentEncoding()) || urlFile.endsWith( ".gz" ) || urlFile.endsWith( ".gzip" )){
+      if( "gzip".equals(resp.contentType) || urlFile.endsWith( ".gz" ) || urlFile.endsWith( ".gzip" )){
         is = new GZIPInputStream(is);
       }
       return is;

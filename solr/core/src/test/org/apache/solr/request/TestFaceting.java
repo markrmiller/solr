@@ -36,6 +36,7 @@ import org.apache.solr.core.SolrCore;
 import org.apache.solr.uninverting.DocTermOrds;
 import org.junit.After;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -362,6 +363,7 @@ public class TestFaceting extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Ignore // MRM TODO: silly non thread safe spammy warning no longer in query
   public void testFacetOverPointFieldWithMinCount0() {
     String field = "f_" + new String[]{"i","l","f","d"}[random().nextInt(4)] + "_p";
     String expectedWarning = "Raising facet.mincount from 0 to 1, because field " + field + " is Points-based.";

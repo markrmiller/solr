@@ -38,6 +38,7 @@ import org.apache.solr.common.util.ContentStream;
 public abstract class SolrRequest<T extends SolrResponse> implements Serializable {
   // This user principal is typically used by Auth plugins during distributed/sharded search
   private Principal userPrincipal;
+  private volatile boolean retried;
 
   public void setUserPrincipal(Principal userPrincipal) {
     this.userPrincipal = userPrincipal;
@@ -45,6 +46,14 @@ public abstract class SolrRequest<T extends SolrResponse> implements Serializabl
 
   public Principal getUserPrincipal() {
     return userPrincipal;
+  }
+
+  public void setRetried(boolean retried) {
+    this.retried = retried;
+  }
+
+  public boolean isRetried() {
+    return retried;
   }
 
   public enum METHOD {

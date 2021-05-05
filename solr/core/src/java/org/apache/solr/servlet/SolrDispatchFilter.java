@@ -77,6 +77,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ConnectionManager;
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -456,7 +457,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
               chain.doFilter(closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
             } catch (Exception e) {
               if (!_response.isCommitted()) {
-                sendException(e, null, (HttpServletRequest) _request,(HttpServletResponse) _response);
+                sendException(e, null, closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
               }
             }
             return;
@@ -564,9 +565,9 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         ExecutorUtil.setServerThreadFlag(null);
       }
     } catch(Exception e) {
-      if (!servletResponse.isCommitted()) {
+     // if (!servletResponse.isCommitted()) {
         consumeInputFully(servletRequest, servletResponse);
-      }
+      //}
 
       if (!servletResponse.isCommitted() && !ASYNC) {
         sendException(e, call, servletRequest, servletResponse);
@@ -622,12 +623,22 @@ public class SolrDispatchFilter extends BaseSolrFilter {
             ct = call.getCt();
           }
 
-          if (solrRequest == null) {
-            String path = ServletUtils.getPathAfterContext(request);
-            solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, path, request);
-          }
+//          if (solrRequest == null) {
+//            String path = ServletUtils.getPathAfterContext(request);
+//            solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, path, request);
+//          }
 
-          responseWriter = SolrCall.getResponseWriter(solrRequest);
+          String wt = request.getParameter(CommonParams.WT);
+          SolrCore core = null;
+          if (core != null) {
+             core = solrRequest.getCore();
+          }
+          if (core != null) {
+            responseWriter = core.getQueryResponseWriter(wt);
+          } else {
+            responseWriter = SolrCore.DEFAULT_RESPONSE_WRITERS.getOrDefault(wt,
+                SolrCore.DEFAULT_RESPONSE_WRITERS.get("standard"));
+          }
           if (ct == null) {
             ct = responseWriter.getContentType(solrRequest, solrResponse);
           }
@@ -636,7 +647,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           if (exp instanceof SolrException) {
             code = ((SolrException) exp).code();
           }
-          response.setStatus(code);
+          response.setStatus(Math.max(code, 1));
 
           if (exp instanceof Exception) {
             solrResponse.setException((Exception) exp);
@@ -666,6 +677,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         } catch (Exception e) {
           log.warn("Count not send client formatted error", e);
           log.error("onError", exp);
+          response.setStatus(e instanceof SolrException ? ((SolrException) e).code() : 500);
           PrintWriter writer = new PrintWriter(response.getOutputStream()); // we don't close, the container will
           writer.write(exp.getClass().getName() + ' ' + exp.getMessage());
         }

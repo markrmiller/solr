@@ -476,7 +476,7 @@ public class SolrTestCase extends Assert {
 
       System.setProperty("solr.tests.ramBufferSizeMB", "40");
 
-      System.setProperty("solr.http2solrclient.default.idletimeout", "30000");
+      System.setProperty("solr.http2solrclient.default.idletimeout", "60000");
       System.setProperty("distribUpdateSoTimeout", "15000");
       System.setProperty("socketTimeout", "30000");
       System.setProperty("connTimeout", "30000");

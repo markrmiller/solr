@@ -76,6 +76,7 @@ import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
+import org.apache.solr.client.solrj.impl.ConcurrentUpdateHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrClient;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
@@ -2324,6 +2325,13 @@ public abstract class SolrTestCaseJ4 extends SolrTestCase {
         .withQueueSize(queueSize)
         .withThreadCount(threadCount)
         .withSocketTimeout(120000)
+        .build();
+  }
+
+  public static ConcurrentUpdateHttp2SolrClient getConcurrentUpdateSolrClient(Http2SolrClient httpClient, String baseSolrUrl, int queueSize, int threadCount) {
+    return new ConcurrentUpdateHttp2SolrClient.Builder(baseSolrUrl, httpClient)
+        .withQueueSize(queueSize)
+        .withThreadCount(threadCount)
         .build();
   }
   

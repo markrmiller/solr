@@ -1056,8 +1056,11 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     
     // Thread.sleep(10000000000L);
     Thread.sleep(250);
-
-    del("*:*"); // delete all docs and test stats request
+    try {
+      del("*:*"); // delete all docs and test stats request
+    } catch (Exception e) {
+      del("*:*"); // delete all docs and test stats request
+    }
     commit();
     try {
       query("q", "*:*", "stats", "true", 

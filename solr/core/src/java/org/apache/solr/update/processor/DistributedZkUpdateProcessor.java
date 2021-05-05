@@ -560,8 +560,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         String myShardId = cloudDesc.getShardId();
         Replica leaderReplica;
         try {
-          leaderReplica = zkController.getZkStateReader().getLeaderRetry(
-              collection, myShardId);
+          leaderReplica = zkController.getZkStateReader().getLeaderRetry(collection, myShardId);
         } catch (Exception e) {
           throw new SolrException(ErrorCode.SERVER_ERROR, "error getting leader", e);
         }
@@ -572,7 +571,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         if (replicaProps != null) {
           final List<SolrCmdDistributor.Node> myReplicas = new ArrayList<>(replicaProps.size());
           for (Replica replicaProp : replicaProps) {
-            myReplicas.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replicaProp, collection, myShardId));
+            if (zkController.getZkStateReader().isNodeLive(replicaProp.getNodeName())) {
+              myReplicas.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replicaProp, collection, myShardId));
+            }
           }
           cmd.isIndexChanged = isIndexChanged;
           cmdDistrib.distribDelete(cmd, myReplicas, params, false, rollupReplicationTracker, leaderReplicationTracker);
@@ -620,7 +621,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       if (replicaProps != null) {
         nodes = new ArrayList<>(replicaProps.size());
         for (Replica props : replicaProps) {
-          nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), props, collection, shardId));
+          if (zkController.getZkStateReader().isNodeLive(props.getNodeName())) {
+            nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), props, collection, shardId));
+          }
         }
       }
     } catch (Exception e) {
@@ -895,7 +898,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       Slice slice = slices.get(sliceEntry.getKey());
       Replica replica = docCollection.getLeader(slice.getName(), zkController.zkStateReader.getLiveNodes());
       if (replica != null) {
-        if (zkController.getZkStateReader().isNodeLive(replica.getNodeName()) && types.contains(replica.getType())) {
+        if (zkController.getZkStateReader().isNodeLive(replica.getNodeName()) && types.contains(replica.getType()) && replica.getState() == Replica.State.ACTIVE) {
           urls.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collectionName, slice.getName()));
         }
       }

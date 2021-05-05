@@ -1623,9 +1623,10 @@ public class IndexFetcher {
     }
     
     private void fetch() throws Exception {
+      DataInputStream is = null;
       try {
 
-        final DataInputStream is = getStream();
+        is =  getStream();
         int result;
         try {
           //fetch packets one by one in a single request
@@ -1633,22 +1634,22 @@ public class IndexFetcher {
 
           //if there is an error continue. But continue from the point where it got broken
         } finally {
-          try {
-            while (true) {
-              final int read = is.read();
-              if (read == -1) break;
-            }
-          } catch (IOException e) {
-            // quietly
-            log.debug("IOException ensure stream is fully read", e);
-          }
-         // IOUtils.closeQuietly(is);
+          IOUtils.closeQuietly(is);
         }
 
       } catch (Exception e) {
         log.error("Problem fetching file", e);
         throw e;
       } finally {
+        if (is != null) {
+          while (true) {
+            try {
+              if (!(is.read() != -1)) break;
+            } catch (IOException e) {
+
+            }
+          }
+        }
         cleanup(null);
         //if cleanup succeeds . The file is downloaded fully
         fsyncService.submit(() -> {

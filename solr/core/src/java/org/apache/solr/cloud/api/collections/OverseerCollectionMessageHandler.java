@@ -816,6 +816,8 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     }
     if (processResponses) {
       shardRequestTracker.processResponses(results, shardHandler, false, null, okayExceptions);
+
+      shardHandler.cancelAll();
     }
     return notLivesReplicas;
   }

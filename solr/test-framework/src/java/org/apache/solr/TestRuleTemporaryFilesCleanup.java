@@ -256,12 +256,12 @@ final class TestRuleTemporaryFilesCleanup extends TestRuleAdapter {
           });
         }));
       }
-
-      for (Future future : futures) {
-        future.get();
-      }
-
-      pool.shutdownNow();
+//
+//      for (Future future : futures) {
+//        future.get();
+//      }
+//
+//      pool.shutdownNow();
 
     } catch(Exception e){
       Class<?> suiteClass = RandomizedContext.current().getTargetClass();

@@ -17,10 +17,8 @@
 package org.apache.solr.servlet;
 
 import javax.servlet.MultipartConfigElement;
-import javax.servlet.ReadListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.Part;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,7 +32,6 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -43,13 +40,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.agrona.ExpandableArrayBuffer;
 import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
-import org.apache.lucene.util.IOUtils;
 import org.apache.solr.api.V2HttpCall;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -69,7 +63,6 @@ import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.util.RTimerTree;
 import org.apache.solr.util.tracing.GlobalTracer;
 import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.server.MultiPartFormInputStream;
 import org.eclipse.jetty.server.Request;
 import org.slf4j.Logger;
@@ -284,7 +277,7 @@ public class SolrRequestParsers {
   /**
    * Given a url-encoded query string (UTF-8), map it into solr params
    */
-  public MultiMapSolrParams parseQueryString(String queryString) {
+  public static MultiMapSolrParams parseQueryString(String queryString) {
     Map<String,String[]> map = new ConcurrentHashMap<>();
     parseQueryString(queryString, map);
     return new MultiMapSolrParams(map);
@@ -328,7 +321,7 @@ public class SolrRequestParsers {
    * @param queryString as given from URL
    * @param map         place all parameters in this map
    */
-  void parseQueryString(final String queryString, final Map<String,String[]> map) {
+  static void parseQueryString(final String queryString, final Map<String,String[]> map) {
     if (queryString != null && queryString.length() > 0) {
       try {
         final int len = queryString.length();
@@ -349,7 +342,8 @@ public class SolrRequestParsers {
    * @param charset     to be used to decode resulting bytes after %-decoding
    * @param map         place all parameters in this map
    */
-  long parseFormDataContent(final InputStream postContent, final long maxLen, Charset charset, final Map<String,String[]> map, boolean supportCharsetParam) throws IOException {
+  static long parseFormDataContent(final InputStream postContent, final long maxLen, Charset charset, final Map<String,String[]> map,
+      boolean supportCharsetParam) throws IOException {
     CharsetDecoder charsetDecoder = supportCharsetParam ? null : getCharsetDecoder(charset);
   //  final LinkedList<Object> buffer = supportCharsetParam ? new LinkedList<>() : null;
     long len = 0L, keyPos = 0L, valuePos = 0L;
@@ -679,7 +673,7 @@ public class SolrRequestParsers {
       try {
         is = in == null ? req.getInputStream() : in;
 
-        final long bytesRead = SolrRequestParsers.getInstance().parseFormDataContent(is, maxLength, charset, map, false);
+        final long bytesRead = SolrRequestParsers.parseFormDataContent(is, maxLength, charset, map, false);
         if (bytesRead == 0L && totalLength > 0L) {
           throw new IncompatibleSolrException();
         }
@@ -845,9 +839,9 @@ public class SolrRequestParsers {
       } catch (IllegalStateException ise) {
         throw (SolrException) new IncompatibleSolrException().initCause(ise);
       } finally {
-        if (shouldClose) {
-          IOUtils.closeWhileHandlingException(in);
-        }
+//        if (shouldClose) {
+//          IOUtils.closeWhileHandlingException(in);
+//        }
       }
     }
   }

@@ -509,13 +509,14 @@ public class SimpleFacets {
             if (ft.isPointField() && mincount <= 0) { // default is mincount=0.  See SOLR-10033 & SOLR-11174.
               String warningMessage 
                   = "Raising facet.mincount from " + mincount + " to 1, because field " + field + " is Points-based.";
-              log.warn(warningMessage);
-              List<String> warnings = (List<String>)rb.rsp.getResponseHeader().get("warnings");
-              if (null == warnings) {
-                warnings = Collections.synchronizedList(new ArrayList<>());
-                rb.rsp.getResponseHeader().add("warnings", warnings);
-              }
-              warnings.add(warningMessage);
+              log.info(warningMessage);
+              // concurrency problem
+//              List<String> warnings = (List<String>)rb.rsp.getResponseHeader().get("warnings");
+//              if (null == warnings) {
+//                warnings = Collections.synchronizedList(new ArrayList<>());
+//                rb.rsp.getResponseHeader().add("warnings", warnings);
+//              }
+//              warnings.add(warningMessage);
 
               mincount = 1;
             }

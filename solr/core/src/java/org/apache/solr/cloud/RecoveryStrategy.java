@@ -359,6 +359,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           return;
         }
 
+        Replica leader = null;
         if (tries == 0) {
 
           UpdateLog ulog = core.getUpdateHandler().getUpdateLog();
@@ -386,7 +387,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
           // ulog.bufferUpdates();
           //}
 
-          Replica leader = zkController.getZkStateReader().getLeaderRetry(coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(),
+           leader = zkController.getZkStateReader().getLeaderRetry(recoveryOnlyClient, coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(),
               Integer.getInteger("solr.getleader.looptimeout", 8000), true);
 
           boolean success = sendPrepRecoveryCmd(leader, core.getCoreDescriptor());
@@ -415,8 +416,10 @@ public class RecoveryStrategy implements Runnable, Closeable {
           return;
         }
 
-        Replica leader = zkController.getZkStateReader().getLeaderRetry(coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(),
-            Integer.getInteger("solr.getleader.looptimeout", 8000), tries > 1);
+        if (tries > 1) {
+          leader = zkController.getZkStateReader()
+              .getLeaderRetry(recoveryOnlyClient, coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(), Integer.getInteger("solr.getleader.looptimeout", 8000), true);
+        }
 
         if (leaderElector != null && leaderElector.isLeader()) {
           log.warn("We are the leader, STOP recovery", new SolrException(ErrorCode.INVALID_STATE, "Leader in recovery"));
@@ -982,8 +985,10 @@ public class RecoveryStrategy implements Runnable, Closeable {
       //prevSendPreRecoveryRequest = null;
       boolean success = latch.await(10, TimeUnit.SECONDS);
       if (!success) {
-        prevSendPreRecoveryRequest.cancel();
-        prevSendPreRecoveryRequest = null;
+        if (prevSendPreRecoveryRequest != null) {
+          prevSendPreRecoveryRequest.cancel();
+          prevSendPreRecoveryRequest = null;
+        }
         log.error("timeout waiting for prep recovery");
         return false;
       }
