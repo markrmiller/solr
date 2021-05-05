@@ -50,6 +50,9 @@ import org.apache.solr.search.grouping.distributed.shardresultserializer.TopGrou
  */
 public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
 
+  public static final TopDocs[] EMPTY_TOP_DOCS = new TopDocs[0];
+  public static final TopFieldDocs[] EMPTY_TOP_FIELD_DOCS = new TopFieldDocs[0];
+
   @Override
   @SuppressWarnings("unchecked")
   public void process(ResponseBuilder rb, ShardRequest shardRequest) {
@@ -165,6 +168,9 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
           docsPerGroup += subTopGroups.totalGroupedHitCount;
         }
       }
+      if (rb.mergedTopGroups == null) {
+        rb.mergedTopGroups = new HashMap<>();
+      }
       rb.mergedTopGroups.put(entry.getKey(), TopGroups.merge(topGroups.toArray(topGroupsArr), groupSort, withinGroupSort, groupOffsetDefault, docsPerGroup, TopGroups.ScoreMergeMode.None));
     }
 
@@ -198,11 +204,12 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
       final TopDocs mergedTopDocs;
       if (withinGroupSort.equals(Sort.RELEVANCE)) {
         mergedTopDocs = TopDocs.merge(
-            start, topN, topDocs.toArray(new TopDocs[0]));
+            start, topN, topDocs.toArray(EMPTY_TOP_DOCS));
       } else {
         mergedTopDocs = TopDocs.merge(
-            withinGroupSort, start, topN, topDocs.toArray(new TopFieldDocs[0]));
+            withinGroupSort, start, topN, topDocs.toArray(EMPTY_TOP_FIELD_DOCS));
       }
+      if (rb.mergedQueryCommandResults == null) rb.mergedQueryCommandResults = new HashMap<>();
       rb.mergedQueryCommandResults.put(entry.getKey(), new QueryCommandResult(mergedTopDocs, mergedMatches, maxScore));
     }
     fillResultIds(rb);
@@ -215,23 +222,27 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
   static void fillResultIds(ResponseBuilder rb) {
     Map<Object, ShardDoc> resultIds = new HashMap<>(32);
     int i = 0;
-    for (TopGroups<BytesRef> topGroups : rb.mergedTopGroups.values()) {
-      for (GroupDocs<BytesRef> group : topGroups.groups) {
-        for (ScoreDoc scoreDoc : group.scoreDocs) {
-          ShardDoc solrDoc = (ShardDoc) scoreDoc;
-          // Include the first if there are duplicate IDs
-          if ( ! resultIds.containsKey(solrDoc.id)) {
-            solrDoc.positionInResponse = i++;
-            resultIds.put(solrDoc.id, solrDoc);
+    if (rb.mergedTopGroups != null) {
+      for (TopGroups<BytesRef> topGroups : rb.mergedTopGroups.values()) {
+        for (GroupDocs<BytesRef> group : topGroups.groups) {
+          for (ScoreDoc scoreDoc : group.scoreDocs) {
+            ShardDoc solrDoc = (ShardDoc) scoreDoc;
+            // Include the first if there are duplicate IDs
+            if (!resultIds.containsKey(solrDoc.id)) {
+              solrDoc.positionInResponse = i++;
+              resultIds.put(solrDoc.id, solrDoc);
+            }
           }
         }
       }
     }
-    for (QueryCommandResult queryCommandResult : rb.mergedQueryCommandResults.values()) {
-      for (ScoreDoc scoreDoc : queryCommandResult.getTopDocs().scoreDocs) {
-        ShardDoc solrDoc = (ShardDoc) scoreDoc;
-        solrDoc.positionInResponse = i++;
-        resultIds.put(solrDoc.id, solrDoc);
+    if (rb.mergedQueryCommandResults != null) {
+      for (QueryCommandResult queryCommandResult : rb.mergedQueryCommandResults.values()) {
+        for (ScoreDoc scoreDoc : queryCommandResult.getTopDocs().scoreDocs) {
+          ShardDoc solrDoc = (ShardDoc) scoreDoc;
+          solrDoc.positionInResponse = i++;
+          resultIds.put(solrDoc.id, solrDoc);
+        }
       }
     }
 

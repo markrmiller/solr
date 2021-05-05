@@ -1311,8 +1311,8 @@ public class TestReplicationHandler extends SolrTestCaseJ4 {
       // now we restart to test what happens with no activity before the slave
       // tries to
       // replicate
-      masterJetty.stop();
-      masterJetty.start();
+      masterJetty.stop().await(5, TimeUnit.SECONDS);
+      masterJetty.start().await(5, TimeUnit.SECONDS);
       
       // masterClient = createNewSolrClient(masterJetty.getLocalPort());
       

@@ -376,12 +376,6 @@ public abstract class LBSolrClient extends SolrClient {
           return rsp; // SUCCESS
         } else {
           log.warn("", ex);
-          ex = doRequest(serverStr, req, rsp, false, serverIterator.isServingZombieServer());
-          if (ex == null) {
-            return rsp; // SUCCESS
-          } else {
-            log.warn("", ex);
-          }
         }
       } finally {
         MDC.remove("LBSolrClient.url");

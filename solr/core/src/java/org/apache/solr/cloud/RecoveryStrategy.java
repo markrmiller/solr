@@ -84,9 +84,14 @@ public class RecoveryStrategy implements Runnable, Closeable {
   private volatile ReplicationHandler replicationHandler;
   private final Http2SolrClient recoveryOnlyClient;
   private volatile boolean firstTime = true;
+  private volatile Replica firstLeader;
 
   final public void unclose() {
     close = false;
+  }
+
+  public final void setFirstLeader(Replica firstLeader) {
+    this.firstLeader = firstLeader;
   }
 
   public static class Builder implements NamedListInitializedPlugin {
@@ -329,7 +334,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
         SolrRequestHandler handler = core.getRequestHandler(ReplicationHandler.PATH);
         replicationHandler = (ReplicationHandler) handler;
 
-        doRecovery(core, coreDescriptor);
+        doRecovery(core, coreDescriptor, firstLeader);
       }
     } catch (InterruptedException e) {
       log.info("InterruptedException, won't do recovery", e);
@@ -343,7 +348,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
     }
   }
 
-  final public void doRecovery(SolrCore core, CoreDescriptor coreDescriptor) throws Exception {
+  final public void doRecovery(SolrCore core, CoreDescriptor coreDescriptor, Replica leader) throws Exception {
 
     int tries = 0;
     while (true) {
@@ -359,43 +364,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
           return;
         }
 
-        Replica leader = null;
         if (tries == 0) {
 
-          UpdateLog ulog = core.getUpdateHandler().getUpdateLog();
-
-          LeaderElector leaderElector = zkController.getLeaderElector(coreName);
-
-          if (leaderElector != null && leaderElector.isLeader()) {
-            log.warn("We are the leader, STOP recovery", new SolrException(ErrorCode.INVALID_STATE, "Leader in recovery"));
-            ZkNodeProps zkNodes = ZkNodeProps
-                .fromKeyVals(StatePublisher.OPERATION, OverseerAction.STATE.toLower(), ZkStateReader.CORE_NAME_PROP, core.getName(), "id",
-                    core.getCoreDescriptor().getCoreProperty("collId", null) + "-" + core.getCoreDescriptor().getCoreProperty("id", null),
-                    ZkStateReader.COLLECTION_PROP, core.getCoreDescriptor().getCollectionName(), ZkStateReader.STATE_PROP, Replica.State.LEADER);
-            zkController.publish(zkNodes);
-            close = true;
-            return;
-          }
-
-          log.debug("Publishing state of core [{}] as buffering {}", coreName, "doSyncOrReplicateRecovery");
-
-          zkController.publish(core.getCoreDescriptor(), Replica.State.BUFFERING);
-
-          //log.debug("Begin buffering updates. core=[{}]", coreName);
-          // recalling buffer updates will drop the old buffer tlog
-          //if (ulog.getState() != UpdateLog.State.BUFFERING) {
-          // ulog.bufferUpdates();
-          //}
-
-           leader = zkController.getZkStateReader().getLeaderRetry(recoveryOnlyClient, coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(),
-              Integer.getInteger("solr.getleader.looptimeout", 8000), true);
-
-          boolean success = sendPrepRecoveryCmd(leader, core.getCoreDescriptor());
-          if (!success) {
-            waitForRetry(core);
-            continue;
-          }
-        } else {
           tries++;
         }
 
@@ -418,7 +388,8 @@ public class RecoveryStrategy implements Runnable, Closeable {
 
         if (tries > 1) {
           leader = zkController.getZkStateReader()
-              .getLeaderRetry(recoveryOnlyClient, coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(), Integer.getInteger("solr.getleader.looptimeout", 8000), true);
+              .getLeaderRetry(recoveryOnlyClient, coreDescriptor.getCollectionName(), coreDescriptor.getCloudDescriptor().getShardId(),
+                  Integer.getInteger("solr.getleader.looptimeout", 8000), true);
         }
 
         if (leaderElector != null && leaderElector.isLeader()) {
@@ -951,94 +922,7 @@ public class RecoveryStrategy implements Runnable, Closeable {
     return close || cc.isShutDown();
   }
 
-  final private boolean sendPrepRecoveryCmd(Replica leader, CoreDescriptor coreDescriptor) {
 
-    if (isClosed()) {
-      throw new AlreadyClosedException();
-    }
 
-    String leaderCoreName = leader.getName();
 
-    if (leader.getNodeName().equals(zkController.getNodeName())) {
-      if (!zkStateReader.isLocalLeader.isLocalLeader(leaderCoreName)) {
-        throw new IllegalStateException("Via local check, " + leaderCoreName + " is not a current valid leader");
-      }
-    }
-    String leaderBaseUrl = leader.getBaseUrl();
-    WaitForState prepCmd = new WaitForState();
-    prepCmd.setCoreName(coreName);
-    prepCmd.setLeaderName(leaderCoreName);
-    prepCmd.setState(Replica.State.BUFFERING);
-    prepCmd.setCoresCollection(coreDescriptor.getCollectionName());
-    prepCmd.setCheckIsLeader(true);
-
-    log.info("Sending prep recovery command to {} for leader={} params={}", leaderBaseUrl, leaderCoreName, prepCmd.getParams());
-
-    try (Http2SolrClient client = new Http2SolrClient.Builder(leaderBaseUrl).withHttpClient(cc.getUpdateShardHandler()
-        .getRecoveryOnlyClient()).markInternalRequest().build()) {
-
-      prepCmd.setBasePath(leaderBaseUrl);
-      CountDownLatch latch = new CountDownLatch(1);
-      AtomicReference<NamedList> results = new AtomicReference<>();
-      AtomicReference<Throwable> exp = new AtomicReference<>();
-      prevSendPreRecoveryRequest = client.asyncRequest(prepCmd, null, new PrepRecoveryAsyncListener(results, latch, exp));
-      //prevSendPreRecoveryRequest = null;
-      boolean success = latch.await(10, TimeUnit.SECONDS);
-      if (!success) {
-        if (prevSendPreRecoveryRequest != null) {
-          prevSendPreRecoveryRequest.cancel();
-          prevSendPreRecoveryRequest = null;
-        }
-        log.error("timeout waiting for prep recovery");
-        return false;
-      }
-      Throwable exception = exp.get();
-      if (exception != null) {
-        log.error("failed in prep recovery", exception);
-        return false;
-      }
-
-      NamedList result = results.get();
-      log.info("results={}", result);
-      String prepSuccess = result._getStr(CoreAdminHandler.RESPONSE_STATUS, null);
-      if (prepSuccess != null) {
-        return Integer.parseInt(prepSuccess) == 0;
-      }
-      return true;
-    } catch (SolrException e) {
-      Throwable cause = e.getRootCause();
-      if (cause instanceof AlreadyClosedException) {
-        close = true;
-        throw new AlreadyClosedException(cause);
-      }
-      log.info("failed in prep recovery", e);
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    } catch (Exception e) {
-      log.info("failed in prep recovery", e);
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    } 
-      
-  }
-
-  private static class PrepRecoveryAsyncListener implements AsyncListener<NamedList<Object>> {
-    private final AtomicReference<NamedList> results;
-    private final CountDownLatch latch;
-    private final AtomicReference<Throwable> exp;
-
-    public PrepRecoveryAsyncListener(AtomicReference<NamedList> results, CountDownLatch latch, AtomicReference<Throwable> exp) {
-      this.results = results;
-      this.latch = latch;
-      this.exp = exp;
-    }
-
-    @Override public void onSuccess(NamedList<Object> entries, int code) {
-      results.set(entries);
-      latch.countDown();
-    }
-
-    @Override public void onFailure(Throwable throwable, int code) {
-      exp.set(throwable);
-      latch.countDown();
-    }
-  }
 }

@@ -111,16 +111,18 @@ public class TopGroupsShardRequestFactory implements ShardRequestFactory {
 
     sreq.params.set(GroupParams.GROUP_DISTRIBUTED_SECOND, "true");
     final IndexSchema schema = rb.req.getSearcher().getSchema();
-    for (Map.Entry<String, Collection<SearchGroup<BytesRef>>> entry : rb.mergedSearchGroups.entrySet()) {
-      for (SearchGroup<BytesRef> searchGroup : entry.getValue()) {
-        String groupValue;
-        if (searchGroup.groupValue != null) {
-          FieldType fieldType = schema.getField(entry.getKey()).getType();
-          groupValue = fieldType.indexedToReadable(searchGroup.groupValue, new CharsRefBuilder()).toString();
-        } else {
-          groupValue = GROUP_NULL_VALUE;
+    if (rb.mergedSearchGroups != null) {
+      for (Map.Entry<String,Collection<SearchGroup<BytesRef>>> entry : rb.mergedSearchGroups.entrySet()) {
+        for (SearchGroup<BytesRef> searchGroup : entry.getValue()) {
+          String groupValue;
+          if (searchGroup.groupValue != null) {
+            FieldType fieldType = schema.getField(entry.getKey()).getType();
+            groupValue = fieldType.indexedToReadable(searchGroup.groupValue, new CharsRefBuilder()).toString();
+          } else {
+            groupValue = GROUP_NULL_VALUE;
+          }
+          sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey(), groupValue);
         }
-        sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey(), groupValue);
       }
     }
 

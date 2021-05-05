@@ -554,7 +554,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 //    checkCollectionProperty(collectionName, propName, null, 3000);
   }
 
-  private void checkCollectionProperty(String collection, String propertyName, String propertyValue, long timeoutMs) throws InterruptedException {
+  private static void checkCollectionProperty(String collection, String propertyName, String propertyValue, long timeoutMs) throws InterruptedException {
     TimeOut timeout = new TimeOut(timeoutMs, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
     while (!timeout.hasTimedOut()){
       Thread.sleep(10);

@@ -42,14 +42,18 @@ public class StoredFieldsShardRequestFactory implements ShardRequestFactory {
   @Override
   public ShardRequest[] constructRequest(ResponseBuilder rb) {
     HashMap<String, Set<ShardDoc>> shardMap = new HashMap<>();
-    for (TopGroups<BytesRef> topGroups : rb.mergedTopGroups.values()) {
-      for (GroupDocs<BytesRef> group : topGroups.groups) {
-        mapShardToDocs(shardMap, group.scoreDocs);
+    if (rb.mergedTopGroups != null) {
+      for (TopGroups<BytesRef> topGroups : rb.mergedTopGroups.values()) {
+        for (GroupDocs<BytesRef> group : topGroups.groups) {
+          mapShardToDocs(shardMap, group.scoreDocs);
+        }
       }
     }
 
-    for (QueryCommandResult queryCommandResult : rb.mergedQueryCommandResults.values()) {
-      mapShardToDocs(shardMap, queryCommandResult.getTopDocs().scoreDocs);
+    if (rb.mergedQueryCommandResults != null) {
+      for (QueryCommandResult queryCommandResult : rb.mergedQueryCommandResults.values()) {
+        mapShardToDocs(shardMap, queryCommandResult.getTopDocs().scoreDocs);
+      }
     }
 
     ShardRequest[] shardRequests = new ShardRequest[shardMap.size()];

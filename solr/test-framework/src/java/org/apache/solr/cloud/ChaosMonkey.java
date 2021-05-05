@@ -585,7 +585,7 @@ public class ChaosMonkey {
     for (JettySolrRunner jetty : jettys) {
       ParWork.submit("ChaosMonkey", () -> {
         try {
-          jetty.stop();
+          jetty.stop().await(5, TimeUnit.SECONDS);
         } catch (Exception e) {
           ParWork.propagateInterrupt(e);
           log.error("error stopping jetty", e);
@@ -600,7 +600,7 @@ public class ChaosMonkey {
     for (JettySolrRunner jetty : jettys) {
       executor.submit(() -> {
         try {
-          jetty.start();
+          jetty.start().await(5, TimeUnit.SECONDS);
         } catch (Exception e) {
           ParWork.propagateInterrupt(e);
           log.error("error starting jetty", e);

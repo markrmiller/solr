@@ -43,6 +43,7 @@ import org.jctools.maps.NonBlockingHashMap;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -187,12 +188,12 @@ public class ResponseBuilder
   boolean _isOlapAnalytics;
 
   // Context fields for grouping
-  public final Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups = new NonBlockingHashMap<>();
-  public final Map<String, Integer> mergedGroupCounts = new NonBlockingHashMap<>();
-  public final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new NonBlockingHashMap<>();
-  public final Map<String, TopGroups<BytesRef>> mergedTopGroups = new NonBlockingHashMap<>();
-  public final Map<String, QueryCommandResult> mergedQueryCommandResults = new NonBlockingHashMap<>();
-  public final Map<Object, SolrDocument> retrievedDocuments = new NonBlockingHashMap<>();
+  public Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups;
+  public Map<String, Integer> mergedGroupCounts;
+  public Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards;
+  public Map<String, TopGroups<BytesRef>> mergedTopGroups;
+  public Map<String, QueryCommandResult> mergedQueryCommandResults;
+  public Map<Object, SolrDocument> retrievedDocuments = new HashMap<>();
   public int totalHitCount; // Hit count used when distributed grouping is performed.
   // Used for timeAllowed parameter. First phase elapsed time is subtracted from the time allowed for the second phase.
   public int firstPhaseElapsedTime;

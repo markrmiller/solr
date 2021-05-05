@@ -99,6 +99,7 @@ public class ZkStateWriter {
   private final Set<String> dirtyStructure = ConcurrentHashMap.newKeySet();
 
   private volatile ExecutorService workerExec;
+  private volatile long start;
 
   public ZkStateWriter(ZkStateReader zkStateReader, Stats stats, Overseer overseer) {
     this.overseer = overseer;
@@ -526,6 +527,7 @@ public class ZkStateWriter {
 
   public void init(boolean weAreReplacement) {
     log.info("ZkStateWriter Init - A new Overseer in charge or we are back baby replacement={}", weAreReplacement);
+    start = System.nanoTime();
     try {
 
       overseer.getCoreContainer().getZkController().clearStatePublisher();
@@ -734,15 +736,14 @@ public class ZkStateWriter {
 
       if (collection == null) {
         log.info("could not find id for collection id={} collections={}", collId, getCollections());
-        if (tryCnt < 5) {
-          ParWork.submitIO("writeStateRetry", () -> {
-            try {
-              Thread.sleep(500);
-            } catch (InterruptedException e) {
+        if (TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS) < 5000) {
 
-            }
-            writeStateUpdatesInternal(Collections.singleton(collId), tryCnt + 1);
-          });
+          try {
+            writeStateUpdates(Collections.singleton(collId));
+          } catch (InterruptedException e) {
+
+          }
+
         }
         continue;
       }
@@ -773,7 +774,6 @@ public class ZkStateWriter {
           return idToStateMap;
         });
 
-
         try {
           //  reader.getZkClient().setData(stateUpdatesPath, toJavabin(javaBinMap), -1, true);
           log.debug("writeStateUpdates for {} {}", collIds, javaBinMap);
@@ -784,14 +784,14 @@ public class ZkStateWriter {
               log.error("Exception writeStateUpdates znode path={}", path1, e);
 
               if (e instanceof KeeperException.ConnectionLossException) {
-//                  reader.getZkClient().getConnectionManager().waitForConnected();
-//                  overseer.getTaskZkWriterExecutor().submit(() -> {
-//                    try {
-//                      workQueue.put(collIds);
-//                    } catch (InterruptedException interruptedException) {
-//                      log.warn("interrupted", interruptedException);
-//                    }
-//                  });
+                //                  reader.getZkClient().getConnectionManager().waitForConnected();
+                //                  overseer.getTaskZkWriterExecutor().submit(() -> {
+                //                    try {
+                //                      workQueue.put(collIds);
+                //                    } catch (InterruptedException interruptedException) {
+                //                      log.warn("interrupted", interruptedException);
+                //                    }
+                //                  });
 
               }
             }
@@ -800,13 +800,13 @@ public class ZkStateWriter {
           log.error("Exception writing out state updates async", e);
 
           if (e instanceof KeeperException.ConnectionLossException) {
-//              reader.getZkClient().getConnectionManager().waitForConnected();
-//              overseer.getTaskZkWriterExecutor().submit(() -> {
-//
-//                if (!workQueue.tryTransfer(collIds)) {
-//                  workQueue.put(collIds);
-//                }
-//              });
+            //              reader.getZkClient().getConnectionManager().waitForConnected();
+            //              overseer.getTaskZkWriterExecutor().submit(() -> {
+            //
+            //                if (!workQueue.tryTransfer(collIds)) {
+            //                  workQueue.put(collIds);
+            //                }
+            //              });
 
           }
         }

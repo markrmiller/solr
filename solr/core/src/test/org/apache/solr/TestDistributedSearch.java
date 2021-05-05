@@ -992,7 +992,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
       JettySolrRunner downJetty = upJettys.remove(indexToRemove);
       upClients.remove(indexToRemove);
       upShards.remove(indexToRemove);
-      downJetty.stop();
+      downJetty.stop().await(5, TimeUnit.SECONDS);
       downJettys.add(downJetty);
     }
     

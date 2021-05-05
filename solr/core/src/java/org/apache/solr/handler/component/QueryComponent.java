@@ -656,6 +656,9 @@ public class QueryComponent extends SearchComponent
   protected static void groupedFinishStage(final ResponseBuilder rb) {
     // To have same response as non-distributed request.
     GroupingSpecification groupSpec = rb.getGroupingSpec();
+    if (rb.mergedTopGroups == null) {
+      rb.mergedTopGroups = new HashMap<>();
+    }
     if (rb.mergedTopGroups.isEmpty()) {
       for (String field : groupSpec.getFields()) {
         rb.mergedTopGroups.put(field, new TopGroups(null, null, 0, 0, EMPTY_GROUPS, Float.NaN));
@@ -679,6 +682,11 @@ public class QueryComponent extends SearchComponent
     }
     Map<String, Object> combinedMap = new LinkedHashMap<>();
     combinedMap.putAll(rb.mergedTopGroups);
+
+    if (rb.mergedQueryCommandResults == null) {
+      rb.mergedQueryCommandResults = new HashMap<>();
+    }
+
     combinedMap.putAll(rb.mergedQueryCommandResults);
     endResultTransformer.transform(combinedMap, rb, solrDocumentSource);
   }
