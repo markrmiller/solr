@@ -276,9 +276,6 @@ public class JettySolrRunner implements Closeable {
 //    classlist.addBefore(
 //        "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
 //        "org.eclipse.jetty.annotations.AnnotationConfiguration");
-    server.setStopAtShutdown(true);
-    server.setStopTimeout(300); // will wait gracefully for stoptime / 2, then interrupts
-
 
 
     long idleTimeout = TimeUnit.SECONDS.toMillis(30);
@@ -356,14 +353,14 @@ public class JettySolrRunner implements Closeable {
       }
       h2.setMaxConcurrentStreams(512);
       h2.setInputBufferSize(8192);
-
+      httpFactory.setInputBufferSize(8192);
       //h2.setStreamIdleTimeout(idleTimeout);
 
     //  NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
 
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, null, null, null, 1, 1, httpFactory, h2);
+        connector = new ServerConnector(server, null, null, null, 1, 1, h2, httpFactory);
       } else {
         connector = new ServerConnector(server, null, null, null, 1, 1, ssl, alpn, httpFactory, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());
@@ -377,6 +374,10 @@ public class JettySolrRunner implements Closeable {
 
     server.addConnector(connector);
     server.manage(connector);
+
+
+    server.setStopAtShutdown(true);
+    server.setStopTimeout(300); // will wait gracefully for stoptime / 2, then interrupts
 
 //    server.setDumpAfterStart(true);
 //    server.setDumpBeforeStop(true);

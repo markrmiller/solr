@@ -59,13 +59,22 @@ public class BinContentStreamDataSource extends DataSource<InputStream> {
 
   @Override
   public void close() {
-     if (contentStream != null) {
+    if (contentStream != null) {
       try {
         if (in == null) in = contentStream.getStream();
-        in.close();
       } catch (IOException e) {
         /*no op*/
+      } finally {
+        if (in != null) {
+          try {
+            while (true) {
+              if (!(in.read() != -1)) break;
+            }
+          } catch (IOException e) {
+
+          }
+        }
       }
-    } 
+    }
   }
 }

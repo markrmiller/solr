@@ -543,7 +543,7 @@ public class Http2SolrClient extends SolrClient {
     BufferingResponseListener listener = new BufferingResponseListener(8 * 1024 * 1024) {
       @Override public void onComplete(Result result) {
         Throwable f = result.getFailure();
-        if (f != null && (f instanceof ClosedChannelException)) {
+        if (f != null && (f instanceof ClosedChannelException || f instanceof IllegalStateException)) {
           try {
             httpClient.getDestinations().forEach(dest1 -> {
               if (new Origin.Address(dest1.getHost(), dest1.getPort()).equals(new Origin.Address(req.getHost(), req.getPort()))) {
@@ -568,7 +568,7 @@ public class Http2SolrClient extends SolrClient {
             //          return body;
             //        }
 
-            throw new RemoteSolrException(req.getHost(), 444, "Request accepted but no response", f);
+            throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", f);
           } finally {
             asyncTracker.arrive();
           }
@@ -749,7 +749,7 @@ public class Http2SolrClient extends SolrClient {
 
 
 
-    FutureResponseListener listener = new FutureResponseListener(req);
+    FutureResponseListener listener = new FutureResponseListener(req, 8 * 1024 * 1024);
 
     CloseShieldInputStream is = null;
     try {
@@ -1184,7 +1184,7 @@ public class Http2SolrClient extends SolrClient {
         if (remoteHost == null) {
           remoteHost = serverBaseUrl;
         }
-        throw new RemoteSolrException(remoteHost, 1, "Exception try to process response", req.getAbortCause());
+        throw new RemoteSolrException(remoteHost, 500, "Exception try to process response", req.getAbortCause());
       }
 
       // log.error("rsp:{}", rsp);

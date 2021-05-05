@@ -734,19 +734,19 @@ public class ZkStateWriter {
     for (Integer collId : collIds) {
       String collection = idToCollection.get(collId);
 
-      if (collection == null) {
-        log.info("could not find id for collection id={} collections={}", collId, getCollections());
-        if (TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS) < 5000) {
-
-          try {
-            writeStateUpdates(Collections.singleton(collId));
-          } catch (InterruptedException e) {
-
-          }
-
-        }
-        continue;
-      }
+//      if (collection == null) {
+//        log.info("could not find id for collection id={} collections={}", collId, getCollections());
+//        if (TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS) < 5000) {
+//
+//          try {
+//            writeStateUpdates(Collections.singleton(collId));
+//          } catch (InterruptedException e) {
+//
+//          }
+//
+//        }
+//        continue;
+//      }
 
       overseer.getTaskZkWriterExecutor().submit(() -> {
 

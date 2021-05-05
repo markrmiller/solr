@@ -109,9 +109,13 @@ public class TestPullReplica extends SolrCloudTestCase {
 
   @Override
   public void tearDown() throws Exception {
-    if (cluster.getSolrClient().getZkStateReader().getClusterState().getCollectionOrNull(collectionName) != null) {
-      log.info("tearDown deleting collection");
-      CollectionAdminRequest.deleteCollection(collectionName).process(cluster.getSolrClient());
+    try {
+      if (cluster.getSolrClient().getZkStateReader().getClusterState().getCollectionOrNull(collectionName) != null) {
+        log.info("tearDown deleting collection");
+        CollectionAdminRequest.deleteCollection(collectionName).process(cluster.getSolrClient());
+      }
+    } catch (Exception e) {
+      log.warn("delete collection failed on teardown", e);
     }
     super.tearDown();
   }

@@ -159,32 +159,32 @@ public abstract class ContentStreamBase implements ContentStream
     @Override
     public InputStream getStream() throws IOException {
       // MRM TODO: not streaming, but using http2
-     // URLConnection conn = this.url.openConnection();
-      Http2SolrClient client = new Http2SolrClient.Builder(url.toString()).build();
-      client.setParser(new InputStreamResponseParser(CommonParams.STREAM_CONTENTTYPE));
+      // URLConnection conn = this.url.openConnection();
+      try (Http2SolrClient client = new Http2SolrClient.Builder(url.toString()).build()) {
+        client.setParser(new InputStreamResponseParser(CommonParams.STREAM_CONTENTTYPE));
 
+        InputStream is = null;
+        Http2SolrClient.SimpleResponse resp = null;
+        try {
+          resp = Http2SolrClient.GET(url.toString());
+          is = new ByteArrayInputStream(resp.bytes);
+        } catch (InterruptedException e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        } catch (ExecutionException e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        } catch (TimeoutException timeoutException) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, timeoutException);
+        }
+        contentType = resp.contentType;
+        name = url.toExternalForm();
+        size = Long.valueOf(resp.bytes.length);
 
-      InputStream is = null;
-      Http2SolrClient.SimpleResponse resp = null;
-      try {
-       resp = Http2SolrClient.GET(url.toString());
-       is = new ByteArrayInputStream(resp.bytes);
-      } catch (InterruptedException e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-      } catch (ExecutionException e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-      } catch (TimeoutException timeoutException) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, timeoutException);
+        String urlFile = url.getFile().toLowerCase(Locale.ROOT);
+        if ("gzip".equals(resp.contentType) || urlFile.endsWith(".gz") || urlFile.endsWith(".gzip")) {
+          is = new GZIPInputStream(is);
+        }
+        return is;
       }
-      contentType = resp.contentType;
-      name = url.toExternalForm();
-      size = Long.valueOf(resp.bytes.length);
-
-      String urlFile = url.getFile().toLowerCase(Locale.ROOT);
-      if( "gzip".equals(resp.contentType) || urlFile.endsWith( ".gz" ) || urlFile.endsWith( ".gzip" )){
-        is = new GZIPInputStream(is);
-      }
-      return is;
     }
   }
   
