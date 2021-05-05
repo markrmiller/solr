@@ -508,6 +508,10 @@ public class MiniSolrCloudCluster {
     return jettys.get(index);
   }
 
+  public JettySolrRunner removeJettySolrRunner(int index) {
+    return jettys.remove(index);
+  }
+
   /**
    * Start a new Solr instance on a particular servlet context
    *
@@ -547,9 +551,8 @@ public class MiniSolrCloudCluster {
    * @return the shut down node
    */
   public JettySolrRunner stopJettySolrRunner(int index) throws Exception {
-    JettySolrRunner jetty = jettys.get(index);
+    JettySolrRunner jetty = jettys.remove(index);
     jetty.stop();
-    jettys.remove(index);
     return jetty;
   }
 

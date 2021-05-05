@@ -65,11 +65,13 @@ import java.lang.invoke.MethodHandles;
 import java.net.BindException;
 import java.net.URI;
 import java.util.EnumSet;
+import java.util.EventListener;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
@@ -119,6 +121,8 @@ public class JettySolrRunner implements Closeable {
 
   private volatile boolean closed;
   private ScheduledReporter reporter;
+  private volatile CountDownLatch startUpLatch;
+  private volatile CountDownLatch stopLatch;
 
   public String getContext() {
     return config.context;
@@ -273,7 +277,7 @@ public class JettySolrRunner implements Closeable {
 //        "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
 //        "org.eclipse.jetty.annotations.AnnotationConfiguration");
     server.setStopAtShutdown(true);
-    server.setStopTimeout(500); // will wait gracefully for stoptime / 2, then interrupts
+    server.setStopTimeout(2000); // will wait gracefully for stoptime / 2, then interrupts
 
 
 
@@ -422,15 +426,22 @@ public class JettySolrRunner implements Closeable {
 
       if (log.isDebugEnabled()) log.debug("Jetty loaded and ready to go");
 
+      connector.addEventListener(new LifeCycle.Listener() {
+        @Override public void lifeCycleStopped(LifeCycle arg0) {
+          log.warn("SERVER STOPPED!");
+          if (stopLatch != null) {
+            stopLatch.countDown();
+          }
+        }
+      });
+
+
       server.addEventListener(new LifeCycle.Listener() {
 
         @Override
         public void lifeCycleStopping(LifeCycle arg0) {
         }
 
-        @Override
-        public void lifeCycleStopped(LifeCycle arg0) {
-        }
 
         @Override
         public void lifeCycleStarting(LifeCycle arg0) {
@@ -474,7 +485,9 @@ public class JettySolrRunner implements Closeable {
             log.debug("user.dir={}", System.getProperty("user.dir"));
           }
 
-
+          if (startUpLatch != null) {
+            startUpLatch.countDown();
+          }
 
          // SolrMetricManager metricsManager = cores.getMetricManager();
 
@@ -612,9 +625,10 @@ public class JettySolrRunner implements Closeable {
    * If the server has been started before, it will restart using the same port
    *
    * @throws Exception if an error occurs on startup
+   * @return
    */
-  public void start() throws Exception {
-    start(true);
+  public CountDownLatch start() throws Exception {
+    return start(true);
   }
 
   /**
@@ -625,12 +639,14 @@ public class JettySolrRunner implements Closeable {
    *                  the port specified by the server's JettyConfig.
    *
    * @throws Exception if an error occurs on startup
+   * @return
    */
-  public void start(boolean reusePort) throws Exception {
+  public CountDownLatch start(boolean reusePort) throws Exception {
     closed = false;
     // Do not let Jetty/Solr pollute the MDC for this thread
     Map<String, String> prevContext = MDC.getCopyOfContextMap();
     MDC.clear();
+    startUpLatch = new CountDownLatch(1);
 
     try {
       int port = reusePort && jettyPort != -1 ? jettyPort : this.config.port;
@@ -663,7 +679,7 @@ public class JettySolrRunner implements Closeable {
           proxy.open(new URI(getBaseUrl()));
         }
       }
-
+      return startUpLatch;
     } finally {
       started  = true;
 
@@ -738,9 +754,13 @@ public class JettySolrRunner implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if (closed) return;
-    closed = true;
+    doClose();
+  }
 
+  public CountDownLatch doClose() throws IOException {
+    if (closed) return new CountDownLatch(0);
+    closed = true;
+    stopLatch = new CountDownLatch(1);
     // Do not let Jetty/Solr pollute the MDC for this thread
     Map<String,String> prevContext = MDC.getCopyOfContextMap();
     MDC.clear();
@@ -764,7 +784,7 @@ public class JettySolrRunner implements Closeable {
       } catch (InterruptedException e) {
 
       }
-
+      return stopLatch;
     } catch (Exception e) {
       log.error("Exception stopping jetty", e);
       throw new RuntimeException(e);
@@ -792,8 +812,8 @@ public class JettySolrRunner implements Closeable {
    *
    * @throws Exception if an error occurs on shutdown
    */
-  public void stop() throws Exception {
-    close();
+  public CountDownLatch stop() throws Exception {
+    return doClose();
   }
 
   /**

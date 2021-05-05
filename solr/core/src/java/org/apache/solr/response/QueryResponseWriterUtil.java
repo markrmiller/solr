@@ -27,6 +27,7 @@ import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.ContentStreamBase;
+import org.apache.solr.common.util.ExpandableBuffers;
 import org.apache.solr.request.SolrQueryRequest;
 
 /**
@@ -44,8 +45,10 @@ public final class QueryResponseWriterUtil {
    */
   public static ExpandableDirectBufferOutputStream writeQueryResponse(QueryResponseWriter responseWriter, SolrQueryRequest solrRequest,
       SolrQueryResponse solrResponse, String contentType) throws IOException {
-    MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
-    ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer);
+
+    //ExpandableDirectBufferOutputStream outStream = ExpandableBuffers.buffer1.get();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
+    ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     if (responseWriter instanceof BinaryQueryResponseWriter) {
       BinaryQueryResponseWriter binWriter = (BinaryQueryResponseWriter) responseWriter;
       binWriter.write(outStream, solrRequest, solrResponse);

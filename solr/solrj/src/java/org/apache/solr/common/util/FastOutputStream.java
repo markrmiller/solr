@@ -16,9 +16,6 @@
  */
 package org.apache.solr.common.util;
 
-import org.agrona.ExpandableDirectByteBuffer;
-import org.agrona.io.ExpandableDirectBufferOutputStream;
-
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.FilterOutputStream;
@@ -31,23 +28,20 @@ import java.io.UnsupportedEncodingException;
  */
 public class FastOutputStream extends FilterOutputStream implements DataOutput {
   protected final SolrDataOutputStream dout;
-  protected final ExpandableDirectBufferOutputStream byteArrayOut;
-
-  //protected final OutputStream out;
-  // protected byte[] buf;
+  //protected final ExpandableDirectBufferOutputStream byteArrayOut;
 
   public FastOutputStream(OutputStream out) {
     super(new SolrDataOutputStream(out));
     this.dout = (SolrDataOutputStream) this.out;
-    byteArrayOut = null;
+   // byteArrayOut = null;
   }
 
-  public FastOutputStream(int sz) {
-    super(new ExpandableDirectBufferOutputStream(new ExpandableDirectByteBuffer(sz)));
-
-    byteArrayOut = (ExpandableDirectBufferOutputStream) out;
-    this.dout = new SolrDataOutputStream(byteArrayOut);
-  }
+//  public FastOutputStream(int sz) {
+//    super(new ExpandableDirectBufferOutputStream(new ExpandableDirectByteBuffer(sz)));
+//
+//    byteArrayOut = (ExpandableDirectBufferOutputStream) out;
+//    this.dout = new SolrDataOutputStream(byteArrayOut);
+//  }
 
 //  public byte[] getData() {
 //    return byteArrayOut.buffer().byteArray();

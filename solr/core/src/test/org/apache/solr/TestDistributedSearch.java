@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.util.LuceneTestCase;
@@ -1045,7 +1046,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
 
     // restart the jettys
     for (JettySolrRunner downJetty : downJettys) {
-      downJetty.start();
+      downJetty.start().await(5, TimeUnit.SECONDS);
     }
 
     // This index has the same number for every field

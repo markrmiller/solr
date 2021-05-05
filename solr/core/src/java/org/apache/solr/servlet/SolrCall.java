@@ -20,7 +20,6 @@ import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JsonSchemaValidator;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -48,7 +47,6 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
-import org.eclipse.jetty.client.util.InputStreamContentProvider;
 import org.eclipse.jetty.client.util.InputStreamRequestContent;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpField;
@@ -362,9 +360,9 @@ public abstract class SolrCall {
       QueryResponseWriter responseWriter, Method reqMethod)
       throws IOException {
     try {
-//      if (!req.getInputStream().isFinished()) {
-//        SolrDispatchFilter.consumeInputFully(req, response);
-//      }
+      if (!req.getInputStream().isFinished()) {
+        SolrDispatchFilter.consumeInputFully(req, response);
+      }
 
       Map invalidStates = (Map) solrReq.getContext().get(BaseCloudSolrClient.STATE_VERSION);
       //This is the last item added to the response and the client would expect it that way.
@@ -394,8 +392,8 @@ public abstract class SolrCall {
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
         // buffer.limit(outStream.siz);
-        buffer.position(outStream.offset());
-        buffer.limit(outStream.position());
+        buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
+        buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
 
         if (SolrDispatchFilter.ASYNC && SolrDispatchFilter.ASYNC_IO) {
 
@@ -817,7 +815,7 @@ public abstract class SolrCall {
       } else {
         AtomicReference<Throwable> failException = new AtomicReference<>();
         InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
-      //  InputStream is = listener.getInputStream();
+        InputStream is = null;
         try {
           proxyRequest.send(listener);
 
@@ -827,7 +825,7 @@ public abstract class SolrCall {
 //          } catch (Exception e) {
 //            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
 //          }
-          InputStream is = null;
+
           try {
             is = listener.getInputStream();
             is.transferTo(response.getOutputStream());
@@ -840,11 +838,11 @@ public abstract class SolrCall {
           }
         } finally {
 
-//          if (is != null) {
-//            while (is.read() != -1) {
-//
-//            }
-//          }
+          if (is != null) {
+            while (is.read() != -1) {
+
+            }
+          }
         }
       }
     }

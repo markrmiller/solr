@@ -157,9 +157,9 @@ public class SolrCmdDistributor implements Closeable {
         }
       }
 
-      if (err.t instanceof IOException && !(err.t instanceof ClosedChannelException)) {
-        doRetry = true;
-      }
+//      if (err.t instanceof IOException && !(err.t instanceof ClosedChannelException)) {
+//        doRetry = true;
+//      }
 
       if (err.req != null && err.req.retries.get() < maxRetries && doRetry && (isClosed == null || !isClosed.isClosed())) {
         try {

@@ -68,10 +68,10 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
   static class StreamCodec extends JavaBinCodec {
 
-    final FastInputStream dis;
+    final SolrInputStream dis;
 
     StreamCodec(InputStream is) {
-      this.dis = FastInputStream.wrap(is);
+      this.dis = SolrInputStream.wrap(is);
     }
 
 

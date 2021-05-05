@@ -25,6 +25,7 @@ import java.nio.file.Paths;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.junit.BeforeClass;
@@ -72,9 +73,10 @@ public class TestRequestForwarding extends SolrTestCaseJ4 {
       };
       for (String q: queryStrings) {
         try {
-          URL url = new URL(jettySolrRunner.getBaseUrl().toString()+"/collection1/select?"+ URLEncoder.encode(q, "UTF-8"));
-          InputStream is = url.openStream(); // Shouldn't throw any errors
-          is.close();
+
+          Http2SolrClient.SimpleResponse res = Http2SolrClient
+              .GET(jettySolrRunner.getBaseUrl().toString() + "/collection1/select?" + URLEncoder.encode(q, "UTF-8"));
+
         } catch (Exception ex) {
           throw new RuntimeException("Query '" + q + "' failed, ",ex);
         }

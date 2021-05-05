@@ -69,7 +69,7 @@ public abstract class LBSolrClient extends SolrClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // defaults
-  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503));
+  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 444));
   private static final int CHECK_INTERVAL = 30 * 1000; //30 seconds between checks
   private static final int NONSTANDARD_PING_LIMIT = 10;  // number of times we'll ping dead servers not in the server list
   public static final ServerWrapper[] EMPTY_SERVER_WRAPPER = new ServerWrapper[0];
@@ -183,6 +183,7 @@ public abstract class LBSolrClient extends SolrClient {
 
       while (it.hasNext()) {
         serverStr = it.next();
+
         serverStr = normalize(serverStr);
         // if the server is currently a zombie, just skip to the next one
         ServerWrapper wrapper = zombieServers.get(serverStr);
@@ -375,6 +376,12 @@ public abstract class LBSolrClient extends SolrClient {
           return rsp; // SUCCESS
         } else {
           log.warn("", ex);
+          ex = doRequest(serverStr, req, rsp, false, serverIterator.isServingZombieServer());
+          if (ex == null) {
+            return rsp; // SUCCESS
+          } else {
+            log.warn("", ex);
+          }
         }
       } finally {
         MDC.remove("LBSolrClient.url");
@@ -423,6 +430,7 @@ public abstract class LBSolrClient extends SolrClient {
         }
         throw e;
       }
+
     } catch (SocketException e) {
       if (!isNonRetryable || e instanceof ConnectException || e.getMessage().contains("Protocol family unavailable")) {
         ex = (!isZombie) ? addZombie(baseUrl, e) : e;

@@ -612,8 +612,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
   public static void sendException(Throwable e, SolrCall call, HttpServletRequest request, HttpServletResponse response) throws IOException {
       log.error("Solr ran into an unexpected problem.", e);
-    log.warn("Count not send client formatted error", e);
-    log.error("onError", e);
+
+
 //    response.setStatus(e instanceof SolrException ? ((SolrException) e).code() : 500);
 //    PrintWriter writer = new PrintWriter(response.getOutputStream()); // we don't close, the container will
 //    writer.write(e.getClass().getName() + ' ' + e.getMessage());
@@ -674,9 +674,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
           ExpandableDirectBufferOutputStream outStream = QueryResponseWriterUtil.writeQueryResponse(responseWriter, solrRequest, solrResponse, ct);
           ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
-          // buffer.limit(outStream.siz);
-          buffer.position(outStream.offset());
-          buffer.limit(outStream.position());
+          buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
+          buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
           out.sendContent(buffer);
         } catch (Exception ex) {
           log.warn("Count not send client formatted error", e);

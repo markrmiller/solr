@@ -81,6 +81,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
@@ -1230,6 +1231,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
         log.info("Poll disabled");
         return;
       }
+      //ExecutorUtil.setServerThreadFlag(true); // so PKI auth works
       try {
         log.debug("Polling for index modifications");
         markScheduledExecutionStart();

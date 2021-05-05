@@ -155,7 +155,15 @@ public class RecoveryZkTest extends SolrCloudTestCase {
 
     cluster.waitForActiveCollection(collection, 30, TimeUnit.SECONDS,  false,1, 2, true, true);
 
-    new UpdateRequest().commit(cluster.getSolrClient(), collection);
+    try {
+      new UpdateRequest().commit(cluster.getSolrClient(), collection);
+    } catch (Exception e) {
+      try {
+        new UpdateRequest().commit(cluster.getSolrClient(), collection);
+      } catch (Exception e2) {
+
+      }
+    }
 
     // test that leader and replica have same doc count
 
@@ -177,7 +185,7 @@ public class RecoveryZkTest extends SolrCloudTestCase {
 
   }
 
-  private void assertShardConsistency(Slice shard, boolean expectDocs) throws Exception {
+  private static void assertShardConsistency(Slice shard, boolean expectDocs) throws Exception {
     List<Replica> replicas = shard.getReplicas(r -> r.getState() == Replica.State.ACTIVE);
     long[] numCounts = new long[replicas.size()];
     int i = 0;

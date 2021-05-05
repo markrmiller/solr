@@ -218,12 +218,9 @@ public class LBHttp2SolrClient extends LBSolrClient {
             listener.onFailure(e, false);
           }
         } catch (Exception e) {
-          if (!isNonRetryable && e instanceof ClosedChannelException) {
-            listener.onFailure(e, true);
-          } else {
-            listener.onFailure(new SolrServerException(e), false);
-          }
+          listener.onFailure(new SolrServerException(e), false);
         }
+
       }
     });
   }

@@ -77,7 +77,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
 
     try (Http2SolrClient client1 = SolrTestCaseJ4.getHttpSolrClient(node1.getBaseUrl())) {
 
-      node2.stop();
+      node2.stop().await(15, TimeUnit.SECONDS);
 
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 2);
       Thread.sleep(250);
@@ -99,7 +99,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
         }
       }
 
-      node2.start();
+      node2.start().await(15, TimeUnit.SECONDS);
 
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
       Thread.sleep(500);
@@ -153,7 +153,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       }
 
       //
-      node2.stop();
+      node2.stop().await(5, TimeUnit.SECONDS);
 
 
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 2);
@@ -167,7 +167,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       v = client1.query(COLLECTION, new SolrQuery("q","id:1", "distrib", "false")).getResults().get(0).get("num");
       assertEquals("20", v.toString());
 
-      node2.start();
+      node2.start().await(5, TimeUnit.SECONDS);
 
       Thread.sleep(500);
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
@@ -191,11 +191,11 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
         }
       }
 
-      node2.stop();
+      node2.stop().await(5, TimeUnit.SECONDS);
 
       Thread.sleep(250);
      // cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 2);
-
+      cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 2);
       log.info("wait for active collection before query");
       cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 10, TimeUnit.SECONDS, false, 1, 2, true, false);
 
@@ -228,7 +228,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       }
 
 
-      node2.start();
+      node2.start().await(5, TimeUnit.SECONDS);
 
 
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
@@ -248,7 +248,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
     }
     Replica oldLeader = cluster.getSolrClient().getZkStateReader().getLeaderRetry(cluster.getSolrClient().getHttpClient(), COLLECTION,"s1", 5000, false);
 
-    node1.stop();
+    node1.stop().await(5, TimeUnit.SECONDS);
 
     cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 2);
     Thread.sleep(250);
@@ -268,7 +268,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       });
     }
 
-    node1.start();
+    node1.start().await(5, TimeUnit.SECONDS);
 
     cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
     Thread.sleep(250);

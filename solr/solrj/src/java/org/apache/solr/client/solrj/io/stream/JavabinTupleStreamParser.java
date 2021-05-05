@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.common.util.DataInputInputStream;
-import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JavaBinCodec;
 

@@ -38,6 +38,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -62,6 +63,7 @@ import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
+import org.apache.solr.client.solrj.impl.BaseHttpSolrClient;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -527,12 +529,12 @@ public class TestReplicationHandler extends SolrTestCaseJ4 {
 
   //Simple function to wrap the invocation of replication commands on the various
   //jetty servers.
-  static void invokeReplicationCommand(int pJettyPort, String pCommand) throws IOException
-  {
+  static void invokeReplicationCommand(int pJettyPort, String pCommand) throws ExecutionException, InterruptedException, TimeoutException {
     String masterUrl = buildUrl(pJettyPort) + "/" + DEFAULT_TEST_CORENAME + ReplicationHandler.PATH+"?command=" + pCommand;
-    URL u = new URL(masterUrl);
-    InputStream stream = u.openStream();
-    stream.close();
+    Http2SolrClient.SimpleResponse resp = Http2SolrClient.GET(masterUrl);
+    if (resp.status != 200) {
+      throw new BaseHttpSolrClient.RemoteSolrException(masterUrl, resp.status, resp.asString, null);
+    }
   }
   
   @Test
@@ -1081,8 +1083,7 @@ public class TestReplicationHandler extends SolrTestCaseJ4 {
     return list.length;
   }
 
-  private void pullFromMasterToSlave() throws MalformedURLException,
-      IOException {
+  private void pullFromMasterToSlave() throws MalformedURLException, IOException, ExecutionException, InterruptedException, TimeoutException {
     pullFromTo(masterJetty, slaveJetty);
   }
   
@@ -1206,23 +1207,24 @@ public class TestReplicationHandler extends SolrTestCaseJ4 {
     return maxVersionSlave;
   }
 
-  private void pullFromSlaveToMaster() throws MalformedURLException,
-      IOException {
+  private void pullFromSlaveToMaster() throws MalformedURLException, IOException, ExecutionException, InterruptedException, TimeoutException {
     pullFromTo(slaveJetty, masterJetty);
   }
   
-  private void pullFromTo(JettySolrRunner from, JettySolrRunner to) throws IOException {
+  private static void pullFromTo(JettySolrRunner from, JettySolrRunner to) throws IOException, ExecutionException, InterruptedException, TimeoutException {
     String masterUrl;
-    URL url;
     InputStream stream;
     masterUrl = buildUrl(to.getLocalPort())
         + "/" + DEFAULT_TEST_CORENAME
         + ReplicationHandler.PATH+"?wait=true&command=fetchindex&masterUrl="
         + buildUrl(from.getLocalPort())
         + "/" + DEFAULT_TEST_CORENAME + ReplicationHandler.PATH;
-    url = new URL(masterUrl);
-    stream = url.openStream();
-    stream.close();
+
+
+    Http2SolrClient.SimpleResponse resp = Http2SolrClient.GET(masterUrl);
+    if (resp.status != 200) {
+      throw new BaseHttpSolrClient.RemoteSolrException(masterUrl, resp.status, resp.asString, null);
+    }
   }
 
   @Test

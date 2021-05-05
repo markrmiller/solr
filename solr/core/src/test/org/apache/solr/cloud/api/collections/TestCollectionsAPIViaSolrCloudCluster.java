@@ -44,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test of the Collections API with the MiniSolrCloudCluster.
@@ -108,7 +109,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     }
 
     // shut down a server
-    JettySolrRunner stoppedServer = cluster.stopJettySolrRunner(0);
+    JettySolrRunner stoppedServer = cluster.removeJettySolrRunner(0);
+    stoppedServer.stop().await(5, TimeUnit.SECONDS);
 
     assertTrue(stoppedServer.isStopped());
     assertEquals(nodeCount - 1, cluster.getJettySolrRunners().size());
@@ -149,7 +151,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     jettys = cluster.getJettySolrRunners();
     for (int i = 0; i < jettys.size(); ++i) {
       if (jettys.get(i).equals(jettyToStop)) {
-        cluster.stopJettySolrRunner(i);
+        jettyToStop.stop().await(5, TimeUnit.SECONDS);
+        cluster.removeJettySolrRunner(i);
         assertEquals(nodeCount - 1, cluster.getJettySolrRunners().size());
       }
     }
@@ -159,6 +162,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     cluster.waitForAllNodes(30);
     assertTrue(startedServer.isRunning());
     assertEquals(nodeCount, cluster.getJettySolrRunners().size());
+
+    Thread.sleep(250);
 
     CollectionAdminRequest.deleteCollection(collectionName).process(client);
 
@@ -288,7 +293,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     for (Integer ii : restartIndicesList) {
       final JettySolrRunner jetty = jettys.get(ii);
       if (!jetty.isRunning()) {
-        cluster.startJettySolrRunner(jetty);
+        JettySolrRunner runner = cluster.getJettySolrRunner(ii);
+        runner.stop().await(2, TimeUnit.SECONDS);
         assertTrue(jetty.isRunning());
       }
     }

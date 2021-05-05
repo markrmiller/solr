@@ -162,6 +162,8 @@ public class DeleteShardCmd implements OverseerCollectionMessageHandler.Cmd {
     } catch (Exception e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
           "Error executing delete operation for collection: " + collectionName + " shard: " + sliceId, e);
+    } finally {
+      shardHandler.cancelAll();
     }
 
     AddReplicaCmd.Response response = new AddReplicaCmd.Response();

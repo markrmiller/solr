@@ -53,8 +53,8 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
+import org.apache.solr.common.util.ExpandableBuffers;
 import org.apache.solr.common.util.FastInputStream;
-import org.apache.solr.common.util.SolrQTP;
 import org.apache.solr.core.RequestHandlers;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
@@ -282,24 +282,6 @@ public class SolrRequestParsers {
     parseQueryString(queryString, map);
     return new MultiMapSolrParams(map);
   }
-  
-  public final static ThreadLocal<ExpandableDirectBufferOutputStream> keyLocal = ThreadLocal.withInitial(() -> {
-    MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(32);
-    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
-    return keyStream;
-  });
-
-  public final static ThreadLocal<ExpandableDirectBufferOutputStream> valLocal = ThreadLocal.withInitial(() -> {
-    MutableDirectBuffer expandableBuffer2 = new ExpandableDirectByteBuffer(32);
-    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(expandableBuffer2);
-    return valueStream;
-  });
-
-
-  static {
-    SolrQTP.registerThreadLocal(keyLocal);
-    SolrQTP.registerThreadLocal(valLocal);
-  }
 
   public static boolean isFormData(HttpServletRequest req) {
     String contentType = req.getContentType();
@@ -349,9 +331,12 @@ public class SolrRequestParsers {
     long len = 0L, keyPos = 0L, valuePos = 0L;
 
     //MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
-    ExpandableDirectBufferOutputStream keyStream = keyLocal.get();
-    ExpandableDirectBufferOutputStream valueStream = valLocal.get();
-
+//    ExpandableDirectBufferOutputStream keyStream = ExpandableBuffers.buffer1.get();
+//    ExpandableDirectBufferOutputStream valueStream = ExpandableBuffers.buffer2.get();
+    MutableDirectBuffer eb1 = new ExpandableDirectByteBuffer(8192);
+    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
+    MutableDirectBuffer eb2 = new ExpandableDirectByteBuffer(8192);
+    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
     if (charsetDecoder == null) {
       charsetDecoder = getCharsetDecoder(StandardCharsets.UTF_8);
     }
@@ -364,10 +349,10 @@ public class SolrRequestParsers {
         case -1: // end of stream
         case '&': // separator
           final ByteBuffer keyBytes = keyStream.buffer().byteBuffer().asReadOnlyBuffer(), valueBytes = valueStream.buffer().byteBuffer().asReadOnlyBuffer();
-          keyBytes.position(0);
-          keyBytes.limit(keyStream.position());
-          valueBytes.position(0);
-          valueBytes.limit(valueStream.position());
+          keyBytes.position(keyStream.offset() + keyStream.buffer().wrapAdjustment());
+          keyBytes.limit(keyStream.position() + keyStream.buffer().wrapAdjustment());
+          valueBytes.position(valueStream.offset());
+          valueBytes.limit(valueStream.position() + valueStream.buffer().wrapAdjustment());
           // we already have a charsetDecoder, so we can directly decode without buffering:
           final String key = decodeChars(keyBytes, keyPos, charsetDecoder), value = decodeChars(valueBytes, valuePos, charsetDecoder);
           MultiMapSolrParams.addParam(key.trim(), value, map);
@@ -377,8 +362,8 @@ public class SolrRequestParsers {
           expandableBuffer1.byteBuffer().clear();
           MutableDirectBuffer expandableBuffer2 = valueStream.buffer();
           expandableBuffer2.byteBuffer().clear();
-          keyStream.wrap(expandableBuffer1, 0);
-          valueStream.wrap(expandableBuffer2, 0);
+          keyStream.wrap(expandableBuffer1);
+          valueStream.wrap(expandableBuffer2);
 
           currentStream = keyStream;
           break;
@@ -521,7 +506,7 @@ public class SolrRequestParsers {
   /**
    * The simple parser just uses the params directly, does not support POST URL-encoded forms
    */
-  class SimpleRequestParser implements SolrRequestParser {
+  static class SimpleRequestParser implements SolrRequestParser {
     @Override public SolrParams parseParamsAndFillStreams(final HttpServletRequest req, ArrayList<ContentStream> streams) {
       return parseQueryString(req.getQueryString());
     }

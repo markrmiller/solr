@@ -1481,13 +1481,14 @@ public class IndexFetcher {
    * Stops the ongoing fetch
    */
   void abortFetch() {
-    stop = true;
-    abort = true;
     fileFetchRequests.forEach((s, cancellable) -> {
       if (cancellable != null) {
         cancellable.cancel();
       }
     });
+    stop = true;
+    abort = true;
+
 
     fileFetchRequests.clear();
   }
