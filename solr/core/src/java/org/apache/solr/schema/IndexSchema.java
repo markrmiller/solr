@@ -657,6 +657,10 @@ public class IndexSchema {
         // we don't want ot fail if there happens to be a dynamicField matching ROOT, (ie: "*")
         // because the user may not care about child docs at all.  The run time code
         // related to child docs can catch that if it happens
+        FieldType rootType = getFieldTypeNoEx(ROOT_FIELD_NAME);
+        isUsableForChildDocs = (null != uniqueKeyFieldType &&
+            null != rootType && rootType.getTypeName() != null &&
+            rootType.getTypeName().equals(uniqueKeyFieldType.getTypeName()));
 
         if (fields.containsKey(ROOT_FIELD_NAME) && ! isUsableForChildDocs()) {
           String msg = ROOT_FIELD_NAME + " field must be defined using the exact same fieldType as the " +
@@ -729,10 +733,7 @@ public class IndexSchema {
 
   public void postReadInform(boolean wait) {
     //Run the callbacks on SchemaAware now that everything else is done
-    FieldType rootType = getFieldTypeNoEx(ROOT_FIELD_NAME);
-    isUsableForChildDocs = (null != uniqueKeyFieldType &&
-        null != rootType && rootType.getTypeName() != null &&
-        rootType.getTypeName().equals(uniqueKeyFieldType.getTypeName()));
+
     if (wait) {
       try (ParWork work = new ParWork(this)) {
         for (SchemaAware aware : schemaAware) {

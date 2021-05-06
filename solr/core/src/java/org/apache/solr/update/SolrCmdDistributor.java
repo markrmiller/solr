@@ -124,7 +124,7 @@ public class SolrCmdDistributor implements Closeable {
       AlreadyClosedUpdateCmd cmd = new AlreadyClosedUpdateCmd(null);
       allErrors.put(cmd, error);
       try {
-        requestSolrClient.waitForOutstandingRequests(2, TimeUnit.MINUTES);
+        asyncTracker.waitForComplete(1, TimeUnit.MINUTES);
       } catch (TimeoutException timeoutException) {
         log.warn("Timeout waiting for requests to finish");
       }
@@ -264,7 +264,7 @@ public class SolrCmdDistributor implements Closeable {
 
   public void blockAndDoRetries() {
     try {
-      requestSolrClient.waitForOutstandingRequests(TIMEOUT, TimeUnit.MINUTES);
+      asyncTracker.waitForComplete(TIMEOUT, TimeUnit.MINUTES);
       //replicaSolrClient.waitForOutstandingRequests(TIMEOUT, TimeUnit.MINUTES);
     } catch (TimeoutException timeoutException) {
       log.warn("Timeout waiting for requests to finish", timeoutException);
