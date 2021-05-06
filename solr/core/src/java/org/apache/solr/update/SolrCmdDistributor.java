@@ -334,7 +334,6 @@ public class SolrCmdDistributor implements Closeable {
           }
 
           @Override public void onFailure(Throwable t, int code) {
-            boolean retried = false;
             try {
               if (t instanceof ClosedChannelException) {
                 // we may get success but be told the peer is shutting down via exception
@@ -369,7 +368,6 @@ public class SolrCmdDistributor implements Closeable {
                 log.info("Retrying distrib update on error: {}", t.getMessage());
                 try {
                   submit(req, tag);
-                  retried = true;
                 } catch (AlreadyClosedException e) {
 
                 }
@@ -377,9 +375,7 @@ public class SolrCmdDistributor implements Closeable {
                 allErrors.put(req.cmd, error);
               }
             } finally {
-              if (retried) {
-                asyncTracker.arrive();
-              }
+              asyncTracker.arrive();
             }
           }
         });
