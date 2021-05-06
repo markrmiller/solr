@@ -330,7 +330,7 @@ public class JettySolrRunner implements Closeable {
         alpn.setDefaultProtocol("h2");
 
         // HTTP Configuration
-        httpConfig.setSecureScheme("https");
+      //  httpConfig.setSecureScheme("https");
         //   httpConfig.setSecurePort(port + 1000);
         httpConfig.setSendServerVersion(false);
 
@@ -362,7 +362,7 @@ public class JettySolrRunner implements Closeable {
 
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, null, null, null, 1, 1, h2, httpFactory);
+        connector = new ServerConnector(server, null, null, null, 1, 1, h2);
       } else {
         connector = new ServerConnector(server, null, null, null, 1, 1, ssl, alpn, httpFactory, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());

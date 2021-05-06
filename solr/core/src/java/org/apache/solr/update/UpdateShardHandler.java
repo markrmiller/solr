@@ -271,5 +271,10 @@ public class UpdateShardHandler implements SolrInfoBean {
 
   public void setSecurityBuilder(HttpClientBuilderPlugin builder) {
     builder.setup(updateOnlyClient);
+    builder.setup(recoveryOnlyClient);
+    builder.setup(solrCmdDistributorClient);
+    builder.setup(recoveryOnlyClient);
+    builder.setup(searchOnlyClient);
+    builder.setup(leaderCheckClient);
   }
 }

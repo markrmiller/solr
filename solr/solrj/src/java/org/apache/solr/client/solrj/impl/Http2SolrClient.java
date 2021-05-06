@@ -186,7 +186,7 @@ public class Http2SolrClient extends SolrClient {
   private final boolean strictEventOrdering;
   private volatile ResponseParser parser = new BinaryResponseParser();
   private volatile RequestWriter requestWriter = new BinaryRequestWriter();
-  private final Set<HttpListenerFactory> listenerFactory = ConcurrentHashMap.newKeySet();
+  private final Set<HttpListenerFactory> listenerFactory;
   private final AsyncTracker asyncTracker;
   /**
    * The URL of the Solr server.
@@ -226,8 +226,10 @@ public class Http2SolrClient extends SolrClient {
     if (builder.http2SolrClient == null) {
       httpClient = createHttpClient(builder);
       closeClient = true;
+      this.listenerFactory  = ConcurrentHashMap.newKeySet();
     } else {
       httpClient = builder.http2SolrClient.httpClient;
+      this.listenerFactory = builder.http2SolrClient.listenerFactory;
     }
   }
 
@@ -525,6 +527,8 @@ public class Http2SolrClient extends SolrClient {
   private static final Cancellable FAILED_MAKING_REQUEST_CANCELLABLE = () -> {};
 
   public Cancellable asyncRequest(@SuppressWarnings({"rawtypes"}) SolrRequest solrRequest, String collection, AsyncListener<NamedList<Object>> asyncListener) {
+
+
     // section asyncRequest
     SolrParams params = solrRequest.getParams();
     Integer idleTimeout = params == null ? null : params.getInt("idleTimeout");
@@ -663,6 +667,7 @@ public class Http2SolrClient extends SolrClient {
     try {
       asyncTracker.register();
       tracking = true;
+      asyncListener.onStart();
       req.send(listener);
 
     } catch (Exception e) {
@@ -795,10 +800,12 @@ public class Http2SolrClient extends SolrClient {
   }
 
   private static void setBasicAuthHeader(SolrRequest solrRequest, Request req) {
+    log.info("Set basic auth header for {}", solrRequest);
     if (solrRequest.getBasicAuthUser() != null && solrRequest.getBasicAuthPassword() != null) {
       String userPass = solrRequest.getBasicAuthUser() + ":" + solrRequest.getBasicAuthPassword();
       String encoded = Base64.byteArrayToBase64(userPass.getBytes(FALLBACK_CHARSET));
-      req.header("Authorization", "Basic " + encoded);
+      log.info("Set basic auth header {}", "Authorization:" + "Basic " + encoded);
+      req.headers(httpFields -> httpFields.put("Authorization", "Basic " + encoded));
     }
   }
 
@@ -814,23 +821,30 @@ public class Http2SolrClient extends SolrClient {
   }
 
   private void decorateRequest(Request req, SolrRequest solrRequest) {
-    req.header(HttpHeader.ACCEPT_ENCODING, null);
+    req.headers(httpFields -> httpFields.remove(HttpHeader.ACCEPT_ENCODING));
+
     if (solrRequest.getUserPrincipal() != null) {
       req.attribute(REQ_PRINCIPAL_KEY, solrRequest.getUserPrincipal());
     }
-
     setBasicAuthHeader(solrRequest, req);
     for (HttpListenerFactory factory : listenerFactory) {
       HttpListenerFactory.RequestResponseListener listener = factory.get();
-      listener.onQueued(req);
+     // req.onRequestQueued(request -> {
+        listener.onQueued(req, solrRequest);
+     // });
       req.onRequestBegin(listener);
       req.onComplete(listener);
     }
 
-    Map<String, String> headers = solrRequest.getHeaders();
-    if (headers != null) {
-      headers.forEach(req::header);
-    }
+//    Map<String, String> headers = solrRequest.getHeaders();
+//    if (headers != null) {
+//      headers.forEach((k, v) -> {
+//        log.info("add header {} {}", k, v);
+//        req.headers(httpFields -> httpFields.put(k,v));
+//      });
+//    }
+
+
   }
 
   private static String changeV2RequestEndpoint(String basePath) throws MalformedURLException {
@@ -1166,6 +1180,7 @@ public class Http2SolrClient extends SolrClient {
       }
 
       try {
+        is.mark(4);
         rsp = processor.processResponse(is, encoding);
       } catch (Exception e) {
         if (response != null) {
@@ -1178,9 +1193,10 @@ public class Http2SolrClient extends SolrClient {
             if (remoteHost == null) {
               remoteHost = serverBaseUrl;
             }
+            is.reset();
             String txt = IOUtils.toString(is, StandardCharsets.UTF_8);
-            log.error("Could not parse response, status={}", httpStatus, txt, e);
-            throw new RemoteSolrException(remoteHost, httpStatus, txt, failure);
+            log.debug("Could not parse response, status={} txt={}", httpStatus, txt, e);
+            throw new RemoteSolrException(remoteHost, httpStatus, txt == null || txt.isEmpty() ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : txt, failure);
           } catch (Exception e1) {
             log.warn("", e1);
           }
@@ -1189,7 +1205,14 @@ public class Http2SolrClient extends SolrClient {
         if (remoteHost == null) {
           remoteHost = serverBaseUrl;
         }
-        throw new RemoteSolrException(remoteHost, 500, "Exception try to process response", req.getAbortCause());
+        String txt = null;
+        try {
+           is.reset();
+           txt = IOUtils.toString(is, StandardCharsets.UTF_8);
+        } catch (IOException ioException) {
+
+        }
+        throw new RemoteSolrException(remoteHost, httpStatus, txt == null || txt.isEmpty() ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : txt, result.getFailure());
       }
 
       // log.error("rsp:{}", rsp);

@@ -683,7 +683,7 @@ public class SolrCLI implements CLIO {
       // ensure we're requesting JSON back from Solr
       Http2SolrClient.SimpleResponse resp = Http2SolrClient.GET(new URIBuilder(getUrl).setParameter(CommonParams.WT, CommonParams.JSON).build().toString(),
           httpClient);
-
+       log.debug("resp{}", resp.asString);
       // make the request and get back a parsed JSON object
       Map<String, Object> json = (Map<String,Object>) Utils.fromJSON(resp.bytes);
       // check the response JSON from Solr to see if it is an error

@@ -127,7 +127,7 @@ public class HttpSolrCall extends SolrCall {
     // Check for container handlers
 
     SolrRequestHandler reqHandler = cores.getRequestHandler(reqPath);
-    if (log.isTraceEnabled()) log.trace("Check for handler {} returned {} handlers={}", reqPath, reqHandler, cores.getRequestHandlers().keySet());
+    if (log.isDebugEnabled()) log.debug("Check for handler {} returned {} handlers={}", reqPath, reqHandler, cores.getRequestHandlers().keySet());
     if (reqHandler != null) {
       solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, request);
       solrRequest.getContext().put(CoreContainer.class.getName(), cores);
@@ -407,6 +407,10 @@ public class HttpSolrCall extends SolrCall {
         Action authorizationAction = authorize(cores, solrReq, req, response);
         if (authorizationAction == RETURN) {
           return authorizationAction;
+        }
+        if (authorizationAction == ADMIN) {
+          handleAdminRequest(cores, req, response);
+          return RETURN;
         }
       }
 

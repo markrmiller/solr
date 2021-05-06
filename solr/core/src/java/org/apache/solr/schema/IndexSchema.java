@@ -150,7 +150,7 @@ public class IndexSchema {
   protected final List<SchemaField> fieldsWithDefaultValue = new ArrayList<>();
   protected final Collection<SchemaField> requiredFields = new HashSet<>();
   protected DynamicField[] dynamicFields = EMPTY_DYNAMIC_FIELDS;
-  private boolean isUsableForChildDocs;
+  protected volatile boolean isUsableForChildDocs;
 
   public DynamicField[] getDynamicFields() { return dynamicFields; }
 
@@ -712,8 +712,8 @@ public class IndexSchema {
       timeLoadCopyFields.done();
 
 
-      fieldTypes = new HashMap<>(fieldTypes);
-      fields = new HashMap<>(fields);
+//      fieldTypes = new HashMap<>(fieldTypes);
+//      fields = new HashMap<>(fields);
 
       timeParseSchemaDom.done();
 

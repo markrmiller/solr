@@ -43,6 +43,7 @@ import org.apache.solr.security.BasicAuthPlugin;
 import org.apache.solr.security.RuleBasedAuthorizationPlugin;
 import org.apache.solr.util.LogLevel;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
@@ -53,6 +54,7 @@ import static org.apache.solr.security.Sha256AuthenticationProvider.getSaltedHas
 
 @Slow
 @LogLevel("org.apache.solr.handler.ReplicationHandler=DEBUG,org.apache.solr.handler.IndexFetcher=DEBUG")
+@Ignore
 public class TestPullReplicaWithAuth extends SolrCloudTestCase {
 
   private static final String USER = "solr";

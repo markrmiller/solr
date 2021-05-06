@@ -64,6 +64,7 @@ public class UpdateRequest extends AbstractUpdateRequest {
   public static final String MIN_REPFACT = "min_rf";
   public static final String VER = "ver";
   public static final String OVERWRITE = "ow";
+
   public static final String COMMIT_WITHIN = "cw";
   private Map<SolrInputDocument,Map<String,Object>> documents = null;
   private Iterator<SolrInputDocument> docIterator = null;
@@ -569,6 +570,12 @@ public class UpdateRequest extends AbstractUpdateRequest {
   
   public void lastDocInBatch() {
     isLastDocInBatch = true;
+  }
+
+  @Override public String toString() {
+    return "UpdateRequest{" + "usev2=" + usev2 + ", useBinaryV2=" + useBinaryV2 + ", params=" + params + ", commitWithin=" + commitWithin + ", documents="
+        + (documents == null ? "(null)" : documents.size()) + ", docIterator=" + (docIterator != null) + ", deleteById=" + (deleteById == null ? "(null)" : deleteById.size()) + ", deleteQuery=" + deleteQuery + ", isLastDocInBatch=" + isLastDocInBatch
+        + '}';
   }
 
 }

@@ -3059,7 +3059,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       }
     }
 
-    public static void preDecorateResponse (SolrQueryRequest req, SolrQueryResponse rsp){
+    public static void preDecorateResponse (SolrQueryRequest req, SolrQueryResponse rsp) {
       // setup response header
       final NamedList<Object> responseHeader = new SimpleOrderedMap<>();
       rsp.addResponseHeader(responseHeader);
@@ -3071,32 +3071,33 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       // are expecting them during handleRequest
       //toLog.add("webapp", req.getContext().get("webapp"));
       //toLog.add(PATH, req.getContext().get(PATH));
+      if (req != null) {
+        final SolrParams params = req.getParams();
+        final String lpList = params.get(CommonParams.LOG_PARAMS_LIST);
+        if (lpList == null) {
+          toLog.add("params", "{" + req.getParamString() + "}");
+        } else if (lpList.length() > 0) {
 
-      final SolrParams params = req.getParams();
-      final String lpList = params.get(CommonParams.LOG_PARAMS_LIST);
-      if (lpList == null) {
-        toLog.add("params", "{" + req.getParamString() + "}");
-      } else if (lpList.length() > 0) {
+          // Filter params by those in LOG_PARAMS_LIST so that we can then call toString
+          HashSet<String> lpSet = new HashSet<>(Arrays.asList(lpList.split(",")));
+          SolrParams filteredParams = new SolrParams() {
+            private static final long serialVersionUID = -643991638344314066L;
 
-        // Filter params by those in LOG_PARAMS_LIST so that we can then call toString
-        HashSet<String> lpSet = new HashSet<>(Arrays.asList(lpList.split(",")));
-        SolrParams filteredParams = new SolrParams() {
-          private static final long serialVersionUID = -643991638344314066L;
+            @Override public Iterator<String> getParameterNamesIterator() {
+              return Iterators.filter(params.getParameterNamesIterator(), lpSet::contains);
+            }
 
-          @Override public Iterator<String> getParameterNamesIterator() {
-            return Iterators.filter(params.getParameterNamesIterator(), lpSet::contains);
-          }
+            @Override public String get(String param) { // assume param is in lpSet
+              return params.get(param);
+            } //assume in lpSet
 
-          @Override public String get(String param) { // assume param is in lpSet
-            return params.get(param);
-          } //assume in lpSet
+            @Override public String[] getParams(String param) { // assume param is in lpSet
+              return params.getParams(param);
+            } // assume in lpSet
+          };
 
-          @Override public String[] getParams(String param) { // assume param is in lpSet
-            return params.getParams(param);
-          } // assume in lpSet
-        };
-
-        toLog.add("params", "{" + filteredParams + "}");
+          toLog.add("params", "{" + filteredParams + "}");
+        }
       }
     }
 

@@ -21,6 +21,7 @@ import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -43,8 +44,13 @@ public class AnalyticsMergeStrategyTest extends BaseDistributedSearchTestCase {
   }
 
   @BeforeClass
-  public static void setUpBeforeClass() throws Exception {
+  public static void beforeAnalyticsMergeStrategyTest() throws Exception {
     initCore("solrconfig-analytics-query.xml", "schema15.xml");
+  }
+
+  @AfterClass
+  public static void afterAnalyticsMergeStrategyTest() throws Exception {
+    deleteCore();
   }
 
   @Test
@@ -94,7 +100,7 @@ public class AnalyticsMergeStrategyTest extends BaseDistributedSearchTestCase {
     assertCount(rsp, 4);
   }
 
-  private void assertCountOnly(QueryResponse rsp, int count) throws Exception {
+  private static void assertCountOnly(QueryResponse rsp, int count) throws Exception {
     NamedList response = rsp.getResponse();
     NamedList analytics = (NamedList)response.get("analytics");
     Integer c = (Integer)analytics.get("mycount");
@@ -103,7 +109,7 @@ public class AnalyticsMergeStrategyTest extends BaseDistributedSearchTestCase {
     }
   }
 
-  private void assertCount(QueryResponse rsp, int count) throws Exception {
+  private static void assertCount(QueryResponse rsp, int count) throws Exception {
     NamedList response = rsp.getResponse();
     NamedList analytics = (NamedList)response.get("analytics");
     Integer c = (Integer)analytics.get("mycount");

@@ -75,6 +75,8 @@ import org.apache.solr.util.TimeOut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletRequest;
+
 import static org.apache.solr.common.params.CommonParams.DISTRIB;
 import static org.apache.solr.update.processor.DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM;
 
@@ -1401,7 +1403,8 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
       assert 0 < errors.size();
       
       if (1 == errors.size()) {
-        return "Async exception during distributed update: " + errors.iterator().next().t.getMessage();
+        Error error = errors.iterator().next();
+        return "Async exception during distributed update (headers=" + error.req.uReq.getHeaders() + ") : " + error.t.getMessage();
       } else {
         StringBuilder buf = new StringBuilder(errors.size());
         buf.append(" Async exceptions during distributed update: ");

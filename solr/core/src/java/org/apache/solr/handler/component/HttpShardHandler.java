@@ -46,8 +46,10 @@ import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletRequest;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -77,6 +79,8 @@ public class HttpShardHandler extends ShardHandler {
   private final AtomicInteger pending;
   private final Map<String, List<String>> shardToURLs;
   private final LBHttp2SolrClient lbClient;
+
+  SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
 
   public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory) {
     this.httpShardHandlerFactory = httpShardHandlerFactory;
@@ -190,8 +194,21 @@ public class HttpShardHandler extends ShardHandler {
         if (tracer != null && span != null) {
           tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new SolrRequestCarrier(req));
         }
-        SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
-        if (requestInfo != null) req.setUserPrincipal(requestInfo.getReq().getUserPrincipal());
+
+//        if (requestInfo != null) {
+//          HttpServletRequest httpReq = requestInfo.httpRequest;
+//          if (httpReq != null) {
+//            Enumeration<String> hnames = httpReq.getHeaderNames();
+//
+//            while(hnames.hasMoreElements()) {
+//              String hname = hnames.nextElement();
+//              req.addHeader(hname, httpReq.getHeader(hname));
+//            }
+//
+//          }
+//          requestInfo.getUserPrincipal();
+//          req.setUserPrincipal(requestInfo.getReq().getUserPrincipal());
+//        }
       }
 
       @Override

@@ -31,6 +31,7 @@ import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestHandler;
+import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.response.QueryResponseWriter;
 import org.apache.solr.response.QueryResponseWriterUtil;
 import org.apache.solr.response.SolrQueryResponse;
@@ -518,10 +519,16 @@ public abstract class SolrCall {
  
   protected SolrDispatchFilter.Action authorize(CoreContainer cores, SolrQueryRequest solrReq, HttpServletRequest req, HttpServletResponse response) throws IOException {
     AuthorizationContext context = getAuthCtx(solrReq, req, getPath(), getRequestType());
+    SolrRequestInfo info = SolrRequestInfo.getRequestInfo();
+
     log.debug("AuthorizationContext : {}", context);
     AuthorizationResponse authResponse = cores.getAuthorizationPlugin().authorize(context);
     int statusCode = authResponse.statusCode;
     log.info("Authorization response status code {}", authResponse.statusCode);
+
+    if (authResponse.statusCode == 200) {
+      response.setHeader(PKIAuthenticationPlugin.HEADER, null);
+    }
 
     if (statusCode == AuthorizationResponse.PROMPT.statusCode) {
       Map<String, String> headers = (Map) req.getAttribute(AuthenticationPlugin.class.getName());
@@ -561,6 +568,7 @@ public abstract class SolrCall {
     if (shouldAudit(cores, AuditEvent.EventType.AUTHORIZED)) {
       cores.getAuditLoggerPlugin().doAudit(new AuditEvent(AuditEvent.EventType.AUTHORIZED, req, context));
     }
+
     return ADMIN;
   }
 
@@ -675,6 +683,24 @@ public abstract class SolrCall {
 
     String resource = getPath();
 
+    int idx = resource.indexOf('/');
+    int idx2 = -1;
+
+    if (idx > -1) {
+
+      idx2 = resource.indexOf('/', 1);
+      if (idx2 > 0) {
+        // save the portion after the ':' for a 'handler' path parameter
+        resource = resource.substring(idx + 1, idx2);
+
+      } else {
+        resource = resource.substring(idx + 1);
+        log.debug("core parsed as {}", resource);
+      }
+    }
+
+    log.info("RESOURCE IS " + resource);
+
     SolrParams params = getQueryParams();
     final ArrayList<AuthorizationContext.CollectionRequest> collectionRequests = new ArrayList<>();
     for (String collection : getCollectionsList()) {
@@ -682,7 +708,7 @@ public abstract class SolrCall {
     }
 
     // Extract collection name from the params in case of a Collection Admin request
-    if (getPath().equals("/admin/collections")) {
+    if (resource.equals("/admin/collections")) {
       if (CREATE.isEqual(params.get("action"))||
           RELOAD.isEqual(params.get("action"))||
           DELETE.isEqual(params.get("action")))
@@ -700,6 +726,7 @@ public abstract class SolrCall {
     }
 
     AuthorizationContext.RequestType finalRequestType = requestType;
+    String finalResource = resource;
     return new AuthorizationContext() {
       @Override
       public SolrParams getParams() {
@@ -755,7 +782,7 @@ public abstract class SolrCall {
         if(collectionRequests.size() > 0)
           response.delete(response.length() - 1, response.length());
 
-        response.append("], Path: [").append(resource).append("]");
+        response.append("], Path: [").append(finalResource).append("]");
         response.append(" path : ").append(getPath()).append(" params :").append(getParams());
         return response.toString();
       }
@@ -889,7 +916,7 @@ public abstract class SolrCall {
       for (Enumeration<String> headerValues = clientRequest.getHeaders(headerName); headerValues.hasMoreElements();) {
         String headerValue = headerValues.nextElement();
         if (headerValue != null) {
-          proxyRequest.header(headerName, headerValue);
+          proxyRequest.headers(httpFields -> httpFields.add(headerName, headerValue));
           //System.out.println("request header: " + headerName + " : " + headerValue);
         }
       }
@@ -1010,8 +1037,8 @@ public abstract class SolrCall {
       for (HttpField field : resp.getHeaders()) {
         String headerName = field.getName();
         String lowerHeaderName = headerName.toLowerCase(Locale.ROOT);
-        //            System.out.println("response header: " + headerName + " : " + field.getValue() + " status:" +
-        //                    resp.getStatus());
+                    System.out.println("response header: " + headerName + " : " + field.getValue() + " status:" +
+                            resp.getStatus());
         if (HOP_HEADERS.contains(lowerHeaderName))
           continue;
 

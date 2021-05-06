@@ -406,6 +406,7 @@ public class CoreContainer implements Closeable {
       log.debug("Security conf doesn't exist. Skipping setup for authorization module.");
     }
     this.authorizationPlugin = authorizationPlugin;
+
     if (old != null) {
       try {
         old.plugin.close();
@@ -522,15 +523,17 @@ public class CoreContainer implements Closeable {
       // http client configurer to set it up for internode communication.
       log.debug("Reconfiguring HttpClient settings.");
 
-      SolrHttpClientContextBuilder httpClientBuilder = new SolrHttpClientContextBuilder();
-      if (builder.getCredentialsProviderProvider() != null) {
-        httpClientBuilder.setDefaultCredentialsProvider(new CredentialsProviderProvider(builder));
-      }
-      if (builder.getAuthSchemeRegistryProvider() != null) {
-        httpClientBuilder.setAuthSchemeRegistryProvider(new AuthSchemeRegistryProvider(builder));
-      }
+      if (builder != null) {
+        SolrHttpClientContextBuilder httpClientBuilder = new SolrHttpClientContextBuilder();
+        if (builder.getCredentialsProviderProvider() != null) {
+          httpClientBuilder.setDefaultCredentialsProvider(new CredentialsProviderProvider(builder));
+        }
+        if (builder.getAuthSchemeRegistryProvider() != null) {
+          httpClientBuilder.setAuthSchemeRegistryProvider(new AuthSchemeRegistryProvider(builder));
+        }
 
-      HttpClientUtil.setHttpClientRequestContextBuilder(httpClientBuilder);
+        HttpClientUtil.setHttpClientRequestContextBuilder(httpClientBuilder);
+      }
     }
     // Always register PKI auth interceptor, which will then delegate the decision of who should secure
     // each request to the configured authentication plugin.
@@ -848,9 +851,9 @@ public class CoreContainer implements Closeable {
         work.collect("", () -> {
           securityConfHandler = isZooKeeperAware() ? new SecurityConfHandlerZk(this) : new SecurityConfHandlerLocal(this);
           securityConfHandler.initializeMetrics(solrMetricsContext, AUTHZ_PATH);
+          securityConfHandler.initializeMetrics(solrMetricsContext, AUTHC_PATH);
           containerHandlers.put(AUTHC_PATH, securityConfHandler);
-          reloadSecurityProperties();
-          warnUsersOfInsecureSettings();
+          containerHandlers.put(AUTHZ_PATH, securityConfHandler);
           this.backupRepoFactory = new BackupRepositoryFactory(cfg.getBackupRepositoryPlugins());
         });
 
@@ -871,6 +874,12 @@ public class CoreContainer implements Closeable {
         }
 
         work.addCollect();
+
+
+        work.collect("", () -> {
+          reloadSecurityProperties();
+          warnUsersOfInsecureSettings();
+        });
 
         work.collect("", () -> {
           solrClientCache = new SolrClientCache(isZooKeeperAware() ? zkSys.getZkController().getZkStateReader() : null, updateShardHandler.getTheSharedHttpClient());

@@ -44,7 +44,10 @@ import org.apache.http.annotation.ThreadingBehavior;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.protocol.HttpContext;
+import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.impl.HttpListenerFactory;
+import org.apache.solr.client.solrj.impl.SolrHttpClientBuilder;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.SpecProvider;
@@ -54,13 +57,13 @@ import org.eclipse.jetty.client.api.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEditablePlugin , SpecProvider {
+public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEditablePlugin , SpecProvider, HttpClientBuilderPlugin {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private AuthenticationProvider authenticationProvider;
+  private volatile AuthenticationProvider authenticationProvider;
   private final static ThreadLocal<Header> authHeader = new ThreadLocal<>();
   private static final String X_REQUESTED_WITH_HEADER = "X-Requested-With";
   private boolean blockUnknown = true;
-  private boolean forwardCredentials = false;
+  private volatile boolean forwardCredentials = false;
 
   public boolean authenticate(String username, String pwd) {
     return authenticationProvider.authenticate(username, pwd);
@@ -195,6 +198,7 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
       log.debug("Prefixing {} header for Basic Auth with 'x' to prevent browser basic auth popup",
           HttpHeaders.WWW_AUTHENTICATE);
     }
+    log.info("set prompts headers for basic auth:  {}", headers);
     return headers;
   }
 
@@ -206,6 +210,20 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
   @Override
   public void closeRequest() {
     authHeader.remove();
+  }
+
+  @Override public SolrHttpClientBuilder getHttpClientBuilder(SolrHttpClientBuilder builder) {
+    return null;
+  }
+
+  public void setup(Http2SolrClient client) {
+    final HttpListenerFactory.RequestResponseListener listener = new HttpListenerFactory.RequestResponseListener() {
+      @Override
+      public void onQueued(Request request, SolrRequest solrRequest) {
+        interceptInternodeRequest(request);
+      }
+    };
+    client.addListenerFactory(() -> listener);
   }
 
   public interface AuthenticationProvider extends SpecProvider {

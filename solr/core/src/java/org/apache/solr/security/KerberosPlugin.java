@@ -35,6 +35,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthenticationHandler;
 import org.apache.http.HttpRequest;
 import org.apache.http.protocol.HttpContext;
+import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpListenerFactory;
 import org.apache.solr.client.solrj.impl.Krb5HttpClientBuilder;
@@ -266,7 +267,7 @@ public class KerberosPlugin extends AuthenticationPlugin implements HttpClientBu
   public void setup(Http2SolrClient client) {
     final HttpListenerFactory.RequestResponseListener listener = new HttpListenerFactory.RequestResponseListener() {
       @Override
-      public void onQueued(Request request) {
+      public void onQueued(Request request, SolrRequest solrRequest) {
         interceptInternodeRequest(request);
       }
     };

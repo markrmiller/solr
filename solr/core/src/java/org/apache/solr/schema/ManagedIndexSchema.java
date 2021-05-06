@@ -135,6 +135,7 @@ public final class ManagedIndexSchema extends IndexSchema {
     this.managedSchemaResourceName = managedSchemaResourceName;
     this.schemaZkVersion = schemaZkVersion;
     this.collection = collection;
+    this.isUsableForChildDocs = managedIndexSchemaFactory.getSchema().isUsableForChildDocs;
     if (log.isDebugEnabled()) {
       log.debug("Copy to new ManagedIndexSchemaFactory with version {}", schemaZkVersion);
     }

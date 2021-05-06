@@ -45,7 +45,10 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -520,6 +523,14 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
       AtomicReference<HttpServletRequest> wrappedRequest = new AtomicReference<>();
       if (!authenticateRequest(cores, servletRequest, servletResponse, wrappedRequest)) { // the response and status code have already been sent
+//        // MRM TODO: why is the plugin missing this sometimes?
+//        if (!servletResponse.getHeaderNames().contains("WWW-Authenticate")) {
+//
+//          List<String> wwwAuthParams = new ArrayList<>();
+//          wwwAuthParams.add("Bearer realm=\"" + "solr" + "\"");
+//
+//          servletResponse.addHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"" + "solr" + "\"");
+//        }
         return;
       }
       if (wrappedRequest.get() != null) {
@@ -549,10 +560,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
             }
             break;
           case FORWARD:
-            servletRequest.getRequestDispatcher(call.getPath()).forward(servletRequest, servletResponse);
+            //servletRequest.getRequestDispatcher(ServletUtils.getPathAfterContext((HttpServletRequest) servletRequest)).forward(servletRequest, servletResponse);
+
             // TODO: does the above work for async?
             // asyncContext.dispatch(call.getPath());
-            break;
+            return;
           case REMOTEQUERY:
             return;
           case ADMIN:
@@ -743,6 +755,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     } else {
       // /admin/info/key must be always open. see SOLR-9188
       String requestPath = ServletUtils.getPathAfterContext(request);
+
+
       if (PublicKeyHandler.PATH.equals(requestPath)) {
         log.debug("Pass through PKI authentication endpoint");
         return true;
@@ -757,7 +771,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         authenticationPlugin = cores.getPkiAuthenticationPlugin();
       try {
         if (log.isDebugEnabled()) {
-          log.debug("Request to authenticate: {}, domain: {}, port: {}", request, request.getLocalName(), request.getLocalPort());
+          log.debug("Request to authenticate: {}, domain: {}, port: {}", authenticationPlugin.getClass().getName(), request.getLocalName(), request.getLocalPort());
         }
         // upon successful authentication, this should call the chain's next filter.
         requestContinues = authenticationPlugin.authenticate(request, response, (req, rsp) -> {

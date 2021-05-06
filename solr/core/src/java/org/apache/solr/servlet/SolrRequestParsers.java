@@ -33,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -263,10 +265,13 @@ public class SolrRequestParsers {
     }
 
     final SolrCall httpSolrCall = req == null ? null : (SolrCall) req.getAttribute(HttpSolrCall.class.getName());
-    SolrQueryRequestBase q = new SQPSolrQueryRequestBase(core, params, requestTimer, req, httpSolrCall);
+    SQPSolrQueryRequestBase q = new SQPSolrQueryRequestBase(core, params, requestTimer, req, httpSolrCall);
     if (streams != null && streams.size() > 0) {
       q.setContentStreams(streams);
     }
+
+
+
     return q;
   }
 

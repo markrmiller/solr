@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.nio.channels.ClosedChannelException;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -49,12 +50,15 @@ import org.apache.solr.common.util.SysStats;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.Diagnostics;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.update.processor.DistributedUpdateProcessor;
 import org.apache.solr.update.processor.DistributedUpdateProcessor.LeaderRequestReplicationTracker;
 import org.apache.solr.update.processor.DistributedUpdateProcessor.RollupRequestReplicationTracker;
 import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * Used for distributing commands from a shard leader to its replicas.
@@ -297,9 +301,23 @@ public class SolrCmdDistributor implements Closeable {
         log.info("sending update to {} retry:{} docid={} params:{}", req.node.getUrl(), req.retries, req.cmd, req.uReq.getParams());
       }
     }
+    SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
+    if (requestInfo != null) {
+      HttpServletRequest httpReq = requestInfo.httpRequest;
+      if (httpReq != null) {
+        Enumeration<String> hnames = httpReq.getHeaderNames();
+
+        while(hnames.hasMoreElements()) {
+          String hname = hnames.nextElement();
+          req.uReq.addHeader(hname, httpReq.getHeader(hname));
+        }
+
+      }
+      requestInfo.getUserPrincipal();
+      req.uReq.setUserPrincipal(requestInfo.getReq().getUserPrincipal());
+    }
 
     req.uReq.setBasePath(req.node.getUrl());
-
 
     if (req.synchronous) {
       blockAndDoRetries();

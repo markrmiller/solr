@@ -50,6 +50,7 @@ import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.protocol.HttpContext;
+import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.client.solrj.impl.HttpListenerFactory;
@@ -151,7 +152,7 @@ public class HttpParamDelegationTokenPlugin extends KerberosPlugin {
   public void setup(Http2SolrClient client) {
     final HttpListenerFactory.RequestResponseListener listener = new HttpListenerFactory.RequestResponseListener() {
       @Override
-      public void onQueued(Request request) {
+      public void onQueued(Request request, SolrRequest solrRequest) {
         getPrincipal().ifPresent(usr -> request.header(INTERNAL_REQUEST_HEADER, usr));
       }
     };

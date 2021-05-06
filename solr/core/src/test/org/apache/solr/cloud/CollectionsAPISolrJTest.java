@@ -379,15 +379,15 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     Map<String, NamedList<Integer>> coresStatus = response.getCollectionCoresStatus();
     int shard10 = 0;
     int shard11 = 0;
-    for (String coreName : coresStatus.keySet()) {
-      assertEquals(0, (int) coresStatus.get(coreName).get("status"));
-      if (coreName.contains("_s1_0")) shard10++;
+    for (Map.Entry<String,NamedList<Integer>> entry : coresStatus.entrySet()) {
+      assertEquals(0, (int) entry.getValue().get("status"));
+      if (entry.getKey().contains("_s1_0")) shard10++;
       else shard11++;
     }
     assertEquals(1, shard10);
     assertEquals(1, shard11);
 
-    waitForState("Expected all shards to be active and parent shard to be removed", collectionName, (n, c) -> {
+    cluster.getSolrClient().getZkStateReader().waitForState(collectionName, 5, TimeUnit.SECONDS, (n, c) -> {
       if (c.getSlice("s1").getState() == Slice.State.ACTIVE)
         return false;
       for (Replica r : c.getReplicas()) {

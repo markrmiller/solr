@@ -43,7 +43,10 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.HttpRequest;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.protocol.HttpContext;
+import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.impl.HttpListenerFactory;
+import org.apache.solr.client.solrj.impl.SolrHttpClientBuilder;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SpecProvider;
 import org.apache.solr.common.StringUtils;
@@ -68,7 +71,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Authenticaion plugin that finds logged in user by validating the signature of a JWT token
  */
-public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider, ConfigEditablePlugin {
+public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider, ConfigEditablePlugin, HttpClientBuilderPlugin {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String PARAM_BLOCK_UNKNOWN = "blockUnknown";
   private static final String PARAM_REQUIRE_SUBJECT = "requireSub";
@@ -546,6 +549,10 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
     return latestConf;
   }
 
+  @Override public SolrHttpClientBuilder getHttpClientBuilder(SolrHttpClientBuilder builder) {
+    return null;
+  }
+
   private enum BearerWwwAuthErrorCode { invalid_request, invalid_token, insufficient_scope}
 
   private void authenticationFailure(HttpServletResponse response, String message, int httpCode, BearerWwwAuthErrorCode responseError) throws IOException {
@@ -687,6 +694,16 @@ public class JWTAuthPlugin extends AuthenticationPlugin implements SpecProvider,
 
   public List<JWTIssuerConfig> getIssuerConfigs() {
     return issuerConfigs;
+  }
+
+  public void setup(Http2SolrClient client) {
+    final HttpListenerFactory.RequestResponseListener listener = new HttpListenerFactory.RequestResponseListener() {
+      @Override
+      public void onQueued(Request request, SolrRequest solrRequest) {
+        interceptInternodeRequest(request);
+      }
+    };
+    client.addListenerFactory(() -> listener);
   }
 
   /**
