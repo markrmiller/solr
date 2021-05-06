@@ -41,7 +41,7 @@ public class VirtualExecutorService extends AbstractExecutorService {
     assert service != null;
     this.name = name;
     this.service = service;
-    asyncTracker = new AsyncTracker(maxSize, wait);
+    asyncTracker = new AsyncTracker(maxSize, wait, 0);
   }
 
   @Override public void shutdown() {

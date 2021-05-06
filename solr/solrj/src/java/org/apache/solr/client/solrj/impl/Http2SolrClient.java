@@ -554,7 +554,7 @@ public class Http2SolrClient extends SolrClient {
                 try {
                   ((HttpDestination) dest1).stop();
                 } catch (Exception e) {
-                  e.printStackTrace();
+
                 }
                 // dest1.getConnectionPool().close();
                 // ((SolrInternalHttpClient) httpClient).getDestinationsMap().values().remove(dest1);
@@ -568,7 +568,7 @@ public class Http2SolrClient extends SolrClient {
             //          body.add("msg", "Success but no response");
             //          return body;
             //        }
-
+            asyncListener.onFailure(CANCELLED_EXCEPTION, 0);
             throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", f);
           } finally {
             asyncTracker.arrive();
@@ -607,7 +607,7 @@ public class Http2SolrClient extends SolrClient {
 //                return;
 //              }
               if (failure == CANCELLED_EXCEPTION) {
-               // asyncListener.onFailure(CANCELLED_EXCEPTION, 0);
+                 asyncListener.onFailure(CANCELLED_EXCEPTION, 0);
                // asyncListener.onSuccess(new NamedList<>(), 0);
                 return;
               }
@@ -671,7 +671,7 @@ public class Http2SolrClient extends SolrClient {
         if (e != CANCELLED_EXCEPTION) {
           asyncListener.onFailure(e, 0);
         } else {
-          asyncListener.onSuccess(new NamedList<>(), 0);
+          asyncListener.onFailure(e, 0);
         }
       } finally {
         if (tracking) {

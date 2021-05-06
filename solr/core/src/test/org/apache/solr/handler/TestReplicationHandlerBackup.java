@@ -251,17 +251,10 @@ public class TestReplicationHandlerBackup extends SolrJettyTestBase {
     
   }
 
-  public static void runBackupCommand(JettySolrRunner masterJetty, String cmd, String params) throws IOException {
+  public static void runBackupCommand(JettySolrRunner masterJetty, String cmd, String params) throws Exception {
     String masterUrl = buildUrl(masterJetty.getLocalPort(), context) + "/" + DEFAULT_TEST_CORENAME
         + ReplicationHandler.PATH+"?wt=xml&command=" + cmd + params;
-    InputStream stream = null;
-    try {
-      URL url = new URL(masterUrl);
-      stream = url.openStream();
-      stream.close();
-    } finally {
-      IOUtils.closeQuietly(stream);
-    }
+    Http2SolrClient.GET(masterUrl);
   }
 
 }

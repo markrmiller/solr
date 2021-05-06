@@ -27,7 +27,7 @@ public class AsyncTracker implements Closeable {
   private final ReentrantLock waitForCompleteLock = new ReentrantLock(false);
 
   // wait for async requests
-  private final Phaser phaser = new ThePhaser(1);
+  private final Phaser phaser;
   // maximum outstanding requests left
 
   public static class ThePhaser extends Phaser {
@@ -43,10 +43,11 @@ public class AsyncTracker implements Closeable {
   }
 
   public AsyncTracker(int maxOutstandingAsyncRequests) {
-    this(maxOutstandingAsyncRequests, true);
+    this(maxOutstandingAsyncRequests, true, 0);
   }
 
-  public AsyncTracker(int maxOutstandingAsyncRequests, boolean wait) {
+  public AsyncTracker(int maxOutstandingAsyncRequests, boolean wait, int start) {
+    phaser = new ThePhaser(start);
     this.wait = wait;
     if (maxOutstandingAsyncRequests > 0) {
       available = new Semaphore(maxOutstandingAsyncRequests, false);
@@ -56,12 +57,11 @@ public class AsyncTracker implements Closeable {
   }
 
   public void waitForComplete(long timeout, TimeUnit timeUnit) throws TimeoutException {
-    waitForCompleteLock.lock();
+  //  waitForCompleteLock.lock();
     try {
       final int registeredParties = phaser.getRegisteredParties();
-      if (registeredParties == 1) {
-        return;
-      }
+      int phase = phaser.getPhase();
+      if (phaser.getUnarrivedParties() == 0) return;
       if (log.isTraceEnabled()) {
         final int unarrivedParties = phaser.getUnarrivedParties();
         final int arrivedParties = phaser.getArrivedParties();
@@ -69,7 +69,7 @@ public class AsyncTracker implements Closeable {
             unarrivedParties, phaser);
       }
       try {
-        phaser.awaitAdvanceInterruptibly(phaser.arrive(), timeout, timeUnit);
+        phaser.awaitAdvanceInterruptibly(phase, timeout, timeUnit);
       } catch (IllegalStateException e) {
         log.error("Unexpected, perhaps came after close; ?", e);
       } catch (InterruptedException e) {
@@ -79,7 +79,7 @@ public class AsyncTracker implements Closeable {
 
       if (log.isTraceEnabled()) log.trace("After wait for outstanding requests {}", phaser);
     } finally {
-      waitForCompleteLock.unlock();
+  //    waitForCompleteLock.unlock();
     }
   }
 
@@ -146,7 +146,7 @@ public class AsyncTracker implements Closeable {
       // }
     }
 
-    if (log.isDebugEnabled()) log.debug("Request complete {}", phaser);
+    if (log.isDebugEnabled()) log.debug("Request complete {}", phaser, new RuntimeException());
   }
 
   public int getUnArrived() {
