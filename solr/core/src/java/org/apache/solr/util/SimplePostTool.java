@@ -38,8 +38,13 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -47,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.security.GeneralSecurityException;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
@@ -882,14 +888,30 @@ public class SimplePostTool {
   public void doGet(URL url) {
     try {
       if(mockMode) return;
-      HttpURLConnection urlc = (HttpURLConnection) url.openConnection();
-      basicAuth(urlc);
-      urlc.connect();
-      checkResponseCode(urlc);
+//      HttpURLConnection urlc = (HttpURLConnection) url.openConnection();
+//      basicAuth(urlc);
+//      urlc.connect();
+ //     checkResponseCode(urlc);
+      HttpClient client = HttpClient.newBuilder()
+          // just to show off; HTTP/2 is the default
+          .version(HttpClient.Version.HTTP_2)
+          .connectTimeout(Duration.ofSeconds(5))
+          //.followRedirects(SECURE)
+          .build();
+      HttpRequest request = HttpRequest.newBuilder()
+          .GET()
+          .version(HttpClient.Version.HTTP_2)
+          .uri(url.toURI())
+          .header("Accept-Language", "en-US,en;q=0.5")
+          .build();
+      client.send(request, HttpResponse.BodyHandlers.ofString());
+
     } catch (IOException e) {
+      e.printStackTrace();
       warn("An error occurred getting data from "+url+". Please check that Solr is running.");
     } catch (Exception e) {
       warn("An error occurred getting data from "+url+". Message: " + e.getMessage());
+      e.printStackTrace();
     }
   }
 
@@ -903,54 +925,88 @@ public class SimplePostTool {
     boolean success = true;
     if(type == null)
       type = DEFAULT_CONTENT_TYPE;
+
+    HttpClient client = HttpClient.newBuilder()
+        // just to show off; HTTP/2 is the default
+        .version(HttpClient.Version.HTTP_2)
+        .connectTimeout(Duration.ofSeconds(5))
+        //.followRedirects(SECURE)
+        .build();
+
+
     HttpURLConnection urlc = null;
     try {
-      try {
-        urlc = (HttpURLConnection) url.openConnection();
-        try {
-          urlc.setRequestMethod("POST");
-        } catch (ProtocolException e) {
-          fatal("Shouldn't happen: HttpURLConnection doesn't support POST??"+e);
-        }
-        urlc.setDoOutput(true);
-        urlc.setDoInput(true);
-        urlc.setUseCaches(false);
-        urlc.setAllowUserInteraction(false);
-        urlc.setRequestProperty("Content-type", type);
-        basicAuth(urlc);
-        if (null != length) {
-          urlc.setFixedLengthStreamingMode(length);
-        } else {
-          urlc.setChunkedStreamingMode(-1);//use JDK default chunkLen, 4k in Java 8.
-        }
-        urlc.connect();
-      } catch (IOException e) {
-        fatal("Connection error (is Solr running at " + solrUrl + " ?): " + e);
-        success = false;
-      } catch (Exception e) {
-        fatal("POST failed with error " + e.getMessage());
-      }
+//      try {
+//        urlc = (HttpURLConnection) url.openConnection();
+//        try {
+//          urlc.setRequestMethod("POST");
+//        } catch (ProtocolException e) {
+//          fatal("Shouldn't happen: HttpURLConnection doesn't support POST??"+e);
+//        }
 
-      try (final OutputStream out = urlc.getOutputStream()) {
-        pipe(data, out);
-      } catch (IOException e) {
-        fatal("IOException while posting data: " + e);
-      }
+        HttpRequest.BodyPublisher requestBody = HttpRequest.BodyPublishers
+            .ofInputStream(() -> data);
+        HttpRequest request = HttpRequest.newBuilder()
+            .POST(requestBody)
+            .version(HttpClient.Version.HTTP_2)
+            .uri(url.toURI())
+            .build();
 
-      try {
-        success &= checkResponseCode(urlc);
-        try (final InputStream in = urlc.getInputStream()) {
-          pipe(in, output);
-        }
-      } catch (IOException e) {
-        warn("IOException while reading response: " + e);
-        success = false;
-      } catch (GeneralSecurityException e) {
-        fatal("Looks like Solr is secured and would not let us in. Try with another user in '-u' parameter");
-      }
+        HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+      int rc = response.statusCode();
+        // `HttpResponse<T>.body()` returns a `T`
+
+      //  try (final OutputStream out = urlc.getOutputStream()) {
+          pipe(response.body(), out);
+      //  } catch (IOException e) {
+       //   fatal("IOException while posting data: " + e);
+       // }
+//        urlc.setDoOutput(true);
+//        urlc.setDoInput(true);
+//        urlc.setUseCaches(false);
+//        urlc.setAllowUserInteraction(false);
+//        urlc.setRequestProperty("Content-type", type);
+//        basicAuth(urlc);
+//        if (null != length) {
+//          urlc.setFixedLengthStreamingMode(length);
+//        } else {
+//          urlc.setChunkedStreamingMode(-1);//use JDK default chunkLen, 4k in Java 8.
+//        }
+//        urlc.connect();
+//      } catch (IOException e) {
+//        fatal("Connection error (is Solr running at " + solrUrl + " ?): " + e);
+//        success = false;
+//      } catch (Exception e) {
+//        fatal("POST failed with error " + e.getMessage());
+//      }
+
+//      try (final OutputStream out = urlc.getOutputStream()) {
+//        pipe(res, out);
+//      } catch (IOException e) {
+//        fatal("IOException while posting data: " + e);
+//      }
+
+ //     try {
+        success = rc == 200;// &= checkResponseCode(urlc);
+//        try (final InputStream in = urlc.getInputStream()) {
+//          pipe(in, output);
+//        }
+//      } catch (IOException e) {
+//        warn("IOException while reading response: " + e);
+//        success = false;
+//      }
+      //    } finally {
+//      if (urlc!=null) urlc.disconnect();
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    } catch (URISyntaxException e) {
+      e.printStackTrace();
     } finally {
-      if (urlc!=null) urlc.disconnect();
+
     }
+
     return success;
   }
 
