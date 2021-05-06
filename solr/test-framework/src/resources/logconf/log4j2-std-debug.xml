@@ -65,6 +65,8 @@
         <AsyncLogger name="org.apache.solr.common.cloud.ZkMaintenanceUtils" level="INFO"/>
         <AsyncLogger name="org.apache.solr.update.processor.DistributedZkUpdateProcessor" level="DEBUG"/>
         <AsyncLogger name="org.apache.solr.update.processor.DistributedUpdateProcessor" level="DEBUG"/>
+        <AsyncLogger name="org.apache.solr.client.solrj.impl.AsyncTracker" level="TRACE"/>
+
         <AsyncLogger name="org.apache.solr.update.SolrCmdDistributor" level="INFO"/>
         <AsyncLogger name="org.apache.solr.update.processor.LogUpdateProcessorFactory" level="INFO"/>
 
