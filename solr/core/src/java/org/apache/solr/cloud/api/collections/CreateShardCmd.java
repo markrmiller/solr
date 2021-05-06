@@ -76,7 +76,8 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
       collectionName = extCollectionName;
     }
 
-    int numNrtReplicas = message.getInt(NRT_REPLICAS, message.getInt(REPLICATION_FACTOR, collection.getInt(NRT_REPLICAS, collection.getInt(REPLICATION_FACTOR, 1))));
+    int numNrtReplicas = message
+        .getInt(NRT_REPLICAS, message.getInt(REPLICATION_FACTOR, collection.getInt(NRT_REPLICAS, collection.getInt(REPLICATION_FACTOR, 1))));
     int numPullReplicas = message.getInt(PULL_REPLICAS, collection.getInt(PULL_REPLICAS, 0));
     int numTlogReplicas = message.getInt(TLOG_REPLICAS, collection.getInt(TLOG_REPLICAS, 0));
 
@@ -90,66 +91,65 @@ public class CreateShardCmd implements OverseerCollectionMessageHandler.Cmd {
     log.info("After create shard {}", clusterState);
 
     String async = message.getStr(ASYNC);
-    ZkNodeProps addReplicasProps = new ZkNodeProps(
-        COLLECTION_PROP, collectionName,
-        SHARD_ID_PROP, sliceName,
-        ZkStateReader.NRT_REPLICAS, String.valueOf(numNrtReplicas),
-        ZkStateReader.TLOG_REPLICAS, String.valueOf(numTlogReplicas),
-        ZkStateReader.PULL_REPLICAS, String.valueOf(numPullReplicas),
-        ZkStateReader.CREATE_NODE_SET, message.getStr(ZkStateReader.CREATE_NODE_SET),
-        CommonAdminParams.WAIT_FOR_FINAL_STATE, Boolean.toString(waitForFinalState));
+    ZkNodeProps addReplicasProps = new ZkNodeProps(COLLECTION_PROP, collectionName, SHARD_ID_PROP, sliceName, ZkStateReader.NRT_REPLICAS,
+        String.valueOf(numNrtReplicas), ZkStateReader.TLOG_REPLICAS, String.valueOf(numTlogReplicas), ZkStateReader.PULL_REPLICAS,
+        String.valueOf(numPullReplicas), ZkStateReader.CREATE_NODE_SET, message.getStr(ZkStateReader.CREATE_NODE_SET), CommonAdminParams.WAIT_FOR_FINAL_STATE,
+        Boolean.toString(waitForFinalState));
 
-    Map<String, Object> propertyParams = new HashMap<>();
+    Map<String,Object> propertyParams = new HashMap<>();
     OverseerCollectionMessageHandler.addPropertyParams(message, propertyParams);
     addReplicasProps = addReplicasProps.plus(propertyParams);
     if (async != null) addReplicasProps.getProperties().put(ASYNC, async);
 
     final String asyncId = message.getStr(ASYNC);
     ShardHandler shardHandler = ocmh.shardHandlerFactory.getShardHandler(ocmh.overseerLbClient);
-
-    OverseerCollectionMessageHandler.ShardRequestTracker shardRequestTracker = ocmh.asyncRequestTracker(asyncId, message.getStr(Overseer.QUEUE_OPERATION));
-
-    final NamedList addResult = new NamedList();
-    AddReplicaCmd.Response resp;
     try {
-      //ocmh.addReplica(zkStateReader.getClusterState(), addReplicasProps, addResult, () -> {
-      resp = new AddReplicaCmd(ocmh)
-          .addReplica(clusterState, addReplicasProps, shardHandler, shardRequestTracker, results); //ocmh.addReplica(clusterState, addReplicasProps, addResult).clusterState;
-      clusterState = resp.clusterState;
-    } catch (Assign.AssignmentException e) {
-      // clean up the slice that we created
-      // MRM TODO:
-//      ZkNodeProps deleteShard = new ZkNodeProps(COLLECTION_PROP, collectionName, SHARD_ID_PROP, sliceName, ASYNC, async);
-//      new DeleteShardCmd(ocmh).call(clusterState, deleteShard, results);
-      throw e;
+      OverseerCollectionMessageHandler.ShardRequestTracker shardRequestTracker = ocmh.asyncRequestTracker(asyncId, message.getStr(Overseer.QUEUE_OPERATION));
+
+      final NamedList addResult = new NamedList();
+      AddReplicaCmd.Response resp;
+      try {
+        //ocmh.addReplica(zkStateReader.getClusterState(), addReplicasProps, addResult, () -> {
+        resp = new AddReplicaCmd(ocmh).addReplica(clusterState, addReplicasProps, shardHandler, shardRequestTracker,
+            results); //ocmh.addReplica(clusterState, addReplicasProps, addResult).clusterState;
+        clusterState = resp.clusterState;
+      } catch (Assign.AssignmentException e) {
+        // clean up the slice that we created
+        // MRM TODO:
+        //      ZkNodeProps deleteShard = new ZkNodeProps(COLLECTION_PROP, collectionName, SHARD_ID_PROP, sliceName, ASYNC, async);
+        //      new DeleteShardCmd(ocmh).call(clusterState, deleteShard, results);
+        throw e;
+      }
+
+      //    () -> {
+      //      Object addResultFailure = addResult.get("failure");
+      //      if (addResultFailure != null) {
+      //        SimpleOrderedMap failure = (SimpleOrderedMap) results.get("failure");
+      //        if (failure == null) {
+      //          failure = new SimpleOrderedMap();
+      //          results.add("failure", failure);
+      //        }
+      //        failure.addAll((NamedList) addResultFailure);
+      //      } else {
+      //        SimpleOrderedMap success = (SimpleOrderedMap) results.get("success");
+      //        if (success == null) {
+      //          success = new SimpleOrderedMap();
+      //          results.add("success", success);
+      //        }
+      //        success.addAll((NamedList) addResult.get("success"));
+      //      }
+      //    }
+
+      log.info("Finished create command on all shards for collection: {}", collectionName);
+      AddReplicaCmd.Response response = new AddReplicaCmd.Response();
+
+      response.asyncFinalRunner = new MyFinalize(collectionName, shardRequestTracker, results, shardHandler, resp, ocmh.overseer);
+
+      response.clusterState = clusterState;
+      return response;
+    } finally {
+      shardHandler.cancelAll();
     }
-
-//    () -> {
-//      Object addResultFailure = addResult.get("failure");
-//      if (addResultFailure != null) {
-//        SimpleOrderedMap failure = (SimpleOrderedMap) results.get("failure");
-//        if (failure == null) {
-//          failure = new SimpleOrderedMap();
-//          results.add("failure", failure);
-//        }
-//        failure.addAll((NamedList) addResultFailure);
-//      } else {
-//        SimpleOrderedMap success = (SimpleOrderedMap) results.get("success");
-//        if (success == null) {
-//          success = new SimpleOrderedMap();
-//          results.add("success", success);
-//        }
-//        success.addAll((NamedList) addResult.get("success"));
-//      }
-//    }
-
-    log.info("Finished create command on all shards for collection: {}", collectionName);
-    AddReplicaCmd.Response response = new AddReplicaCmd.Response();
-
-    response.asyncFinalRunner = new MyFinalize(collectionName, shardRequestTracker, results, shardHandler, resp, ocmh.overseer);
-
-    response.clusterState = clusterState;
-    return response;
   }
 
   private static class MyFinalize implements OverseerCollectionMessageHandler.Finalize {

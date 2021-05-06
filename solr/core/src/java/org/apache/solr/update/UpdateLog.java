@@ -2110,6 +2110,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
             }
           } catch (Exception e) {
             SolrException.log(log, e);
+            throw new SolrException(ErrorCode.SERVER_ERROR, e);
           }
 
           if (o == null) break;

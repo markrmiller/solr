@@ -425,10 +425,10 @@ public class MiniSolrCloudCluster {
   }
 
   /**
-   * @return Unmodifiable list of all the currently started Solr Jettys.
+   * @return list of all the currently started Solr Jettys.
    */
   public List<JettySolrRunner> getJettySolrRunners() {
-    return Collections.unmodifiableList(jettys);
+    return jettys;
   }
 
   /**

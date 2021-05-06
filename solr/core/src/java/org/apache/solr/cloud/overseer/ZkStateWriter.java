@@ -541,13 +541,13 @@ public class ZkStateWriter {
 
       collectionRefs.forEach((collectionName, docStateRef) -> {
         DocCollection docState = docStateRef.get(false).join();
-
+        idToCollection.put(docState.getId(), collectionName);
         if (weAreReplacement) {
           stateUpdates.compute(docState.getId(), (k, v) -> {
             //
-            //            if (v != null) {
-            //              return v;
-            //            }
+//                        if (v != null) {
+//                          return v;
+//                        }
 
             String stateUpdatesPath = ZkStateReader.getCollectionStateUpdatesPath(collectionName);
             byte[] data;
@@ -583,20 +583,19 @@ public class ZkStateWriter {
               //}
             });
 
-            return v;
+            return finalV;
           });
 
           writeStateUpdatesInternal(Collections.singleton(docState.getId()), 1);
         } else {
-          Map<Integer,Integer> su = stateUpdates.get(docState.getId());
-          if (su != null) {
-            su.clear();
-            writeStateUpdatesInternal(Collections.singleton(docState.getId()), 1);
-          }
+//          Map<Integer,Integer> su = stateUpdates.get(docState.getId());
+//          if (su != null) {
+//            su.clear();
+//            writeStateUpdatesInternal(Collections.singleton(docState.getId()), 1);
+//          }
         }
 
         cs.put(collectionName, docState);
-        idToCollection.put(docState.getId(), collectionName);
 
         if (docState.getId() > highId[0]) {
           highId[0] = docState.getId();

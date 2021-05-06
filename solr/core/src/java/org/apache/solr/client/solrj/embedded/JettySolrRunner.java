@@ -276,8 +276,7 @@ public class JettySolrRunner implements Closeable {
 //    classlist.addBefore(
 //        "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
 //        "org.eclipse.jetty.annotations.AnnotationConfiguration");
-    server.setStopAtShutdown(true);
-    server.setStopTimeout(300); // will wait gracefully for stoptime / 2, then interrupts
+
 
 
 
@@ -377,6 +376,9 @@ public class JettySolrRunner implements Closeable {
 
     server.addConnector(connector);
     server.manage(connector);
+
+    server.setStopAtShutdown(true);
+    server.setStopTimeout(1500); // will wait gracefully for stoptime / 2, then interrupts
 
 //    server.setDumpAfterStart(true);
 //    server.setDumpBeforeStop(true);
