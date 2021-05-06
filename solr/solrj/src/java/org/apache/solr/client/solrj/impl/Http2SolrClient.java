@@ -1587,6 +1587,13 @@ public class Http2SolrClient extends SolrClient {
     return doGet(url, httpClient, headers);
   }
 
+  public static SimpleResponse POST(String url, ByteBuffer bytes, String contentType, Map headers)
+      throws ExecutionException, InterruptedException, TimeoutException {
+    try (Http2SolrClient http2SolrClient = new Builder().build()) {
+      return POST(url, http2SolrClient, bytes, contentType, headers);
+    }
+  }
+
   public static SimpleResponse POST(String url, Http2SolrClient httpClient, byte[] bytes, String contentType)
           throws InterruptedException, ExecutionException, TimeoutException {
     return doPost(url, httpClient, bytes, contentType, Collections.emptyMap());

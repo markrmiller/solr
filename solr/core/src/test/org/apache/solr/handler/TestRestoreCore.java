@@ -232,29 +232,21 @@ public class TestRestoreCore extends SolrJettyTestBase {
 
   }
 
-  public static boolean fetchRestoreStatus (String baseUrl, String coreName) throws IOException {
-    String masterUrl = baseUrl + "/" + coreName +
-        ReplicationHandler.PATH + "?wt=xml&command=" + ReplicationHandler.CMD_RESTORE_STATUS;
+  public static boolean fetchRestoreStatus (String baseUrl, String coreName) throws Exception {
+    String masterUrl = baseUrl + "/" + coreName + ReplicationHandler.PATH + "?wt=xml&command=" + ReplicationHandler.CMD_RESTORE_STATUS;
     final Pattern pException = Pattern.compile("<str name=\"exception\">(.*?)</str>");
 
-    InputStream stream = null;
-    try {
-      URL url = new URL(masterUrl);
-      stream = url.openStream();
-      String response = IOUtils.toString(stream, "UTF-8");
-      Matcher matcher = pException.matcher(response);
-      if(matcher.find()) {
-        fail("Failed to complete restore action with exception " + matcher.group(1));
-      }
-      if(response.contains("<str name=\"status\">success</str>")) {
-        return true;
-      } else if (response.contains("<str name=\"status\">failed</str>")){
-        fail("Restore Failed");
-      }
-      stream.close();
-    } finally {
-      IOUtils.closeQuietly(stream);
+    String response = Http2SolrClient.GET(masterUrl).asString;
+    Matcher matcher = pException.matcher(response);
+    if (matcher.find()) {
+      fail("Failed to complete restore action with exception " + matcher.group(1));
     }
+    if (response.contains("<str name=\"status\">success</str>")) {
+      return true;
+    } else if (response.contains("<str name=\"status\">failed</str>")) {
+      fail("Restore Failed");
+    }
+
     return false;
   }
 }
