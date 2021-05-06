@@ -221,7 +221,7 @@ public class LeaderElector implements Closeable {
         leadersElected.inc();
         return true;
       }
-      log.warn("{} Failed becoming leader {}", context.replica.getSlice(), context.replica);
+      log.warn("{} Failed becoming leader {}", context.replica, context.replica);
       return false;
     } finally {
       if (!success) {

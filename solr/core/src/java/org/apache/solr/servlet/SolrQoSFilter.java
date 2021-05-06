@@ -59,11 +59,11 @@ public class SolrQoSFilter extends QoSFilter {
 
   private final Limiter<HttpServletRequest> limiter = null;
 
-  static Meter requests = Metrics.MARKS_METRICS.meter("qosfilter_requests");
-  static Meter requestsInternal = Metrics.MARKS_METRICS.meter("qosfilter_internal_requests");
-  static Meter requestsExternal = Metrics.MARKS_METRICS.meter("qosfilter_external_requests");
-  static Meter requestsInToExt = Metrics.MARKS_METRICS.meter("qosfilter_internal_toext_requests");
-  static Meter highLoadEvent = Metrics.MARKS_METRICS.meter("qosfilter_highload_event");
+//  static Meter requests = Metrics.MARKS_METRICS.meter("qosfilter_requests");
+//  static Meter requestsInternal = Metrics.MARKS_METRICS.meter("qosfilter_internal_requests");
+//  static Meter requestsExternal = Metrics.MARKS_METRICS.meter("qosfilter_external_requests");
+//  static Meter requestsInToExt = Metrics.MARKS_METRICS.meter("qosfilter_internal_toext_requests");
+//  static Meter highLoadEvent = Metrics.MARKS_METRICS.meter("qosfilter_highload_event");
 
   @Override public void init(FilterConfig filterConfig) {
     super.init(filterConfig);
@@ -79,7 +79,7 @@ public class SolrQoSFilter extends QoSFilter {
   // allow the user to select and configure one
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
     //chain.doFilter(request, response);
-    requests.mark();
+   // requests.mark();
 
     if (limiter != null) {
       Optional<Limiter.Listener> listener = limiter.acquire((HttpServletRequest) request);
@@ -96,9 +96,9 @@ public class SolrQoSFilter extends QoSFilter {
 
     if (externalRequest) {
 
-      log.debug("external request {} {}", req.getPathInfo(), requests.getOneMinuteRate());
+     // log.debug("external request {} {}", req.getPathInfo(), requests.getOneMinuteRate());
 
-      requestsExternal.mark();
+     // requestsExternal.mark();
 
       if (highLoadAt == 0 && (offHighLoadAt == 0 || System.nanoTime() - offHighLoadAt > TimeUnit.NANOSECONDS.convert(15, TimeUnit.SECONDS)) && (
           lastCheckLoad == 0 || System.nanoTime() - lastCheckLoad > TimeUnit.NANOSECONDS.convert(15, TimeUnit.SECONDS))) {
@@ -116,14 +116,14 @@ public class SolrQoSFilter extends QoSFilter {
       super.doFilter(req, response, chain);
 
     } else {
-      log.debug("internal request {} {}", req.getPathInfo(), requests.getOneMinuteRate());
+    //  log.debug("internal request {} {}", req.getPathInfo(), requests.getOneMinuteRate());
 
       //      if (requests.getMeanRate() > 12000) {
       //        requestsInToExt.mark();
       //        super.doFilter(req, response, chain);
       //      }
 
-      requestsInternal.mark();
+     // requestsInternal.mark();
       req.getServletContext().setAttribute("internal", "true");
       // super.doFilter(req, response, chain);
       chain.doFilter(req, response);
@@ -152,7 +152,7 @@ public class SolrQoSFilter extends QoSFilter {
         updateMaxRequests(20, sLoad, ourLoad);
         offHighLoadAt = 0;
         highLoadAt = System.nanoTime();
-        highLoadEvent.mark();
+       // highLoadEvent.mark();
       }
     }
     //  }

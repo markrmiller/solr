@@ -53,6 +53,8 @@ public class UpdateShardHandler implements SolrInfoBean {
 
   private final Http2SolrClient updateOnlyClient;
 
+  private final Http2SolrClient solrCmdDistributorClient;
+
   private final Http2SolrClient searchOnlyClient;
 
   private final Http2SolrClient recoveryOnlyClient;
@@ -105,6 +107,14 @@ public class UpdateShardHandler implements SolrInfoBean {
     queryParams.add(DistributedUpdateProcessor.DISTRIB_FROM);
     queryParams.add(DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM);
     updateOnlyClient.setQueryParams(queryParams);
+
+    solrCmdDistributorClient = updateOnlyClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(SysStats.PROC_COUNT).build();
+    solrCmdDistributorClient.enableCloseLock();
+    // updateOnlyClient.addListenerFactory(updateHttpListenerFactory);
+    queryParams = new HashSet<>(2);
+    queryParams.add(DistributedUpdateProcessor.DISTRIB_FROM);
+    queryParams.add(DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM);
+    solrCmdDistributorClient.setQueryParams(queryParams);
 
 
     Http2SolrClient.Builder recoveryOnlyClientBuilder = new Http2SolrClient.Builder();
@@ -200,6 +210,10 @@ public class UpdateShardHandler implements SolrInfoBean {
     return updateOnlyClient;
   }
 
+  public Http2SolrClient getSolrCmdDistributorClient() {
+    return solrCmdDistributorClient;
+  }
+
   public Http2SolrClient getRecoveryOnlyClient() {
     return recoveryOnlyClient;
   }
@@ -233,6 +247,7 @@ public class UpdateShardHandler implements SolrInfoBean {
       closer.collect(recoveryOnlyClient);
       closer.collect(searchOnlyClient);
       closer.collect(updateOnlyClient);
+      closer.collect(solrCmdDistributorClient);
       closer.collect(leaderCheckClient);
     }
     try {

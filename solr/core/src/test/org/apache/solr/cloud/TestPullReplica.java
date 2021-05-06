@@ -42,7 +42,6 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.SolrCore;
-import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.util.TestInjection;
 import org.apache.solr.util.TimeOut;
 import org.apache.zookeeper.KeeperException;
@@ -76,7 +75,7 @@ public class TestPullReplica extends SolrCloudTestCase {
   private String collectionName = null;
   private final static int REPLICATION_TIMEOUT_SECS = 10;
 
-  private String suggestedCollectionName() {
+  private static String suggestedCollectionName() {
     return (SolrTestUtil.getTestName().replace("Test", "") + "_" + SolrTestUtil.getTestName().split(" ")[0]).replaceAll("(.)(\\p{Upper})", "$1_$2").toLowerCase(Locale.ROOT);
   }
 
@@ -634,7 +633,7 @@ public class TestPullReplica extends SolrCloudTestCase {
   }
 
 
-  private CollectionStatePredicate activeReplicaCount(int numNrtReplicas, int numTlogReplicas, int numPullReplicas) {
+  private static CollectionStatePredicate activeReplicaCount(int numNrtReplicas, int numTlogReplicas, int numPullReplicas) {
     return (liveNodes, collectionState) -> {
       int nrtFound = 0, tlogFound = 0, pullFound = 0;
       if (collectionState == null)

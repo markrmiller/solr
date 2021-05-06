@@ -278,6 +278,8 @@ public class JettySolrRunner implements Closeable {
 //        "org.eclipse.jetty.annotations.AnnotationConfiguration");
 
 
+
+
     long idleTimeout = TimeUnit.SECONDS.toMillis(30);
 
     //if (System.getProperty("jetty.testMode") != null) {
@@ -375,9 +377,8 @@ public class JettySolrRunner implements Closeable {
     server.addConnector(connector);
     server.manage(connector);
 
-
     server.setStopAtShutdown(true);
-    server.setStopTimeout(300); // will wait gracefully for stoptime / 2, then interrupts
+    server.setStopTimeout(0); // will wait gracefully for stoptime / 2, then interrupts
 
 //    server.setDumpAfterStart(true);
 //    server.setDumpBeforeStop(true);

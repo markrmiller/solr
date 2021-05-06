@@ -458,7 +458,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
                 .fromKeyVals(StatePublisher.OPERATION, OverseerAction.STATE.toLower(), ZkStateReader.CORE_NAME_PROP, core.getName(), "id",
                     core.getCoreDescriptor().getCoreProperty("collId", null) + "-" + core.getCoreDescriptor().getCoreProperty("id", null), ZkStateReader.COLLECTION_PROP, core.getCoreDescriptor().getCollectionName(), ZkStateReader.STATE_PROP, Replica.State.LEADER);
             core.getCoreContainer().getZkController().publish(zkNodes);
-            throw new IllegalStateException();
+            break;
           }
 
           log.debug("Publishing state of core [{}] as buffering {}", core.getName(), "doSyncOrReplicateRecovery");
@@ -482,7 +482,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
           if (leader.getNodeName().equals(core.getCoreContainer().getZkController().getNodeName())) {
             if (!core.getCoreContainer().getZkController().zkStateReader.isLocalLeader.isLocalLeader(leaderCoreName)) {
-              throw new IllegalStateException("Via local check, " + leaderCoreName + " is not a current valid leader");
+              break;
             }
           }
           String leaderBaseUrl = leader.getBaseUrl();
@@ -495,7 +495,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
           if (prepForClose || closed || core.getCoreContainer().isShutDown()) {
             log.warn("Skipping recovery because Solr is shutdown");
-            throw new AlreadyClosedException();
+             break;
           }
           log.info("Sending prep recovery command to {} for leader={} params={}", leaderBaseUrl, leaderCoreName, prepCmd.getParams());
 
@@ -510,7 +510,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
           } catch (SolrException e) {
             Throwable cause = e.getRootCause();
             if (cause instanceof AlreadyClosedException) {
-              throw new AlreadyClosedException(cause);
+              break;
             }
             log.info("failed in prep recovery", e);
           } catch (Exception e) {

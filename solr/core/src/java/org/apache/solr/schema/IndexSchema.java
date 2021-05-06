@@ -149,7 +149,8 @@ public class IndexSchema {
 
   protected final List<SchemaField> fieldsWithDefaultValue = new ArrayList<>();
   protected final Collection<SchemaField> requiredFields = new HashSet<>();
-  protected volatile DynamicField[] dynamicFields = EMPTY_DYNAMIC_FIELDS;
+  protected DynamicField[] dynamicFields = EMPTY_DYNAMIC_FIELDS;
+  private boolean isUsableForChildDocs;
 
   public DynamicField[] getDynamicFields() { return dynamicFields; }
 
@@ -545,7 +546,7 @@ public class IndexSchema {
   }
 
   public static String normalize (String path, String prefix){
-    return (prefix == null || path.startsWith("/")) ? path : prefix + path;
+    return (prefix == null || !path.isEmpty() && path.charAt(0) == '/') ? path : prefix + path;
   }
 
   protected void readSchema(String resourceName, InputSource is, SolrResourceLoader loader) {
@@ -728,7 +729,10 @@ public class IndexSchema {
 
   public void postReadInform(boolean wait) {
     //Run the callbacks on SchemaAware now that everything else is done
-
+    FieldType rootType = getFieldTypeNoEx(ROOT_FIELD_NAME);
+    isUsableForChildDocs = (null != uniqueKeyFieldType &&
+        null != rootType && rootType.getTypeName() != null &&
+        rootType.getTypeName().equals(uniqueKeyFieldType.getTypeName()));
     if (wait) {
       try (ParWork work = new ParWork(this)) {
         for (SchemaAware aware : schemaAware) {
@@ -1133,8 +1137,8 @@ public class IndexSchema {
       protected DynamicPattern(String regex, String fixedStr) { this.regex = regex; this.fixedStr = fixedStr; }
 
       static DynamicPattern createPattern(String regex) {
-        if (regex.startsWith("*")) { return new NameEndsWith(regex); }
-        else if (regex.endsWith("*")) { return new NameStartsWith(regex); }
+        if (!regex.isEmpty() && regex.charAt(0) == '*') { return new NameEndsWith(regex); }
+        else if (!regex.isEmpty() && regex.charAt(regex.length() - 1) == '*') { return new NameStartsWith(regex); }
         else { return new NameEquals(regex);
         }
       }
@@ -2037,11 +2041,7 @@ public class IndexSchema {
    * @lucene.internal
    */
   public boolean isUsableForChildDocs() {
-    //TODO make this boolean a field so it needn't be looked up each time?
-    FieldType rootType = getFieldTypeNoEx(ROOT_FIELD_NAME);
-    return (null != uniqueKeyFieldType &&
-            null != rootType && rootType.getTypeName() != null &&
-            rootType.getTypeName().equals(uniqueKeyFieldType.getTypeName()));
+    return isUsableForChildDocs;
   }
 
   /**

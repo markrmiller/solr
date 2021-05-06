@@ -100,7 +100,7 @@ public class AsyncTracker implements Closeable {
     }
   }
 
-  public boolean register() throws InterruptedException {
+  public boolean register() {
     if (log.isDebugEnabled()) {
       log.debug("Registered new party {}", phaser);
     }
@@ -118,7 +118,11 @@ public class AsyncTracker implements Closeable {
         }
         return success;
       } else {
-        available.acquire();
+        try {
+          available.acquire();
+        } catch (InterruptedException e) {
+          throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, e);
+        }
       }
     }
     return true;

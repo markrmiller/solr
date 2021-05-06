@@ -158,7 +158,8 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     }
 
     // re-create a server (to restore original nodeCount count)
-    startedServer = cluster.startJettySolrRunner(jettyToStop);
+    jettyToStop.start().await(5, TimeUnit.SECONDS);
+    cluster.getJettySolrRunners().add(jettyToStop);
     cluster.waitForAllNodes(30);
     assertTrue(startedServer.isRunning());
     assertEquals(nodeCount, cluster.getJettySolrRunners().size());
@@ -293,15 +294,16 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     for (Integer ii : restartIndicesList) {
       final JettySolrRunner jetty = jettys.get(ii);
       if (!jetty.isRunning()) {
-        JettySolrRunner runner = cluster.getJettySolrRunner(ii);
-        runner.start().await(2, TimeUnit.SECONDS);
+        jetty.start().await(5, TimeUnit.SECONDS);
+        cluster.getJettySolrRunners().add(jetty);
         assertTrue(jetty.isRunning());
       }
     }
 
     cluster.waitForActiveCollection(collectionName, numShards, numShards * numReplicas);
-
-    // re-query collection
-    assertEquals(numDocs, client.query(collectionName, query).getResults().getNumFound());
+    try (org.apache.solr.client.solrj.impl.Http2SolrClient solrClient = new org.apache.solr.client.solrj.impl.Http2SolrClient.Builder(cluster.getJettySolrRunners().get(0).getBaseUrl()).build()) {
+      // re-query collection
+      assertEquals(numDocs, solrClient.query(collectionName, query).getResults().getNumFound());
+    }
   }
 }

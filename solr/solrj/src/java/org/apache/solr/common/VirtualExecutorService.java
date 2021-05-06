@@ -85,12 +85,9 @@ public class VirtualExecutorService extends AbstractExecutorService {
     // is an available permit - we must still arrive for tracking purposes
     // accomplished by the phaser (AsyncTracker = Semaphore + Phaser)
     boolean success;
-    try {
-      success = asyncTracker.register();
-    } catch (InterruptedException e) {
-      log.warn("executor interrupted");
-      throw new RejectedExecutionException("executor interrupted");
-    }
+
+    success = asyncTracker.register();
+
     try {
       if (!success) {
         try {

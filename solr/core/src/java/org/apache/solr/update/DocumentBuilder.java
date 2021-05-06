@@ -257,7 +257,7 @@ public class DocumentBuilder {
   }
 
   private static SolrException unexpectedNestedDocException(IndexSchema schema, boolean forInPlaceUpdate) {
-    if (! schema.isUsableForChildDocs()) {
+    if (!schema.isUsableForChildDocs()) {
       return new SolrException(SolrException.ErrorCode.BAD_REQUEST,
           "Unable to index docs with children: the schema must " +
               "include definitions for both a uniqueKey field and the '" + IndexSchema.ROOT_FIELD_NAME +

@@ -61,7 +61,7 @@
 
         <AsyncRoot level="INFO">
             <AppenderRef ref="FILE"/>
-            <AppenderRef ref="STDERR"/>
-         </AsyncRoot>
-     </Loggers>
- </Configuration>
+            <!--   <AppenderRef ref="STDERR"/> -->
+           </AsyncRoot>
+       </Loggers>
+   </Configuration>

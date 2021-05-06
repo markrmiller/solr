@@ -17,12 +17,18 @@
 package org.apache.solr.bench.schema;
 
 import org.apache.solr.SolrTestUtil;
+import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.request.AbstractUpdateRequest;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
+import org.apache.solr.client.solrj.request.UpdateRequest;
+import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.cloud.SolrCloudTestCase;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.NamedList;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -37,6 +43,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
+import org.openjdk.jmh.annotations.Timeout;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -46,18 +53,28 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.SECONDS)
-@Threads(1)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@Threads(4)
 @Warmup(iterations = 1)
 @Measurement(iterations = 1)
-@Fork(jvmArgsAppend = "-Xmx4g")
+@Fork(value = 1, jvmArgs = {"-Xmx8g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
+    "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=8",
+     "-XX:ParallelGCThreads=16", "-XX:+UseG1GC", "-Djetty.insecurerandom=1", "-Djava.security.egd=file:/dev/./urandom", "-XX:-UseBiasedLocking",
+    "-XX:+UseG1GC", "-XX:+PerfDisableSharedMem", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=250", "-Dsolr.enableMetrics=false", "-Dsolr.perThreadPoolSize=16", "-Dsolr.maxHttp2ClientThreads=128", "-Dsolr.jettyRunnerThreadPoolMaxSize=200",
+    "-Dsolr.enablePublicKeyHandler=false", "-Dzookeeper.nio.numSelectorThreads=16", "-Dzookeeper.nio.numWorkerThreads=16", "-Dzookeeper.commitProcessor.numWorkerThreads=16",
+    "-Dsolr.rootSharedThreadPoolCoreSize=120", "-Dlucene.cms.override_spins=false", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100", "-DtempDir=/data3-ext3/solr-jmh-temp",
+    "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true",
+    "-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=/data3-ext3"
+    + "/jfr_results,dumponexit=true,settings=profile,path-to-gc-roots=true"})
+@Timeout(time = 300)
 public class PointsVsTrie {
-
 
   //@State(Scope.Thread)
   @State(Scope.Benchmark)
@@ -67,7 +84,11 @@ public class PointsVsTrie {
     @Param({"point", "trie"})
     String fieldType;
 
-    int nodeCount = 3;
+    int nodeCount = 5;
+
+    int numShards = 9;
+    int numReplicas = 3;
+
     List<String> nodes;
     Random random = new Random();
     MiniSolrCloudCluster cluster;
@@ -110,6 +131,7 @@ public class PointsVsTrie {
 
       cluster = new SolrCloudTestCase.Builder(nodeCount, SolrTestUtil.createTempDir()).
           addConfig("conf", Paths.get("solr/test-framework/src/resources/configs/number-fields/conf")).formatZk(true).configure();
+      System.out.println("cluster base path=" + cluster.getBaseDir());
       client = cluster.getSolrClient().getHttpClient();
       nodes = new ArrayList<>(nodeCount);
       List<JettySolrRunner> jetties = cluster.getJettySolrRunners();
@@ -117,12 +139,51 @@ public class PointsVsTrie {
         nodes.add(runner.getBaseUrl());
       }
 
-      CollectionAdminRequest.Create request = CollectionAdminRequest.createCollection(collectionName, "conf", 4, 4);
+      CollectionAdminRequest.Create request = CollectionAdminRequest.createCollection(collectionName, "conf", numShards, numReplicas);
       request.setBasePath(nodes.get(random.nextInt(nodeCount)));
 
       client.asyncRequest(request, null, new BenchState.RequestAsyncListener());
 
-      cluster.waitForActiveCollection(collectionName, 5, TimeUnit.SECONDS, false, 4, 16, true, false);
+      cluster.waitForActiveCollection(collectionName, 15, TimeUnit.SECONDS, false, numShards, numReplicas * numReplicas, true, false);
+
+      Set<SolrInputDocument> docs = new HashSet<>();
+      final int perBatch = 500;
+      for (int batch = 0; batch < 100; batch++) {
+
+        for (int i = 0; i < perBatch; i++) {
+          SolrInputDocument doc = new SolrInputDocument();
+          doc.addField("id", batch * perBatch + i);
+          doc.addField("number_i", random.nextInt(1000));
+          doc.addField("number_i_dv", random.nextInt(1000));
+          docs.add(doc);
+        }
+        UpdateRequest updateRequest = new UpdateRequest();
+        updateRequest.setBasePath(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
+        updateRequest.add(docs);
+        updateRequest.process(client);
+        int finalBatch = batch;
+        client.asyncRequest(updateRequest, collectionName, new AsyncListener<>() {
+          @Override public void onSuccess(NamedList<Object> entries, int code) {
+            System.out.println("doc update batch success batch=" + finalBatch + " perBatch=" + perBatch);
+          }
+
+          @Override public void onFailure(Throwable throwable, int code) {
+            System.out.println("doc update batch failure");
+            throwable.printStackTrace();
+          }
+        });
+      }
+
+      client.waitForOutstandingRequests(1, TimeUnit.MINUTES);
+
+      client.setBaseUrl(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
+      UpdateRequest commitRequest = new UpdateRequest();
+      commitRequest.setBasePath(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
+      commitRequest.setAction(UpdateRequest.ACTION.COMMIT, false, true);
+      commitRequest.process(client, collectionName);
+
+      System.out.println("doc count=" + client.query(new SolrQuery("*:*")).getResults().getNumFound());
+
     }
 
     @TearDown(Level.Trial)
@@ -133,15 +194,22 @@ public class PointsVsTrie {
   }
 
   @Benchmark
-  public static void indexNumerics(BenchState state) throws Exception {
-
-
+  @Timeout(time = 300)
+  public static void matchAllSortAsc(BenchState state) throws Exception {
+//    "*_p_i_ni_mv_dv", "*_p_i_ni_dv_ns_mv",
+//        "*_p_i_dv_ns_mv", "*_p_i_mv_dv",
+//        "*_p_i_mv_dv_smf", "*_p_i_ni_mv_dv_smf",
+//        "*_p_i_mv_dv_sml", "*_p_i_ni_mv_dv_sml"
+    //"q", "*:*", "fl", "id, " + field, "sort", field + " asc, id asc
+     state.client.query(new SolrQuery("q", "*:*", "fl", "id,number_i", "sort", "number_i asc, id asc"));
+     state.client.query(new SolrQuery("q", "*:*", "fl", "id,number_i", "sort", "product(-9,number_i) asc, id asc"));
   }
 
   @Benchmark
-  public static void indexTries(BenchState state) throws Exception {
-
-
+  @Timeout(time = 300)
+  public static void matchAllSortDesc(BenchState state) throws Exception {
+    state.client.query(new SolrQuery("q", "*:*", "fl", "id,number_i", "sort", "number_i asc, id desc"));
+    state.client.query(new SolrQuery("q", "*:*", "fl", "id,number_i", "sort", "product(-9,number_i) asc, id desc"));
   }
 
   public static void main(String[] args) throws RunnerException {

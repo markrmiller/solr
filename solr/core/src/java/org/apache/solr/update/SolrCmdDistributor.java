@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.AsyncTracker;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest;
@@ -73,6 +74,8 @@ public class SolrCmdDistributor implements Closeable {
   
   private final Http2SolrClient requestSolrClient;
 
+  AsyncTracker asyncTracker = new AsyncTracker(-1);
+
  // private final Http2SolrClient replicaSolrClient;
 
   private final static long TIMEOUT = 1;
@@ -85,8 +88,7 @@ public class SolrCmdDistributor implements Closeable {
     assert ObjectReleaseTracker.getInstance().track(this);
     coreDesc = null;
     zkShardTerms = null;
-    this.requestSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().maxOutstandingAsyncRequests(
-        SysStats.PROC_COUNT).build();
+    this.requestSolrClient = updateShardHandler.getSolrCmdDistributorClient();
     //this.replicaSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().build();
     isClosed = null;
   }
@@ -95,7 +97,7 @@ public class SolrCmdDistributor implements Closeable {
     //assert ObjectReleaseTracker.track(this);
     this.zkShardTerms = zkShardTerms;
     this.coreDesc = coreDesc;
-    this.requestSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().build();
+    this.requestSolrClient = updateShardHandler.getSolrCmdDistributorClient();
     //this.replicaSolrClient = new Http2SolrClient.Builder().withHttpClient(updateShardHandler.getTheSharedHttpClient()).markInternalRequest().build();
     this.isClosed = isClosed;
   }
@@ -111,7 +113,7 @@ public class SolrCmdDistributor implements Closeable {
 
     if (isClosed == null || !isClosed.isClosed()) {
       try {
-        requestSolrClient.waitForOutstandingRequests(2, TimeUnit.MINUTES);
+        asyncTracker.waitForComplete(10, TimeUnit.MINUTES);
       } catch (TimeoutException timeoutException) {
         log.warn("Timeout waiting for requests to finish");
       }
@@ -132,7 +134,7 @@ public class SolrCmdDistributor implements Closeable {
   
   public void close() {
     this.closed = true;
-    requestSolrClient.close();
+    asyncTracker.close();
     assert ObjectReleaseTracker.getInstance().release(this);
   }
 
@@ -299,79 +301,85 @@ public class SolrCmdDistributor implements Closeable {
 
     req.uReq.setBasePath(req.node.getUrl());
 
-    boolean nonReplicaRequest =
-        req.node instanceof ForwardNode && (coreDesc != null && !req.node.getShardId().equals(coreDesc.getCloudDescriptor().getShardId()));
 
     if (req.synchronous) {
       blockAndDoRetries();
-
-      if (nonReplicaRequest) {
-        try {
-          requestSolrClient.request(req.uReq);
-        } catch (Exception e) {
-          log.error("Exception sending synchronous dist update", e);
-          Error error = new Error(tag);
-          error.t = e;
-          error.req = req;
-          if (e instanceof SolrException) {
-            error.statusCode = ((SolrException) e).code();
-          }
-          allErrors.put(req.cmd, error);
+      asyncTracker.register();
+      try {
+        requestSolrClient.request(req.uReq);
+      } catch (Exception e) {
+        log.error("Exception sending synchronous dist update", e);
+        Error error = new Error(tag);
+        error.t = e;
+        error.req = req;
+        if (e instanceof SolrException) {
+          error.statusCode = ((SolrException) e).code();
         }
+        allErrors.put(req.cmd, error);
+      } finally {
+        asyncTracker.arrive();
       }
 
       return;
     }
 
     try {
-  //    if (nonReplicaRequest || req.requiresWait) {
+        asyncTracker.register();
         requestSolrClient.asyncRequest(req.uReq, null, new AsyncListener<>() {
           @Override public void onSuccess(NamedList result, int code) {
             if (log.isTraceEnabled()) {
               log.trace("Success for distrib update {}", result);
             }
+            asyncTracker.arrive();
           }
 
           @Override public void onFailure(Throwable t, int code) {
-
-            if (t instanceof ClosedChannelException) {
-              // we may get success but be told the peer is shutting down via exception
-              if (log.isTraceEnabled()) {
-                log.trace("Success for distrib update {}", code);
+            boolean retried = false;
+            try {
+              if (t instanceof ClosedChannelException) {
+                // we may get success but be told the peer is shutting down via exception
+                if (log.isTraceEnabled()) {
+                  log.trace("Success for distrib update {}", code);
+                }
+                return;
               }
-              return;
-            }
 
-            log.error("Exception sending dist update code={}", code, t);
+              log.error("Exception sending dist update code={}", code, t);
 
-            if (t == Http2SolrClient.CANCELLED_EXCEPTION) {
-              log.info("Stream cancelled code={}", code);
-              return;
-            }
-
-            // MRM TODO: - we want to prevent any more from this request
-            // to go just to this node rather than stop the whole request
-            if (code == 404) {
-              cancelExeption = t;
-              return;
-            }
-
-            Error error = new Error(tag);
-            error.t = t;
-            error.req = req;
-            error.statusCode = code;
-
-            boolean retry = checkRetry(error);
-
-            if (retry) {
-              log.info("Retrying distrib update on error: {}", t.getMessage());
-              try {
-                submit(req, tag);
-              } catch (AlreadyClosedException e) {
-
+              if (t == Http2SolrClient.CANCELLED_EXCEPTION) {
+                log.info("Stream cancelled code={}", code);
+                return;
               }
-            } else {
-              allErrors.put(req.cmd, error);
+
+              // MRM TODO: - we want to prevent any more from this request
+              // to go just to this node rather than stop the whole request
+              if (code == 404) {
+                cancelExeption = t;
+                return;
+              }
+
+              Error error = new Error(tag);
+              error.t = t;
+              error.req = req;
+              error.statusCode = code;
+
+              boolean retry = checkRetry(error);
+
+              if (retry) {
+                log.info("Retrying distrib update on error: {}", t.getMessage());
+                try {
+                  submit(req, tag);
+                  retried = true;
+                } catch (AlreadyClosedException e) {
+
+                }
+              } else {
+                allErrors.put(req.cmd, error);
+              }
+            } finally {
+              if (retried) {
+                asyncTracker.arrive();
+              }
             }
           }
         });
@@ -459,6 +467,7 @@ public class SolrCmdDistributor implements Closeable {
         log.info("Retrying distrib update on error: {}", e.getMessage());
         submit(req, "root");
       } else {
+        asyncTracker.arrive();
         allErrors.put(req.cmd, error);
       }
     }

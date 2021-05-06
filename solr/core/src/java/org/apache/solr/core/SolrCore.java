@@ -3017,7 +3017,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
     public void execute (SolrRequestHandler handler, SolrQueryRequest req, SolrQueryResponse rsp){
       if (handler == null) {
-        String msg = "Null Request Handler '" + req.getParams().get(CommonParams.QT) + "'";
+        String msg = "Null Request Handler '" + req.getParams().get(CommonParams.QT) + "' path=" + req.getPath();
 
         log.warn("{}{}:{}", logid, msg, req);
 

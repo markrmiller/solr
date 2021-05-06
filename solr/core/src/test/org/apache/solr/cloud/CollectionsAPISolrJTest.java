@@ -128,12 +128,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
       horridGc.stopHorridGC();
       horridGc.waitForThreads(15000);
     }
-  }
-
-
-  @After
-  public void afterTest() throws Exception {
-
+    shutdownCluster();
   }
 
   /**
@@ -236,8 +231,6 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
       assertNull(clusterProperty);
       clusterProperty = cluster.getSolrClient().getZkStateReader().getClusterProperty(ImmutableList.of(COLLECTION_DEF, NUM_SHARDS_PROP), null);
       assertNull(clusterProperty);
-
-
   }
 
   @Test
@@ -394,15 +387,15 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     assertEquals(1, shard10);
     assertEquals(1, shard11);
 
-//    waitForState("Expected all shards to be active and parent shard to be removed", collectionName, (n, c) -> {
-//      if (c.getSlice("s1").getState() == Slice.State.ACTIVE)
-//        return false;
-//      for (Replica r : c.getReplicas()) {
-//        if (r.isActive(n) == false)
-//          return false;
-//      }
-//      return true;
-//    });
+    waitForState("Expected all shards to be active and parent shard to be removed", collectionName, (n, c) -> {
+      if (c.getSlice("s1").getState() == Slice.State.ACTIVE)
+        return false;
+      for (Replica r : c.getReplicas()) {
+        if (r.isActive(n) == false)
+          return false;
+      }
+      return true;
+    });
 
     // MRM TODO: - just to remove from equation
     // Test splitting using split.key
@@ -634,7 +627,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     assertEquals(0, rsp.getStatus());
     Number down = (Number) rsp.getResponse().findRecursive(collectionName, "shards", "s1", "replicas", "down");
     assertTrue("should be some down replicas, but there were none in shard1:" + rsp, down.intValue() > 0);
-    jetty.start();
+   // jetty.start();
   }
 
   @Test

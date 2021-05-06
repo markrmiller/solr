@@ -210,9 +210,9 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
           //        }
         }
       }
-      Timer.Context timer = requestTimes.time();
+     // Timer.Context timer = requestTimes.time();
       //  @SuppressWarnings("resource")
-      Timer.Context dTimer = distrib ? distribRequestTimes.time() : localRequestTimes.time();
+    //  Timer.Context dTimer = distrib ? distribRequestTimes.time() : localRequestTimes.time();
       try {
         if (pluginInfo != null && pluginInfo.attributes.containsKey(USEPARAM)) req.getContext().put(USEPARAM, pluginInfo.attributes.get(USEPARAM));
         SolrPluginUtils.setDefaults(this, req, defaults, appends, invariants);
@@ -280,14 +280,14 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
           }
         }
       } finally {
-        dTimer.stop();
-        long elapsed = timer.stop();
-        totalTime.inc(elapsed);
-        if (distrib) {
-          distribTotalTime.inc(elapsed);
-        } else {
-          localTotalTime.inc(elapsed);
-        }
+     //   dTimer.stop();
+      //  long elapsed = timer.stop();
+//        totalTime.inc(elapsed);
+//        if (distrib) {
+//          distribTotalTime.inc(elapsed);
+//        } else {
+//          localTotalTime.inc(elapsed);
+//        }
       }
     } finally {
       if (req.getCore() != null) {
