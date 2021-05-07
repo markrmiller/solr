@@ -551,7 +551,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         switch (result) {
           case PASSTHROUGH:
             if (ASYNC) {
-              log.info("PASSTHROUGH");
               asyncContext.getRequest().setAttribute("PASSTHROUGH", true);
               asyncContext.dispatch();
               return;
@@ -564,7 +563,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
             // TODO: does the above work for async?
             // asyncContext.dispatch(call.getPath());
-            return;
+            break;
           case REMOTEQUERY:
             return;
           case ADMIN:

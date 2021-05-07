@@ -20,6 +20,7 @@ import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.ExpandableBuffers;
 import org.apache.solr.common.util.JsonSchemaValidator;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -403,12 +404,13 @@ public abstract class SolrCall {
           out.sendContent(buffer, new Callback() {
             @Override public void succeeded() {
               Callback.super.succeeded();
+              ExpandableBuffers.getInstance().release(outStream.buffer());
               req.getAsyncContext().complete();
             }
 
             @Override public void failed(Throwable t) {
               Callback.super.failed(t);
-
+              ExpandableBuffers.getInstance().release(outStream.buffer());
               log.error("Solr ran into an unexpected problem", t);
               int code = 500;
               if (t instanceof SolrException) {
@@ -427,6 +429,7 @@ public abstract class SolrCall {
         } else {
           HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
           out.sendContent(buffer);
+          ExpandableBuffers.getInstance().release(outStream.buffer());
         }
       }
       //else http HEAD request, nothing to write out, waited this long just to get ContentType
@@ -519,16 +522,16 @@ public abstract class SolrCall {
  
   protected SolrDispatchFilter.Action authorize(CoreContainer cores, SolrQueryRequest solrReq, HttpServletRequest req, HttpServletResponse response) throws IOException {
     AuthorizationContext context = getAuthCtx(solrReq, req, getPath(), getRequestType());
-    SolrRequestInfo info = SolrRequestInfo.getRequestInfo();
+  //  SolrRequestInfo info = SolrRequestInfo.getRequestInfo();
 
     log.debug("AuthorizationContext : {}", context);
     AuthorizationResponse authResponse = cores.getAuthorizationPlugin().authorize(context);
     int statusCode = authResponse.statusCode;
     log.info("Authorization response status code {}", authResponse.statusCode);
 
-    if (authResponse.statusCode == 200) {
-      response.setHeader(PKIAuthenticationPlugin.HEADER, null);
-    }
+//    if (authResponse.statusCode == 200) {
+//      response.setHeader(PKIAuthenticationPlugin.HEADER, null);
+//    }
 
     if (statusCode == AuthorizationResponse.PROMPT.statusCode) {
       Map<String, String> headers = (Map) req.getAttribute(AuthenticationPlugin.class.getName());
@@ -1037,8 +1040,6 @@ public abstract class SolrCall {
       for (HttpField field : resp.getHeaders()) {
         String headerName = field.getName();
         String lowerHeaderName = headerName.toLowerCase(Locale.ROOT);
-                    System.out.println("response header: " + headerName + " : " + field.getValue() + " status:" +
-                            resp.getStatus());
         if (HOP_HEADERS.contains(lowerHeaderName))
           continue;
 
@@ -1047,6 +1048,15 @@ public abstract class SolrCall {
       response.setStatus(resp.getStatus());
 
     }
+
+//    @Override
+//    public void onComplete(Result result)
+//    {
+//      AsyncContext context = req.getAsyncContext();
+//      if (response.isCommitted()) {
+//        context.complete();
+//      }
+//    }
   }
 
   private static class ProxyWriteListener implements WriteListener {

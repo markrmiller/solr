@@ -7,49 +7,27 @@ import org.agrona.io.ExpandableDirectBufferOutputStream;
 import java.nio.ByteBuffer;
 
 public class ExpandableBuffers {
-  public final static ThreadLocal<ExpandableDirectBufferOutputStream> buffer1 = new ThreadLocal<>() {
+  public final static ThreadLocal<MutableDirectBuffer> buffer1 = new ThreadLocal<>() {
 
-    protected ExpandableDirectBufferOutputStream initialValue() {
-          MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
-          ExpandableDirectBufferOutputStream stream1 = new ExpandableDirectBufferOutputStream(expandableBuffer1);
-          return stream1;
-    }
-
-    public ExpandableDirectBufferOutputStream get() {
-      ExpandableDirectBufferOutputStream stream1 = super.get();
-      return getExpandableDirectBufferOutputStream(stream1, buffer1);
+    protected MutableDirectBuffer initialValue() {
+      return new ExpandableDirectByteBuffer(8192);
     }
   };
 
-  public final static ThreadLocal<ExpandableDirectBufferOutputStream> buffer2 = new ThreadLocal<>() {
+  public final static ThreadLocal<MutableDirectBuffer> buffer2 = new ThreadLocal<>() {
 
-    protected ExpandableDirectBufferOutputStream initialValue() {
-      MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
-      ExpandableDirectBufferOutputStream stream1 = new ExpandableDirectBufferOutputStream(expandableBuffer1);
-      return stream1;
-    }
-
-    public ExpandableDirectBufferOutputStream get() {
-      ExpandableDirectBufferOutputStream stream1 = super.get();
-      return getExpandableDirectBufferOutputStream(stream1, buffer2);
+    protected MutableDirectBuffer initialValue() {
+      return new ExpandableDirectByteBuffer(8192);
     }
   };
 
-  private static ExpandableDirectBufferOutputStream getExpandableDirectBufferOutputStream(ExpandableDirectBufferOutputStream stream1,
-      ThreadLocal<ExpandableDirectBufferOutputStream> tl) {
-
-    MutableDirectBuffer buffer = stream1.buffer();
-    ByteBuffer byteBuffer = buffer.byteBuffer();
-
-    if (byteBuffer.capacity() > 64000) {
-      tl.remove();
-      return tl.get();
-    }
-    byteBuffer.clear();
-    stream1.wrap(buffer);
-    return stream1;
+  public static class Holder {
+    private static final ArrayByteBufferPool pool = new ArrayByteBufferPool(16384, 4096,  16384);
   }
 
+  public static ByteBufferPool getInstance() {
+    return Holder.pool;
+  }
 
   static {
     SolrQTP.registerThreadLocal(buffer1);

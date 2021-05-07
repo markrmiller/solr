@@ -10,21 +10,22 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ThreadFactory;
 
 @ManagedObject("A thread pool")
 public class SolrQTP extends QueuedThreadPool {
 
   public SolrQTP() {
-    this("jetty", Integer.MAX_VALUE, 12, null);
+    this("jetty", Integer.MAX_VALUE, 12, getSolrQueue());
   }
 
   public SolrQTP(String name) {
-    this(name, Integer.MAX_VALUE, 12, null);
+    this(name, Integer.MAX_VALUE, 12, getSolrQueue());
   }
 
   public SolrQTP(String name, int maxThreads, int minThreads) {
-    this(name, maxThreads, minThreads, null);
+    this(name, maxThreads, minThreads, getSolrQueue());
   }
 
   public SolrQTP(String name, int maxThreads, int minThreads, BlockingQueue<Runnable> queue) {
@@ -42,6 +43,10 @@ public class SolrQTP extends QueuedThreadPool {
 //    ReservedThreadExecutor exec = getBean(ReservedThreadExecutor.class);
 //    exec.stop();
     super.doStop();
+  }
+
+  public static BlockingQueue<Runnable> getSolrQueue() {
+    return new LinkedTransferQueue<>();
   }
 
   public static class JettyThread extends Thread {
@@ -102,16 +107,16 @@ public class SolrQTP extends QueuedThreadPool {
         } finally {
           JavaBinCodec.THREAD_LOCAL_ARR.remove();
           JavaBinCodec.THREAD_LOCAL_BRR.remove();
-          for (ThreadLocal tl : threadLocals) {
-            tl.remove();
-          }
+//          for (ThreadLocal tl : threadLocals) {
+//            tl.remove();
+//          }
           MDCLoggingContext.reset();
         }
       }
     }
   }
 
-  private static Set<ThreadLocal> threadLocals = ConcurrentHashMap.newKeySet();
+  public static Set<ThreadLocal> threadLocals = ConcurrentHashMap.newKeySet();
 
   public static void registerThreadLocal(ThreadLocal tl) {
     threadLocals.add(tl);

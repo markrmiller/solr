@@ -67,7 +67,7 @@ public class SolrQoSFilter extends QoSFilter {
 
   @Override public void init(FilterConfig filterConfig) {
     super.init(filterConfig);
-    _origMaxRequests = Integer.getInteger("solr.concurrentRequests.max", 2500);
+    _origMaxRequests = Integer.getInteger("solr.concurrentRequests.max", 10000);
     super.setMaxRequests(_origMaxRequests);
     super.setSuspendMs(Integer.getInteger("solr.concurrentRequests.suspendms", 3000));
     super.setWaitMs(Integer.getInteger("solr.concurrentRequests.waitms", 250));
@@ -100,17 +100,17 @@ public class SolrQoSFilter extends QoSFilter {
 
      // requestsExternal.mark();
 
-      if (highLoadAt == 0 && (offHighLoadAt == 0 || System.nanoTime() - offHighLoadAt > TimeUnit.NANOSECONDS.convert(15, TimeUnit.SECONDS)) && (
-          lastCheckLoad == 0 || System.nanoTime() - lastCheckLoad > TimeUnit.NANOSECONDS.convert(15, TimeUnit.SECONDS))) {
-        lastCheckLoad = System.nanoTime();
-        checkLoad();
-      } else {
-        if (highLoadAt > 0 && System.nanoTime() - highLoadAt > TimeUnit.NANOSECONDS.convert(10, TimeUnit.SECONDS)) {
-          updateMaxRequests(_origMaxRequests, SysStats.getSystemLoad(), 0);
-          highLoadAt = 0;
-          offHighLoadAt = System.nanoTime();
-        }
-      }
+//      if (highLoadAt == 0 && (offHighLoadAt == 0 || System.nanoTime() - offHighLoadAt > TimeUnit.NANOSECONDS.convert(15, TimeUnit.SECONDS)) && (
+//          lastCheckLoad == 0 || System.nanoTime() - lastCheckLoad > TimeUnit.NANOSECONDS.convert(15, TimeUnit.SECONDS))) {
+//        lastCheckLoad = System.nanoTime();
+//        checkLoad();
+//      } else {
+//        if (highLoadAt > 0 && System.nanoTime() - highLoadAt > TimeUnit.NANOSECONDS.convert(10, TimeUnit.SECONDS)) {
+//          updateMaxRequests(_origMaxRequests, SysStats.getSystemLoad(), 0);
+//          highLoadAt = 0;
+//          offHighLoadAt = System.nanoTime();
+//        }
+//      }
 
       //chain.doFilter(req, response);
       super.doFilter(req, response, chain);

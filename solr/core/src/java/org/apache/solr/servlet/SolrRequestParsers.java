@@ -338,9 +338,9 @@ public class SolrRequestParsers {
     //MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
 //    ExpandableDirectBufferOutputStream keyStream = ExpandableBuffers.buffer1.get();
 //    ExpandableDirectBufferOutputStream valueStream = ExpandableBuffers.buffer2.get();
-    MutableDirectBuffer eb1 = new ExpandableDirectByteBuffer(8192);
+    MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(16384, true); //ExpandableBuffers.buffer1.get();
     ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
-    MutableDirectBuffer eb2 = new ExpandableDirectByteBuffer(8192);
+    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(16384, true);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
     ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
     if (charsetDecoder == null) {
       charsetDecoder = getCharsetDecoder(StandardCharsets.UTF_8);
@@ -400,7 +400,8 @@ public class SolrRequestParsers {
         throw new SolrException(ErrorCode.BAD_REQUEST, "application/x-www-form-urlencoded content exceeds upload limit of " + (maxLen / 1024L) + " KB");
       }
     }
-
+    ExpandableBuffers.getInstance().release(eb1);
+    ExpandableBuffers.getInstance().release(eb2);
     return len;
   }
 

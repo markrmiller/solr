@@ -1243,7 +1243,7 @@ public class TestReplicationHandler extends SolrTestCaseJ4 {
     master.copyConfigFile(CONF_DIR + "solrconfig-master2.xml",
                           "solrconfig.xml");
 
-    masterJetty.stop();
+    masterJetty.stop().await(5, TimeUnit.SECONDS);
 
     masterJetty = createAndStartJetty(master);
     masterClient.close();

@@ -17,6 +17,8 @@
 package org.apache.solr.common;
 
 import org.apache.solr.common.util.CloseTracker;
+import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.SolrQTP;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,6 +127,11 @@ public class ParWorkExecutor extends ThreadPoolExecutor {
     if (r instanceof ParWorkFutureTask) {
       ((SolrThread)Thread.currentThread()).resetName();
       //((SolrThread)Thread.currentThread()).clearExecutor();
+    }
+    JavaBinCodec.THREAD_LOCAL_ARR.remove();
+    JavaBinCodec.THREAD_LOCAL_BRR.remove();
+    for (ThreadLocal tl : SolrQTP.threadLocals) {
+      tl.remove();
     }
     MDCLoggingContext.reset();
   }

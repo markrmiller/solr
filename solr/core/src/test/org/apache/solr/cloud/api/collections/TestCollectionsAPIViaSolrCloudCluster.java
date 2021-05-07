@@ -63,7 +63,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
   @Override public void setUp() throws Exception {
     System.setProperty("solr.skipCommitOnClose", "false");
     useFactory(null);
-    configureCluster(nodeCount).addConfig(configName, SolrTestUtil.configset("cloud-minimal")).configure();
+    configureCluster(nodeCount).addConfig(configName, SolrTestUtil.configset("cloud-minimal")).formatZk(true).configure();
     super.setUp();
   }
 

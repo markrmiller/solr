@@ -36,6 +36,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseUtil;
 import org.apache.solr.SolrTestUtil;
@@ -64,6 +65,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
+import org.apache.solr.servlet.SolrDispatchFilter;
 import org.apache.solr.util.LogLevel;
 import org.apache.solr.util.SolrCLI;
 import org.junit.After;
@@ -108,6 +110,8 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
   // commented out on: 17-Feb-2019   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // annotated on: 24-Dec-2018
   @LogLevel("org.apache.solr.security=DEBUG")
   public void testBasicAuth() throws Exception {
+    LuceneTestCase.assumeFalse("Need to address async path", SolrDispatchFilter.ASYNC);
+
     boolean isUseV2Api = false;//random().nextBoolean();
     String authcPrefix = "/admin/authentication";
     String authzPrefix = "/admin/authorization";
@@ -131,7 +135,7 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       randomJetty.stop();
 
       randomJetty.start();
-     // cluster.waitForActiveCollection(COLLECTION, 3, 3);
+      cluster.waitForActiveCollection(COLLECTION, 3, 3);
       
       baseUrl = randomJetty.getBaseUrl().toString();
      // verifySecurityStatus(cl, baseUrl + authcPrefix, "authentication/class", "solr.BasicAuthPlugin", 20);
@@ -316,7 +320,6 @@ public class BasicAuthIntegrationTest extends SolrCloudAuthTestCase {
       executeCommand(baseUrl + authcPrefix, "{set-property : { forwardCredentials: true}}", "harry", "HarryIsUberCool");
      // verifySecurityStatus(cl, baseUrl + authcPrefix, "authentication/forwardCredentials", "true", 20, "harry", "HarryIsUberCool");
 
-      Thread.sleep(5000);
       assertEquals(1, executeQuery(SolrTestCaseJ4.params("q", "id:5"), "harry", "HarryIsUberCool").getResults().getNumFound());
  //     assertAuthMetricsMinimums(32, 20, 9, 1, 2, 0);
   //    assertPkiAuthMetricsMinimums(19, 19, 0, 0, 0, 0);

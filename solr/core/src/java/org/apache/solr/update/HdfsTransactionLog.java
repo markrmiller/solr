@@ -16,6 +16,7 @@
  */
 package org.apache.solr.update;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Collection;
@@ -99,8 +100,8 @@ public class HdfsTransactionLog extends TransactionLog {
         tlogOutStream = fs.create(tlogFile, (short)tlogDfsReplication.intValue());
         tlogOutStream.hsync();
       }
-
-      fos = new FastOutputStream(tlogOutStream);
+// MRM TODO
+      //fos = new DataOutputStream(tlogOutStream);
       long start = tlogOutStream.getPos(); 
 
       if (openExisting) {
@@ -111,7 +112,7 @@ public class HdfsTransactionLog extends TransactionLog {
          // raf.seek(start);
 
         //  assert channel.position() == start;
-          fos.setWritten((int) start);    // reflect that we aren't starting at the beginning
+    //      fos.setWritten((int) start);    // reflect that we aren't starting at the beginning
           //assert fos.size() == channel.size();
         } else {
           addGlobalStrings(globalStrings);
@@ -271,7 +272,7 @@ public class HdfsTransactionLog extends TransactionLog {
       if (debug) {
         log.debug("Closing output for {}", tlogFile);
       }
-      fos.flushBuffer();
+     // fos.flushBuffer();
       finalLogSize = fos.size();
       fos = null;
     } finally {
@@ -308,7 +309,7 @@ public class HdfsTransactionLog extends TransactionLog {
     if (syncLevel == UpdateLog.SyncLevel.NONE) return;
     try {
       synchronized (this) {
-        fos.flushBuffer();
+    //    fos.flushBuffer();
       }
 
       if (syncLevel == UpdateLog.SyncLevel.FSYNC) {

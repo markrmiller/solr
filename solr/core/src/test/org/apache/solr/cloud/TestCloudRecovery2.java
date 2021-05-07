@@ -102,9 +102,11 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       node2.start().await(15, TimeUnit.SECONDS);
 
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
-      Thread.sleep(500);
+
       log.info("wait for active collection before query");
       cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 15, TimeUnit.SECONDS, false, 1, 3, true, true);
+
+      Thread.sleep(500);
 
       try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
         long numFound = client.query(COLLECTION, new SolrQuery("q","*:*", "distrib", "false")).getResults().getNumFound();

@@ -97,6 +97,7 @@ import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
 import org.eclipse.jetty.http2.client.http.HttpClientTransportOverHTTP2;
 import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
+import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.Fields;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
@@ -759,7 +760,7 @@ public class Http2SolrClient extends SolrClient {
 
 
 
-    FutureResponseListener listener = new FutureResponseListener(req, 8 * 1024 * 1024);
+    SolrFutureResponseListener listener = new SolrFutureResponseListener(req, 8 * 1024 * 1024);
 
     CloseShieldInputStream is = null;
     try {
@@ -800,11 +801,9 @@ public class Http2SolrClient extends SolrClient {
   }
 
   private static void setBasicAuthHeader(SolrRequest solrRequest, Request req) {
-    log.info("Set basic auth header for {}", solrRequest);
     if (solrRequest.getBasicAuthUser() != null && solrRequest.getBasicAuthPassword() != null) {
       String userPass = solrRequest.getBasicAuthUser() + ":" + solrRequest.getBasicAuthPassword();
       String encoded = Base64.byteArrayToBase64(userPass.getBytes(FALLBACK_CHARSET));
-      log.info("Set basic auth header {}", "Authorization:" + "Basic " + encoded);
       req.headers(httpFields -> httpFields.put("Authorization", "Basic " + encoded));
     }
   }
@@ -948,17 +947,22 @@ public class Http2SolrClient extends SolrClient {
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
 
-        //ExpandableDirectBufferOutputStream outStream = ExpandableBuffers.buffer1.get();
-        MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
+        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(16384, true);
+
+        //ExpandableBuffers.buffer2.get();
+    //    expandableBuffer1.byteBuffer().clear();
+       // int pos = BufferUtil.flipToFill(expandableBuffer1.byteBuffer());
+     //   MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
         ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
         contentWriter.write(outStream);
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
         buffer.limit( outStream.position() + outStream.buffer().wrapAdjustment());
+     //   BufferUtil.flipToFlush(expandableBuffer1.byteBuffer(), pos);
         ByteBufferRequestContent bcp = new ByteBufferRequestContent(contentWriter.getContentType(), buffer);
       //  return req.headers(httpFields -> httpFields.add(HttpHeader.CONTENT_LENGTH, String.valueOf(outStream.position()))).body(bcp);
-        return req.body(bcp);
+        return req.onRequestCommit(request -> ExpandableBuffers.getInstance().release(expandableBuffer1)).body(bcp);
       } else if (streams == null || isMultipart) {
         // send server list and request list as query string params
         ModifiableSolrParams queryParams = calculateQueryParams(this.queryParams, wparams);
@@ -1212,7 +1216,7 @@ public class Http2SolrClient extends SolrClient {
         } catch (IOException ioException) {
 
         }
-        throw new RemoteSolrException(remoteHost, httpStatus, txt == null || txt.isEmpty() ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : txt, result.getFailure());
+        throw new RemoteSolrException(remoteHost, httpStatus, txt == null || txt.isEmpty() ? (httpStatus > 0 ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : "No message") : txt, result.getFailure());
       }
 
       // log.error("rsp:{}", rsp);

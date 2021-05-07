@@ -16,8 +16,10 @@
  */
 package org.apache.solr.update;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -41,6 +43,7 @@ import java.util.concurrent.atomic.LongAccumulator;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.solr.common.util.BufferedChannel;
 import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
@@ -82,7 +85,7 @@ public class TransactionLog implements Closeable {
   RandomAccessFile raf;
   FileChannel channel;
   OutputStream os;
-  FastOutputStream fos;    // all accesses to this stream should be synchronized on "this" (The TransactionLog)
+  BufferedChannel fos;    // all accesses to this stream should be synchronized on "this" (The TransactionLog)
   final ReentrantLock fosLock = new ReentrantLock(true);
   private final LongAdder numRecords = new LongAdder();
   boolean isBuffer;
@@ -184,7 +187,7 @@ public class TransactionLog implements Closeable {
       long start = raf.length();
       channel = raf.getChannel();
       os = Channels.newOutputStream(channel);
-      fos = TranLogOutputStream.wrap(os);
+      fos = new BufferedChannel(channel, 8192);
 
       if (openExisting) {
         if (start > 0) {
@@ -512,7 +515,7 @@ public class TransactionLog implements Closeable {
         endRecord(pos);
 
         fos.flush();  // flush since this will be the last record in a log fill
-        assert fos.size() == channel.size();
+        assert fos.size() == channel.size() : "fos="+fos.size() + " ch=" + channel.size();
 
         return pos;
       } catch (IOException e) {
@@ -872,7 +875,7 @@ public class TransactionLog implements Closeable {
       long sz;
       fosLock.lock();
       try {
-        fos.flush();
+        fos.flushBuffer();
         sz = fos.size();
         assert sz == channel.size() : "sz:" + sz + " ch:" + channel.size();
       } finally {
