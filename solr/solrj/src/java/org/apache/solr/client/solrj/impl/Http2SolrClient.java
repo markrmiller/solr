@@ -1187,6 +1187,7 @@ public class Http2SolrClient extends SolrClient {
         is.mark(4);
         rsp = processor.processResponse(is, encoding);
       } catch (Exception e) {
+        log.warn("Could not parse", e);
         if (response != null) {
           try {
             //

@@ -243,7 +243,7 @@ public class SolrZkClient implements Closeable {
    */
   public boolean isConnected() {
     try {
-      return started && !isClosed && connManager.getKeeper().getState().isConnected();
+      return started && !isClosed && connManager.getKeeper().getState().isConnected() && connManager.isConnected();
     } catch (AlreadyClosedException e) {
       return true;
     }

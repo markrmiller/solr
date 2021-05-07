@@ -281,13 +281,9 @@ public class ConnectionManager implements Watcher, Closeable {
     log.info("zkClient Connected: {}", connected);
   }
 
-  public boolean isConnectedAndNotClosed() {
-    return !isClosed() && connected;
-  }
-
   public boolean isConnected() {
     SolrZooKeeper fkeeper = keeper;
-    return fkeeper != null && fkeeper.getState().isConnected();
+    return fkeeper != null && fkeeper.getState().isConnected() && !isClosed;
   }
 
   public void close() {

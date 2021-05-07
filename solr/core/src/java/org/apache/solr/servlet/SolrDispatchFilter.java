@@ -559,7 +559,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
             }
             break;
           case FORWARD:
-            //servletRequest.getRequestDispatcher(ServletUtils.getPathAfterContext((HttpServletRequest) servletRequest)).forward(servletRequest, servletResponse);
+            servletRequest.getRequestDispatcher(ServletUtils.getPathAfterContext((HttpServletRequest) servletRequest)).forward(servletRequest, servletResponse);
 
             // TODO: does the above work for async?
             // asyncContext.dispatch(call.getPath());

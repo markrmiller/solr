@@ -3,6 +3,7 @@ package org.apache.solr.servlet;
 import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.ByteBufferUtil;
 import org.apache.http.HttpStatus;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
@@ -49,12 +50,15 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
+import org.eclipse.jetty.client.util.AsyncRequestContent;
 import org.eclipse.jetty.client.util.InputStreamRequestContent;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.server.HttpOutput;
+import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.Callback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,9 +101,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongConsumer;
 
 public abstract class SolrCall {
 
@@ -805,7 +812,7 @@ public abstract class SolrCall {
 
   protected abstract SolrRequestHandler _getHandler();
 
-  protected static SolrDispatchFilter.Action remoteQuery(HttpServletRequest req, HttpServletResponse response, String coreUrl, HttpClient httpClient) throws IOException {
+  protected static SolrDispatchFilter.Action remoteQuery(HttpServletRequest req, HttpServletResponse httpResponse, String coreUrl, HttpClient httpClient) throws IOException {
     if (req != null) {
       // MRM TODO: ASYNC IO Mode
       log.info("proxy to:{}?{}", coreUrl, req.getQueryString());
@@ -814,7 +821,7 @@ public abstract class SolrCall {
       if (fhost != null) {
         // Already proxied
         log.warn("Already proxied, return 404");
-        sendError(404, "No SolrCore found to service request.", response);
+        sendError(404, "No SolrCore found to service request.", httpResponse);
         return RETURN;
       }
 
@@ -834,46 +841,141 @@ public abstract class SolrCall {
 
       if (hasContent(req)) {
         ServletInputStream is = req.getInputStream();
-        InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), new CloseShieldInputStream(is), 8192);
+        // InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), new CloseShieldInputStream(is), 8192);
+        AsyncRequestContent content = new AsyncRequestContent();
         //Response.AsyncContentListener content2 = new Response.AsyncContentListener();
-        proxyRequest.body(defferedContent);
-      }
+        proxyRequest.body(content);
 
-
-      if (SolrDispatchFilter.ASYNC) {
-        proxyRequest.onResponseHeaders(new RemoteAsyncResponseListener(req, response)).send(new OnContentOutputListener(response, req));
-      } else {
-        AtomicReference<Throwable> failException = new AtomicReference<>();
-        InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
-        InputStream is = null;
-        try {
-          proxyRequest.send(listener);
-
-//          try {
-//            // wait for headers
-//            listener.get(30, TimeUnit.SECONDS);
-//          } catch (Exception e) {
-//            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
-//          }
-
-          try {
-            is = listener.getInputStream();
-            is.transferTo(response.getOutputStream());
-          } catch (Exception e) {
-            sendError(e, response);
-          }
-
-          if (failException.get() != null) {
-            sendError(failException.get(), response);
-          }
-        } finally {
-
-          if (is != null) {
-            while (is.read() != -1) {
-
+        HttpInput input = (HttpInput) ((SolrDispatchFilter.CloseShieldHttpServletRequestWrapper) req).request.getInputStream();
+        input.addInterceptor(content1 ->{
+          Callback callback = new Callback() {
+            @Override public void succeeded() {
+              Callback.super.succeeded();
             }
+
+            @Override public void failed(Throwable x) {
+              Callback.super.failed(x);
+            }
+          };
+          content.offer(content1.getByteBuffer(), callback);
+          callback.succeeded();
+          return content1;
+        });
+        HttpOutput output = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) httpResponse).response.getOutputStream();
+        proxyRequest.onResponseContentDemanded(new Response.DemandedContentListener() {
+          @Override public void onBeforeContent(Response response, LongConsumer demand) {
+            // Only when the request to server2 has been sent,
+            // then demand response content from server1.
+            log.error("SET RESPONSE:" + response.getStatus());
+            httpResponse.setStatus(response.getStatus());
+            demand.accept(1);
+
+          }
+
+          @Override public void onContent(Response response, LongConsumer demand, ByteBuffer proxyContent, Callback callback) {
+            // When response content is received from server1, forward it to server2.
+               if (proxyContent.hasRemaining()) {
+
+                 output.sendContent(proxyContent, Callback.from(() -> {
+                   // When the request content to server2 is sent,
+                   // succeed the callback to recycle the buffer.
+                   callback.succeeded();
+                   // Then demand more response content from server1.
+                   demand.accept(1);
+
+                 }, callback::failed));
+               }
+          }
+        });
+
+        //   new Callback() {
+        //          @Override public void succeeded() {
+        //            Callback.super.succeeded();
+        //            try {
+        //              content.offer(ByteBuffer.wrap(input.readNBytes(input.available())));
+        //            } catch (IOException e) {
+        //              e.printStackTrace();
+        //            }
+        //          }
+        //
+        //          @Override public void failed(Throwable x) {
+        //            Callback.super.failed(x);
+        //            log.error("failed", x);
+        //          }
+        //        });
+           CountDownLatch latch = new CountDownLatch(1);
+        proxyRequest.onComplete(response1 -> {
+          content.close();
+           latch.countDown();
+        });
+
+        if (SolrDispatchFilter.ASYNC) {
+          proxyRequest.onResponseHeaders(new RemoteAsyncResponseListener(req, httpResponse)).send(new OnContentOutputListener(httpResponse, req));
+        } else {
+          try {
+            proxyRequest.onRequestBegin(request -> {
+              while (input.isReady() && !input.isFinished()) {
+                try {
+                  input.readNBytes(input.available());
+                } catch (IOException e) {
+                  e.printStackTrace();
+                }
+              }
+            });
+            proxyRequest.send();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          } catch (TimeoutException timeoutException) {
+            timeoutException.printStackTrace();
+          } catch (ExecutionException e) {
+            e.printStackTrace();
           }
         }
+        //else {
+        //          AtomicReference<Throwable> failException = new AtomicReference<>();
+        //          InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
+        //      //    InputStream is = null;
+        //          try {
+        //            proxyRequest.send(new Response.Listener() {
+        //              @Override public void onContent(Response r, ByteBuffer buffer) {
+        //                try {
+        //                  HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
+        //                  ProxyWriteListener proxListener = new ProxyWriteListener(out, buffer, req);
+        //                  out.setWriteListener(proxListener);
+        //                } catch (Exception e) {
+        //                  log.error("Exception", e);
+        //                  req.getAsyncContext().complete();
+        //                }
+        //              }
+        //            });
+
+        //          try {
+        //            // wait for headers
+        //            listener.get(30, TimeUnit.SECONDS);
+        //          } catch (Exception e) {
+        //            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
+        //          }
+
+        //          try {
+        //            is = listener.getInputStream();
+        //            is.transferTo(response.getOutputStream());
+        //          } catch (Exception e) {
+        //            sendError(e, response);
+        //          }
+
+        //            if (failException.get() != null) {
+        //              sendError(failException.get(), response);
+        //            }
+        //          } finally {
+        //
+        //            if (is != null) {
+        //              while (is.read() != -1) {
+        //
+        //              }
+        //            }
+        //          }
+
+
       }
     }
 
