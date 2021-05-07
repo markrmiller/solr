@@ -176,7 +176,7 @@ public class QueryComponent extends SearchComponent
         if(rq instanceof RankQuery) {
           RankQuery rankQuery = (RankQuery)rq;
           rb.setRankQuery(rankQuery);
-          MergeStrategy mergeStrategy = rankQuery.getMergeStrategy();
+          MergeStrategy mergeStrategy = rankQuery.getMergeStrategy(req.getCore().getCoreContainer().getUpdateShardHandler().getSearchOnlyClient());
           if(mergeStrategy != null) {
             rb.addMergeStrategy(mergeStrategy);
             if(mergeStrategy.handlesMergeFields()) {

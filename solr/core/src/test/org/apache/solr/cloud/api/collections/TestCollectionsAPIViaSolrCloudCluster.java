@@ -303,7 +303,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     cluster.waitForActiveCollection(collectionName, numShards, numShards * numReplicas);
     cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == nodeCount);
 
-    try (org.apache.solr.client.solrj.impl.Http2SolrClient solrClient = new org.apache.solr.client.solrj.impl.Http2SolrClient.Builder(cluster.getJettySolrRunners().get(0).getBaseUrl()).build()) {
+    try (org.apache.solr.client.solrj.impl.Http2SolrClient solrClient = new org.apache.solr.client.solrj.impl.Http2SolrClient.Builder(jettys.get(0).getBaseUrl()).build()) {
       // re-query collection
       assertEquals(numDocs, solrClient.query(collectionName, query).getResults().getNumFound());
     }

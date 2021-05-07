@@ -35,9 +35,18 @@ import org.apache.solr.client.solrj.io.stream.metrics.SumMetric;
 import java.util.HashMap;
 
 public class Lang {
-  private static StreamFactory baseStreamFactory;
-  static {
-    baseStreamFactory = new StreamFactory().withFunctionName("search", SearchFacadeStream.class).withFunctionName("facet", FacetStream.class).withFunctionName("facet2D", Facet2DStream.class)
+
+  private Lang() {
+
+  }
+
+  public static class Holder {
+    private static final Lang instance = new Lang();
+  }
+
+    private StreamFactory baseStreamFactory;
+  {
+    Lang.this.baseStreamFactory = new StreamFactory().withFunctionName("search", SearchFacadeStream.class).withFunctionName("facet", FacetStream.class).withFunctionName("facet2D", Facet2DStream.class)
         .withFunctionName("update", UpdateStream.class).withFunctionName("delete", DeleteStream.class).withFunctionName("jdbc", JDBCStream.class).withFunctionName("topic", TopicStream.class)
         .withFunctionName("commit", CommitStream.class).withFunctionName("random", RandomFacadeStream.class).withFunctionName("knnSearch", KnnStream.class)
 
@@ -166,7 +175,11 @@ public class Lang {
         .withFunctionName("if", IfThenElseEvaluator.class).withFunctionName("convert", ConversionEvaluator.class);
   }
 
-  public static void register(StreamFactory streamFactory) {
-    streamFactory.setFunctionNames(new HashMap<>(baseStreamFactory.getFunctionNames()));
+  public static Lang getInstance() {
+    return Holder.instance;
+  }
+
+  public void register(StreamFactory streamFactory) {
+    streamFactory.setFunctionNames(new HashMap<>(Lang.this.baseStreamFactory.getFunctionNames()));
   }
 }

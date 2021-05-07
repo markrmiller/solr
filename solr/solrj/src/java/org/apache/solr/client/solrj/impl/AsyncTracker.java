@@ -146,7 +146,7 @@ public class AsyncTracker implements Closeable {
       // }
     }
 
-    if (log.isDebugEnabled()) log.debug("Request complete {}", phaser, new RuntimeException());
+    if (log.isDebugEnabled()) log.debug("Request complete {}", phaser);
   }
 
   public int getUnArrived() {

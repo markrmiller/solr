@@ -225,7 +225,7 @@ public class ConnectionManager implements Watcher, Closeable {
   private void reconnect() {
     ActionThrottle throttle = new ActionThrottle("ConnectionManager", 1000);
     do {
-      if (isClosed()) return;
+      if (isClosed() || isClosed) return;
 
       connected = false;
 

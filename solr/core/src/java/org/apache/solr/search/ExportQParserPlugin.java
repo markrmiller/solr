@@ -34,6 +34,7 @@ import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.FixedBitSet;
+import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.handler.component.MergeStrategy;
 import org.apache.solr.request.SolrQueryRequest;
@@ -77,7 +78,8 @@ public class ExportQParserPlugin extends QParserPlugin {
       return this;
     }
 
-    public MergeStrategy getMergeStrategy() {
+    @Override
+    public MergeStrategy getMergeStrategy(SolrClient client) {
       return null;
     }
 

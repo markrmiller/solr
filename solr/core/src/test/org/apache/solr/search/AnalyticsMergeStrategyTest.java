@@ -90,7 +90,7 @@ public class AnalyticsMergeStrategyTest extends BaseDistributedSearchTestCase {
     params.add("fq", "{!count iterate=true}");
     setDistributedParams(params);
     rsp = queryServer(params);
-    assertCountOnly(rsp, 44);
+    assertCountOnly(rsp, 42);
 
     params = new ModifiableSolrParams();
     params.add("q", "id:(1 2 5 6)");

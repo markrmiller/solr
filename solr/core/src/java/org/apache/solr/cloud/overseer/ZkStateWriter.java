@@ -135,14 +135,14 @@ public class ZkStateWriter {
       // log.debug("enqueue state updates result {} {}", replicaStatesEntry.getKey(), stateUpdates.get(replicaStatesEntry.getKey()));
     });
 
-    sliceStates.forEach((collectionId, stateUpdates) -> {
+    sliceStates.forEach((collectionId, updates) -> {
       String collection = idToCollection.get(collectionId);
 
       DocCollection docColl = cs.get(collection);
 
       boolean didUpdate = false;
 
-      for (StateUpdate update : stateUpdates) {
+      for (StateUpdate update : updates) {
         Slice slice = docColl.getSlice(update.sliceName);
         if (slice != null) {
           didUpdate = true;
@@ -484,8 +484,6 @@ public class ZkStateWriter {
       });
       collLock.lock();
       try {
-
-
         assignMap.remove(collection);
         dirtyStructure.remove(collection);
 
@@ -627,7 +625,7 @@ public class ZkStateWriter {
         Set<String> lostLiveNodes = new HashSet<>(oldLiveNodes);
         lostLiveNodes.removeAll(newLiveNodes);
         log.info("Detected nodes that went down, removing states for nodes=[{}]...", lostLiveNodes);
-        if (lostLiveNodes.size() == 0) {
+        if (lostLiveNodes.isEmpty()) {
           return false;
         }
         Set<Integer> collIds = new HashSet<>();
@@ -722,10 +720,10 @@ public class ZkStateWriter {
   }
 
   public static class StateUpdate {
-    public int id;
-    public Slice.State state;
-    public String sliceName;
-    public String nodeName;
+    int id;
+    Slice.State state;
+    String sliceName;
+    String nodeName;
   }
 
   private void writeStateUpdatesInternal(Set<Integer> collIds, int tryCnt) {
