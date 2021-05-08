@@ -1384,34 +1384,36 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       newSearcherMaxReachedCounter = parentContext.counter("maxReached", Category.SEARCHER.toString(), "new");
       newSearcherOtherErrorsCounter = parentContext.counter("errors", Category.SEARCHER.toString(), "new");
 
-      parentContext.gauge(() -> name == null ? "(null)" : name, true, "coreName", Category.CORE.toString());
-      parentContext.gauge(() -> startTime, true, "startTime", Category.CORE.toString());
+      String fname = name;
+      Date fstartTime = startTime;
+      parentContext.gauge(() -> fname == null ? "(null)" : name, true, "coreName", Category.CORE.toString());
+      parentContext.gauge(() -> fstartTime, true, "startTime", Category.CORE.toString());
       parentContext.gauge(new MySolrCoreRefCntGauge(this), true, "refCount", Category.CORE.toString());
       parentContext.gauge(new MySolrCoreInstanceDirGauge(this), true, "instanceDir", Category.CORE.toString());
       parentContext.gauge(new MySolrCoreIndexDirGauge(this), true, "indexDir", Category.CORE.toString());
       parentContext.gauge(new MyWeakRefSizeInBytesGauge(this), true, "sizeInBytes", Category.INDEX.toString());
       parentContext.gauge(new MyWeakRefSizeGauge(this), isReloaded, "size", Category.INDEX.toString());
-      if (coreContainer != null) {
-        parentContext.gauge(new MySolrCoreAliasGauge(this), true, "aliases", Category.CORE.toString());
-        final CloudDescriptor cd = coreDescriptor.getCloudDescriptor();
-        if (cd != null) {
-          parentContext.gauge(() -> {
-            if (cd.getCollectionName() != null) {
-              return cd.getCollectionName();
-            } else {
-              return "_notset_";
-            }
-          }, true, "collection", Category.CORE.toString());
-
-          parentContext.gauge(() -> {
-            if (cd.getShardId() != null) {
-              return cd.getShardId();
-            } else {
-              return "_auto_";
-            }
-          }, true, "shard", Category.CORE.toString());
-        }
-      }
+//      if (coreContainer != null) {
+//        parentContext.gauge(new MySolrCoreAliasGauge(this), true, "aliases", Category.CORE.toString());
+//        final CloudDescriptor cd = coreDescriptor.getCloudDescriptor();
+//        if (cd != null) {
+//          parentContext.gauge(() -> {
+//            if (cd.getCollectionName() != null) {
+//              return cd.getCollectionName();
+//            } else {
+//              return "_notset_";
+//            }
+//          }, true, "collection", Category.CORE.toString());
+//
+//          parentContext.gauge(() -> {
+//            if (cd.getShardId() != null) {
+//              return cd.getShardId();
+//            } else {
+//              return "_auto_";
+//            }
+//          }, true, "shard", Category.CORE.toString());
+//        }
+//      }
       // initialize disk total / free metrics
       Path dataDirPath = Paths.get(dataDir);
       File dataDirFile = dataDirPath.toFile();

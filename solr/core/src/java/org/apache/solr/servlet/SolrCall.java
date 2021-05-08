@@ -3,7 +3,6 @@ package org.apache.solr.servlet;
 import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.ByteBufferUtil;
 import org.apache.http.HttpStatus;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;

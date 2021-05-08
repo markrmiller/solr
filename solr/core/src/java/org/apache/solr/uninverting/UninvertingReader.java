@@ -327,7 +327,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = getType(field);
+    Type v = mapping.apply(field);
     if (v != null) {
       switch (v) {
         case INTEGER_POINT: return FieldCache.DEFAULT.getNumerics(in, field, FieldCache.INT_POINT_PARSER);
@@ -357,7 +357,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = getType(field);
+    Type v = mapping.apply(field);
     if (v == Type.BINARY) {
       return FieldCache.DEFAULT.getTerms(in, field);
     } else {
@@ -371,7 +371,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = getType(field);
+    Type v = mapping.apply(field);
     if (v == Type.SORTED) {
       return FieldCache.DEFAULT.getTermsIndex(in, field);
     } else {
@@ -385,7 +385,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = getType(field);
+    Type v = mapping.apply(field);
     if (v != null) {
       switch (v) {
         case SORTED_SET_INTEGER:
@@ -416,9 +416,9 @@ public class UninvertingReader extends FilterLeafReader {
    * Returns the field's uninversion type, or null 
    * if the field doesn't exist or doesn't have a mapping.
    */
-  private Type getType(String field) {
-    return mapping.apply(field);
-  }
+//  private Type getType(String field) {
+//    return mapping.apply(field);
+//  }
 
   // NOTE: delegating the cache helpers is wrong since this wrapper alters the
   // content of the reader, it is only fine to do that because Solr ALWAYS

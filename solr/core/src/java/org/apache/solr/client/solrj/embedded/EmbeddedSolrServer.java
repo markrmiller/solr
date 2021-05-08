@@ -163,7 +163,7 @@ public class EmbeddedSolrServer extends SolrClient {
   public NamedList<Object> request(SolrRequest request, String coreName) throws SolrServerException, IOException {
 
     String path = request.getPath();
-    if (path == null || !path.startsWith("/")) {
+    if (path == null || !(!path.isEmpty() && path.charAt(0) == '/')) {
       path = "/select";
     }
 

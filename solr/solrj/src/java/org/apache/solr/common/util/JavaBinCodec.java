@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.util;
 
+import org.agrona.MutableDirectBuffer;
 import org.apache.solr.common.ConditionalKeyMapWriter;
 import org.apache.solr.common.EnumFieldValue;
 import org.apache.solr.common.IteratorWriter;
@@ -28,6 +29,8 @@ import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.params.CommonParams;
+
+import org.eclipse.jetty.util.BufferUtil;
 import org.noggit.CharArr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,11 +39,13 @@ import static org.apache.solr.common.util.ByteArrayUtf8CharSequence.convertCharS
 
 import java.io.DataInput;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -937,34 +942,34 @@ public class JavaBinCodec implements PushWriter {
     int maxSize = end * ByteUtils.MAX_UTF8_BYTES_PER_CHAR;
 
     if (maxSize <= MAX_UTF8_SIZE_FOR_ARRAY_GROW_STRATEGY) {
-      ByteBuffer brr = getByteArr(maxSize);
-      byte[] b = brr.array();
-      int sz = ByteUtils.UTF16toUTF8(s, 0, end, b, 0);
+      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+
+      int sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
+      brr.byteBuffer().limit(brr.byteBuffer().position());
+      brr.byteBuffer().position(0);
       writeTag(STR, sz);
-      daos.write(b, 0, sz);
+
+      int index = brr.byteBuffer().position();
+      int cnt = 0;
+      while (cnt < sz) {
+        daos.write(brr.getByte(index++));
+        cnt++;
+      }
+
+      ExpandableBuffers.getInstance().release(brr);
     } else {
       // double pass logic for large strings, see SOLR-7971
       int sz = ByteUtils.calcUTF16toUTF8Length(s, 0, end);
       writeTag(STR, sz);
-      ByteBuffer brr = getByteArr(8192);
-      byte[] b = brr.array();
-      ByteUtils.writeUTF16toUTF8(s, 0, end, daos, b);
+      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+
+      //  BufferUtil.writeTo(brr.byteBuffer(), daos);
+      ByteUtils.writeUTF16toUTF8(s, 0, end, daos, brr);
+      ExpandableBuffers.getInstance().release(brr);
     }
   }
 
   public final static ThreadLocal<CharArr> THREAD_LOCAL_ARR = new ThreadLocal<>();
-  public final static ThreadLocal<ByteBuffer> THREAD_LOCAL_BRR = new ThreadLocal<>();
-
-  public static ByteBuffer getByteArr(int sz) {
-    ByteBuffer brr = THREAD_LOCAL_BRR.get();
-    if (brr == null || brr.capacity() < sz) {
-      brr = ByteBuffer.allocate(sz);
-      THREAD_LOCAL_BRR.set(brr);
-      return brr;
-    }
-    brr.clear();
-    return brr;
-  }
 
 
   public static CharArr getCharArr(int sz) {
@@ -993,18 +998,30 @@ public class JavaBinCodec implements PushWriter {
     return _readStr(dis, stringCache, sz);
   }
 
-  private CharSequence _readStr(DataInputInputStream dis, StringCache stringCache, int sz) throws IOException {
-    ByteBuffer brr = getByteArr(sz);
-    byte[] b = brr.array();
-    dis.readFully(b, 0, sz);
-    if (stringCache != null) {
-      return stringCache.get(bytesRef.reset(b, 0, sz));
-    } else {
-      CharArr arr = getCharArr(sz);
-      ByteUtils.UTF8toUTF16(b, 0, sz, arr);
-      return arr.toString();
+  private static CharSequence _readStr(DataInputInputStream dis, StringCache stringCache, int sz) throws IOException {
+    MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+    try {
+      for (int i = 0; i < sz; i++) {
+
+        brr.putByte(i, dis.readByte());
+      }
+    } catch (EOFException e) {
+
     }
-  }
+
+    brr.byteBuffer().limit(brr.byteBuffer().position());
+    brr.byteBuffer().position(0);
+
+
+//        if (stringCache != null) {
+//          return stringCache.get(bytesRef.reset(b, 0, sz));
+//        } else {
+    CharArr arr = getCharArr(sz);
+    ByteUtils.UTF8toUTF16(brr, 0, sz, arr);
+    ExpandableBuffers.getInstance().release(brr);
+    return arr.toString();
+      }
+//  }
 
   /////////// code to optimize reading UTF8
   static final int MAX_UTF8_SZ = 1024 << 6;//too big strings can cause too much memory allocation

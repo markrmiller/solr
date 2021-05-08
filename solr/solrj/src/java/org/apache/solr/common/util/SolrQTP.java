@@ -68,7 +68,7 @@ public class SolrQTP extends QueuedThreadPool {
             runnable.run();
           } finally {
             JavaBinCodec.THREAD_LOCAL_ARR.remove();
-            JavaBinCodec.THREAD_LOCAL_BRR.remove();
+
             //FastInputStream.THREAD_LOCAL_BYTEARRAY.remove();
             MDCLoggingContext.reset();
           }
@@ -106,7 +106,7 @@ public class SolrQTP extends QueuedThreadPool {
           r.run();
         } finally {
           JavaBinCodec.THREAD_LOCAL_ARR.remove();
-          JavaBinCodec.THREAD_LOCAL_BRR.remove();
+
 //          for (ThreadLocal tl : threadLocals) {
 //            tl.remove();
 //          }
