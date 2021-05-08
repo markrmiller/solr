@@ -79,7 +79,10 @@ public interface ByteBufferPool
      */
     default MutableDirectBuffer newByteBuffer(int capacity, boolean direct)
     {
-        return new ExpandableDirectByteBuffer(capacity);
+        if (direct) {
+            return new ExpandableDirectByteBuffer(capacity);
+        }
+        return new ExpandableArrayBuffer(capacity);
     }
 
     public static class Lease

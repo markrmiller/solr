@@ -22,6 +22,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -46,6 +47,7 @@ import org.apache.solr.core.DirectoryFactory;
 import org.apache.solr.core.DirectoryFactory.DirContext;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrInfoBean;
+import org.apache.solr.core.WeakRefGauge;
 import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.schema.IndexSchema;
 import org.slf4j.Logger;
@@ -200,16 +202,8 @@ public class SolrIndexWriter extends IndexWriter {
         }
         Boolean Totals = config.metricsInfo.initArgs.getBooleanArg("merge");
         Boolean Details = config.metricsInfo.initArgs.getBooleanArg("mergeDetails");
-        if (Details != null) {
-          mergeDetails = Details;
-        } else {
-          mergeDetails = false;
-        }
-        if (Totals != null) {
-          mergeTotals = Totals;
-        } else {
-          mergeTotals = false;
-        }
+        mergeDetails = Objects.requireNonNullElse(Details, false);
+        mergeTotals = Objects.requireNonNullElse(Totals, false);
         if (mergeDetails) {
           mergeTotals = true; // override
           majorMergedDocs = solrMetricsContext.meter("docs", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
@@ -220,12 +214,36 @@ public class SolrIndexWriter extends IndexWriter {
           majorMerge = solrMetricsContext.timer("major", SolrInfoBean.Category.INDEX.toString(), "merge");
           mergeErrors = solrMetricsContext.counter("errors", SolrInfoBean.Category.INDEX.toString(), "merge");
           String tag = core.getMetricTag();
-          solrMetricsContext.gauge(() -> runningMajorMerges.get(), true, "running", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
-          solrMetricsContext.gauge(() -> runningMinorMerges.get(), true, "running", SolrInfoBean.Category.INDEX.toString(), "merge", "minor");
-          solrMetricsContext.gauge(() -> runningMajorMergesDocs.get(), true, "running.docs", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
-          solrMetricsContext.gauge(() -> runningMinorMergesDocs.get(), true, "running.docs", SolrInfoBean.Category.INDEX.toString(), "merge", "minor");
-          solrMetricsContext.gauge(() -> runningMajorMergesSegments.get(), true, "running.segments", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
-          solrMetricsContext.gauge(() -> runningMinorMergesSegments.get(), true, "running.segments", SolrInfoBean.Category.INDEX.toString(), "merge", "minor");
+          solrMetricsContext.gauge(new WeakRefGauge<Integer, SolrIndexWriter>(this) {
+            @Override protected Integer getValue(SolrIndexWriter writer) {
+              return writer.runningMajorMerges.get();
+            }
+          }, true, "running", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
+          solrMetricsContext.gauge(new WeakRefGauge<Integer, SolrIndexWriter>(this) {
+            @Override protected Integer getValue(SolrIndexWriter writer) {
+              return writer.runningMinorMerges.get();
+            }
+          }, true, "running", SolrInfoBean.Category.INDEX.toString(), "merge", "minor");
+          solrMetricsContext.gauge(new WeakRefGauge<Long, SolrIndexWriter>(this) {
+            @Override protected Long getValue(SolrIndexWriter writer) {
+              return writer.runningMajorMergesDocs.get();
+            }
+          }, true, "running.docs", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
+          solrMetricsContext.gauge(new WeakRefGauge<Long, SolrIndexWriter>(this) {
+            @Override protected Long getValue(SolrIndexWriter writer) {
+              return writer.runningMinorMergesDocs.get();
+            }
+          }, true, "running.docs", SolrInfoBean.Category.INDEX.toString(), "merge", "minor");
+          solrMetricsContext.gauge(new WeakRefGauge<Integer, SolrIndexWriter>(this) {
+            @Override protected Integer getValue(SolrIndexWriter writer) {
+              return writer.runningMajorMergesSegments.get();
+            }
+          }, true, "running.segments", SolrInfoBean.Category.INDEX.toString(), "merge", "major");
+          solrMetricsContext.gauge(new WeakRefGauge<Integer, SolrIndexWriter>(this) {
+            @Override protected Integer getValue(SolrIndexWriter writer) {
+              return writer.runningMinorMergesSegments.get();
+            }
+          }, true, "running.segments", SolrInfoBean.Category.INDEX.toString(), "merge", "minor");
           flushMeter = solrMetricsContext.meter("flush", SolrInfoBean.Category.INDEX.toString());
         }
       }

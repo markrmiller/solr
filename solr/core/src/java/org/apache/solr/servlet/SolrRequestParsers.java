@@ -338,6 +338,10 @@ public class SolrRequestParsers {
     //MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
 //    ExpandableDirectBufferOutputStream keyStream = ExpandableBuffers.buffer1.get();
 //    ExpandableDirectBufferOutputStream valueStream = ExpandableBuffers.buffer2.get();
+//    MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(256, false); //ExpandableBuffers.buffer1.get();
+//    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
+//    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(256, false);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
+//    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
     MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(16384, true); //ExpandableBuffers.buffer1.get();
     ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
     MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(16384, true);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();

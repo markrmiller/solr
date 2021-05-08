@@ -20,7 +20,6 @@ import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.search.Query;
@@ -34,7 +33,6 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.search.QParser;
-import org.apache.solr.search.SyntaxError;
 import org.apache.solr.util.DateMathParser;
 import org.locationtech.spatial4j.shape.Shape;
 
@@ -51,11 +49,6 @@ public class DateRangeField extends AbstractSpatialPrefixTreeFieldType<NumberRan
   private static final String OP_PARAM = "op";//local-param to resolve SpatialOperation
 
   private static final DateRangePrefixTree tree = new DateRangePrefixTree(DateRangePrefixTree.JAVA_UTIL_TIME_COMPAT_CAL);
-
-  @Override
-  protected void init(IndexSchema schema, Map<String, String> args) {
-    super.init(schema, args);
-  }
 
   @Override
   protected NumberRangePrefixTreeStrategy newPrefixTreeStrategy(String fieldName) {
@@ -178,7 +171,7 @@ public class DateRangeField extends AbstractSpatialPrefixTreeFieldType<NumberRan
     }
 
     @Override
-    public Query parse() throws SyntaxError {
+    public Query parse() {
       throw new IllegalStateException();
     }
   }

@@ -52,6 +52,9 @@ dependencies {
   api 'org.agrona:agrona-agent'
   api 'com.netflix.concurrency-limits:concurrency-limits-core'
 
+  api 'com.google.http-client:google-http-client'
+
+
 
   api 'com.fasterxml.woodstox:woodstox-core'
 

@@ -16,15 +16,12 @@
  */
 package org.apache.solr.client.solrj.impl;
 
-import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
 import org.apache.http.entity.ContentType;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.ssl.SSLContexts;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -76,6 +73,7 @@ import org.eclipse.jetty.client.util.BufferingResponseListener;
 import org.eclipse.jetty.client.util.ByteBufferContentProvider;
 import org.eclipse.jetty.client.util.ByteBufferRequestContent;
 import org.eclipse.jetty.client.util.BytesContentProvider;
+import org.eclipse.jetty.client.util.BytesRequestContent;
 import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.client.util.FormRequestContent;
 import org.eclipse.jetty.client.util.FutureResponseListener;
@@ -107,7 +105,6 @@ import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -121,8 +118,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -134,11 +129,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -1038,7 +1031,7 @@ public class Http2SolrClient extends SolrClient {
           }
         }
       }
-      FormRequestContent provider = new FormRequestContent(fields, FALLBACK_CHARSET);
+      SolrFormEncoder provider = new SolrFormEncoder(fields, FALLBACK_CHARSET);
       req.body(provider);
     }
 
@@ -1180,7 +1173,7 @@ public class Http2SolrClient extends SolrClient {
       }
 
       if (is == null) {
-        throw new RemoteSolrException(remoteHost, response.getStatus(), result.toString(), result.getFailure());
+        throw new RemoteSolrException(remoteHost, response != null ? response.getStatus() : null, result.toString(), result.getFailure());
       }
 
       try {
@@ -1266,7 +1259,7 @@ public class Http2SolrClient extends SolrClient {
           log.warn("Exception parsing error response", ex);
         }
         if (reason == null) {
-          String msg = response.getReason() + "\n\n" + "request: " + response.getRequest().getMethod();
+          String msg = response == null ? null : response.getReason() + "\n\n" + "request: " + response.getRequest().getMethod();
           reason = URLDecoder.decode(msg, FALLBACK_CHARSET);
         }
         log.error("rsp {}", rsp);
@@ -1672,21 +1665,21 @@ public class Http2SolrClient extends SolrClient {
 
   private static SimpleResponse doPost(String url, Http2SolrClient httpClient, byte[] bytes, String contentType,
                                        Map<String,String> headers) throws InterruptedException, ExecutionException, TimeoutException {
-    Request req = httpClient.httpClient.newRequest(url).method(POST).content(new BytesContentProvider(contentType, bytes));
+    Request req = httpClient.httpClient.newRequest(url).method(POST).body(new BytesRequestContent(contentType, bytes));
     headers.forEach(req::header);
     return getSimpleResponse(req);
   }
 
   private static SimpleResponse doPut(String url, Http2SolrClient httpClient, byte[] bytes, String contentType,
       Map<String,String> headers) throws InterruptedException, ExecutionException, TimeoutException {
-    Request req = httpClient.httpClient.newRequest(url).method(PUT).content(new BytesContentProvider(contentType, bytes));
+    Request req = httpClient.httpClient.newRequest(url).method(PUT).body(new BytesRequestContent(contentType, bytes));
     headers.forEach(req::header);
     return getSimpleResponse(req);
   }
 
   private static SimpleResponse doPost(String url, Http2SolrClient httpClient, ByteBuffer bytes, String contentType,
                                        Map<String,String> headers) throws InterruptedException, ExecutionException, TimeoutException {
-    Request req = httpClient.httpClient.newRequest(url).method(POST).content(new ByteBufferContentProvider(contentType, bytes));
+    Request req = httpClient.httpClient.newRequest(url).method(POST).body(new ByteBufferRequestContent(contentType, bytes));
     headers.forEach(req::header);
     return getSimpleResponse(req);
   }
@@ -1703,7 +1696,7 @@ public class Http2SolrClient extends SolrClient {
 
   public static String httpPut(String url, HttpClient httpClient, byte[] bytes, String contentType)
           throws InterruptedException, ExecutionException, TimeoutException {
-    ContentResponse response = httpClient.newRequest(url).method(PUT).content(new BytesContentProvider(bytes), contentType).send();
+    ContentResponse response = httpClient.newRequest(url).method(PUT).body(new BytesRequestContent(contentType, bytes)).send();
     return response.getContentAsString();
   }
 

@@ -130,7 +130,6 @@ import org.apache.solr.util.plugin.PluginInfoInitialized;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
-import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1390,8 +1389,8 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       parentContext.gauge(new MySolrCoreRefCntGauge(this), true, "refCount", Category.CORE.toString());
       parentContext.gauge(new MySolrCoreInstanceDirGauge(this), true, "instanceDir", Category.CORE.toString());
       parentContext.gauge(new MySolrCoreIndexDirGauge(this), true, "indexDir", Category.CORE.toString());
-      parentContext.gauge(new MySolrCoreSizeInBytesGauge(this), true, "sizeInBytes", Category.INDEX.toString());
-      parentContext.gauge(new MySolrCoreSizeGauge(this), isReloaded, "size", Category.INDEX.toString());
+      parentContext.gauge(new MyWeakRefSizeInBytesGauge(this), true, "sizeInBytes", Category.INDEX.toString());
+      parentContext.gauge(new MyWeakRefSizeGauge(this), isReloaded, "size", Category.INDEX.toString());
       if (coreContainer != null) {
         parentContext.gauge(new MySolrCoreAliasGauge(this), true, "aliases", Category.CORE.toString());
         final CloudDescriptor cd = coreDescriptor.getCloudDescriptor();
@@ -3653,64 +3652,65 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       }
     }
 
-    private static class MySolrCoreInstanceDirGauge extends SolrCoreGauge {
+    private static class MySolrCoreInstanceDirGauge extends WeakRefGauge<String, SolrCore> {
       public MySolrCoreInstanceDirGauge(SolrCore solrCore) {
         super(solrCore);
       }
 
-      @Override protected Object getValue(SolrCore solrCore) {
+      @Override protected String getValue(SolrCore solrCore) {
         return solrCore.getInstancePath().toString();
       }
     }
 
-    private static class MySolrCoreRefCntGauge extends SolrCoreGauge {
+    private static class MySolrCoreRefCntGauge extends WeakRefGauge<Integer, SolrCore> {
       public MySolrCoreRefCntGauge(SolrCore solrCore) {
         super(solrCore);
       }
 
-      @Override protected Object getValue(SolrCore solrCore) {
+      @Override protected Integer getValue(SolrCore solrCore) {
         return solrCore.refCount.get();
       }
     }
 
-    private static class MySolrCoreIndexDirGauge extends SolrCoreGauge {
+    private static class MySolrCoreIndexDirGauge extends WeakRefGauge<String, SolrCore> {
       public MySolrCoreIndexDirGauge(SolrCore solrCore) {
         super(solrCore);
       }
 
-      @Override protected Object getValue(SolrCore solrCore) {
+      @Override protected String getValue(SolrCore solrCore) {
         return solrCore.isClosed() ? "(closed)" : solrCore.getIndexDir();
       }
     }
 
-    private static class MySolrCoreSizeInBytesGauge extends SolrCoreGauge.SolrCoreCachedGauge {
-      public MySolrCoreSizeInBytesGauge(SolrCore solrCore) {
+    private static class MyWeakRefSizeInBytesGauge extends WeakRefGauge.WeakRefCachedGauge<Long,SolrCore> {
+      public MyWeakRefSizeInBytesGauge(SolrCore solrCore) {
         super(solrCore, 3, TimeUnit.SECONDS);
       }
 
-      @Override protected Object getValue(SolrCore solrCore) {
+      @Override protected Long getValue(SolrCore solrCore) {
         return solrCore.isClosed() ? 0 : solrCore.getIndexSize();
       }
     }
 
-    private static class MySolrCoreSizeGauge extends SolrCoreGauge.SolrCoreCachedGauge {
-      public MySolrCoreSizeGauge(SolrCore solrCore) {
+    private static class MyWeakRefSizeGauge extends WeakRefGauge.WeakRefCachedGauge<String, SolrCore> {
+
+      public MyWeakRefSizeGauge(SolrCore solrCore) {
         super(solrCore, 3, TimeUnit.SECONDS);
       }
 
-      @Override protected Object getValue(SolrCore solrCore) {
+      @Override protected String getValue(SolrCore solrCore) {
         return solrCore.isClosed() ? "(closed)" : NumberUtils.readableSize(solrCore.getIndexSize());
       }
     }
 
-    private static class MySolrCoreAliasGauge extends SolrCoreGauge {
+    private static class MySolrCoreAliasGauge extends WeakRefGauge<Collection<String>,SolrCore> {
 
       public MySolrCoreAliasGauge(SolrCore solrCore) {
         super(solrCore);
 
       }
 
-      @Override protected Object getValue(SolrCore solrCore) {
+      @Override protected Collection<String> getValue(SolrCore solrCore) {
         return solrCore.getCoreContainer().getNamesForCore(solrCore);
       }
     }

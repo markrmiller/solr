@@ -17,6 +17,7 @@
 package org.apache.solr.search.facet;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -326,8 +327,8 @@ public abstract class FacetRequest {
   }
 
   public FacetRequest() {
-    facetStats = new ConcurrentLinkedHashMap.Builder().initialCapacity(16).maximumWeightedCapacity(1000).build();
-    subFacets = new ConcurrentLinkedHashMap.Builder().initialCapacity(16).maximumWeightedCapacity(1000).build();
+    facetStats = new LinkedHashMap<>();
+    subFacets = new LinkedHashMap<>();
   }
 
   public Map<String, AggValueSource> getFacetStats() {

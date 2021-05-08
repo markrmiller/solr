@@ -49,7 +49,7 @@ import java.util.List;
  *
  * @since 5.0, replaced {@code SolrServer}
  */
-public abstract class SolrClient implements Serializable, Closeable {
+public abstract class SolrClient implements Closeable {
 
   private static final long serialVersionUID = 1L;
 

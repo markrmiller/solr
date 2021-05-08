@@ -22,7 +22,7 @@ public class ExpandableBuffers {
   };
 
   public static class Holder {
-    private static final ArrayByteBufferPool pool = new ArrayByteBufferPool(16384, 4096,  16384);
+    private static final ArrayByteBufferPool pool = new ArrayByteBufferPool(256, 16384,  65536);
   }
 
   public static ByteBufferPool getInstance() {
