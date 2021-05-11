@@ -30,14 +30,13 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.params.CommonParams;
 
-import org.eclipse.jetty.util.BufferUtil;
 import org.noggit.CharArr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.solr.common.util.ByteArrayUtf8CharSequence.convertCharSeq;
 
-import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -111,6 +110,7 @@ public class JavaBinCodec implements PushWriter {
       ENUM_FIELD_VALUE = 18,
       MAP_ENTRY = 19,
       UUID = 20, // This is reserved to be used only in LogCodec
+      X_STRING = 22,
   // types that combine tag + length (or other info) in a single byte
   TAG_AND_LEN = (byte) (1 << 5),
       STR = (byte) (1 << 5),
@@ -120,6 +120,7 @@ public class JavaBinCodec implements PushWriter {
       ORDERED_MAP = (byte) (5 << 5), // SimpleOrderedMap (a NamedList subclass, and more common)
       NAMED_LST = (byte) (6 << 5), // NamedList
       EXTERN_STRING = (byte) (7 << 5);
+
 
   private static final int MAX_UTF8_SIZE_FOR_ARRAY_GROW_STRATEGY = 65536;
   public static final int SZ = 1024 << 2;
@@ -367,6 +368,8 @@ public class JavaBinCodec implements PushWriter {
         return readMapEntry(dis);
       case MAP_ENTRY_ITER:
         return readMapIter(dis);
+      case X_STRING:
+        return xreadStr(dis, stringCache);
     }
 
     throw new RuntimeException("Unknown type " + tagByte);
@@ -422,7 +425,7 @@ public class JavaBinCodec implements PushWriter {
         return true;
       }
       if (val instanceof Path) {
-        writeStr(((Path) val).toAbsolutePath().toString());
+        writeStr(((Path) val).toAbsolutePath().toString(), false);
         return true;
       }
       if (val instanceof Iterable) {
@@ -562,7 +565,7 @@ public class JavaBinCodec implements PushWriter {
     @Override
     public MapWriter.EntryWriter put(CharSequence k, CharSequence v) throws IOException {
       codec.writeExternString(k);
-      codec.writeStr(v);
+      codec.writeStr(v, false);
       return this;
     }
 
@@ -899,7 +902,7 @@ public class JavaBinCodec implements PushWriter {
   public void writeEnumFieldValue(EnumFieldValue enumFieldValue) throws IOException {
     writeTag(ENUM_FIELD_VALUE);
     writeInt(enumFieldValue.toInt());
-    writeStr(enumFieldValue.toString());
+    writeStr(enumFieldValue.toString(), false);
   }
 
   public void writeMapEntry(Map.Entry<?,?> val) throws IOException {
@@ -929,22 +932,45 @@ public class JavaBinCodec implements PushWriter {
   /**
    * write the string as tag+length, with length being the number of UTF-8 bytes
    */
-  public void writeStr(CharSequence s) throws IOException {
+  public void  writeStr(CharSequence s, boolean tagWritten) throws IOException {
     if (s == null) {
       writeTag(NULL);
       return;
     }
+
+////      writeTag(X_STRING, ((String) s).getBytes(UTF_8).length);
+    ////      MutableDirectBuffer buffer = ((ExpandableDirectBufferOutputStream) daos).buffer();
+    ////
+    ////      int written = buffer.putStringWithoutLengthUtf8(((ExpandableDirectBufferOutputStream) daos).position(), (String) s);
+    ////      ((ExpandableDirectBufferOutputStream) daos).setPosition(((ExpandableDirectBufferOutputStream) daos).position() + written);
+    ////
+    if (!tagWritten && s instanceof String && daos instanceof ExpandableDirectBufferOutputStream) {
+      writeTag(X_STRING);
+      writeVInt(((String) s).getBytes(UTF_8).length, daos);
+      MutableDirectBuffer buffer = ((ExpandableDirectBufferOutputStream) daos).buffer();
+
+      int written = buffer.putStringWithoutLengthUtf8(((ExpandableDirectBufferOutputStream) daos).position(), (String) s);
+      ((ExpandableDirectBufferOutputStream) daos).setPosition(((ExpandableDirectBufferOutputStream) daos).position() + written);
+
+      return;
+    }
+
     if (s instanceof Utf8CharSequence) {
       writeUTF8Str((Utf8CharSequence) s);
       return;
     }
+
     int end = s.length();
     int maxSize = end * ByteUtils.MAX_UTF8_BYTES_PER_CHAR;
 
     if (maxSize <= MAX_UTF8_SIZE_FOR_ARRAY_GROW_STRATEGY) {
       MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
-
-      int sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
+      int sz;
+      if (maxSize < 16384) {
+        sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
+      } else {
+        sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
+      }
       brr.byteBuffer().limit(brr.byteBuffer().position());
       brr.byteBuffer().position(0);
       writeTag(STR, sz);
@@ -963,7 +989,6 @@ public class JavaBinCodec implements PushWriter {
       writeTag(STR, sz);
       MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
 
-      //  BufferUtil.writeTo(brr.byteBuffer(), daos);
       ByteUtils.writeUTF16toUTF8(s, 0, end, daos, brr);
       ExpandableBuffers.getInstance().release(brr);
     }
@@ -998,7 +1023,30 @@ public class JavaBinCodec implements PushWriter {
     return _readStr(dis, stringCache, sz);
   }
 
+
+  private CharSequence xreadStr(DataInputInputStream dis, StringCache stringCache) throws IOException {
+    // if (sz == 0) {
+    MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+    int sz = readVInt(dis);
+    try {
+      for (int i = 0; i < sz; i++) {
+
+        brr.putByte(i, dis.readByte());
+      }
+
+
+      brr.byteBuffer().limit(brr.byteBuffer().position());
+      brr.byteBuffer().position(0);
+
+      return brr.getStringWithoutLengthUtf8(0, sz);
+    } finally {
+      ExpandableBuffers.getInstance().release(brr);
+    }
+  }
+
   private static CharSequence _readStr(DataInputInputStream dis, StringCache stringCache, int sz) throws IOException {
+
+
     MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
     try {
       for (int i = 0; i < sz; i++) {
@@ -1011,11 +1059,11 @@ public class JavaBinCodec implements PushWriter {
 
     brr.byteBuffer().limit(brr.byteBuffer().position());
     brr.byteBuffer().position(0);
-
-
-//        if (stringCache != null) {
-//          return stringCache.get(bytesRef.reset(b, 0, sz));
-//        } else {
+//
+//
+//////        if (stringCache != null) {
+//////          return stringCache.get(bytesRef.reset(b, 0, sz));
+//////        } else {
     CharArr arr = getCharArr(sz);
     ByteUtils.UTF8toUTF16(brr, 0, sz, arr);
     ExpandableBuffers.getInstance().release(brr);
@@ -1031,6 +1079,7 @@ public class JavaBinCodec implements PushWriter {
   protected CharSequence readUtf8(DataInputInputStream dis) throws IOException {
     int sz = readSize(dis);
     return readUtf8(dis, sz);
+   // return _readStr(dis, null, 0);
   }
 
   protected CharSequence readUtf8(DataInputInputStream dis, int sz) throws IOException {
@@ -1119,7 +1168,7 @@ public class JavaBinCodec implements PushWriter {
       writeUTF8Str((Utf8CharSequence) val);
       return true;
     } else if (val instanceof CharSequence) {
-      writeStr((CharSequence) val);
+      writeStr((CharSequence) val, false);
       return true;
     } else if (val instanceof Number) {
 
@@ -1265,7 +1314,7 @@ public class JavaBinCodec implements PushWriter {
     if (idx == null) idx = 0;
     writeTag(EXTERN_STRING, idx);
     if (idx == 0) {
-      writeStr(s);
+      writeStr(s, true);
       if (stringsMap == null) stringsMap = new HashMap<>();
       stringsMap.put(s.toString(), ++stringsCount);
     }
@@ -1294,6 +1343,7 @@ public class JavaBinCodec implements PushWriter {
 
   public void writeUtf8CharSeq(Utf8CharSequence utf8) throws IOException {
     utf8.write(daos);
+   // writeStr(utf8, false);
   }
 
 //  public long getTotalBytesWritten() {

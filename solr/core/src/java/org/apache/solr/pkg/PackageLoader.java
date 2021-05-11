@@ -67,7 +67,7 @@ public class PackageLoader implements Closeable {
   }
 
   public static Map<String, Package> getPackages() {
-    return Collections.EMPTY_MAP;
+    return Collections.emptyMap();
   }
 
   public void refreshPackageConf() {
@@ -75,9 +75,8 @@ public class PackageLoader implements Closeable {
       log.debug("{} updated to version {}", ZkStateReader.SOLR_PKGS_PATH, packageAPI.pkgs.znodeVersion);
     }
 
-    List<Package> updated = new ArrayList<>();
     Map<String, List<PackageAPI.PkgVersion>> modified = getModified(myCopy, packageAPI.pkgs);
-
+    List<Package> updated = new ArrayList<>(modified.size());
     modified.forEach((key, value) -> {
       if (value != null) {
         Package p = packageClassLoaders.get(key);
@@ -138,9 +137,7 @@ public class PackageLoader implements Closeable {
       List<Package> l = Collections.singletonList(p);
       try (ParWork work = new ParWork(this, false)) {
         for (SolrCore core : coreContainer.getCores()) {
-          work.collect("packageListeners", () -> {
-            core.getPackageListeners().packagesUpdated(l);
-          });
+          work.collect("packageListeners", () -> core.getPackageListeners().packagesUpdated(l));
         }
       }
     }
@@ -153,7 +150,7 @@ public class PackageLoader implements Closeable {
     final String name;
     final Map<String, Version> myVersions = new NonBlockingHashMap<>();
     private final List<String> sortedVersions = new CopyOnWriteArrayList<>();
-    final AtomicReference<String> latest = new AtomicReference<String>();
+    final AtomicReference<String> latest = new AtomicReference<>();
     private boolean deleted;
     private PackageLoader packageLoader;
 
@@ -166,6 +163,15 @@ public class PackageLoader implements Closeable {
       return deleted;
     }
 
+    private static String findBiggest(String lessThan, List<String> sortedList) {
+      String latest = null;
+      for (String v : sortedList) {
+        if (v.compareTo(lessThan) < 1) {
+          latest = v;
+        } else break;
+      }
+      return latest;
+    }
 
     private void updateVersions(List<PackageAPI.PkgVersion> modified) {
       for (PackageAPI.PkgVersion v : modified) {
@@ -200,7 +206,7 @@ public class PackageLoader implements Closeable {
       }
 
       sortedVersions.sort(String::compareTo);
-      if (sortedVersions.size() > 0) {
+      if (!sortedVersions.isEmpty()) {
         String latest = sortedVersions.get(sortedVersions.size() - 1);
         String currentLatest = this.latest.get();
         if (!latest.equals(currentLatest)) {
@@ -215,7 +221,7 @@ public class PackageLoader implements Closeable {
 
 
     public Version getLatest() {
-      return latest.get() == null ? null : myVersions.get(latest);
+      return latest.get() == null ? null : myVersions.get(latest.get());
     }
 
     public Version getLatest(String lessThan) {
@@ -259,10 +265,10 @@ public class PackageLoader implements Closeable {
         this.packageLoader = packageLoader;
         version = v;
         this.name = name;
-        List<Path> paths = new ArrayList<>();
+        List<Path> paths = new ArrayList<>(version.files.size());
 
         List<String> errs = new ArrayList<>();
-        packageLoader.coreContainer.getPackageStoreAPI().validateFiles(version.files, true, s -> errs.add(s));
+        packageLoader.coreContainer.getPackageStoreAPI().validateFiles(version.files, true, errs::add);
         if(!errs.isEmpty()) {
           throw new RuntimeException("Cannot load package: " +errs);
         }
@@ -329,16 +335,6 @@ public class PackageLoader implements Closeable {
     public  <T> void addToInfoBeans(T obj) {
       //do not do anything. It should be handled externally
     }
-  }
-
-  private static String findBiggest(String lessThan, List<String> sortedList) {
-    String latest = null;
-    for (String v : sortedList) {
-      if (v.compareTo(lessThan) < 1) {
-        latest = v;
-      } else break;
-    }
-    return latest;
   }
 
   @Override

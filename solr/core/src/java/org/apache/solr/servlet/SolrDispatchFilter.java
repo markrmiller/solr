@@ -68,7 +68,6 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import net.sf.saxon.expr.sort.CodepointCollator;
-import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.lucene.util.Version;
@@ -82,6 +81,7 @@ import org.apache.solr.common.cloud.ConnectionManager;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -929,7 +929,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     @Override
     public void sendError(int sc, String msg) throws IOException {
 
-      log.debug("sendError called! {}:{}", sc, msg);
+      log.error("sendError called! {}:{}", sc, msg);
 
       response.setStatus(sc);
       PrintWriter writer = new PrintWriter(response.getOutputStream()); // we don't close, the container will

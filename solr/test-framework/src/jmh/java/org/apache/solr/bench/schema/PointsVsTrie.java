@@ -64,12 +64,12 @@ import java.util.concurrent.TimeUnit;
 @Threads(4)
 @Warmup(iterations = 1)
 @Measurement(iterations = 1)
-@Fork(value = 1, jvmArgs = {"-Xmx8g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
-    "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=8",
-     "-XX:ParallelGCThreads=16", "-XX:+UseG1GC", "-Djetty.insecurerandom=1", "-Djava.security.egd=file:/dev/./urandom", "-XX:-UseBiasedLocking",
-    "-XX:+UseG1GC", "-XX:+PerfDisableSharedMem", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=250", "-Dsolr.enableMetrics=false", "-Dsolr.perThreadPoolSize=16", "-Dsolr.maxHttp2ClientThreads=128", "-Dsolr.jettyRunnerThreadPoolMaxSize=200",
-    "-Dsolr.enablePublicKeyHandler=false", "-Dzookeeper.nio.numSelectorThreads=16", "-Dzookeeper.nio.numWorkerThreads=16", "-Dzookeeper.commitProcessor.numWorkerThreads=16",
-    "-Dsolr.rootSharedThreadPoolCoreSize=120", "-Dlucene.cms.override_spins=false", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100", "-DtempDir=/Users/markmiller/solr-jmh-temp",
+@Fork(value = 1, jvmArgs = {"-Xmx6g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
+    "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=2",
+     "-XX:ParallelGCThreads=3", "-XX:+UseG1GC", "-Djetty.insecurerandom=1", "-Djava.security.egd=file:/dev/./urandom", "-XX:-UseBiasedLocking",
+    "-XX:+UseG1GC", "-XX:+PerfDisableSharedMem", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=250", "-Dsolr.enableMetrics=false", "-Dsolr.perThreadPoolSize=6", "-Dsolr.maxHttp2ClientThreads=64", "-Dsolr.jettyRunnerThreadPoolMaxSize=200",
+    "-Dsolr.enablePublicKeyHandler=false", "-Dzookeeper.nio.numSelectorThreads=6", "-Dzookeeper.nio.numWorkerThreads=6", "-Dzookeeper.commitProcessor.numWorkerThreads=4",
+    "-Dsolr.rootSharedThreadPoolCoreSize=120", "-Dlucene.cms.override_spins=true", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100", "-DtempDir=/Users/markmiller/solr-jmh-temp",
     "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true",
     "-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=/Users/markmiller/jfr_results,dumponexit=true,settings=profile,path-to-gc-roots=true"})
 @Timeout(time = 300)
@@ -171,10 +171,9 @@ public class PointsVsTrie {
             throwable.printStackTrace();
           }
         });
+        client.waitForOutstandingRequests(2, TimeUnit.MINUTES);
       }
-
-      client.waitForOutstandingRequests(1, TimeUnit.MINUTES);
-
+      
       client.setBaseUrl(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
       UpdateRequest commitRequest = new UpdateRequest();
       commitRequest.setBasePath(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);

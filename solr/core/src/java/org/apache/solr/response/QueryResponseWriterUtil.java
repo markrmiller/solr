@@ -23,11 +23,10 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
-import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.ExpandableBuffers;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.request.SolrQueryRequest;
 
 /**
@@ -47,7 +46,7 @@ public final class QueryResponseWriterUtil {
       SolrQueryResponse solrResponse, String contentType) throws IOException {
 
 
-    MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(16384, true);//ExpandableBuffers.buffer1.get();
+    MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(32768, true);//ExpandableBuffers.buffer1.get();
     expandableBuffer1.byteBuffer().clear();
     ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     if (responseWriter instanceof BinaryQueryResponseWriter) {

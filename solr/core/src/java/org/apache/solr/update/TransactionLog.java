@@ -125,7 +125,7 @@ public class TransactionLog implements Closeable {
       Integer idx = globalStringMap.get(s.toString());
       if (idx == null) {
         // write a normal string
-        writeStr(s);
+        writeStr(s, false);
       } else {
         // write the extern string
         writeTag(EXTERN_STRING, idx);
@@ -476,7 +476,7 @@ public class TransactionLog implements Closeable {
       codec.writeTag(JavaBinCodec.ARR, 3);
       codec.writeInt(UpdateLog.DELETE_BY_QUERY);  // should just take one byte
       codec.writeLong(cmd.getVersion());
-      codec.writeStr(cmd.query);
+      codec.writeStr(cmd.query, false);
 
       fosLock.lock();
       try {
@@ -510,7 +510,7 @@ public class TransactionLog implements Closeable {
         codec.writeTag(JavaBinCodec.ARR, 3);
         codec.writeInt(UpdateLog.COMMIT);  // should just take one byte
         codec.writeLong(cmd.getVersion());
-        codec.writeStr(END_MESSAGE);  // ensure these bytes are (almost) last in the file
+        codec.writeStr(END_MESSAGE, false);  // ensure these bytes are (almost) last in the file
 
         endRecord(pos);
 

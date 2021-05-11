@@ -80,5 +80,25 @@
 
   </requestHandler>
 
+  <query>
+   <queryResultCache
+          enabled ="false"
+          class="solr.LRUCache"
+          size="0"
+          initialSize="0"
+          autowarmCount="0"/>
+   <documentCache
+          enabled ="false"
+          class="solr.LRUCache"
+          size="0"
+          initialSize="0"
+          autowarmCount="0"/>
+   <filterCache
+          enabled ="false"
+          class="solr.LRUCache"
+          size="0"
+          initialSize="0"
+          autowarmCount="0"/>
+  </query>
 </config>
 

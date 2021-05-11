@@ -42,9 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.solr.api.V2HttpCall;
 import org.apache.solr.common.SolrException;
@@ -56,6 +54,7 @@ import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.ExpandableBuffers;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.core.RequestHandlers;
 import org.apache.solr.core.SolrConfig;
@@ -342,9 +341,9 @@ public class SolrRequestParsers {
 //    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
 //    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(256, false);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
 //    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
-    MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(16384, true); //ExpandableBuffers.buffer1.get();
+    MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(32768, true); //ExpandableBuffers.buffer1.get();
     ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
-    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(16384, true);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
+    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(32768, true);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
     ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
     if (charsetDecoder == null) {
       charsetDecoder = getCharsetDecoder(StandardCharsets.UTF_8);

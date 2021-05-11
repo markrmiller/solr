@@ -15,10 +15,8 @@ package org.apache.solr.common.util;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,7 +25,6 @@ import java.util.function.Consumer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.eclipse.jetty.util.BufferUtil;
 
 /**
  * <p>A {@link ByteBuffer} pool.</p>

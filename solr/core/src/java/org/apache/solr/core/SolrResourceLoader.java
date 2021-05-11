@@ -110,7 +110,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
 
   final static XPathFactoryImpl xpathFactory;
 
-  static Configuration conf = Configuration.newConfiguration();
+  static public Configuration conf = Configuration.newConfiguration();
 
   static {
 

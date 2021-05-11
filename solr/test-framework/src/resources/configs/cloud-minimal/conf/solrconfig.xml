@@ -29,10 +29,44 @@
 
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
 
+  <indexConfig>
+    <mergePolicyFactory class="org.apache.solr.index.TieredMergePolicyFactory">
+      <int name="maxMergeAtOnce">10</int>
+      <int name="segmentsPerTier">10</int>
+      <double name="noCFSRatio">0.1</double>
+    </mergePolicyFactory>
+
+    <useCompoundFile>${useCompoundFile:false}</useCompoundFile>
+
+    <ramBufferSizeMB>${solr.tests.ramBufferSizeMB}</ramBufferSizeMB>
+    <ramPerThreadHardLimitMB>60</ramPerThreadHardLimitMB>
+
+    <mergeScheduler class="org.apache.lucene.index.ConcurrentMergeScheduler">
+      <int name="maxThreadCount">6</int>
+      <int name="maxMergeCount">8</int>
+      <bool name="ioThrottle">false</bool>
+    </mergeScheduler>
+
+    <writeLockTimeout>1000</writeLockTimeout>
+    <commitLockTimeout>10000</commitLockTimeout>
+
+    <!-- this sys property is not set by SolrTestCaseJ4 because almost all tests should
+         use the single process lockType for speed - but tests that explicitly need
+         to vary the lockType canset it as needed.
+    -->
+    <lockType>${solr.tests.lockType:single}</lockType>
+
+    <infoStream>${solr.tests.infostream:false}</infoStream>
+
+  </indexConfig>
+
   <updateHandler class="solr.DirectUpdateHandler2">
     <commitWithin>
       <softCommit>${solr.commitwithin.softcommit:true}</softCommit>
     </commitWithin>
+    <autoCommit>
+      <maxTime>${solr.autoCommit.maxTime:60000}</maxTime>
+    </autoCommit>
     <updateLog class="${solr.ulog:solr.UpdateLog}" enable="${enable.update.log:true}"></updateLog>
   </updateHandler>
 
@@ -44,10 +78,6 @@
     </lst>
 
   </requestHandler>
-  <indexConfig>
-    <mergeScheduler class="${solr.mscheduler:org.apache.lucene.index.ConcurrentMergeScheduler}"/>
-    <lockType>${solr.tests.lockType:single}</lockType>
-    <infoStream>${solr.tests.infostream:false}</infoStream>
-  </indexConfig>
+
 </config>
 

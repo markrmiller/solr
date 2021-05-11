@@ -351,9 +351,9 @@ public class ExportTool extends SolrCLI.ToolBase {
       }
       codec.set(new JavaBinCodec(fos, null));
       codec.get().writeTag(JavaBinCodec.NAMED_LST, 2);
-      codec.get().writeStr("params");
+      codec.get().writeStr("params", false);
       codec.get().writeNamedList(new NamedList<>());
-      codec.get().writeStr("docs");
+      codec.get().writeStr("docs", false);
       codec.get().writeTag(JavaBinCodec.ITERATOR);
 
     }

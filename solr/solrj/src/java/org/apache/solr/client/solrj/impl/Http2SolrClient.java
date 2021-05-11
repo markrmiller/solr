@@ -17,7 +17,6 @@
 package org.apache.solr.client.solrj.impl;
 
 import org.agrona.MutableDirectBuffer;
-import org.agrona.io.ExpandableDirectBufferOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
@@ -46,6 +45,7 @@ import org.apache.solr.common.util.Base64;
 import org.apache.solr.common.util.CloseTracker;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ExpandableBuffers;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrInternalHttpClient;
@@ -648,7 +648,7 @@ public class Http2SolrClient extends SolrClient {
 
                   }
                 }
-                //  org.apache.solr.common.util.IOUtils.closeQuietly(is);
+                org.apache.solr.common.util.IOUtils.closeQuietly(is);
               }
             } finally {
               asyncTracker.arrive();
@@ -755,7 +755,7 @@ public class Http2SolrClient extends SolrClient {
 
     SolrFutureResponseListener listener = new SolrFutureResponseListener(req, 8 * 1024 * 1024);
 
-    CloseShieldInputStream is = null;
+    InputStream is = null;
     try {
       req.send(listener);
 
@@ -771,9 +771,9 @@ public class Http2SolrClient extends SolrClient {
         throw new SolrServerException(e);
       }
 
-     // if (res  != null && res.getStatus() == 200) {
-         is = new CloseShieldInputStream(listener.getContentAsInputStream());
-     // }
+      if (res  != null) {
+         is = listener.getContentAsInputStream();
+      }
       return processErrorsAndResponse(req, solrRequest, parser, new Result(req, res, fail), is);
     } finally {
       if (is != null) {
@@ -785,6 +785,7 @@ public class Http2SolrClient extends SolrClient {
           }
         }
       }
+      org.apache.solr.common.util.IOUtils.closeQuietly(is);
     }
   }
 
@@ -940,7 +941,7 @@ public class Http2SolrClient extends SolrClient {
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
 
-        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(16384, true);
+        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(32768, true);
 
         //ExpandableBuffers.buffer2.get();
     //    expandableBuffer1.byteBuffer().clear();
@@ -1273,17 +1274,6 @@ public class Http2SolrClient extends SolrClient {
         throw rss;
       }
     } finally {
-       if (is != null) {
-         while (true) {
-           try {
-             if (!(is.read() != -1)) break;
-           } catch (IOException e) {
-
-           }
-
-         }
-       }
-       // org.apache.solr.common.util.IOUtils.closeQuietly(is);
 
     }
 

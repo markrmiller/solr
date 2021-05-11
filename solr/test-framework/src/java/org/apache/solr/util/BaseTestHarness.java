@@ -19,6 +19,7 @@ package org.apache.solr.util;
 import net.sf.saxon.event.PipelineConfiguration;
 import net.sf.saxon.event.Sender;
 import net.sf.saxon.lib.ParseOptions;
+import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.trans.XPathException;
 import net.sf.saxon.tree.tiny.TinyDocumentImpl;
 import org.apache.solr.common.SolrException;
@@ -85,9 +86,9 @@ abstract public class BaseTestHarness {
     TinyDocumentImpl docTree = null;
     PipelineConfiguration plc = SolrResourceLoader.getConf().makePipelineConfiguration();
 
-    SolrTinyBuilder builder = new SolrTinyBuilder(plc, new Properties());
+ //   SolrTinyBuilder builder = new SolrTinyBuilder(plc, new Properties());
     try {
-      builder.open();
+  //    builder.open();
       SAXSource source = new SAXSource(new InputSource(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
       //source.setXMLReader(resourceLoader.getXmlReader());
       //  source.getInputSource().setSystemId(SystemIdResolver.createSystemIdFromResourceName(name));
@@ -96,8 +97,9 @@ abstract public class BaseTestHarness {
       // Set via conf already
 
       po.setPleaseCloseAfterUse(true);
-      Sender.send(source, builder, po);
-      docTree = (TinyDocumentImpl) builder.getCurrentRoot();
+     // Sender.send(source, builder, po);
+      NodeInfo saxTreeInfo = SolrResourceLoader.conf.buildDocumentTree(source, po).getRootNode();
+      docTree = (TinyDocumentImpl) saxTreeInfo.getTreeInfo().getRootNode();//(TinyDocumentImpl) builder.getCurrentRoot();
     } catch (XPathException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     } finally {

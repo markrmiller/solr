@@ -192,11 +192,7 @@ public class XmlConfigFile { // formerly simply "Config"
     //  po.setCheckEntityReferences(false);
     // po.setExpandAttributeDefaults(false);
     po.setPleaseCloseAfterUse(true);
-    po.addFilter(new FilterFactory() {
-      @Override public Receiver makeFilter(Receiver next) {
-        return new ReceiverFilter(next, substituteProps);
-      }
-    });
+    po.addFilter(next -> new ReceiverFilter(next, substituteProps));
 
 
     //TreeInfo saxTreeInfo = config.buildDocumentTree(saxSrc, po);

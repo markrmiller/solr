@@ -371,8 +371,8 @@ public class SolrTestCase extends Assert {
     System.setProperty("solr.tests.EnumFieldType", "org.apache.solr.schema.EnumFieldType");
     System.setProperty("solr.tests.numeric.dv", "true");
 
-    System.setProperty("solr.tests.ramBufferSizeMB", "60");
-    System.setProperty("solr.tests.ramPerThreadHardLimitMB", "80");
+    System.setProperty("solr.tests.ramBufferSizeMB", "100");
+    System.setProperty("solr.tests.ramPerThreadHardLimitMB", "200");
 
 
    // System.setProperty("solr.tests.mergePolicyFactory", "org.apache.solr.index.NoMergePolicyFactory");
