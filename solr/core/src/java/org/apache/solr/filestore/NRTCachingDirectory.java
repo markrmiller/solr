@@ -26,6 +26,7 @@ import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.SingleInstanceLockFactory;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.IOUtils;
+import org.apache.solr.common.util.Utils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -123,21 +124,24 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
     final Set<String> files = new HashSet<>(cFiles.length + inFiles.length);
     files.addAll(Arrays.asList(cFiles));
     files.addAll(Arrays.asList(inFiles));
-    String[] result = files.toArray(new String[0]);
+    String[] result = files.toArray(Utils.EMPTY_STRINGS);
     Arrays.sort(result);
     return result;
   }
 
   @Override
-  public synchronized void deleteFile(String name) throws IOException {
+  public void deleteFile(String name) throws IOException {
     if (VERBOSE) {
       System.out.println("nrtdir.deleteFile name=" + name);
     }
-    if (cacheDirectory.fileExists(name)) {
+    try {
       cacheDirectory.deleteFile(name);
-    } else {
-      in.deleteFile(name);
+      return;
+    } catch (NoSuchFileException | FileNotFoundException e) {
+
     }
+
+    in.deleteFile(name);
   }
 
   @Override

@@ -1,7 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="All in lucene-solr.solr.core.test" type="JUnit" factoryName="JUnit" nameIsGenerated="true">
     <module name="lucene-solr.solr.core.test" />
-    <extension name="GrepConsole" selectedProfileId="1620160669947" />
     <option name="PACKAGE_NAME" value="" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />
