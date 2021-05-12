@@ -6,6 +6,7 @@ import org.apache.http.HttpStatus;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.cloud.DocCollection;
@@ -47,13 +48,16 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
+import org.eclipse.jetty.client.util.AsyncRequestContent;
 import org.eclipse.jetty.client.util.InputStreamRequestContent;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpHeaderValue;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.HttpOutput;
 import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.util.IteratingCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +74,10 @@ import static org.apache.solr.servlet.SolrDispatchFilter.Action.REMOTEQUERY;
 import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETRY;
 import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETURN;
 import javax.annotation.Nonnull;
+import javax.servlet.AsyncContext;
+import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -81,6 +88,7 @@ import java.lang.invoke.MethodHandles;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritePendingException;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -101,6 +109,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public abstract class SolrCall {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+  private static final String WRITE_LISTENER_ATTRIBUTE = "proxy.writeListener";
 
   public static final Random random;
   static {
@@ -154,7 +164,7 @@ public abstract class SolrCall {
   }
 
   protected static void sendError(int code, String message, HttpServletResponse response) throws IOException {
-    log.error("ERROR", message);
+    log.error("sendError={}", message);
     try {
       response.sendError(code, message);
     } catch (EOFException e) {
@@ -264,7 +274,7 @@ public abstract class SolrCall {
               return rep.getState() == Replica.State.ACTIVE;
             });
           } catch (InterruptedException e) {
-            log.debug("interrupted waiting to see active replica");
+            ParWork.propagateInterrupt("interrupted waiting to see active replica", e);
             return null;
           } catch (TimeoutException e) {
             log.debug("timeout waiting to see active replica {} {}", replica.getName(), replica.getState());
@@ -337,7 +347,7 @@ public abstract class SolrCall {
         return false;
       });
     } catch (Exception e) {
-
+      ParWork.propagateInterrupt(e);
     }
 
     final DocCollection docCollection = cores.getZkController().getZkStateReader().getCollectionOrNull(collectionName);
@@ -394,7 +404,7 @@ public abstract class SolrCall {
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
         buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
 
-        if (SolrDispatchFilter.ASYNC && SolrDispatchFilter.ASYNC_IO) {
+        if (req.isAsyncStarted() && SolrDispatchFilter.ASYNC_IO) {
 
           HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
           //out.setWriteListener(new MyWriteListener(out, buffer, req, response));
@@ -409,10 +419,6 @@ public abstract class SolrCall {
               Callback.super.failed(t);
               ExpandableBuffers.getInstance().release(outStream.buffer());
               log.error("Solr ran into an unexpected problem", t);
-              int code = 500;
-              if (t instanceof SolrException) {
-                code = ((SolrException) t).code();
-              }
               try {
               //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
                 SolrDispatchFilter.sendException(t, SolrCall.this, req, response);
@@ -435,53 +441,6 @@ public abstract class SolrCall {
     }
   }
 
-  private static class MyWriteListener implements WriteListener {
-    private final HttpOutput out;
-    private final ByteBuffer buffer;
-    private final HttpServletRequest req;
-    private final HttpServletResponse response;
-
-    public MyWriteListener(HttpOutput out, ByteBuffer buffer, HttpServletRequest req, HttpServletResponse response) {
-      this.out = out;
-      this.buffer = buffer;
-      this.req = req;
-      this.response = response;
-    }
-
-    @Override public void onWritePossible() throws IOException {
-      try {
-        while (out.isReady()) {
-          if (!buffer.hasRemaining()) {
-            log.info("Nothing remaining in BUFFER!");
-            // SolrDispatchFilter.consumeInputFully(req, response);
-            req.getAsyncContext().complete();
-            return;
-          }
-          log.info("write BUFFER!");
-          out.write(buffer);
-        }
-      } catch (Exception e) {
-        log.error("Solr ran into an unexpected problem", e);
-        req.getAsyncContext().complete();
-      }
-
-    }
-
-    @Override public void onError(Throwable t) {
-      log.error("Solr ran into an unexpected problem", t);
-      int code = 500;
-      if (t instanceof SolrException) {
-        code = ((SolrException) t).code();
-      }
-      try {
-        response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
-      } catch (IOException ioException) {
-        log.warn("Exception sending error", t); // MRM TODO
-      } finally {
-        req.getAsyncContext().complete();
-      }
-    }
-  }
   /**
    * Sets the "collection" parameter on the request to the list of alias-resolved collections for this request.
    * It can be avoided sometimes.
@@ -631,7 +590,7 @@ public abstract class SolrCall {
           try {
             Thread.sleep(150); // nocommit - make efficient
           } catch (InterruptedException interruptedException) {
-
+            ParWork.propagateInterrupt(interruptedException);
           }
         }
         core = cores.getCore(replica.getName());
@@ -698,8 +657,6 @@ public abstract class SolrCall {
         log.debug("core parsed as {}", resource);
       }
     }
-
-    log.info("RESOURCE IS " + resource);
 
     SolrParams params = getQueryParams();
     final ArrayList<AuthorizationContext.CollectionRequest> collectionRequests = new ArrayList<>();
@@ -804,7 +761,10 @@ public abstract class SolrCall {
 
   protected static SolrDispatchFilter.Action remoteQuery(HttpServletRequest req, HttpServletResponse response, String coreUrl, HttpClient httpClient) throws IOException {
     if (req != null) {
-      // MRM TODO: ASYNC IO Mode
+      if (!req.isAsyncStarted()) {
+        AsyncContext asyncContext = req.startAsync();
+        asyncContext.setTimeout(0);
+      }
       log.info("proxy to:{}?{}", coreUrl, req.getQueryString());
       // MRM TODO: - dont proxy around too much
       String fhost = req.getHeader(HttpHeader.X_FORWARDED_FOR.toString());
@@ -824,57 +784,66 @@ public abstract class SolrCall {
         log.error("Error parsing URI for proxying {}", url, e);
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       }
-
+      proxyRequest.timeout(120000, TimeUnit.MILLISECONDS);
       copyRequestHeaders(req, proxyRequest);
 
       addProxyHeaders(req, proxyRequest);
 
       if (hasContent(req)) {
-        ServletInputStream is = req.getInputStream();
-        InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), new CloseShieldInputStream(is), 8192);
+      //  ServletInputStream is = req.getInputStream();
+       // InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), new CloseShieldInputStream(is), 8192);
         //Response.AsyncContentListener content2 = new Response.AsyncContentListener();
-        proxyRequest.body(defferedContent);
+       // proxyRequest.body(defferedContent);
+        AsyncRequestContent content = new AsyncRequestContent();
+        req.getInputStream().setReadListener(newReadListener(req, response, proxyRequest, content));
+        proxyRequest.body(content);
       }
 
+      proxyRequest.send(newProxyResponseListener(req, response));
 
-      if (SolrDispatchFilter.ASYNC) {
-        proxyRequest.onResponseHeaders(new RemoteAsyncResponseListener(req, response)).send(new OnContentOutputListener(response, req));
-      } else {
-        AtomicReference<Throwable> failException = new AtomicReference<>();
-        InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
-        InputStream is = null;
-        try {
-          proxyRequest.send(listener);
-
+//      if (SolrDispatchFilter.ASYNC) {
+//        proxyRequest.onResponseHeaders(new RemoteAsyncResponseListener(req, response)).send(new OnContentOutputListener(response, req));
+//      } else {
+//        AtomicReference<Throwable> failException = new AtomicReference<>();
+//        InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
+//        InputStream is = null;
+//        try {
+//          proxyRequest.send(listener);
+//
+////          try {
+////            // wait for headers
+////            listener.get(30, TimeUnit.SECONDS);
+////          } catch (Exception e) {
+////            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
+////          }
+//
 //          try {
-//            // wait for headers
-//            listener.get(30, TimeUnit.SECONDS);
+//            is = listener.getInputStream();
+//            is.transferTo(response.getOutputStream());
 //          } catch (Exception e) {
-//            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
+//            sendError(e, response);
 //          }
-
-          try {
-            is = listener.getInputStream();
-            is.transferTo(response.getOutputStream());
-          } catch (Exception e) {
-            sendError(e, response);
-          }
-
-          if (failException.get() != null) {
-            sendError(failException.get(), response);
-          }
-        } finally {
-
-          if (is != null) {
-            while (is.read() != -1) {
-
-            }
-          }
-        }
-      }
+//
+//          if (failException.get() != null) {
+//            sendError(failException.get(), response);
+//          }
+//        } finally {
+//
+//          if (is != null) {
+//            while (is.read() != -1) {
+//
+//            }
+//          }
+//        }
+//      }
     }
 
     return REMOTEQUERY;
+  }
+
+  protected static Response.Listener newProxyResponseListener(HttpServletRequest request, HttpServletResponse response)
+  {
+    return new ProxyResponseListener(request, response);
   }
 
   protected static boolean hasContent(@Nonnull HttpServletRequest clientRequest) {
@@ -1086,62 +1055,333 @@ public abstract class SolrCall {
     }
   }
 
+  protected static StreamWriter newWriteListener(HttpServletRequest request, Response proxyResponse)
+  {
+    return new StreamWriter(request, proxyResponse);
+  }
 
-  private static class RemoteInputStreamResponseListener extends InputStreamResponseListener {
-
-    private final AtomicReference<Throwable> failException;
+  protected static class StreamReader extends IteratingCallback implements ReadListener
+  {
+    private final byte[] buffer = new byte[8192];
+    private final HttpServletRequest request;
     private final HttpServletResponse response;
+    private final Request proxyRequest;
+    private final AsyncRequestContent content;
 
-    public RemoteInputStreamResponseListener(AtomicReference<Throwable> failException, HttpServletResponse response) {
-      this.failException = failException;
+    protected StreamReader(HttpServletRequest request, HttpServletResponse response, Request proxyRequest, AsyncRequestContent content)
+    {
+      this.request = request;
       this.response = response;
-    }
-
-    public void onComplete(@Nonnull Result result) {
-      super.onComplete(result);
-
-      if (result.isFailed()) {
-        failException.set(result.getFailure());
-      }
+      this.proxyRequest = proxyRequest;
+      this.content = content;
     }
 
     @Override
-    public void onHeaders(@Nonnull Response resp) {
-      super.onHeaders(resp);
+    public void onDataAvailable()
+    {
+      iterate();
+    }
+
+    @Override
+    public void onAllDataRead()
+    {
+      if (log.isDebugEnabled())
+        log.debug("proxying content to upstream completed");
+      content.close();
+    }
+
+    @Override
+    public void onError(Throwable t)
+    {
+      sendProxyResponseError(request, response, t instanceof TimeoutException
+          ? HttpStatus.SC_GATEWAY_TIMEOUT
+          : HttpStatus.SC_BAD_GATEWAY);
+    }
+
+    @Override
+    protected Action process() throws Exception
+    {
+      int requestId =  0;
+      ServletInputStream input = request.getInputStream();
+
+      while (input.isReady())
+      {
+        int read = input.read(buffer);
+        if (log.isDebugEnabled())
+          log.debug("{} asynchronous read {} bytes on {}", requestId, read, input);
+        if (read > 0)
+        {
+          if (log.isDebugEnabled())
+            log.debug("{} proxying content to upstream: {} bytes", requestId, read);
+          onRequestContent(request, proxyRequest, content, buffer, 0, read, this);
+          return Action.SCHEDULED;
+        }
+        else if (read < 0)
+        {
+          if (log.isDebugEnabled())
+            log.debug("{} asynchronous read complete on {}", requestId, input);
+          return Action.SUCCEEDED;
+        }
+      }
+
+      if (log.isDebugEnabled())
+        log.debug("{} asynchronous read pending on {}", requestId, input);
+      return Action.IDLE;
+    }
+
+    protected void onRequestContent(HttpServletRequest request, Request proxyRequest, AsyncRequestContent content, byte[] buffer, int offset, int length, Callback callback)
+    {
+      content.offer(ByteBuffer.wrap(buffer, offset, length), callback);
+    }
+
+    @Override
+    public void failed(Throwable x)
+    {
+      super.failed(x);
+      onError(x);
+    }
+  }
+
+  protected static class StreamWriter implements WriteListener
+  {
+    private final HttpServletRequest request;
+    private final Response proxyResponse;
+    private WriteState state;
+    private byte[] buffer;
+    private int offset;
+    private int length;
+    private Callback callback;
+
+    protected StreamWriter(HttpServletRequest request, Response proxyResponse)
+    {
+      this.request = request;
+      this.proxyResponse = proxyResponse;
+      this.state = WriteState.IDLE;
+    }
+
+    protected void data(byte[] bytes, int offset, int length, Callback callback)
+    {
+      if (state != WriteState.IDLE)
+        throw new WritePendingException();
+      this.state = WriteState.READY;
+      this.buffer = bytes;
+      this.offset = offset;
+      this.length = length;
+      this.callback = callback;
+    }
+
+    @Override
+    public void onWritePossible() throws IOException
+    {
+    //  int requestId = getRequestId(request);
+      ServletOutputStream output = request.getAsyncContext().getResponse().getOutputStream();
+      if (state == WriteState.READY)
+      {
+        // There is data to write.
+        if (log.isDebugEnabled())
+          log.debug("asynchronous write start of {} bytes on {}", length, output);
+        output.write(buffer, offset, length);
+        state = WriteState.PENDING;
+        if (output.isReady())
+        {
+          if (log.isDebugEnabled())
+            log.debug("asynchronous write of {} bytes completed on {}", length, output);
+          complete();
+        }
+        else
+        {
+          if (log.isDebugEnabled())
+            log.debug("asynchronous write of {} bytes pending on {}", length, output);
+        }
+      }
+      else if (state == WriteState.PENDING)
+      {
+        // The write blocked but is now complete.
+        if (log.isDebugEnabled())
+          log.debug("asynchronous write of {} bytes completing on {}", length, output);
+        complete();
+      }
+      else
+      {
+        throw new IllegalStateException();
+      }
+    }
+
+    protected void complete()
+    {
+      buffer = null;
+      offset = 0;
+      length = 0;
+      Callback c = callback;
+      callback = null;
+      state = WriteState.IDLE;
+      // Call the callback only after the whole state has been reset,
+      // because the callback may trigger a reentrant call and
+      // the state must already be the new one that we reset here.
+      c.succeeded();
+    }
+
+    @Override
+    public void onError(Throwable failure)
+    {
+      proxyResponse.abort(failure);
+    }
+  }
+
+  protected static void onProxyResponseSuccess(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Response serverResponse)
+  {
+    if (log.isDebugEnabled())
+      log.debug("{} proxying successful");
+
+    AsyncContext asyncContext = clientRequest.getAsyncContext();
+    asyncContext.complete();
+  }
+
+  protected static void sendProxyResponseError(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, int status)
+  {
+    try
+    {
+      if (!proxyResponse.isCommitted())
+      {
+        proxyResponse.resetBuffer();
+        proxyResponse.setHeader(HttpHeader.CONNECTION.asString(), HttpHeaderValue.CLOSE.asString());
+      }
+      proxyResponse.sendError(status);
+    }
+    catch (Exception e)
+    {
+      log.trace("IGNORED", e);
+      try
+      {
+        proxyResponse.sendError(-1);
+      }
+      catch (Exception e2)
+      {
+        log.trace("IGNORED", e2);
+      }
+    }
+    finally
+    {
+      if (clientRequest.isAsyncStarted())
+        clientRequest.getAsyncContext().complete();
+    }
+  }
+
+  private enum WriteState
+  {
+    READY, PENDING, IDLE
+  }
+
+  protected static class ProxyResponseListener extends Response.Listener.Adapter
+  {
+    private final HttpServletRequest request;
+    private final HttpServletResponse response;
+
+    protected ProxyResponseListener(HttpServletRequest request, HttpServletResponse response)
+    {
+      this.request = request;
+      this.response = response;
+    }
+
+    @Override
+    public void onBegin(Response proxyResponse)
+    {
+      response.setStatus(proxyResponse.getStatus());
+    }
+
+    @Override
+    public void onHeaders(Response resp)
+    {
       //System.out.println("resp code:" + resp.getStatus());
       for (HttpField field : resp.getHeaders()) {
         String headerName = field.getName();
         String lowerHeaderName = headerName.toLowerCase(Locale.ROOT);
-        //            System.out.println("response header: " + headerName + " : " + field.getValue() + " status:" +
-        //                    resp.getStatus());
         if (HOP_HEADERS.contains(lowerHeaderName))
           continue;
 
         response.addHeader(headerName, field.getValue());
       }
       response.setStatus(resp.getStatus());
-      super.onHeaders(resp);
+    }
+
+    @Override
+    public void onContent(Response proxyResponse, ByteBuffer content, Callback callback)
+    {
+      byte[] buffer;
+      int offset;
+      int length = content.remaining();
+      if (content.hasArray())
+      {
+        buffer = content.array();
+        offset = content.arrayOffset();
+      }
+      else
+      {
+        buffer = new byte[length];
+        content.get(buffer);
+        offset = 0;
+      }
+
+      onResponseContent(request, response, proxyResponse, buffer, offset, length, new Callback.Nested(callback)
+      {
+        @Override
+        public void failed(Throwable x)
+        {
+          super.failed(x);
+          proxyResponse.abort(x);
+        }
+      });
+    }
+
+    @Override
+    public void onComplete(Result result)
+    {
+      if (result.isSucceeded())
+        onProxyResponseSuccess(request, response, result.getResponse());
+      else
+        sendProxyResponseError(request, response, result.getFailure() instanceof TimeoutException
+            ? HttpStatus.SC_GATEWAY_TIMEOUT
+            : HttpStatus.SC_BAD_GATEWAY);
+      if (log.isDebugEnabled())
+        log.debug("proxying complete");
     }
   }
 
-  private static class OnContentOutputListener implements Response.Listener {
-    private final HttpServletResponse response;
-    private final HttpServletRequest req;
+  protected static ReadListener newReadListener(HttpServletRequest request, HttpServletResponse response, Request proxyRequest, AsyncRequestContent content)
+  {
+    return new StreamReader(request, response, proxyRequest, content);
+  }
 
-    public OnContentOutputListener(HttpServletResponse response, HttpServletRequest req) {
-      this.response = response;
-      this.req = req;
-    }
+  protected static void onResponseContent(HttpServletRequest request, HttpServletResponse response, Response proxyResponse, byte[] buffer, int offset, int length, Callback callback)
+  {
+    try
+    {
+      if (log.isDebugEnabled())
+        log.debug("proxying content to downstream: {} bytes", length);
+      StreamWriter writeListener = (StreamWriter)request.getAttribute(WRITE_LISTENER_ATTRIBUTE);
+      if (writeListener == null)
+      {
+        writeListener = newWriteListener(request, proxyResponse);
+        request.setAttribute(WRITE_LISTENER_ATTRIBUTE, writeListener);
 
-    @Override public void onContent(Response r, ByteBuffer buffer) {
-      try {
-        HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
-        ProxyWriteListener proxListener = new ProxyWriteListener(out, buffer, req);
-        out.setWriteListener(proxListener);
-      } catch (Exception e) {
-        log.error("Exception", e);
-        req.getAsyncContext().complete();
+        // Set the data to write before calling setWriteListener(), because
+        // setWriteListener() may trigger the call to onWritePossible() on
+        // a different thread and we would have a race.
+        writeListener.data(buffer, offset, length, callback);
+
+        // Setting the WriteListener triggers an invocation to onWritePossible().
+        response.getOutputStream().setWriteListener(writeListener);
       }
+      else
+      {
+        writeListener.data(buffer, offset, length, callback);
+        writeListener.onWritePossible();
+      }
+    }
+    catch (Throwable x)
+    {
+      callback.failed(x);
+      proxyResponse.abort(x);
     }
   }
 }

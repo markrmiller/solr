@@ -192,7 +192,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
     // going to just be recovering from the new leader
    // if (Boolean.getBoolean("solr.nrtDirSync")) {
       in.sync(fileNames);
-  //  }
+   // }
   }
 
   @Override
@@ -237,7 +237,7 @@ public class NRTCachingDirectory extends FilterDirectory implements Accountable 
         }
       }, cacheDirectory, in);
   //  }
-  //  super.close();
+    super.close();
   }
 
   /** Subclass can override this to customize logic; return

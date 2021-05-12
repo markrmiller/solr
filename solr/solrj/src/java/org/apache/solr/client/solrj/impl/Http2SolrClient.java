@@ -1393,7 +1393,7 @@ public class Http2SolrClient extends SolrClient {
     private SSLConfig sslConfig = defaultSSLConfig;
     private Integer idleTimeout = DEFAULT_IDLE_TIME;
     private Integer connectionTimeout;
-    private Integer maxConnectionsPerHost = 3;
+    private Integer maxConnectionsPerHost = 12;
     private boolean useHttp1_1 = Boolean.getBoolean("solr.http1");
     protected String baseSolrUrl;
     protected Map<String,String> headers = new HashMap<>();
@@ -1785,10 +1785,10 @@ public class Http2SolrClient extends SolrClient {
       // MRM TODO: should be configurable
       MultiplexConnectionPool thePool = new MultiplexConnectionPool(destination, pool, destination, maxQueuedRequestsPerDest);
       //mulitplexPool.setMaxMultiplex(512);
-      thePool.setMaximizeConnections(false);
+      thePool.setMaximizeConnections(true);
 
     //  mulitplexPool.preCreateConnections(12);
-      thePool.preCreateConnections(1);
+      thePool.preCreateConnections(3);
       return thePool;
     }
   }

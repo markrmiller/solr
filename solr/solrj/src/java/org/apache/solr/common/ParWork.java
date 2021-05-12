@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.ForkJoinParWorkRootExec;
 import org.apache.commons.ParWorkRootExec;
 import org.apache.commons.ParWorkRootIOExec;
+import org.apache.commons.ParWorkUnknownRootIOExec;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
 import org.apache.solr.common.util.ObjectReleaseTrackerTestImpl;
@@ -97,7 +98,7 @@ public class ParWork implements Closeable {
   }
 
   public static ParWorkExecutor getRootSharedIOExecutor() {
-    return ParWorkRootIOExec.RootExecHolder.getExecutor();
+    return ParWorkRootIOExec.getExecutor();
   }
 
   public static ParWorkExecutor getRootSharedForkJoinExecutor() {
@@ -505,13 +506,12 @@ public class ParWork implements Closeable {
     // section perThreadExec
     Thread thread = Thread.currentThread();
 
-    ExecutorService service = null;
     if (thread instanceof  SolrThread) {
       return getExecutorService("SolrPerThread", PER_THREAD_MAX, false);
     }
 
     log.debug("Unknown thread {}", thread);
-    return getExecutorService("ExtSolrPerThread", Math.max(SysStats.PROC_COUNT, 4), true);
+    return new VirtualExecutorService("ExtSolrPerThread", ParWorkUnknownRootIOExec.getExecutor(), Math.max(SysStats.PROC_COUNT, 4), false);
 
   }
 

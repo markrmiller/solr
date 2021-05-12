@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
 
-public class ParWorkRootIOExec {
+public class ParWorkUnknownRootIOExec {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static class RootExecHolder {
@@ -18,8 +18,8 @@ public class ParWorkRootIOExec {
       try {
         EXEC_HOLDER_INSTANCE = (ParWorkExecutor) ParWork
             .getParExecutorService(ParWork.ROOT_EXEC_IO_NAME,
-                Integer.getInteger("solr.rootSharedThreadPoolCoreSize", Math.max(2, SysStats.PROC_COUNT)),
-                Integer.MAX_VALUE, 1000);
+                0,
+                Integer.MAX_VALUE, 500);
       } catch (Throwable e) {
         log.warn("Could not find object release tracker class", e);
         throw e;

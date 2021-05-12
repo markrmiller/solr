@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Threads(6)
-@Warmup(iterations = 3)
+@Warmup(iterations = 8)
 @Measurement(iterations = 5)
 @Fork(value = 1, jvmArgs = {"-Xmx4g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
     "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=2",
@@ -72,7 +72,7 @@ import java.util.concurrent.atomic.AtomicInteger;
     "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true", "-Djava.util.concurrent.ForkJoinPool.common.threadFactory=org.apache.commons.SolrForkJoinThreadFactory"
   //  "-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=jfr_results/,dumponexit=true,settings=profile,path-to-gc-roots=true"})
     })
-@Timeout(time = 300)
+@Timeout(time = 60)
 public class PointsVsTrieIndex {
 
   @State(Scope.Benchmark)
@@ -172,7 +172,7 @@ public class PointsVsTrieIndex {
       }
     }
 
-    @TearDown(Level.Trial)
+    @TearDown(Level.Iteration)
     public void doTearDown() throws Exception {
       cluster.shutdown();
     }

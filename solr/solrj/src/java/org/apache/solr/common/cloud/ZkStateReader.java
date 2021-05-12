@@ -545,7 +545,9 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
 
       String[] parts = event.getPath().substring(1).split("/");
 
-      log.debug("Recursive Watch event={} parts={}", event, Arrays.asList(parts));
+      if (log.isDebugEnabled()) {
+        log.debug("Recursive Watch event={} parts={}", event, Arrays.asList(parts));
+      }
 
       switch (event.getType()) {
         case NodeCreated:
@@ -564,7 +566,6 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
           break;
         case NodeDeleted:
           if (parts.length == 2 && parts[0].equals(ZkStateReader.COLLECTIONS_ZKNODE.substring(1))) {
-            log.info("Recursive Watch got a collection child change event");
             colectionRemoved(parts[1]);
           }
           break;
@@ -605,7 +606,7 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
         try {
           if (!watcher.onStateChanged(null)) {
             if (watcher instanceof DocCollectionAndLiveNodesWatcherWrapper) {
-               ((DocCollectionAndLiveNodesWatcherWrapper) watcher).latch.close();
+               ((DocCollectionAndLiveNodesWatcherWrapper) watcher).latch.close("collection removed, " + collection);
             }
           }
         } catch (Exception exception) {
@@ -1943,8 +1944,8 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
     }
   }
 
-  private static class SolrCountDownLatch extends CountDownLatch implements Closeable  {
-    private volatile boolean closed;
+  private static class SolrCountDownLatch extends CountDownLatch {
+    private volatile String closed;
 
     /**
      * Constructs a {@code CountDownLatch} initialized with the given count.
@@ -1960,14 +1961,14 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
     public boolean await(long timeout, TimeUnit unit)
         throws InterruptedException {
       boolean val = super.await(timeout, unit);
-      if (closed) {
-        throw new AlreadyClosedException();
+      if (closed != null) {
+        throw new AlreadyClosedException(closed);
       }
       return val;
     }
 
-    @Override public void close() throws IOException {
-      closed = true;
+    public void close(String reason) throws IOException {
+      closed = reason;
       countDown();
     }
   }
@@ -2622,7 +2623,7 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
     }
 
     @Override public void close() throws IOException {
-      IOUtils.closeQuietly(latch);
+      latch.close("ZkStateReader closed");
     }
   }
 

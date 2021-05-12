@@ -19,6 +19,7 @@ package org.apache.solr.servlet;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.Part;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,6 +33,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -282,7 +284,7 @@ public class SolrRequestParsers {
    * Given a url-encoded query string (UTF-8), map it into solr params
    */
   public static MultiMapSolrParams parseQueryString(String queryString) {
-    Map<String,String[]> map = new ConcurrentHashMap<>();
+    Map<String,String[]> map = new HashMap<>();
     parseQueryString(queryString, map);
     return new MultiMapSolrParams(map);
   }
@@ -331,48 +333,47 @@ public class SolrRequestParsers {
   static long parseFormDataContent(final InputStream postContent, final long maxLen, Charset charset, final Map<String,String[]> map,
       boolean supportCharsetParam) throws IOException {
     CharsetDecoder charsetDecoder = supportCharsetParam ? null : getCharsetDecoder(charset);
-  //  final LinkedList<Object> buffer = supportCharsetParam ? new LinkedList<>() : null;
+    final LinkedList<Object> buffer = supportCharsetParam ? new LinkedList<>() : null;
     long len = 0L, keyPos = 0L, valuePos = 0L;
-
-    //MutableDirectBuffer expandableBuffer = new ExpandableDirectByteBuffer(4096);
-//    ExpandableDirectBufferOutputStream keyStream = ExpandableBuffers.buffer1.get();
-//    ExpandableDirectBufferOutputStream valueStream = ExpandableBuffers.buffer2.get();
-//    MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(256, false); //ExpandableBuffers.buffer1.get();
-//    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
-//    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(256, false);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
-//    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
-    MutableDirectBuffer eb1 = ExpandableBuffers.getInstance().acquire(32768, true); //ExpandableBuffers.buffer1.get();
-    ExpandableDirectBufferOutputStream keyStream = new ExpandableDirectBufferOutputStream(eb1);
-    MutableDirectBuffer eb2 =  ExpandableBuffers.getInstance().acquire(32768, true);//new ExpandableDirectByteBuffer(4096);//ExpandableBuffers.buffer2.get();
-    ExpandableDirectBufferOutputStream valueStream = new ExpandableDirectBufferOutputStream(eb2);
-    if (charsetDecoder == null) {
-      charsetDecoder = getCharsetDecoder(StandardCharsets.UTF_8);
-    }
-   //final ByteArrayOutputStream keyStream = new ByteArrayOutputStream(), valueStream = new ByteArrayOutputStream(
-    // );
-    ExpandableDirectBufferOutputStream currentStream = keyStream;
+    final ByteArrayOutputStream keyStream = new ByteArrayOutputStream(), valueStream = new ByteArrayOutputStream();
+    ByteArrayOutputStream currentStream = keyStream;
     for (; ; ) {
       int b = postContent.read();
       switch (b) {
         case -1: // end of stream
         case '&': // separator
-          final ByteBuffer keyBytes = keyStream.buffer().byteBuffer().asReadOnlyBuffer(), valueBytes = valueStream.buffer().byteBuffer().asReadOnlyBuffer();
-          keyBytes.position(keyStream.offset() + keyStream.buffer().wrapAdjustment());
-          keyBytes.limit(keyStream.position() + keyStream.buffer().wrapAdjustment());
-          valueBytes.position(valueStream.offset());
-          valueBytes.limit(valueStream.position() + valueStream.buffer().wrapAdjustment());
-          // we already have a charsetDecoder, so we can directly decode without buffering:
-          final String key = decodeChars(keyBytes, keyPos, charsetDecoder), value = decodeChars(valueBytes, valuePos, charsetDecoder);
-          MultiMapSolrParams.addParam(key.trim(), value, map);
-
+          if (keyStream.size() > 0) {
+            final byte[] keyBytes = keyStream.toByteArray(), valueBytes = valueStream.toByteArray();
+            if (Arrays.equals(keyBytes, INPUT_ENCODING_BYTES)) {
+              // we found a charset declaration in the raw bytes
+              if (charsetDecoder != null) {
+                throw new SolrException(ErrorCode.BAD_REQUEST, supportCharsetParam ?
+                    ("Query string invalid: duplicate '" + INPUT_ENCODING_KEY + "' (input encoding) key.") :
+                    ("Key '" + INPUT_ENCODING_KEY + "' (input encoding) cannot " + "be used in POSTed application/x-www-form-urlencoded form data. "
+                        + "To set the input encoding of POSTed form data, use the " + "'Content-Type' header and provide a charset!"));
+              }
+              // decode the charset from raw bytes
+              charset = Charset.forName(decodeChars(valueBytes, keyPos, getCharsetDecoder(CHARSET_US_ASCII)));
+              charsetDecoder = getCharsetDecoder(charset);
+              // finally decode all buffered tokens
+              decodeBuffer(buffer, map, charsetDecoder);
+            } else if (charsetDecoder == null) {
+              // we have no charset decoder until now, buffer the keys / values for later processing:
+              buffer.add(keyBytes);
+              buffer.add(keyPos);
+              buffer.add(valueBytes);
+              buffer.add(valuePos);
+            } else {
+              // we already have a charsetDecoder, so we can directly decode without buffering:
+              final String key = decodeChars(keyBytes, keyPos, charsetDecoder), value = decodeChars(valueBytes, valuePos, charsetDecoder);
+              MultiMapSolrParams.addParam(key.trim(), value, map);
+            }
+          } else if (valueStream.size() > 0) {
+            throw new SolrException(ErrorCode.BAD_REQUEST, "application/x-www-form-urlencoded invalid: missing key");
+          }
+          keyStream.reset();
+          valueStream.reset();
           keyPos = valuePos = len + 1;
-          MutableDirectBuffer expandableBuffer1 = keyStream.buffer();
-          expandableBuffer1.byteBuffer().clear();
-          MutableDirectBuffer expandableBuffer2 = valueStream.buffer();
-          expandableBuffer2.byteBuffer().clear();
-          keyStream.wrap(expandableBuffer1);
-          valueStream.wrap(expandableBuffer2);
-
           currentStream = keyStream;
           break;
         case '+': // space replacement
@@ -403,8 +404,11 @@ public class SolrRequestParsers {
         throw new SolrException(ErrorCode.BAD_REQUEST, "application/x-www-form-urlencoded content exceeds upload limit of " + (maxLen / 1024L) + " KB");
       }
     }
-    ExpandableBuffers.getInstance().release(eb1);
-    ExpandableBuffers.getInstance().release(eb2);
+    // if we have not seen a charset declaration, decode the buffer now using the default one (UTF-8 or given via Content-Type):
+    if (buffer != null && !buffer.isEmpty()) {
+      assert charsetDecoder == null;
+      decodeBuffer(buffer, map, getCharsetDecoder(charset));
+    }
     return len;
   }
 
@@ -421,26 +425,17 @@ public class SolrRequestParsers {
     }
   }
 
-  private static String decodeChars(ByteBuffer bytes, long position, CharsetDecoder charsetDecoder) {
-    try {
-      return charsetDecoder.decode(bytes).toString();
-    } catch (CharacterCodingException cce) {
-      throw new SolrException(ErrorCode.BAD_REQUEST,
-          "URLDecoder: Invalid character encoding detected after position " + position + " of query string / form data (while parsing as " + charsetDecoder.charset().name() + ")");
-    }
-  }
-
   private static void decodeBuffer(final LinkedList<Object> input, final Map<String,String[]> map, CharsetDecoder charsetDecoder) {
     for (final Iterator<Object> it = input.iterator(); it.hasNext(); ) {
-      final Object keyBytes = it.next();
+      final byte[] keyBytes = (byte[]) it.next();
       it.remove();
       final Long keyPos = (Long) it.next();
       it.remove();
-      final Object valueBytes = it.next();
+      final byte[] valueBytes = (byte[]) it.next();
       it.remove();
       final Long valuePos = (Long) it.next();
       it.remove();
-      MultiMapSolrParams.addParam(decodeChars((ByteBuffer) keyBytes, keyPos, charsetDecoder).trim(), decodeChars((ByteBuffer) valueBytes, valuePos, charsetDecoder), map);
+      MultiMapSolrParams.addParam(decodeChars(keyBytes, keyPos, charsetDecoder).trim(), decodeChars(valueBytes, valuePos, charsetDecoder), map);
     }
   }
 

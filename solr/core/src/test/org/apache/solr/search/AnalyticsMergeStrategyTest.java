@@ -95,7 +95,7 @@ public class AnalyticsMergeStrategyTest extends BaseDistributedSearchTestCase {
     NamedList analytics = (NamedList)response.get("analytics");
     Integer c = (Integer)analytics.get("mycount");
     // After moving to http2client reused, the iterative merge strat is returning between 42 and 48
-    if(c.intValue() >= 42 || c.intValue() <= 48) {
+    if(c.intValue() < 42 || c.intValue() > 48) {
       throw new Exception("Count is not correct: 42-48:"+c.intValue());
     }
    // assertCountOnly(rsp, 44);

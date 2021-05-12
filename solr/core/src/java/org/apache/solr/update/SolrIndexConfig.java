@@ -28,6 +28,8 @@ import org.apache.lucene.index.IndexWriter.IndexReaderWarmer;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.MergeScheduler;
+import org.apache.lucene.index.NoMergePolicy;
+import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.util.InfoStream;
 import org.apache.solr.common.util.NamedList;
@@ -236,8 +238,15 @@ public class SolrIndexConfig implements MapSerializable {
     iwc.setSimilarity(schema.getSimilarity());
     MergePolicy mergePolicy = buildMergePolicy(core.getResourceLoader(), schema);
     iwc.setMergePolicy(mergePolicy);
-    MergeScheduler mergeScheduler = buildMergeScheduler(core.getResourceLoader());
-    iwc.setMergeScheduler(mergeScheduler);
+
+    if (mergePolicy == NoMergePolicy.INSTANCE) {
+      iwc.setMergeScheduler(NoMergeScheduler.INSTANCE);
+    } else {
+      MergeScheduler mergeScheduler = buildMergeScheduler(core.getResourceLoader());
+      iwc.setMergeScheduler(mergeScheduler);
+    }
+
+
     iwc.setInfoStream(infoStream);
 
     if (mergePolicy instanceof SortingMergePolicy) {

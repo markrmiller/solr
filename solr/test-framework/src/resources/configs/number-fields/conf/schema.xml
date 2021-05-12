@@ -38,7 +38,7 @@
     <dynamicField name="*_s"  type="string"  indexed="true"  stored="true"/>
     <dynamicField name="*_sS" type="string"  indexed="false" stored="true"/>
 
-    <dynamicField name="*_i"  type="int"    indexed="true"  stored="true" docValues="${solr.tests.numeric.dv}"/>
+    <dynamicField name="*_i"  type="int"    indexed="true"  stored="${solr.tests.numeric.stored}" docValues="${solr.tests.numeric.dv}"/>
     <dynamicField name="*_i_dv"  type="int"    indexed="true"  stored="true" docValues="true"/>
     <dynamicField name="*_i_mv"  type="int"    indexed="true"  stored="true" multiValued="true"/>
     <dynamicField name="*_i_mv_dv"  type="int"    indexed="true"  stored="true" docValues="true" multiValued="true"/>
@@ -63,7 +63,7 @@
     <dynamicField name="*_i_ni_dv_sml"  type="int"    indexed="false"  stored="true" docValues="true" sortMissingLast="true"/>
     <dynamicField name="*_i_ni_mv_dv_sml"  type="int"    indexed="false"  stored="true" docValues="true" multiValued="true" sortMissingLast="true"/>
 
-    <dynamicField name="*_l"  type="long"    indexed="true"  stored="true"/>
+    <dynamicField name="*_l"  type="long"    indexed="true"  stored="${solr.tests.numeric.stored}" docValues="${solr.tests.numeric.dv}"/>
     <dynamicField name="*_l_dv"  type="long"    indexed="true"  stored="true" docValues="true"/>
     <dynamicField name="*_l_mv"  type="long"    indexed="true"  stored="true" multiValued="true"/>
     <dynamicField name="*_l_mv_dv"  type="long"    indexed="true"  stored="true" docValues="true" multiValued="true"/>

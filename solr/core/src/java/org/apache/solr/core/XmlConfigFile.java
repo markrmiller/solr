@@ -192,6 +192,9 @@ public class XmlConfigFile { // formerly simply "Config"
     //  po.setCheckEntityReferences(false);
     // po.setExpandAttributeDefaults(false);
     po.setPleaseCloseAfterUse(true);
+
+    po.setCheckEntityReferences(false);
+    po.setUseXsiSchemaLocation(false);
     po.addFilter(next -> new ReceiverFilter(next, substituteProps));
 
 

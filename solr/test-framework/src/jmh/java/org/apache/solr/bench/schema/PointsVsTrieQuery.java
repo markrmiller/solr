@@ -60,15 +60,15 @@ import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Threads(4)
-@Warmup(iterations = 1)
-@Measurement(iterations = 3)
+@Warmup(iterations = 3)
+@Measurement(iterations = 5)
 @Fork(value = 1, jvmArgs = {"-Xmx4g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
     "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=2",
      "-XX:ParallelGCThreads=3", "-XX:+UseG1GC", "-Djetty.insecurerandom=1", "-Djava.security.egd=file:/dev/./urandom", "-XX:-UseBiasedLocking",
     "-XX:+UseG1GC", "-XX:+PerfDisableSharedMem", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=250", "-Dsolr.enableMetrics=false", "-Dsolr.perThreadPoolSize=6", "-Dsolr.maxHttp2ClientThreads=64", "-Dsolr.jettyRunnerThreadPoolMaxSize=200",
     "-Dsolr.enablePublicKeyHandler=false", "-Dzookeeper.nio.numSelectorThreads=6", "-Dzookeeper.nio.numWorkerThreads=6", "-Dzookeeper.commitProcessor.numWorkerThreads=4",
     "-Dsolr.rootSharedThreadPoolCoreSize=120", "-Dlucene.cms.override_spins=false", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100",
-    "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true",
+    "-Dlog4j.configurationFile=logconf/log4j2-std-debug.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true",
     //"-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=jfr_results/,dumponexit=true,settings=profile,path-to-gc-roots=true"})
     })
 @Timeout(time = 300)
@@ -87,10 +87,15 @@ public class PointsVsTrieQuery {
     int numShards = 9;
     int numReplicas = 3;
 
+    int docsPerBatch = 1000;
+    int numBatches = 10;
+
     List<String> nodes;
     static Random random = new Random(313);
     MiniSolrCloudCluster cluster;
     Http2SolrClient client;
+
+    int rows = 100;
 
     private static class RequestAsyncListener implements AsyncListener<NamedList<Object>> {
       @Override public void onSuccess(NamedList<Object> objectNamedList, int code) {
@@ -109,6 +114,8 @@ public class PointsVsTrieQuery {
       System.out.println("Current relative path is: " + s);
 
       System.setProperty("solr.tests.dv.as.stored", "false");
+      System.setProperty("solr.tests.numeric.stored", "true");
+
       if (fieldType.equals("point")) {
         System.setProperty("solr.tests.IntegerFieldType", "org.apache.solr.schema.IntPointField");
         System.setProperty("solr.tests.FloatFieldType", "org.apache.solr.schema.FloatPointField");
@@ -122,9 +129,9 @@ public class PointsVsTrieQuery {
         System.setProperty("solr.tests.LongFieldType", "org.apache.solr.schema.TrieLongField");
         System.setProperty("solr.tests.DoubleFieldType", "org.apache.solr.schema.TrieDoubleField");
         System.setProperty("solr.tests.DateFieldType", "org.apache.solr.schema.TrieDateField");
-        System.setProperty("solr.tests.numeric.dv", "false");
+        System.setProperty("solr.tests.numeric.dv", "true");
       } else {
-        throw new IllegalStateException();
+        throw new IllegalStateException("FieldType not recognized for this benchmark fieldType=" + fieldType);
       }
 
       cluster = new SolrCloudTestCase.Builder(nodeCount, SolrTestUtil.createTempDir()).
@@ -145,8 +152,8 @@ public class PointsVsTrieQuery {
       cluster.waitForActiveCollection(collectionName, 15, TimeUnit.SECONDS, false, numShards, numShards * numReplicas, true, false);
 
       Set<SolrInputDocument> docs = new HashSet<>();
-      final int perBatch = 500;
-      for (int batch = 0; batch < 100; batch++) {
+      final int perBatch = docsPerBatch;
+      for (int batch = 0; batch < numBatches; batch++) {
 
         for (int i = 0; i < perBatch; i++) {
           SolrInputDocument doc = new SolrInputDocument();
@@ -173,20 +180,19 @@ public class PointsVsTrieQuery {
         client.waitForOutstandingRequests(2, TimeUnit.MINUTES);
       }
 
-      client.setBaseUrl(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
       UpdateRequest commitRequest = new UpdateRequest();
       commitRequest.setBasePath(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
       commitRequest.setAction(UpdateRequest.ACTION.COMMIT, false, true);
       commitRequest.process(client, collectionName);
 
-      CollectionAdminRequest.Reload reload = CollectionAdminRequest.reloadCollection(collectionName);
-      reload.process(client);
+      client.setBaseUrl(nodes.get(random.nextInt(nodeCount)) + "/" + collectionName);
       System.out.println("doc count=" + client.query(new SolrQuery("*:*")).getResults().getNumFound());
 
     }
 
     @TearDown(Level.Trial)
     public void doTearDown() throws Exception {
+      System.out.println("Teardown cluster");
       cluster.shutdown();
     }
 
@@ -195,25 +201,25 @@ public class PointsVsTrieQuery {
   @Benchmark
   @Timeout(time = 300)
   public static void matchAllSortAsc(BenchState state) throws Exception {
-     state.client.query(new SolrQuery("q", "*:*", "fl", "id," + state.n_field + "," + state.n_field + "_dv", "sort", state.n_field + " asc, id asc"));
+     state.client.query(new SolrQuery("q", "*:*", "fl", "id," + state.n_field + "," + state.n_field + "_dv",  "rows", String.valueOf(state.rows), "sort", state.n_field + " asc, id asc"));
   }
 
   @Benchmark
   @Timeout(time = 300)
   public static void matchAllSortDesc(BenchState state) throws Exception {
-    state.client.query(new SolrQuery("q", "*:*", "fl", "id" + state.n_field + "," + state.n_field + "_dv", "sort", state.n_field + " asc, id desc"));
+    state.client.query(new SolrQuery("q", "*:*", "fl", "id" + state.n_field + "," + state.n_field + "_dv", "rows", String.valueOf(state.rows), "sort", state.n_field + " asc, id desc"));
   }
 
   @Benchmark
   @Timeout(time = 300)
   public static void sortByProductFunc(BenchState state) throws Exception {
-    state.client.query(new SolrQuery("q", "*:*", "fl", "id" + state.n_field + "," + state.n_field + "_dv", "sort", "product(-9," + state.n_field + ") asc, id desc"));
+    state.client.query(new SolrQuery("q", "*:*", "fl", "id" + state.n_field + "," + state.n_field + "_dv", "rows", String.valueOf(state.rows), "sort", "product(-9," + state.n_field + ") asc, id desc"));
   }
 
   @Benchmark
   @Timeout(time = 300)
   public static void facetRange(BenchState state) throws Exception {
-    state.client.query(new SolrQuery( "q", "*:*", "facet", "true", "facet.range", state.n_field, "facet.range.start", String.valueOf(100),
+    state.client.query(new SolrQuery( "q", "*:*", "facet", "true", "rows", String.valueOf(state.rows), "facet.range", state.n_field, "facet.range.start", String.valueOf(100),
         "facet.range.end", String.valueOf(600), "facet.range.gap", String.valueOf(10)));
   }
 

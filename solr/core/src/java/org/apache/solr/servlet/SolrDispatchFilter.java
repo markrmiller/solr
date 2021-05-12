@@ -556,7 +556,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         if (log.isDebugEnabled()) log.debug("Call type is {}", result);
         switch (result) {
           case PASSTHROUGH:
-            if (ASYNC) {
+            if (servletRequest.isAsyncStarted()) {
               asyncContext.getRequest().setAttribute("PASSTHROUGH", true);
               asyncContext.dispatch();
               return;
@@ -586,7 +586,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         consumeInputFully(servletRequest, servletResponse);
       }
 
-      if (!servletResponse.isCommitted() && !ASYNC) {
+      if (!servletResponse.isCommitted() && !servletRequest.isAsyncStarted()) {
         sendException(e, call, servletRequest, servletResponse);
       } else {
         exp = e;
@@ -605,7 +605,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //        }
       } finally {
         if (result != Action.REMOTEQUERY && result != Action.PASSTHROUGH) {
-          if (ASYNC && (!ASYNC_IO || exp != null)) {
+          if (servletRequest.isAsyncStarted() && (!ASYNC_IO || exp != null)) {
             try {
               log.info("ACTION={} url={}", result, requestPath);
               if (exp != null) {

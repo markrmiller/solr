@@ -33,7 +33,7 @@ public abstract class ServletUtils {
    * @return String with path starting with a "/", or empty string if no path
    */
   public static String getPathAfterContext(HttpServletRequest request) {
-    if (!SolrDispatchFilter.ASYNC) {
+    if (!request.isAsyncStarted()) {
       return request.getServletPath() + (request.getPathInfo() != null ? request.getPathInfo() : "");
     }
     Object pathInfo = request.getAttribute(AsyncContext.ASYNC_PATH_INFO);

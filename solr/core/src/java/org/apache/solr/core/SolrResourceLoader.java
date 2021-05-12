@@ -117,7 +117,7 @@ public class SolrResourceLoader implements ResourceLoader, Closeable {
    // conf.setSourceParserClass("com.fasterxml.aalto.sax.SAXParserFactoryImpl");
     conf.setSourceParserClass("org.apache.xerces.jaxp.SAXParserFactoryImpl");
     //conf.setXIncludeAware(true);
-    conf.setExpandAttributeDefaults(false);
+    //conf.setExpandAttributeDefaults(false);
     conf.setValidation(false);
 
     xpathFactory = new XPathFactoryImpl(conf);
