@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -40,6 +41,7 @@ import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.cloud.ZkShardTerms;
 import org.apache.solr.cloud.overseer.OverseerAction;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SkyHook;
 import org.apache.solr.common.SolrException;
@@ -211,16 +213,16 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       }
     }
 
-//    if (localCommitFuture != null) {
-//      try {
-//        localCommitFuture.get();
-//      } catch (InterruptedException e) {
-//        ParWork.propagateInterrupt(e);
-//        throw new AlreadyClosedException(e);
-//      } catch (ExecutionException e) {
-//        throw new SolrException(ErrorCode.SERVER_ERROR, e);
-//      }
-//    }
+    if (localCommitFuture != null) {
+      try {
+        localCommitFuture.get();
+      } catch (InterruptedException e) {
+        ParWork.propagateInterrupt(e);
+        throw new AlreadyClosedException(e);
+      } catch (ExecutionException e) {
+        throw new SolrException(ErrorCode.SERVER_ERROR, e);
+      }
+    }
 
     if (log.isDebugEnabled()) log.debug("processCommit(CommitUpdateCommand) - end");
   }
@@ -228,7 +230,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
   private Future<?> sendCommitToReplicasAndLocalCommit(CommitUpdateCommand cmd, String leaderName, ModifiableSolrParams params) throws IOException {
 
     List<SolrCmdDistributor.Node> useNodes = getReplicaNodesForForCommit(cloudDesc.getShardId(), leaderName);
-
+    Future future = null;
     if (useNodes != null && useNodes.size() > 0) {
       if (log.isDebugEnabled()) log.debug("processCommit - Found the following replicas to send commit to {}", useNodes);
 
@@ -236,7 +238,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       params.set(COMMIT_END_POINT, "terminal");
       params.set(DISTRIB_FROM, Replica.getCoreUrl(zkController.getBaseUrl(), req.getCore().getName()));
       if (log.isDebugEnabled()) log.debug("processCommit - send commit to replicas nodes={} params={}", useNodes, params);
-      cmdDistrib.distribCommit(cmd, useNodes, new ModifiableSolrParams(params));
+      future = CompletableFuture.runAsync(() -> {
+        cmdDistrib.distribCommit(cmd, useNodes, new ModifiableSolrParams(params));
+      }, ParWork.getRootSharedIOExecutor());
+
     }
 
     if (log.isDebugEnabled()) {
@@ -245,7 +250,10 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
     doLocalCommit(cmd);
 
-    return CompletableFuture.completedFuture(null);
+    if (future == null) {
+      return CompletableFuture.completedFuture(null);
+    }
+    return future;
   }
 
   @Override
