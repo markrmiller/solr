@@ -68,7 +68,7 @@ public class UpdateShardHandler implements SolrInfoBean {
   //private final InstrumentedHttpListenerFactory updateHttpListenerFactory;
 
 
-  private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
+  //private final Set<String> metricNames = ConcurrentHashMap.newKeySet();
   private SolrMetricsContext solrMetricsContext;
 
   private int socketTimeout = HttpClientUtil.DEFAULT_SO_TIMEOUT;
@@ -108,7 +108,7 @@ public class UpdateShardHandler implements SolrInfoBean {
     queryParams.add(DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM);
     updateOnlyClient.setQueryParams(queryParams);
 
-    solrCmdDistributorClient = updateOnlyClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(SysStats.PROC_COUNT).build();
+    solrCmdDistributorClient = updateOnlyClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(SysStats.PROC_COUNT * 2).build();
     solrCmdDistributorClient.enableCloseLock();
     // updateOnlyClient.addListenerFactory(updateHttpListenerFactory);
     queryParams = new HashSet<>(2);
@@ -131,7 +131,7 @@ public class UpdateShardHandler implements SolrInfoBean {
     leaderCheckClient.enableCloseLock();
 
     Http2SolrClient.Builder searchOnlyClientBuilder = new Http2SolrClient.Builder();
-    searchOnlyClientBuilder.connectionTimeout(5000).idleTimeout(60000);
+    searchOnlyClientBuilder.connectionTimeout(5000).maxOutstandingAsyncRequests(-1).idleTimeout(60000);
 
 
     searchOnlyClient = recoveryOnlyClientBuilder.name("search").markInternalRequest().build();
