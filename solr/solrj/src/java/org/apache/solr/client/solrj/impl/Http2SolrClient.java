@@ -250,7 +250,7 @@ public class Http2SolrClient extends SolrClient {
     //httpClientExecutor.setLowThreadsThreshold(-1);
     // section SolrQTP
     SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads);
-    httpClientExecutor.setStopTimeout(10);
+    httpClientExecutor.setStopTimeout(0);
 
         // SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads, new MPMCQueue.RunnableBlockingQueue());
 //    try {
@@ -1199,7 +1199,7 @@ public class Http2SolrClient extends SolrClient {
       }
 
       if (is == null) {
-        throw new RemoteSolrException(remoteHost, response != null ? response.getStatus() : null, result != null ? result.toString() : "(null)", result != null ? result.getFailure() : null);
+        throw new RemoteSolrException(remoteHost, response != null ? response.getStatus() : httpStatus, result != null ? result.toString() : "(null)", result != null ? result.getFailure() : null);
       }
 
       try {
