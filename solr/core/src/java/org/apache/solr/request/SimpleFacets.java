@@ -70,6 +70,7 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.StrUtils;
+import org.apache.solr.common.util.SysStats;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.handler.component.SpatialHeatmapFacets;
 import org.apache.solr.request.IntervalFacets.FacetInterval;
@@ -179,7 +180,7 @@ public class SimpleFacets {
     String facetValue = param;
     String key = param;
     List<String> tags = Collections.emptyList();
-    int threads = 4;
+    int threads = Math.max(3, SysStats.PROC_COUNT / 2);
 
     if (localParams == null) {
       SolrParams params = global;

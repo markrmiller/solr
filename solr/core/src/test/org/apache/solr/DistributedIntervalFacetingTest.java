@@ -17,6 +17,7 @@
 package org.apache.solr;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.lucene.util.LuceneTestCase;
@@ -193,7 +194,7 @@ public class DistributedIntervalFacetingTest extends
 
   }
 
-  private String getFieldWithKey(String field) {
+  private static String getFieldWithKey(String field) {
     return "{!key='_some_key_for_" + field + "_" + random().nextInt() + "'}" + field;
   }
 
@@ -205,12 +206,12 @@ public class DistributedIntervalFacetingTest extends
    * two fields used for Strings), the comparison will be done
    * alphabetically
    */
-  private Integer[] getRandomRange(int max, String fieldName) {
+  private static Integer[] getRandomRange(int max, String fieldName) {
     Integer[] values = new Integer[2];
     values[0] = random().nextInt(max);
     values[1] = random().nextInt(max);
     if ("test_s_dv".equals(fieldName) || "test_ss_dv".equals(fieldName)) {
-      Arrays.sort(values, (o1, o2) -> String.valueOf(o1).compareTo(String.valueOf(o2)));
+      Arrays.sort(values, Comparator.comparing(String::valueOf));
     } else {
       Arrays.sort(values);
     }

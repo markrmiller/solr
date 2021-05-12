@@ -321,7 +321,7 @@ public class TestIntervalFaceting extends SolrTestCaseJ4 {
     }
     assertU(commit());
 
-    final int atLeast1 = SolrTestUtil.atLeast(TEST_NIGHTLY ? 3000 : 100);
+    final int atLeast1 = SolrTestUtil.atLeast(TEST_NIGHTLY ? 1713 : 100);
     for (int i = 0; i < atLeast1; i++) {
       doTestQuery(cardinality, fields);
     }

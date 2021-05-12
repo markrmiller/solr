@@ -55,6 +55,7 @@ import org.eclipse.jetty.client.ConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpClientTransport;
 import org.eclipse.jetty.client.HttpDestination;
+import org.eclipse.jetty.client.MultiplexConnectionPool;
 import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.ProtocolHandlers;
 import org.eclipse.jetty.client.RoundRobinConnectionPool;
@@ -82,6 +83,7 @@ import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
 import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
 import org.eclipse.jetty.util.Fields;
+import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -533,6 +535,7 @@ public class Http2SolrClient extends SolrClient {
                 //   ((HttpDestination)dest1).close();
 
                 ((SolrInternalHttpClient) httpClient).removeDestination((HttpDestination) dest1);
+                httpClient.removeBean(dest1);
                 try {
                   ((HttpDestination) dest1).stop();
                 } catch (Exception e) {
@@ -1390,7 +1393,7 @@ public class Http2SolrClient extends SolrClient {
     private SSLConfig sslConfig = defaultSSLConfig;
     private Integer idleTimeout = DEFAULT_IDLE_TIME;
     private Integer connectionTimeout;
-    private Integer maxConnectionsPerHost = 8;
+    private Integer maxConnectionsPerHost = 3;
     private boolean useHttp1_1 = Boolean.getBoolean("solr.http1");
     protected String baseSolrUrl;
     protected Map<String,String> headers = new HashMap<>();
@@ -1776,16 +1779,16 @@ public class Http2SolrClient extends SolrClient {
 
     @Override
     public ConnectionPool newConnectionPool(HttpDestination destination) {
-     //Pool pool = new Pool(Pool.StrategyType.THREAD_ID, maxConnectionsPerDest, true);
+     Pool pool = new Pool(Pool.StrategyType.THREAD_ID, maxConnectionsPerDest, true);
      // pool.setMaxMultiplex(512);
-      RoundRobinConnectionPool thePool = new RoundRobinConnectionPool(destination, maxConnectionsPerDest, destination, maxQueuedRequestsPerDest);
+     // RoundRobinConnectionPool thePool = new RoundRobinConnectionPool(destination, maxConnectionsPerDest, destination, maxQueuedRequestsPerDest);
       // MRM TODO: should be configurable
-     // MultiplexConnectionPool mulitplexPool = new MultiplexConnectionPool(destination, pool, destination, maxQueuedRequestsPerDest);
+      MultiplexConnectionPool thePool = new MultiplexConnectionPool(destination, pool, destination, maxQueuedRequestsPerDest);
       //mulitplexPool.setMaxMultiplex(512);
-     // mulitplexPool.setMaximizeConnections(false);
+      thePool.setMaximizeConnections(false);
 
     //  mulitplexPool.preCreateConnections(12);
-      thePool.preCreateConnections(3);
+      thePool.preCreateConnections(1);
       return thePool;
     }
   }
