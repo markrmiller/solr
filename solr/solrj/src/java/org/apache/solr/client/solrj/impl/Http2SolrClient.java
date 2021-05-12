@@ -550,9 +550,8 @@ public class Http2SolrClient extends SolrClient {
             //          body.add("msg", "Success but no response");
             //          return body;
             //        }
-            asyncListener.onFailure(f, 503);
-            return;
-           // throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", f);
+            asyncListener.onFailure(f, 0);
+            throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", f);
           } finally {
             try {
 //              InputStream is = getContentAsInputStream();

@@ -382,7 +382,7 @@ public class JettySolrRunner implements Closeable {
     server.manage(connector);
 
     server.setStopAtShutdown(true);
-    server.setStopTimeout(10); // will wait gracefully for stoptime / 2, then interrupts
+    server.setStopTimeout(0); // will wait gracefully for stoptime / 2, then interrupts
 
 
 
