@@ -423,7 +423,7 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
   public void testIndexingBatchPerRequestWithHttpSolrClient() throws Exception {
     final CloudHttp2SolrClient cloudClient = cluster.getSolrClient();
     final String collectionName = createAndSetNewDefaultCollection();
-
+    cluster.waitForActiveCollection(collectionName, 2, 4);
     final int numDocsPerBatch = SolrTestUtil.atLeast(5);
     final int numBatchesPerThread = SolrTestUtil.atLeast(5);
       
@@ -470,7 +470,7 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
       // all we care about is propogating any possibile execution exception...
       final Object ignored = result.get();
     }
-    cluster.waitForActiveCollection(collectionName, 2, 4);
+
     cloudClient.commit();
     assertEquals(totalDocsExpected, cloudClient.query(params("q","*:*")).getResults().getNumFound());
     checkShardConsistency(params("q","*:*", "rows", String.valueOf(totalDocsExpected), "_trace","batches_done"));

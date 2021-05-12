@@ -2188,38 +2188,28 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
       cache.initializeMetrics(solrMetricsContext, SolrMetricManager.mkName(cache.name(), STATISTICS_KEY));
     }
 
-    solrMetricsContext.gauge(() -> name, true, "searcherName", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> cachingEnabled, true, "caching", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> openTime, true, "openedAt", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> warmupTime, true, "warmupTime", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> registerTime, true, "registeredAt", Category.SEARCHER.toString(), scope);
+    String fname = name;
+    boolean fcachingEnabled = cachingEnabled;
+    Date fopenTime = openTime;
+    long fwarmupTime = warmupTime;
+    Date fregisterTime = registerTime;
+
+    solrMetricsContext.gauge(() -> fname, true, "searcherName", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(() -> fcachingEnabled, true, "caching", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(() -> fopenTime, true, "openedAt", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(() -> fwarmupTime, true, "warmupTime", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(() -> fregisterTime, true, "registeredAt", Category.SEARCHER.toString(), scope);
     // reader stats
     solrMetricsContext.gauge(new MySolrIndexSearcherNumDocsGauge(), true, "numDocs", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> reader.maxDoc(), true, "maxDoc", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> reader.maxDoc() - reader.numDocs(), true, "deletedDocs", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> reader.toString(), true, "reader", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> reader.directory().toString(), true, "readerDir", Category.SEARCHER.toString(), scope);
-    solrMetricsContext.gauge(() -> reader.getVersion(), true, "indexVersion", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherMaxDocsGauge(), true, "maxDoc", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherDeletedDocsGauge(), true, "deletedDocs", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherReaderGauge(), true, "reader", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherReaderDirGauge(), true, "readerDir", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherIndexVersionGauge(), true, "indexVersion", Category.SEARCHER.toString(), scope);
     // size of the currently opened commit
-    solrMetricsContext.gauge(() -> {
-      try {
-        Collection<String> files = reader.getIndexCommit().getFileNames();
-        long total = 0;
-//        for (String file : files) {
-//          total += DirectoryFactory.sizeOf(reader.directory(), file);
-//        }
-        return total;
-      } catch (Exception e) {
-        ParWork.propagateInterrupt(e);
-        return -1;
-      }
-    }, true, "indexCommitSize", Category.SEARCHER.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherCommitSizeGauge(), true, "indexCommitSize", Category.SEARCHER.toString(), scope);
     // statsCache metrics
-    solrMetricsContext.gauge(
-        new MetricsMap((detailed, map) -> {
-          map.putAll(statsCache.getCacheMetrics().getSnapshot());
-          map.put("statsCacheImpl", statsCache.getClass().getSimpleName());
-        }, true), true, "statsCache", Category.CACHE.toString(), scope);
+    solrMetricsContext.gauge(new MySolrIndexSearcherStatsCacheGauge(), true, "statsCache", Category.CACHE.toString(), scope);
     // we have to cache due to the size stuff, maybe improve granularity
   }
 
@@ -2481,7 +2471,89 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
     @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
       return solrIndexSearcher.reader.numDocs();
     }
+  }
 
+  private class MySolrIndexSearcherMaxDocsGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherMaxDocsGauge() {
+      super(SolrIndexSearcher.this, 1, TimeUnit.SECONDS);
+    }
 
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      return solrIndexSearcher.reader.maxDoc();
+    }
+  }
+
+  private class MySolrIndexSearcherDeletedDocsGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherDeletedDocsGauge() {
+      super(SolrIndexSearcher.this, 1, TimeUnit.SECONDS);
+    }
+
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      return solrIndexSearcher.reader.maxDoc() - solrIndexSearcher.reader.numDocs();
+    }
+  }
+
+  private class MySolrIndexSearcherIndexVersionGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherIndexVersionGauge() {
+      super(SolrIndexSearcher.this, 1, TimeUnit.SECONDS);
+    }
+
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      return solrIndexSearcher.reader.maxDoc() - solrIndexSearcher.reader.numDocs();
+    }
+  }
+
+  private class MySolrIndexSearcherReaderGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherReaderGauge() {
+      super(SolrIndexSearcher.this, 1, TimeUnit.SECONDS);
+    }
+
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      return solrIndexSearcher.reader.maxDoc() - solrIndexSearcher.reader.numDocs();
+    }
+  }
+
+  private class MySolrIndexSearcherReaderDirGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherReaderDirGauge() {
+      super(SolrIndexSearcher.this, 1, TimeUnit.SECONDS);
+    }
+
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      return solrIndexSearcher.reader.maxDoc() - solrIndexSearcher.reader.numDocs();
+    }
+  }
+
+  private class MySolrIndexSearcherCommitSizeGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherCommitSizeGauge() {
+      super(SolrIndexSearcher.this, 5, TimeUnit.SECONDS);
+    }
+
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      try {
+        Collection<String> files = solrIndexSearcher.reader.getIndexCommit().getFileNames();
+        long total = 0;
+        // MRM TODO
+        //        for (String file : files) {
+        //          total += DirectoryFactory.sizeOf(reader.directory(), file);
+        //        }
+        return total;
+      } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
+        return -1;
+      }
+    }
+  }
+
+  private class MySolrIndexSearcherStatsCacheGauge extends SolrIndexSearcherGauge.SolrIndexSearcherCachedGauge {
+    public MySolrIndexSearcherStatsCacheGauge() {
+      super(SolrIndexSearcher.this, 3, TimeUnit.SECONDS);
+    }
+
+    @Override protected Object getValue(SolrIndexSearcher solrIndexSearcher) {
+      return new MetricsMap((detailed, map) -> {
+        map.putAll(solrIndexSearcher.statsCache.getCacheMetrics().getSnapshot());
+        map.put("statsCacheImpl", statsCache.getClass().getSimpleName());
+      });
+    }
   }
 }

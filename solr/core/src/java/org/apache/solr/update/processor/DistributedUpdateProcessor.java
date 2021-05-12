@@ -1076,7 +1076,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
       try {
         doLocalDelete(cmd);
       } catch (Exception e) {
-        future.cancel(false);
+        if (future != null) future.cancel(false);
         if (clonedCmd != null) {
           cancelCmds.add(clonedCmd);
         }

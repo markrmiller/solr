@@ -406,7 +406,6 @@ public class IndexFetcher {
           return IndexFetchResult.EXPECTING_NON_LEADER;
         }
 
-        CloudDescriptor cd = solrCore.getCoreDescriptor().getCloudDescriptor();
         if (solrCore.getCoreDescriptor().getName().equals(replica.getName())) {
           return IndexFetchResult.EXPECTING_NON_LEADER;
         }
@@ -522,7 +521,7 @@ public class IndexFetcher {
       // Create the sync service
       fsyncService = Executors.newSingleThreadScheduledExecutor(new SolrNamedThreadFactory("fsyncService"));
       // use a synchronized list because the list is read by other threads (to show details)
-      filesDownloaded = Collections.synchronizedList(new ArrayList<Map<String, Object>>());
+      filesDownloaded = Collections.synchronizedList(new ArrayList<>());
       // if the generation of master is older than that of the slave , it means they are not compatible to be copied
       // then a new index directory to be created and all the files need to be copied
       boolean isFullCopyNeeded = IndexDeletionPolicyWrapper
@@ -614,6 +613,7 @@ public class IndexFetcher {
           if (!modifiedConfFiles.isEmpty() && !downloadFailed) {
             reloadCore = true;
             downloadConfFiles(confFilesToDownload, latestGeneration);
+            terminateAndWaitFsyncService();
             if (isFullCopyNeeded) {
               successfulInstall = solrCore.modifyIndexProps(tmpIdxDirName);
               if (successfulInstall) deleteTmpIdxDir = false;
@@ -676,8 +676,6 @@ public class IndexFetcher {
             solrCore.getUpdateHandler().newIndexWriter(true);
           }
 
-          openNewSearcherAndUpdateCommitPoint();
-
           // let the system know we are changing dir's and the old one
           // may be closed
           if (indexDir != null) {
@@ -701,6 +699,8 @@ public class IndexFetcher {
             });
 
           }
+
+          openNewSearcherAndUpdateCommitPoint();
         }
 
         if (!isFullCopyNeeded && !forceReplication && !successfulInstall && !abort) {
@@ -1273,6 +1273,19 @@ public class IndexFetcher {
     }
   }
 
+  /** Returns true if the file exists (can be opened), false
+   *  if it cannot be opened, and (unlike Java's
+   *  File.exists) throws IOException if there's some
+   *  unexpected error. */
+//  private static boolean slowFileExists(Directory dir, String fileName) throws IOException {
+//    try {
+//      dir.openInput(fileName, IOContext.DEFAULT).close();
+//      return true;
+//    } catch (NoSuchFileException | FileNotFoundException e) {
+//      return false;
+//    }
+//  }
+
   /**
    * All the files which are common between master and slave must have same size and same checksum else we assume
    * they are not compatible (stale).
@@ -1285,20 +1298,21 @@ public class IndexFetcher {
       String filename = (String) file.get(NAME);
       Long length = (Long) file.get(SIZE);
       Long checksum = (Long) file.get(CHECKSUM);
-
-      if (checksum != null) {
-        if (!(compareFile(dir, filename, length, checksum, masterUrl, "isIndexStale").equal)) {
-          // file exists and size or checksum is different, therefore we must download it again
-          log.debug("Index is stale using checksums");
-          return true;
+   //   if (slowFileExists(dir, filename)) {
+        if (checksum != null) {
+          if (!(compareFile(dir, filename, length, checksum, masterUrl, "isIndexStale").equal)) {
+            // file exists and size or checksum is different, therefore we must download it again
+            log.debug("Index is stale using checksums");
+            return true;
+          }
+        } else {
+          if (length != dir.fileLength(filename)) {
+            log.debug("File {} did not match on stale index check. expected length is {} and actual length is {}", filename, length, dir.fileLength(filename));
+            log.debug("Index is stale using file lengths");
+            return true;
+          }
         }
-      } else {
-        if (length != dir.fileLength(filename)) {
-          log.debug("File {} did not match on stale index check. expected length is {} and actual length is {}", filename, length, dir.fileLength(filename));
-          log.debug("Index is stale using file lengths");
-          return true;
-        }
-      }
+    //  }
     }
 
     log.debug("Index is not stale");
@@ -1325,6 +1339,13 @@ public class IndexFetcher {
       if (log.isDebugEnabled()) {
         log.debug("Moving file: {} size={}", fname, tmpIdxDir.fileLength(fname));
       }
+   //   if (slowFileExists(indexDir, fname)) {
+        log.warn("Cannot complete replication attempt because file already exists: {}", fname);
+
+        // we fail - we downloaded the files we need, if we can't move one in, we can't
+        // count on the correct index
+  //      return false;
+    //  }
     } catch (IOException e) {
       SolrException.log(log, "could not check if a file exists", e);
       return false;
@@ -1626,26 +1647,14 @@ public class IndexFetcher {
     
     private void fetch() throws Exception {
       DataInputStream is = null;
+
+      is = getStream();
+      int result;
       try {
+        //fetch packets one by one in a single request
+        result = fetchPackets(is);
 
-        is =  getStream();
-        int result;
-        try {
-          //fetch packets one by one in a single request
-          result = fetchPackets(is);
-
-          //if there is an error continue. But continue from the point where it got broken
-        } finally {
-          if (is != null) {
-            while (true) {
-              try {
-                if (!(is.read() != -1)) break;
-              } catch (IOException e) {
-
-              }
-            }
-          }
-        }
+        //if there is an error continue. But continue from the point where it got broken
 
       } catch (Exception e) {
         log.error("Problem fetching file", e);
@@ -1659,7 +1668,7 @@ public class IndexFetcher {
 
             }
           }
-         // org.apache.solr.common.util.IOUtils.closeQuietly(is);
+          org.apache.solr.common.util.IOUtils.closeQuietly(is);
         }
         cleanup(null);
         //if cleanup succeeds . The file is downloaded fully
@@ -1758,6 +1767,12 @@ public class IndexFetcher {
         }
         if (bytesDownloaded != size) {
           log.warn("bytesDownloaded != size bytesDownloaded={} size={}", bytesDownloaded, size);
+
+          Cancellable cancel = fileFetchRequests.get(fileName);
+          if (cancel != null) {
+            cancel.cancel();
+          }
+
           //if the download is not complete then
           //delete the file being downloaded
           try {
@@ -1765,11 +1780,6 @@ public class IndexFetcher {
           } catch (Exception e) {
             log.error("Error deleting file: {}", this.saveAs, e);
           }
-          Cancellable cancel = fileFetchRequests.get(fileName);
-          if (cancel != null) {
-
-          }
-
 
 
           //if the failure is due to a user abort it is returned normally else an exception is thrown
@@ -1850,16 +1860,15 @@ public class IndexFetcher {
           return new SolrInputStream(is);
         } catch (Exception e) {
           //close stream on error
-          //IOUtils.closeQuietly(is);
           if (is != null) {
-            while (true) {
-              try {
-                if (!(is.read() != -1)) break;
-              } catch (IOException e2) {
-
-              }
-            }
-            // org.apache.solr.common.util.IOUtils.closeQuietly(is);
+//            while (true) {
+//              try {
+//                if (!(is.read() != -1)) break;
+//              } catch (IOException e2) {
+//
+//              }
+//            }
+            org.apache.solr.common.util.IOUtils.closeQuietly(is);
           }
           throw new IOException("Could not download file '" + fileName + "'", e);
         }
@@ -1963,6 +1972,7 @@ public class IndexFetcher {
 
   public void destroy() {
     abortFetch();
+    solrClient.close();
   }
 
   String getMasterUrl() {

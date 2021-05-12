@@ -1745,15 +1745,15 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         return;
       }
 
-//          if (log.isInfoEnabled()) {
-//            RuntimeException e = new RuntimeException();
-//            StackTraceElement[] stack = e.getStackTrace();
-//            for (int i = 0; i < Math.min(8, stack.length - 1); i++) {
-//              log.info(stack[i].toString());
-//            }
-//
-//            log.info("close refcount after {} {} {}", this, name, count);
-//          }
+          if (log.isTraceEnabled()) {
+            RuntimeException e = new RuntimeException();
+            StackTraceElement[] stack = e.getStackTrace();
+            for (int i = 0; i < Math.min(8, stack.length - 1); i++) {
+              log.trace(stack[i].toString());
+            }
+
+            log.trace("close refcount after {} {} {}", this, name, count);
+          }
 
       if (count == 0) {
         try {

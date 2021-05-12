@@ -205,7 +205,7 @@ public class TestFieldCacheWithThreads extends SolrTestCase {
 
     final long END_TIME = System.nanoTime() + TimeUnit.NANOSECONDS.convert((TEST_NIGHTLY ? 30 : 1), TimeUnit.SECONDS);
 
-    final int NUM_THREADS = TEST_NIGHTLY ? TestUtil.nextInt(random(), 1, 10) : 2;
+    final int NUM_THREADS = TEST_NIGHTLY ? TestUtil.nextInt(random(), 1, 7) : 2;
     List<Future>  futures = new ArrayList<>(NUM_THREADS);
 
     for(int thread=0;thread<NUM_THREADS;thread++) {

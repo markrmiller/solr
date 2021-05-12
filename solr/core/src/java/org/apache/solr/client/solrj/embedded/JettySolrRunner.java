@@ -255,7 +255,7 @@ public class JettySolrRunner implements Closeable {
 
     //qtp = new SolrQueuedThreadPool("JettySolrRunner qtp");
     //qtp = new QueuedThreadPool(Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 200), 24);
-    QueuedThreadPool qtp = new SolrQTP("jetty", Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 36), 12);
+    QueuedThreadPool qtp = new SolrQTP("jetty", Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 128), 12);
 
     //qtp = new SolrQTP("jetty", Integer.getInteger("solr.jettyRunnerThreadPoolMaxSize", 60), 8, new MPMCQueue.RunnableBlockingQueue());
     //ParWork.getQueue())

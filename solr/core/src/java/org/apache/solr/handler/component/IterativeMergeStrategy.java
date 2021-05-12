@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -112,7 +113,7 @@ public abstract class IterativeMergeStrategy implements MergeStrategy  {
     }
   }
 
-  public List<Future<CallBack>> callBack(List<ShardResponse> responses, QueryRequest req) {
+  public List<Future<CallBack>> callBack(Set<ShardResponse> responses, QueryRequest req) {
     @SuppressWarnings({"unchecked", "rawtypes"})
     List<Future<CallBack>> futures = new ArrayList();
     for(ShardResponse response : responses) {

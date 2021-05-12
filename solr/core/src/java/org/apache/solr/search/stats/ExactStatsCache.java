@@ -92,8 +92,8 @@ public class ExactStatsCache extends StatsCache {
   }
 
   @Override
-  protected void doMergeToGlobalStats(SolrQueryRequest req, List<ShardResponse> responses) {
-    Set<Term> allTerms = new HashSet<>();
+  protected void doMergeToGlobalStats(SolrQueryRequest req, Set<ShardResponse> responses) {
+    Set<Term> allTerms = new HashSet<>(32);
     for (ShardResponse r : responses) {
       if (log.isDebugEnabled()) {
         log.debug("Merging to global stats, shard={}, response={}", r.getShard(), r.getSolrResponse().getResponse());

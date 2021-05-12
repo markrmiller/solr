@@ -18,7 +18,6 @@ package org.apache.solr.client.solrj.impl;
 
 import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
 import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.ResponseParser;
@@ -56,13 +55,10 @@ import org.eclipse.jetty.client.ConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpClientTransport;
 import org.eclipse.jetty.client.HttpDestination;
-import org.eclipse.jetty.client.HttpRequest;
-import org.eclipse.jetty.client.MultiplexConnectionPool;
 import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.ProtocolHandlers;
 import org.eclipse.jetty.client.RoundRobinConnectionPool;
 import org.eclipse.jetty.client.api.ContentResponse;
-import org.eclipse.jetty.client.api.Destination;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
@@ -70,34 +66,22 @@ import org.eclipse.jetty.client.dynamic.HttpClientTransportDynamic;
 import org.eclipse.jetty.client.http.HttpClientConnectionFactory;
 import org.eclipse.jetty.client.http.HttpClientTransportOverHTTP;
 import org.eclipse.jetty.client.util.BufferingResponseListener;
-import org.eclipse.jetty.client.util.ByteBufferContentProvider;
 import org.eclipse.jetty.client.util.ByteBufferRequestContent;
-import org.eclipse.jetty.client.util.BytesContentProvider;
 import org.eclipse.jetty.client.util.BytesRequestContent;
-import org.eclipse.jetty.client.util.FormContentProvider;
-import org.eclipse.jetty.client.util.FormRequestContent;
-import org.eclipse.jetty.client.util.FutureResponseListener;
-import org.eclipse.jetty.client.util.InputStreamContentProvider;
 import org.eclipse.jetty.client.util.InputStreamRequestContent;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
-import org.eclipse.jetty.client.util.MultiPartContentProvider;
 import org.eclipse.jetty.client.util.MultiPartRequestContent;
 import org.eclipse.jetty.client.util.OutputStreamContentProvider;
-import org.eclipse.jetty.client.util.StringContentProvider;
 import org.eclipse.jetty.client.util.StringRequestContent;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.http2.ErrorCode;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
-import org.eclipse.jetty.http2.client.http.HttpClientTransportOverHTTP2;
 import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
-import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.Fields;
-import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -334,7 +318,7 @@ public class Http2SolrClient extends SolrClient {
       httpClient.setExecutor(httpClientExecutor);
       httpClient.addBean(httpClientExecutor);
       httpClient.manage(httpClientExecutor);
-      httpClient.setRemoveIdleDestinations(true);
+
       httpClient.setStrictEventOrdering(strictEventOrdering);
        httpClient.setSocketAddressResolver(new SocketAddressResolver.Sync());
       httpClient.setConnectBlocking(false);
@@ -347,7 +331,7 @@ public class Http2SolrClient extends SolrClient {
       httpClient.setConnectTimeout(5000);
       httpClient.setTCPNoDelay(true);
 
-     // httpClient.setRemoveIdleDestinations(true);
+      httpClient.setRemoveIdleDestinations(false);
       httpClient.setAddressResolutionTimeout(3000);
       if (builder.connectionTimeout != null) httpClient.setConnectTimeout(builder.connectionTimeout);
       httpClient.start();
@@ -475,7 +459,7 @@ public class Http2SolrClient extends SolrClient {
         .newRequest(basePath + "update"
             + requestParams.toQueryString())
         .method(HttpMethod.POST)
-        .header(HttpHeader.CONTENT_TYPE, contentType)
+        .headers(httpFields -> httpFields.add(HttpHeader.CONTENT_TYPE, contentType))
         .content(provider);
     headers.forEach(postRequest::header);
 
@@ -566,10 +550,25 @@ public class Http2SolrClient extends SolrClient {
             //          body.add("msg", "Success but no response");
             //          return body;
             //        }
-            asyncListener.onFailure(CANCELLED_EXCEPTION, 0);
-            throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", f);
+            asyncListener.onFailure(f, 503);
+            return;
+           // throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", f);
           } finally {
-            asyncTracker.arrive();
+            try {
+//              InputStream is = getContentAsInputStream();
+//              if (is != null) {
+//                while (true) {
+//                  try {
+//                    if (!(is.read() != -1)) break;
+//                  } catch (IOException e) {
+//
+//                  }
+//                }
+//                org.apache.solr.common.util.IOUtils.closeQuietly(is);
+//              }
+            } finally {
+              asyncTracker.arrive();
+            }
           }
         }
         ParWork.submitIO("Http2SolrClientAsync", () -> {
@@ -711,6 +710,17 @@ public class Http2SolrClient extends SolrClient {
     }
 
     if (response.getStatus() != 200) {
+//      InputStream is = mysl.getInputStream();
+//      if (is != null) {
+//        while (true) {
+//          try {
+//            if (!(is.read() != -1)) break;
+//          } catch (IOException e) {
+//
+//          }
+//        }
+        //   org.apache.solr.common.util.IOUtils.closeQuietly(is);
+//      }
       throw new SolrServerException("Request failed with status " + response.getStatus());
     }
 
@@ -745,8 +755,19 @@ public class Http2SolrClient extends SolrClient {
       if (response.getStatus() == 200) {
         // no processor specified, return raw stream
         NamedList<Object> rsp = new NamedList<>(1);
-        rsp.add("stream", new CloseShieldInputStream(listener.getInputStream()));
+        rsp.add("stream", listener.getInputStream());
         return rsp;
+      } else {
+//        InputStream is = listener.getInputStream();
+//        if (is != null) {
+//          while (true) {
+//            try {
+//              if (!(is.read() != -1)) break;
+//            } catch (IOException e) {
+//
+//            }
+//          }
+//        }
       }
       throw new SolrServerException("Request failed with status " + response.getStatus());
     }
@@ -884,7 +905,7 @@ public class Http2SolrClient extends SolrClient {
     String basePath = solrRequest.getBasePath() == null ? serverBaseUrl : solrRequest.getBasePath();
     if (collection != null) {
       if (solrRequest.getBasePath() == null) {
-        basePath += "/" + collection;
+        basePath += '/' + collection;
       }
     }
 
@@ -903,7 +924,7 @@ public class Http2SolrClient extends SolrClient {
 
       Request req = httpClient.newRequest(basePath + path + wparams.toQueryString()).method(HttpMethod.GET);
       for (Map.Entry<String,String> entry : headers.entrySet()) {
-        req = req.header(entry.getKey(), entry.getValue());
+        req = req.headers(httpFields -> httpFields.add(entry.getKey(), entry.getValue()));
       }
       return req;
     }
@@ -911,7 +932,7 @@ public class Http2SolrClient extends SolrClient {
     if (SolrRequest.METHOD.DELETE == solrRequest.getMethod()) {
       Request req = httpClient.newRequest(basePath + path + wparams.toQueryString()).method(HttpMethod.DELETE);
       for (Map.Entry<String,String> entry : headers.entrySet()) {
-        req = req.header(entry.getKey(), entry.getValue());
+        req = req.headers(httpFields -> httpFields.add(entry.getKey(), entry.getValue()));
       }
       return req;
     }
@@ -936,7 +957,7 @@ public class Http2SolrClient extends SolrClient {
           throw new SolrServerException("Illegal url for request url=" + url, e);
         }
         for (Map.Entry<String,String> entry : headers.entrySet()) {
-          req = req.header(entry.getKey(), entry.getValue());
+          req = req.headers(httpFields -> httpFields.add(entry.getKey(), entry.getValue()));
         }
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
@@ -965,17 +986,18 @@ public class Http2SolrClient extends SolrClient {
             .newRequest(url + queryParams.toQueryString())
             .method(method);
         for (Map.Entry<String,String> entry : headers.entrySet()) {
-          req = req.header(entry.getKey(), entry.getValue());
+          req = req.headers(httpFields -> httpFields.add(entry.getKey(), entry.getValue()));
         }
         return fillContentStream(req, streams, wparams, isMultipart);
       } else {
         // It is has one stream, it is the post body, put the params in the URL
         ContentStream contentStream = streams.iterator().next();
-        InputStreamContentProvider provider = new InputStreamContentProvider(contentStream.getStream());
+        InputStream is = contentStream.getStream();
+        InputStreamRequestContent provider = new InputStreamRequestContent(contentStream.getContentType(), is);
 
-        Request req = httpClient.newRequest(url + wparams.toQueryString()).method(method).content(provider, contentStream.getContentType());
+        Request req = httpClient.newRequest(url + wparams.toQueryString()).method(method).body(provider);
         for (Map.Entry<String,String> entry : headers.entrySet()) {
-          req = req.header(entry.getKey(), entry.getValue());
+          req = req.headers(httpFields -> httpFields.add(entry.getKey(), entry.getValue()));
         }
         return req;
       }
@@ -1328,7 +1350,7 @@ public class Http2SolrClient extends SolrClient {
       } catch (Exception e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
       }
-      return new CloseShieldInputStream(mysl.getInputStream());
+      return mysl.getInputStream();
     }
   }
 

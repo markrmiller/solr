@@ -34,7 +34,7 @@ public class StoredFieldsShardResponseProcessor implements ShardResponseProcesso
   @Override
   public void process(ResponseBuilder rb, ShardRequest shardRequest) {
     boolean returnScores = (rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES) != 0;
-    ShardResponse srsp = shardRequest.responses.get(0);
+    ShardResponse srsp = shardRequest.responses.iterator().next();
     SolrDocumentList docs = (SolrDocumentList)srsp.getSolrResponse().getResponse().get("response");
     String uniqueIdFieldName = rb.req.getSchema().getUniqueKeyField().getName();
 

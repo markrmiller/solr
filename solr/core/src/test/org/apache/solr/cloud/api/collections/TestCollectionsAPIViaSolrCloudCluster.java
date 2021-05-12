@@ -74,7 +74,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     super.tearDown();
   }
 
-  private void createCollection(String collectionName, String createNodeSet, boolean waitForState) throws Exception {
+  private void createCollection(String collectionName, String createNodeSet) throws Exception {
     if (random().nextBoolean()) { // process asynchronously
       CollectionAdminRequest.Create req = CollectionAdminRequest.createCollection(collectionName, configName, numShards, numReplicas)
           .setMaxShardsPerNode(maxShardsPerNode).setCreateNodeSet(createNodeSet);
@@ -170,7 +170,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
 
     log.info("create collection again");
     // create it again
-    createCollection(collectionName, null, false);
+    createCollection(collectionName, null);
 
     // check that there's no left-over state
     assertEquals(0, client.query(collectionName, new SolrQuery("*:*")).getResults().getNumFound());
@@ -191,7 +191,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     assertFalse(cluster.getJettySolrRunners().isEmpty());
 
     // create collection
-    createCollection(collectionName, ZkStateReader.CREATE_NODE_SET_EMPTY, false);
+    createCollection(collectionName, ZkStateReader.CREATE_NODE_SET_EMPTY);
 
     // check the collection's corelessness
     int coreCount = 0;
@@ -221,7 +221,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     final SolrInputDocument doc = new SolrInputDocument();
 
     // create collection
-    createCollection(collectionName, null, true);
+    createCollection(collectionName, null);
 
     ZkStateReader zkStateReader = client.getZkStateReader();
 

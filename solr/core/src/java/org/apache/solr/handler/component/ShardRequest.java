@@ -17,11 +17,12 @@
 package org.apache.solr.handler.component;
 
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.jctools.maps.NonBlockingHashMap;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
+import java.util.Set;
 
 // todo... when finalized make accessors
 public class ShardRequest {
@@ -52,7 +53,7 @@ public class ShardRequest {
 
 
   /** list of responses... filled out by framework */
-  public List<ShardResponse> responses = Collections.synchronizedList(new ArrayList<>());
+  public Set<ShardResponse> responses = Collections.newSetFromMap(new NonBlockingHashMap<>());
 
   /** actual shards to send the request to, filled out by framework */
   public String[] actualShards;

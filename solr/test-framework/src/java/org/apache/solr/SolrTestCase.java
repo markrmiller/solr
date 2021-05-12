@@ -337,7 +337,7 @@ public class SolrTestCase extends Assert {
 
     System.setProperty("lucene.cms.override_spins", "true"); // TODO: detecting spins for every core, every IW#ConcurrentMergeScheduler can be a bit costly, let's detect and cache somehow?
 
-    System.setProperty("solr.jettyRunnerThreadPoolMaxSize", "64");
+    System.setProperty("solr.jettyRunnerThreadPoolMaxSize", "128");
     System.setProperty("solr.waitForLeaderInZkRegSec", "5");
     System.setProperty("solr.mscheduler", "org.apache.lucene.index.ConcurrentMergeScheduler");
 

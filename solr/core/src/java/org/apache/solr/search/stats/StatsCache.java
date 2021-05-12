@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 
@@ -167,12 +168,12 @@ public abstract class StatsCache implements PluginInfoInitialized {
    * @param responses responses from shards containing local stats for each shard
    */
   public void mergeToGlobalStats(SolrQueryRequest req,
-                                          List<ShardResponse> responses) {
+                                          Set<ShardResponse> responses) {
     statsCacheMetrics.mergeToGlobalStats.increment();
     doMergeToGlobalStats(req, responses);
   }
 
-  protected abstract void doMergeToGlobalStats(SolrQueryRequest req, List<ShardResponse> responses);
+  protected abstract void doMergeToGlobalStats(SolrQueryRequest req, Set<ShardResponse> responses);
 
   /**
    * Receive global stats data from the master and update a local cache of global stats
