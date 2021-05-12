@@ -1007,7 +1007,7 @@ public class FacetComponent extends SearchComponent {
           ShardFacetCount sfc = dff.counts.get(name);
           if (sfc == null) {
             // we got back a term we didn't ask for?
-            log.error("Unexpected term returned for facet refining. key='{}' term='{}'\n\trequest params={}\n\ttoRefine={}\n\tresponse={}\n\tshardCounts={}"
+            log.error("Unexpected term returned for facet refining. key='{}' term='{}'\n\trequest params={}\n\ttoRefine={}\n\tshardCounts={}"
                 , key, name, sreq.params, dff._toRefine, shardCounts);
             continue;
           }

@@ -662,7 +662,7 @@ public class IndexSchema {
             null != rootType && rootType.getTypeName() != null &&
             rootType.getTypeName().equals(uniqueKeyFieldType.getTypeName()));
 
-        if (fields.containsKey(ROOT_FIELD_NAME) && ! isUsableForChildDocs()) {
+        if (fields.containsKey(ROOT_FIELD_NAME) && ! isUsableForChildDocs) {
           String msg = ROOT_FIELD_NAME + " field must be defined using the exact same fieldType as the " +
             UNIQUE_KEY + " field ("+uniqueKeyFieldName+") uses: " + uniqueKeyFieldType.getTypeName();
           log.error(msg);
@@ -2053,7 +2053,7 @@ public class IndexSchema {
    */
   public boolean savesChildDocRelations() {
     //TODO make this boolean a field so it needn't be looked up each time?
-    if (!isUsableForChildDocs()) {
+    if (!isUsableForChildDocs) {
       return false;
     }
     FieldType nestPathType = getFieldTypeNoEx(NEST_PATH_FIELD_NAME);

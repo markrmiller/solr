@@ -62,6 +62,8 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final Pattern COMPILE = Pattern.compile("^#.*$");
+  private static final Pattern REMOVE_LINES = Pattern.compile("\\s+#.*$");
+  private static final Pattern SPACE_REPEATED = Pattern.compile("\\s+");
 
   private boolean enabled = true;
   private String inputFieldname = DEFAULT_INPUT_FIELDNAME;
@@ -128,7 +130,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
       String line = null;
       while ((line = reader.readLine()) != null) {
         // Remove comments
-        line = line.replaceAll("\\s+#.*$", "");
+        line = REMOVE_LINES.matcher(line).replaceAll("");
         line = COMPILE.matcher(line).replaceAll("");
 
         // Skip empty lines or comment lines
@@ -136,7 +138,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
           continue;
         }
 
-        String[] fields = line.split("\\s+");
+        String[] fields = SPACE_REPEATED.split(line);
 
         if (fields.length == 2) {
           String regexp = fields[0];

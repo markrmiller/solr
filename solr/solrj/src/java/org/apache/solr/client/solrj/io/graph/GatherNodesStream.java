@@ -60,7 +60,7 @@ import static org.apache.solr.common.params.CommonParams.SORT;
  */
 public class GatherNodesStream extends TupleStream implements Expressible {
 
-  private static final Pattern COMPILE = Pattern.compile("->");
+  private static final Pattern RIGHT_ARROW = Pattern.compile("->");
   private String zkHost;
   private String collection;
   private StreamContext streamContext;
@@ -157,7 +157,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
       if(streamExpressions.size() > 0) {
         stream = factory.constructStream(streamExpressions.get(0));
         String edge = ((StreamExpressionValue) edgeExpression.getParameter()).getValue();
-        String[] fields = COMPILE.split(edge);
+        String[] fields = RIGHT_ARROW.split(edge);
         if (fields.length != 2) {
           throw new IOException(String.format(Locale.ROOT, "invalid expression %s - walk param separated by an -> and must contain two fields", expression));
         }
@@ -165,7 +165,7 @@ public class GatherNodesStream extends TupleStream implements Expressible {
         traverseTo = fields[1].trim();
       } else {
         String edge = ((StreamExpressionValue) edgeExpression.getParameter()).getValue();
-        String[] fields = edge.split("->");
+        String[] fields = RIGHT_ARROW.split(edge);
         if (fields.length != 2) {
           throw new IOException(String.format(Locale.ROOT, "invalid expression %s - walk param separated by an -> and must contain two fields", expression));
         }

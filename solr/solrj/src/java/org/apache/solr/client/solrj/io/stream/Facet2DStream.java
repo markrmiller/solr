@@ -140,7 +140,7 @@ public class Facet2DStream extends TupleStream implements Expressible {
     }
 
     if (x == null || y == null) {
-      throw new IOException(String.format(Locale.ROOT, "invalid expression %s - x and y buckets expected. eg. 'x=\"name\"'", expression, collectionName));
+      throw new IOException(String.format(Locale.ROOT, "invalid expression %s - x and y buckets expected. eg. 'x=\"name\"'", expression));
     }
 
     Metric metric = null;

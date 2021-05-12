@@ -382,7 +382,7 @@ public class V2HttpCall extends SolrCall {
               AuditEvent.EventType eventType = solrRsp.getException() == null ? AuditEvent.EventType.COMPLETED : AuditEvent.EventType.ERROR;
               if (shouldAudit(cores, eventType)) {
                 cores.getAuditLoggerPlugin().doAudit(
-                    new AuditEvent(eventType, req, getAuthCtx(solrReq, req, getPath(), requestType), solrReq.getRequestTimer().getTime(), solrRsp.getException()));
+                    new AuditEvent(eventType, req, getAuthCtx(solrReq, req, path, requestType), solrReq.getRequestTimer().getTime(), solrRsp.getException()));
               }
             }
             HttpCacheHeaderUtil.checkHttpCachingVeto(solrRsp, response, reqMethod);

@@ -1,6 +1,5 @@
 package org.apache.solr.servlet;
 
-import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.apache.solr.api.ApiBag;
@@ -49,30 +48,18 @@ import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.client.util.AsyncRequestContent;
-import org.eclipse.jetty.client.util.InputStreamRequestContent;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpHeaderValue;
 import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.server.HttpOutput;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.IteratingCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
-import static org.apache.solr.common.cloud.ZkStateReader.REPLICATION_FACTOR;
-import static org.apache.solr.common.params.CollectionAdminParams.SYSTEM_COLL;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATE;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETE;
-import static org.apache.solr.common.params.CollectionParams.CollectionAction.RELOAD;
-import static org.apache.solr.common.params.CommonParams.NAME;
-import static org.apache.solr.common.params.CoreAdminParams.ACTION;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.ADMIN;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.REMOTEQUERY;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETRY;
-import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETURN;
 import javax.annotation.Nonnull;
 import javax.servlet.AsyncContext;
 import javax.servlet.ReadListener;
@@ -83,7 +70,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -105,6 +91,19 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
+import static org.apache.solr.common.cloud.ZkStateReader.REPLICATION_FACTOR;
+import static org.apache.solr.common.params.CollectionAdminParams.SYSTEM_COLL;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.CREATE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.DELETE;
+import static org.apache.solr.common.params.CollectionParams.CollectionAction.RELOAD;
+import static org.apache.solr.common.params.CommonParams.NAME;
+import static org.apache.solr.common.params.CoreAdminParams.ACTION;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.ADMIN;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.REMOTEQUERY;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETRY;
+import static org.apache.solr.servlet.SolrDispatchFilter.Action.RETURN;
 
 public abstract class SolrCall {
 
@@ -357,9 +356,9 @@ public abstract class SolrCall {
 
     String coreUrl = getCoreUrl(cores, docCollection.getSlices());
 
-    //if (log.isDebugEnabled()) {
-      log.info("get remote core url returning {} for {}", coreUrl, collectionName);
-    //}
+    if (log.isDebugEnabled()) {
+      log.debug("get remote core url returning {} for {}", coreUrl, collectionName);
+      }
     return coreUrl;
   }
 
@@ -400,7 +399,6 @@ public abstract class SolrCall {
         response.setContentLength(outStream.position() - outStream.offset());
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
-        // buffer.limit(outStream.siz);
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
         buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
 
@@ -431,8 +429,11 @@ public abstract class SolrCall {
           });
         } else {
           HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
-          out.sendContent(buffer);
-          ExpandableBuffers.getInstance().release(outStream.buffer());
+          try {
+            out.sendContent(buffer);
+          } finally {
+            ExpandableBuffers.getInstance().release(outStream.buffer());
+          }
         }
       }
       //else http HEAD request, nothing to write out, waited this long just to get ContentType
@@ -478,16 +479,11 @@ public abstract class SolrCall {
  
   protected SolrDispatchFilter.Action authorize(CoreContainer cores, SolrQueryRequest solrReq, HttpServletRequest req, HttpServletResponse response) throws IOException {
     AuthorizationContext context = getAuthCtx(solrReq, req, getPath(), getRequestType());
-  //  SolrRequestInfo info = SolrRequestInfo.getRequestInfo();
 
     log.debug("AuthorizationContext : {}", context);
     AuthorizationResponse authResponse = cores.getAuthorizationPlugin().authorize(context);
     int statusCode = authResponse.statusCode;
     log.info("Authorization response status code {}", authResponse.statusCode);
-
-//    if (authResponse.statusCode == 200) {
-//      response.setHeader(PKIAuthenticationPlugin.HEADER, null);
-//    }
 
     if (statusCode == AuthorizationResponse.PROMPT.statusCode) {
       Map<String, String> headers = (Map) req.getAttribute(AuthenticationPlugin.class.getName());
@@ -790,52 +786,12 @@ public abstract class SolrCall {
       addProxyHeaders(req, proxyRequest);
 
       if (hasContent(req)) {
-      //  ServletInputStream is = req.getInputStream();
-       // InputStreamRequestContent defferedContent = new InputStreamRequestContent(req.getContentType(), new CloseShieldInputStream(is), 8192);
-        //Response.AsyncContentListener content2 = new Response.AsyncContentListener();
-       // proxyRequest.body(defferedContent);
         AsyncRequestContent content = new AsyncRequestContent();
         req.getInputStream().setReadListener(newReadListener(req, response, proxyRequest, content));
         proxyRequest.body(content);
       }
 
       proxyRequest.send(newProxyResponseListener(req, response));
-
-//      if (SolrDispatchFilter.ASYNC) {
-//        proxyRequest.onResponseHeaders(new RemoteAsyncResponseListener(req, response)).send(new OnContentOutputListener(response, req));
-//      } else {
-//        AtomicReference<Throwable> failException = new AtomicReference<>();
-//        InputStreamResponseListener listener = new RemoteInputStreamResponseListener(failException, response);
-//        InputStream is = null;
-//        try {
-//          proxyRequest.send(listener);
-//
-////          try {
-////            // wait for headers
-////            listener.get(30, TimeUnit.SECONDS);
-////          } catch (Exception e) {
-////            throw new BaseHttpSolrClient.RemoteSolrException(url.toString(), 0, e.getMessage(), e);
-////          }
-//
-//          try {
-//            is = listener.getInputStream();
-//            is.transferTo(response.getOutputStream());
-//          } catch (Exception e) {
-//            sendError(e, response);
-//          }
-//
-//          if (failException.get() != null) {
-//            sendError(failException.get(), response);
-//          }
-//        } finally {
-//
-//          if (is != null) {
-//            while (is.read() != -1) {
-//
-//            }
-//          }
-//        }
-//      }
     }
 
     return REMOTEQUERY;
@@ -1014,15 +970,6 @@ public abstract class SolrCall {
       response.setStatus(resp.getStatus());
 
     }
-
-//    @Override
-//    public void onComplete(Result result)
-//    {
-//      AsyncContext context = req.getAsyncContext();
-//      if (response.isCommitted()) {
-//        context.complete();
-//      }
-//    }
   }
 
   private static class ProxyWriteListener implements WriteListener {
@@ -1102,7 +1049,7 @@ public abstract class SolrCall {
     protected Action process() throws Exception
     {
       int requestId =  0;
-      ServletInputStream input = request.getInputStream();
+      HttpInput input = (HttpInput) request.getInputStream();
 
       while (input.isReady())
       {
@@ -1129,7 +1076,8 @@ public abstract class SolrCall {
       return Action.IDLE;
     }
 
-    protected void onRequestContent(HttpServletRequest request, Request proxyRequest, AsyncRequestContent content, byte[] buffer, int offset, int length, Callback callback)
+    protected static void onRequestContent(HttpServletRequest request, Request proxyRequest, AsyncRequestContent content, byte[] buffer, int offset, int length,
+        Callback callback)
     {
       content.offer(ByteBuffer.wrap(buffer, offset, length), callback);
     }

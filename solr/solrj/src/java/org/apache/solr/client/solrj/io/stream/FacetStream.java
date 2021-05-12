@@ -168,7 +168,7 @@ public class FacetStream extends TupleStream implements Expressible  {
     }
 
     if(null == buckets){      
-      throw new IOException(String.format(Locale.ROOT,"invalid expression %s - at least one bucket expected. eg. 'buckets=\"name\"'",expression,collectionName));
+      throw new IOException(String.format(Locale.ROOT,"invalid expression %s - at least one bucket expected. eg. 'buckets=\"name\"'",expression));
     }
 
 
@@ -194,14 +194,14 @@ public class FacetStream extends TupleStream implements Expressible  {
           (!bucketSortString.equals("count(*) desc") &&
            !bucketSortString.equals("count(*) asc"))) {
       //Attempting bucket sort on a metric that is not going to be calculated.
-        throw new IOException(String.format(Locale.ROOT,"invalid expression %s - the bucketSort is being performed on a metric that is not being calculated.",expression,collectionName));
+        throw new IOException(String.format(Locale.ROOT,"invalid expression %s - the bucketSort is being performed on a metric that is not being calculated.",expression));
       }
     }
 
     FieldComparator[] bucketSorts = parseBucketSorts(bucketSortString, buckets);
 
     if(null == bucketSorts || 0 == bucketSorts.length) {
-      throw new IOException(String.format(Locale.ROOT,"invalid expression %s - at least one bucket sort expected. eg. 'bucketSorts=\"name asc\"'",expression,collectionName));
+      throw new IOException(String.format(Locale.ROOT,"invalid expression %s - at least one bucket sort expected. eg. 'bucketSorts=\"name asc\"'",expression));
     }
 
 

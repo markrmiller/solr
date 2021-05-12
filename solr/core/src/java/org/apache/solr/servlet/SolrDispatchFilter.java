@@ -45,10 +45,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -113,6 +110,7 @@ import org.apache.solr.util.configuration.SSLConfigurationsFactory;
 import org.apache.solr.util.tracing.GlobalTracer;
 import org.apache.zookeeper.KeeperException;
 import org.eclipse.jetty.server.HttpOutput;
+import org.eclipse.jetty.util.Callback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -401,7 +399,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     }
     log.info("Loading solr.xml from SolrHome (not found in ZooKeeper)");
 
-    return new SolrXmlConfig().fromSolrHome(solrHome, nodeProperties);
+    return SolrXmlConfig.fromSolrHome(solrHome, nodeProperties);
   }
   
   public CoreContainer getCores() {
@@ -693,7 +691,15 @@ public class SolrDispatchFilter extends BaseSolrFilter {
           ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
           buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
           buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
-          out.sendContent(buffer);
+          out.sendContent(buffer, new Callback() {
+            @Override public void succeeded() {
+              Callback.super.succeeded();
+            }
+
+            @Override public void failed(Throwable x) {
+              Callback.super.failed(x);
+            }
+          });
         } catch (Exception ex) {
           log.warn("Count not send client formatted error", e);
           log.error("onError", ex);

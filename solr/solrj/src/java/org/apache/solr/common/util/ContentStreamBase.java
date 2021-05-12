@@ -104,7 +104,7 @@ public abstract class ContentStreamBase implements ContentStream
   private String attemptToDetermineTypeFromFirstCharacter() {
     String type = null;
     try {
-      InputStream stream = new CloseShieldInputStream(getStream());
+      InputStream stream = getStream();
       // Last ditch effort to determine content, if the first non-white space
       // is a '<' or '{', assume xml or json.
       int data = stream.read();

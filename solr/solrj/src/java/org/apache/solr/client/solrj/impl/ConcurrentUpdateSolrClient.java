@@ -595,7 +595,7 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
     return dummy;
   }
 
-  public synchronized void blockUntilFinished() throws IOException {
+  public void blockUntilFinished() throws IOException {
     lock = new CountDownLatch(1);
     try {
 

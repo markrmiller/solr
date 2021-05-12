@@ -338,11 +338,11 @@ public class CoreContainer implements Closeable {
    * @see #load()
    */
   public CoreContainer(Path solrHome, Properties properties) throws IOException {
-    this(new SolrXmlConfig().fromSolrHome(solrHome, properties));
+    this(SolrXmlConfig.fromSolrHome(solrHome, properties));
   }
 
   public CoreContainer(Path solrHome, Properties properties, boolean asyncSolrCoreLoad) throws IOException {
-    this(new SolrXmlConfig().fromSolrHome(solrHome, properties), asyncSolrCoreLoad);
+    this(SolrXmlConfig.fromSolrHome(solrHome, properties), asyncSolrCoreLoad);
   }
 
 

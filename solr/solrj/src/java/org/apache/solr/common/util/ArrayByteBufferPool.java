@@ -13,7 +13,6 @@
 
 package org.apache.solr.common.util;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.IntFunction;

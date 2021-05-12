@@ -67,7 +67,7 @@ public class TestSolrXml extends SolrTestCaseJ4 {
     Path testSrcRoot = SolrTestUtil.TEST_PATH();
     Files.copy(testSrcRoot.resolve("solr-50-all.xml"), solrHome.resolve("solr.xml"));
 
-    NodeConfig cfg = new SolrXmlConfig().fromSolrHome(solrHome, new Properties());
+    NodeConfig cfg = SolrXmlConfig.fromSolrHome(solrHome, new Properties());
     CloudConfig ccfg = cfg.getCloudConfig();
     UpdateShardHandlerConfig ucfg = cfg.getUpdateShardHandlerConfig();
     PluginInfo[] backupRepoConfigs = cfg.getBackupRepositoryPlugins();
@@ -123,7 +123,7 @@ public class TestSolrXml extends SolrTestCaseJ4 {
     Path testSrcRoot = SolrTestUtil.TEST_PATH();
     Files.copy(testSrcRoot.resolve("solr-50-all.xml"), solrHome.resolve("solr.xml"));
 
-    NodeConfig cfg = solrXmlConfig.fromSolrHome(solrHome, new Properties());
+    NodeConfig cfg = SolrXmlConfig.fromSolrHome(solrHome, new Properties());
     assertThat(cfg.getCoreRootDirectory().toString(), containsString("myCoreRoot"));
     assertEquals("solr host port", 8888, cfg.getCloudConfig().getSolrHostPort());
     assertEquals("schema cache", false, cfg.hasSchemaCache());

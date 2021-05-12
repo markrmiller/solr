@@ -162,7 +162,7 @@ public class SolrXmlConfig {
     }
   }
 
-  public NodeConfig fromSolrHome( Path solrHome, Properties substituteProps) throws IOException {
+  public static NodeConfig fromSolrHome(Path solrHome, Properties substituteProps) throws IOException {
     return fromFile(solrHome, solrHome.resolve(SOLR_XML_FILE), substituteProps);
   }
 

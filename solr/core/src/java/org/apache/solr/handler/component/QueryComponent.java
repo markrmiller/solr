@@ -680,8 +680,7 @@ public class QueryComponent extends SearchComponent
     } else {
       return;
     }
-    Map<String, Object> combinedMap = new LinkedHashMap<>();
-    combinedMap.putAll(rb.mergedTopGroups);
+    Map<String,Object> combinedMap = new LinkedHashMap<>(rb.mergedTopGroups);
 
     if (rb.mergedQueryCommandResults == null) {
       rb.mergedQueryCommandResults = new HashMap<>();

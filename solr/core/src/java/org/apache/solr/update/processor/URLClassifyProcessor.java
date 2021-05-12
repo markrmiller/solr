@@ -58,7 +58,7 @@ public class URLClassifyProcessor extends UpdateRequestProcessor {
   private static final String DEFAULT_TOPLEVEL_FIELDNAME = "url_toplevel";
   private static final String DEFAULT_LANDINGPAGE_FIELDNAME = "url_landingpage";
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private static final Pattern COMPILE = Pattern.compile("/+$");
+  private static final Pattern TOP_LEVEL = Pattern.compile("/+$");
   private boolean enabled = true;
   private String urlFieldname = DEFAULT_URL_FIELDNAME;
   private String lengthFieldname = DEFAULT_LENGTH_FIELDNAME;
@@ -164,7 +164,7 @@ public class URLClassifyProcessor extends UpdateRequestProcessor {
    */
   public static int levels(URL url) {
     // Remove any trailing slashes for the purpose of level counting
-    String path = COMPILE.matcher(getPathWithoutSuffix(url)).replaceAll("");
+    String path = TOP_LEVEL.matcher(getPathWithoutSuffix(url)).replaceAll("");
     int levels = 0;
     for (int i = 0; i < path.length(); i++) {
       if (path.charAt(i) == '/') {
@@ -181,7 +181,7 @@ public class URLClassifyProcessor extends UpdateRequestProcessor {
    */
   public static boolean isTopLevelPage(URL url) {
     // Remove any trailing slashes for the purpose of level counting
-    String path = getPathWithoutSuffix(url).replaceAll("/+$", "");
+    String path = TOP_LEVEL.matcher(getPathWithoutSuffix(url)).replaceAll("");
     return path.length() == 0 && url.getQuery() == null;
   }
 
