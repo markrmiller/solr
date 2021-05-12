@@ -45,6 +45,7 @@ import org.eclipse.jetty.servlet.Source;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -307,11 +308,14 @@ public class JettySolrRunner implements Closeable {
 
     httpConfig.setIdleTimeout(idleTimeout);
 
+    SecurityManager s = System.getSecurityManager();
+    ThreadGroup group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+    ScheduledExecutorScheduler scheduler = new ScheduledExecutorScheduler("jetty-scheduler", true, null, group);
 
     if (config.onlyHttp1) {
       HttpConnectionFactory http1ConnectionFactory = new HttpConnectionFactory(httpConfig);
       // ParWork.getRootSharedIOExecutor()
-      connector = new ServerConnector(server, null, null, null, 1, 1, new SslConnectionFactory(sslContextFactory, http1ConnectionFactory.getProtocol()),
+      connector = new ServerConnector(server, null, scheduler, null, 1, 1, new SslConnectionFactory(sslContextFactory, http1ConnectionFactory.getProtocol()),
           http1ConnectionFactory);
     } else {
 
@@ -362,9 +366,9 @@ public class JettySolrRunner implements Closeable {
 
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, null, null, null, 1, 1, h2);
+        connector = new ServerConnector(server, null, scheduler, null, 1, 1, h2);
       } else {
-        connector = new ServerConnector(server, null, null, null, 1, 1, ssl, alpn, h2);
+        connector = new ServerConnector(server, null, scheduler, null, 1, 1, ssl, alpn, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());
       }
 
@@ -378,7 +382,9 @@ public class JettySolrRunner implements Closeable {
     server.manage(connector);
 
     server.setStopAtShutdown(true);
-    server.setStopTimeout(0); // will wait gracefully for stoptime / 2, then interrupts
+    server.setStopTimeout(10); // will wait gracefully for stoptime / 2, then interrupts
+
+
 
 //    server.setDumpAfterStart(true);
 //    server.setDumpBeforeStop(true);

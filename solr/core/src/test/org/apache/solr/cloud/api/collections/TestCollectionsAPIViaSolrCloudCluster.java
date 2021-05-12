@@ -122,7 +122,7 @@ public class TestCollectionsAPIViaSolrCloudCluster extends SolrCloudTestCase {
     assertEquals(nodeCount, cluster.getJettySolrRunners().size());
 
     // create collection
-    createCollection(collectionName, null, true);
+    createCollection(collectionName, null);
 
     // modify/query collection
     new UpdateRequest().add("id", "1").commit(client, collectionName);

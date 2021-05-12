@@ -822,21 +822,23 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
       // Create the index if it doesn't exist.
       String indexDir = getNewIndexDir();
-      if ((!coreContainer.isZooKeeperAware() || newCore) && !directoryFactory.exists(indexDir)) {
-        log.debug("{}Solr index directory doesn't exist. Creating new index...", logid);
-        Files.createDirectories(Paths.get(indexDir));
-        RefCounted<IndexWriter> writer = solrCoreState.getIndexWriter(this, true);
-        IndexWriter iw = writer.get();
-        try {
-          iw.commit(); // readers need to see the segments file
-        } finally {
-          writer.decref();
+      if ((!coreContainer.isZooKeeperAware() || newCore)) {
+        if (!directoryFactory.exists(indexDir)) {
+          log.debug("{}Solr index directory doesn't exist. Creating new index...", logid);
+          Files.createDirectories(Paths.get(indexDir));
+          RefCounted<IndexWriter> writer = solrCoreState.getIndexWriter(this, true);
+          IndexWriter iw = writer.get();
+          try {
+            iw.commit(); // readers need to see the segments file
+          } finally {
+            writer.decref();
+          }
         }
       }
 
-     // ParWork.getRootSharedExecutor().submit(()->{
+      ParWork.getRootSharedIOExecutor().submit(()->{
         cleanupOldIndexDirectories(reload);
-     // });
+      });
     }
 
     public static <T > T createInstance(String className, Class < T > cast, String msg, SolrCore core, ResourceLoader resourceLoader) {

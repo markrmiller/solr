@@ -250,7 +250,7 @@ public class Http2SolrClient extends SolrClient {
     //httpClientExecutor.setLowThreadsThreshold(-1);
     // section SolrQTP
     SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads);
-    httpClientExecutor.setStopTimeout(0);
+    httpClientExecutor.setStopTimeout(10);
 
         // SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads, new MPMCQueue.RunnableBlockingQueue());
 //    try {
@@ -1083,26 +1083,29 @@ public class Http2SolrClient extends SolrClient {
 
     Throwable failure = result.getFailure();
     try {
-//      if (failure != null && (failure instanceof ClosedChannelException)) {
-//        httpClient.getDestinations().forEach(dest1 -> {
-//          if (new Origin.Address(dest1.getHost(), dest1.getPort()).equals(new Origin.Address(req.getHost(), req.getPort()))) {
-////            ((HttpDestination)dest1).close();
-////            try {
-////              ((HttpDestination)dest1).stop();
-////            } catch (Exception e) {
-////              e.printStackTrace();
-////            }
-//            ((SolrInternalHttpClient) httpClient).removeDestination((HttpDestination) dest1);
-//            try {
-//              ((HttpDestination)dest1).stop();
-//            } catch (Exception e) {
-//              e.printStackTrace();
-//            }
-//            // dest1.getConnectionPool().close();
-//           // ((SolrInternalHttpClient) httpClient).getDestinationsMap().values().remove(dest1);
-//          }
-//
-//        });
+      if (failure != null && (failure instanceof ClosedChannelException)) {
+        httpClient.getDestinations().forEach(dest1 -> {
+              if (new Origin.Address(dest1.getHost(), dest1.getPort()).equals(new Origin.Address(req.getHost(), req.getPort()))) {
+                ////            ((HttpDestination)dest1).close();
+                ////            try {
+                ////              ((HttpDestination)dest1).stop();
+                ////            } catch (Exception e) {
+                ////              e.printStackTrace();
+                ////            }
+                ((SolrInternalHttpClient) httpClient).removeDestination((HttpDestination) dest1);
+                try {
+                  ((HttpDestination) dest1).stop();
+                } catch (Exception e) {
+                  //              e.printStackTrace();
+                }
+                //            // dest1.getConnectionPool().close();
+                //           // ((SolrInternalHttpClient) httpClient).getDestinationsMap().values().remove(dest1);
+
+              };
+
+        });
+        throw new RemoteSolrException(req.getHost(), 503, "Request accepted but no response", failure);
+    }
         // we may get success but be told the peer is shutting down via exception
 //        if (solrRequest instanceof UpdateRequest) {
 //          NamedList<Object> body = new NamedList<>();
@@ -1111,8 +1114,8 @@ public class Http2SolrClient extends SolrClient {
 //          return body;
 //        }
 
-//        throw new RemoteSolrException(req.getHost(), 444, "Request accepted but no response", failure);
-//      }
+//
+//     }
       //        HttpClientTransport transport = httpClient.getTransport();
       //        //  Origin origin = transport.newOrigin((HttpRequest)req);
       //        //
@@ -1196,7 +1199,7 @@ public class Http2SolrClient extends SolrClient {
       }
 
       if (is == null) {
-        throw new RemoteSolrException(remoteHost, response != null ? response.getStatus() : null, result.toString(), result.getFailure());
+        throw new RemoteSolrException(remoteHost, response != null ? response.getStatus() : null, result != null ? result.toString() : "(null)", result != null ? result.getFailure() : null);
       }
 
       try {

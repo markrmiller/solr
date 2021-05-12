@@ -68,6 +68,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import net.sf.saxon.expr.sort.CodepointCollator;
+import org.apache.commons.ForkJoinParWorkRootExec;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.lucene.util.Version;
@@ -136,6 +137,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         FieldTypeXmlAdapter.dbf, XMLResponseParser.inputFactory, XMLResponseParser.saxFactory,
         AnnotatedApi.MAPPER, org.apache.http.conn.util.PublicSuffixMatcherLoader.getDefault(),
         StdValueSourceParsers.standardValueSourceParsers.getClass().getSimpleName(), CodepointCollator.getInstance());
+  }
+
+  static {
+    System.setProperty("java.util.concurrent.ForkJoinPool.common.threadFactory",
+        ForkJoinParWorkRootExec.RootExecHolder.SolrForkJoinThreadFactory.class.getName());
   }
 
   private volatile CoreContainer cores;

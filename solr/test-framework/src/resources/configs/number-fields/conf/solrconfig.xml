@@ -45,7 +45,7 @@
     <mergeScheduler class="org.apache.lucene.index.ConcurrentMergeScheduler">
       <int name="maxThreadCount">6</int>
       <int name="maxMergeCount">8</int>
-      <bool name="ioThrottle">false</bool>
+      <bool name="ioThrottle">true</bool>
     </mergeScheduler>
 
     <writeLockTimeout>1000</writeLockTimeout>
