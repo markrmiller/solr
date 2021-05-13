@@ -22,12 +22,7 @@ description = 'Solr Test Framework'
 sourceSets {
   // Note that just declaring this sourceset creates two configurations.
   jmh {
-    main {
-
-      runtimeClasspath += sourceSets.main.runtimeClasspath
-    }
-    compileClasspath += sourceSets.main.runtimeClasspath
-    runtimeClasspath += sourceSets.main.runtimeClasspath
+    java.srcDirs = ['src/jmh/java']
   }
 }
 
@@ -44,16 +39,16 @@ forbiddenApisJmh {
 }
 
 task jmh(type: JavaExec) {
-
+  dependsOn("jmhClasses")
   group = "benchmark"
   main = "org.openjdk.jmh.Main"
-  classpath = sourceSets.jmh.runtimeClasspath + files(sourceSets.jmh.java.classesDirectory) + files('src/jmh/generated')
+  classpath = sourceSets.jmh.compileClasspath + sourceSets.jmh.runtimeClasspath
   //args "-Dfile.encoding=UTF-8", "-Dlog4j.configurationFile=src/resources/logconf/log4j2-startup-debug.xml"
   standardOutput(System.out)
   errorOutput(System.err)
 
-  def include = project.properties.get('include', '');
-  def exclude = project.properties.get('exclude');
+  def include = project.properties.get('include', "org.apache.solr.bench.index.CloudIndexing");
+ // def exclude = project.properties.get('exclude');
   def format = project.properties.get('format', 'json');
   def profilers = project.properties.get('profilers');
   def jvmArgs = project.properties.get('jvmArgs')
@@ -62,9 +57,9 @@ task jmh(type: JavaExec) {
   def resultFile = file("build/reports/jmh/result.${format}")
 
   args include
-  if (exclude) {
-    args '-e', exclude
-  }
+//  if (exclude) {
+//    args '-e', exclude
+//  }
   if (verify != null) {
     // execute benchmarks with the minimum amount of execution (only to check if they are working)
     println "≥≥ Running in verify mode"
@@ -79,7 +74,7 @@ task jmh(type: JavaExec) {
       args '-prof', it
     }
   }
-  args '-jvmArgsPrepend', '-Xmx4gm'
+ // args '-jvmArgsPrepend', '-Xmx4g'
   args '-jvmArgsPrepend', '-Xms4g'
   if (jvmArgs) {
     for (jvmArg in jvmArgs.split(' ')) {
@@ -90,10 +85,13 @@ task jmh(type: JavaExec) {
   args '-rff', resultFile
 
   doFirst {
+    println "\nClasspath:" + jmh.classpath.toList()
     println "\nExecuting JMH with: $args \n"
     resultFile.parentFile.mkdirs()
   }
 }
+
+classes.finalizedBy(jmhClasses)
 
 dependencies {
   api project(':solr:core')
@@ -101,8 +99,8 @@ dependencies {
   api project(':lucene:test-framework')
   api project(':lucene:analysis:common')
 
-  jmhCompile project
-  jmhCompile 'org.openjdk.jmh:jmh-core'
+  jmhImplementation project(':solr:test-framework')
+  jmhImplementation 'org.openjdk.jmh:jmh-core'
   jmhAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess'
 
   api ('com.google.guava:guava', {

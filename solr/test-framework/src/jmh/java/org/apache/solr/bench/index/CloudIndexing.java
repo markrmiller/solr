@@ -60,8 +60,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Threads(6)
-@Warmup(iterations = 5)
+@Threads(5)
+@Warmup(iterations = 3)
 @Measurement(iterations = 5)
 @Fork(value = 1, jvmArgs = {"-Xmx4g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
     "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=2",
@@ -82,7 +82,7 @@ public class CloudIndexing {
     int nodeCount = 5;
 
     int numShards = 9;
-    @Param({"1", "2", "3", "4", "5", "6"})
+    @Param({"1", "2", "3"})
     int numReplicas;
 
 

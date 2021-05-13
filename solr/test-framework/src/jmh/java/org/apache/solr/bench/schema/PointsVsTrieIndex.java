@@ -113,6 +113,7 @@ public class PointsVsTrieIndex {
       String s = currentRelativePath.toAbsolutePath().toString();
       System.out.println("Current relative path is: " + s);
 
+      System.setProperty("solr.tests.numeric.stored", "true");
       if (docValues.equals("disabled")) {
         System.setProperty("solr.tests.dv.as.stored", "false");
         System.setProperty("solr.tests.numeric.dv", "false");

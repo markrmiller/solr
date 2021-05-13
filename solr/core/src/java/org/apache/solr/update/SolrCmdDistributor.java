@@ -21,9 +21,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +38,7 @@ import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.util.AsyncListener;
+import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.cloud.ZkShardTerms;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
@@ -69,6 +72,8 @@ public class SolrCmdDistributor implements Closeable {
   private final ConnectionManager.IsClosed isClosed;
   private final CoreDescriptor coreDesc;
   private final ZkShardTerms zkShardTerms;
+
+  private final Set<Cancellable> asyncRequests = Collections.newSetFromMap(new NonBlockingHashMap<>());
 
   private volatile boolean finished = false; // see finish()
 
@@ -127,19 +132,20 @@ public class SolrCmdDistributor implements Closeable {
       error.t = new AlreadyClosedException();
       AlreadyClosedUpdateCmd cmd = new AlreadyClosedUpdateCmd(null);
       allErrors.put(cmd, error);
-      try {
-        asyncTracker.waitForComplete(1, TimeUnit.MINUTES);
-      } catch (TimeoutException timeoutException) {
-        log.warn("Timeout waiting for requests to finish");
-      }
+      cancelAll();
     }
     finished = true;
   }
   
   public void close() {
     this.closed = true;
+    cancelAll();
     asyncTracker.close();
     assert ObjectReleaseTracker.getInstance().release(this);
+  }
+
+  private void cancelAll() {
+    asyncRequests.forEach(cancellable -> cancellable.cancel());
   }
 
   public boolean checkRetry(Error err) {
@@ -307,7 +313,7 @@ public class SolrCmdDistributor implements Closeable {
       if (httpReq != null) {
         Enumeration<String> hnames = httpReq.getHeaderNames();
 
-        while(hnames.hasMoreElements()) {
+        while (hnames.hasMoreElements()) {
           String hname = hnames.nextElement();
           req.uReq.addHeader(hname, httpReq.getHeader(hname));
         }
@@ -343,150 +349,158 @@ public class SolrCmdDistributor implements Closeable {
       blockAndDoRetries();
     }
     try {
-        asyncTracker.register();
-        requestSolrClient.asyncRequest(req.uReq, null, new AsyncListener<>() {
-          @Override public void onSuccess(NamedList result, int code) {
-            if (log.isTraceEnabled()) {
-              log.trace("Success for distrib update {}", result);
+      asyncTracker.register();
+      AtomicReference<Cancellable> asyncReq = new AtomicReference<>();
+      asyncReq.set(requestSolrClient.asyncRequest(req.uReq, null, new AsyncListener<>() {
+        @Override public void onSuccess(NamedList result, int code) {
+          if (log.isTraceEnabled()) {
+            log.trace("Success for distrib update {}", result);
+          }
+          if (asyncReq.get() != null) {
+            asyncRequests.remove(asyncReq.get());
+          }
+          asyncTracker.arrive();
+        }
+
+        @Override public void onFailure(Throwable t, int code) {
+          try {
+            if (asyncReq.get() != null) {
+              asyncRequests.remove(asyncReq.get());
             }
+            if (t instanceof ClosedChannelException) {
+              // we may get success but be told the peer is shutting down via exception
+              if (log.isTraceEnabled()) {
+                log.trace("Success for distrib update {}", code);
+              }
+              return;
+            }
+
+            log.error("Exception sending dist update code={}", code, t);
+
+            if (t instanceof Http2SolrClient.CancelledException) {
+              log.info("Stream cancelled code={}", code);
+              return;
+            }
+
+            // MRM TODO: - we want to prevent any more from this request
+            // to go just to this node rather than stop the whole request
+            if (code == 404) {
+              cancelExeption = t;
+              return;
+            }
+
+            Error error = new Error(tag);
+            error.t = t;
+            error.req = req;
+            error.statusCode = code;
+
+            boolean retry = checkRetry(error);
+
+            if (retry) {
+              log.info("Retrying distrib update on error: {}", t.getMessage());
+              try {
+                submit(req, tag);
+              } catch (AlreadyClosedException e) {
+
+              }
+            } else {
+              allErrors.put(req.cmd, error);
+            }
+          } finally {
             asyncTracker.arrive();
           }
-
-          @Override public void onFailure(Throwable t, int code) {
-            try {
-              if (t instanceof ClosedChannelException) {
-                // we may get success but be told the peer is shutting down via exception
-                if (log.isTraceEnabled()) {
-                  log.trace("Success for distrib update {}", code);
-                }
-                return;
-              }
-
-              log.error("Exception sending dist update code={}", code, t);
-
-              if (t instanceof Http2SolrClient.CancelledException) {
-                log.info("Stream cancelled code={}", code);
-                return;
-              }
-
-              // MRM TODO: - we want to prevent any more from this request
-              // to go just to this node rather than stop the whole request
-              if (code == 404) {
-                cancelExeption = t;
-                return;
-              }
-
-              Error error = new Error(tag);
-              error.t = t;
-              error.req = req;
-              error.statusCode = code;
-
-              boolean retry = checkRetry(error);
-
-              if (retry) {
-                log.info("Retrying distrib update on error: {}", t.getMessage());
-                try {
-                  submit(req, tag);
-                } catch (AlreadyClosedException e) {
-
-                }
-              } else {
-                allErrors.put(req.cmd, error);
-              }
-            } finally {
-              asyncTracker.arrive();
-            }
-          }
-        });
-//      } else {
-//        replicaSolrClient.asyncRequest(req.uReq, null, new AsyncListener<>() {
-//          @Override public void onSuccess(NamedList result, int code) {
-//            if (log.isTraceEnabled()) {
-//              log.trace("Success for distrib update {}", result);
-//            }
-//          }
-//
-//          @Override public void onFailure(Throwable t, int code) {
-//            log.error("Exception sending dist update code={}", code, t);
-//
-//            if (code == ErrorCode.CANCEL_STREAM_ERROR.code) {
-//              log.info("Stream cancelled code={}", code);
-//              return;
-//            }
-//
-//            // MRM TODO: - we want to prevent any more from this request
-//            // to go just to this node rather than stop the whole request
-//            if (code == 404) {
-//              cancelExeption = t;
-//              return;
-//            }
-//
-//            Error error = new Error(tag);
-//            error.t = t;
-//            error.req = req;
-//            if (t instanceof SolrException) {
-//              error.statusCode = ((SolrException) t).code();
-//            }
-//
-//            boolean retry = checkRetry(error);
-//
-//            if (retry) {
-//              log.info("Retrying distrib update on error: {}", t.getMessage());
-//              try {
-//                submit(req, tag);
-//              } catch (AlreadyClosedException e) {
-//
-//              }
-//            } else {
-//              if (coreDesc != null) {
-//                try {
-//                  Boolean indexChanged = req.cmd.isIndexChanged.get();
-//                  if (zkShardTerms != null && (indexChanged == null || indexChanged)) {
-//                    zkShardTerms.ensureHighestTermsAreNotZero();
-//                    zkShardTerms.ensureTermsIsHigher(coreDesc.getName(), Collections.singleton(req.node.getNodeProps().getName()));
-//                  }
-//
-//                } catch (Exception e) {
-//                  log.error("Exception in dist update", e);
-//                }
-//              }
-//            }
-//          }
-//        });
-//
-//      }
+        }
+      }));
+      asyncRequests.add(asyncReq.get());
+      //      } else {
+      //        replicaSolrClient.asyncRequest(req.uReq, null, new AsyncListener<>() {
+      //          @Override public void onSuccess(NamedList result, int code) {
+      //            if (log.isTraceEnabled()) {
+      //              log.trace("Success for distrib update {}", result);
+      //            }
+      //          }
+      //
+      //          @Override public void onFailure(Throwable t, int code) {
+      //            log.error("Exception sending dist update code={}", code, t);
+      //
+      //            if (code == ErrorCode.CANCEL_STREAM_ERROR.code) {
+      //              log.info("Stream cancelled code={}", code);
+      //              return;
+      //            }
+      //
+      //            // MRM TODO: - we want to prevent any more from this request
+      //            // to go just to this node rather than stop the whole request
+      //            if (code == 404) {
+      //              cancelExeption = t;
+      //              return;
+      //            }
+      //
+      //            Error error = new Error(tag);
+      //            error.t = t;
+      //            error.req = req;
+      //            if (t instanceof SolrException) {
+      //              error.statusCode = ((SolrException) t).code();
+      //            }
+      //
+      //            boolean retry = checkRetry(error);
+      //
+      //            if (retry) {
+      //              log.info("Retrying distrib update on error: {}", t.getMessage());
+      //              try {
+      //                submit(req, tag);
+      //              } catch (AlreadyClosedException e) {
+      //
+      //              }
+      //            } else {
+      //              if (coreDesc != null) {
+      //                try {
+      //                  Boolean indexChanged = req.cmd.isIndexChanged.get();
+      //                  if (zkShardTerms != null && (indexChanged == null || indexChanged)) {
+      //                    zkShardTerms.ensureHighestTermsAreNotZero();
+      //                    zkShardTerms.ensureTermsIsHigher(coreDesc.getName(), Collections.singleton(req.node.getNodeProps().getName()));
+      //                  }
+      //
+      //                } catch (Exception e) {
+      //                  log.error("Exception in dist update", e);
+      //                }
+      //              }
+      //            }
+      //          }
+      //        });
+      //
+      //      }
     } catch (Exception e) {
       log.error("Exception sending dist update", e);
-       try {
+      try {
 
-         if (e instanceof Http2SolrClient.CancelledException) {
-           log.info("Stream cancelled msg={}", e.getMessage());
-           return;
-         }
+        if (e instanceof Http2SolrClient.CancelledException) {
+          log.info("Stream cancelled msg={}", e.getMessage());
+          return;
+        }
 
-         if (e instanceof ClosedChannelException) {
-           // we may get success but be told the peer is shutting down via exception
-           if (log.isTraceEnabled()) {
-             log.trace("Success for distrib update {}", e);
-           }
-           return;
-         }
+        if (e instanceof ClosedChannelException) {
+          // we may get success but be told the peer is shutting down via exception
+          if (log.isTraceEnabled()) {
+            log.trace("Success for distrib update {}", e);
+          }
+          return;
+        }
 
-         Error error = new Error(tag);
-         error.t = e;
-         error.req = req;
-         if (e instanceof SolrException) {
-           error.statusCode = ((SolrException) e).code();
-         }
-         if (checkRetry(error)) {
-           log.info("Retrying distrib update on error: {}", e.getMessage());
-           submit(req, "root");
-         } else {
-           allErrors.put(req.cmd, error);
-         }
-       } finally {
-         asyncTracker.arrive();
-       }
+        Error error = new Error(tag);
+        error.t = e;
+        error.req = req;
+        if (e instanceof SolrException) {
+          error.statusCode = ((SolrException) e).code();
+        }
+        if (checkRetry(error)) {
+          log.info("Retrying distrib update on error: {}", e.getMessage());
+          submit(req, "root");
+        } else {
+          allErrors.put(req.cmd, error);
+        }
+      } finally {
+        asyncTracker.arrive();
+      }
     }
   }
 

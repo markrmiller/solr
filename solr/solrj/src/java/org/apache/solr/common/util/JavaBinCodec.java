@@ -121,7 +121,7 @@ public class JavaBinCodec implements PushWriter {
       EXTERN_STRING = (byte) (7 << 5);
 
 
-  private static final int MAX_UTF8_SIZE_FOR_ARRAY_GROW_STRATEGY = 32768;
+  private static final int MAX_UTF8_SIZE_FOR_ARRAY_GROW_STRATEGY = 65536;
   public static final int SZ = 1024 << 2;
 
   private static final byte VERSION = 2;
@@ -937,7 +937,7 @@ public class JavaBinCodec implements PushWriter {
       return;
     }
 
-////      writeTag(X_STRING, ((String) s).getBytes(UTF_8).length);
+    ////      writeTag(X_STRING, ((String) s).getBytes(UTF_8).length);
     ////      MutableDirectBuffer buffer = ((ExpandableDirectBufferOutputStream) daos).buffer();
     ////
     ////      int written = buffer.putStringWithoutLengthUtf8(((ExpandableDirectBufferOutputStream) daos).position(), (String) s);
@@ -963,14 +963,10 @@ public class JavaBinCodec implements PushWriter {
     int maxSize = end * ByteUtils.MAX_UTF8_BYTES_PER_CHAR;
 
     if (maxSize <= MAX_UTF8_SIZE_FOR_ARRAY_GROW_STRATEGY) {
-      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(-1, true);
       try {
-        int sz;
-        if (maxSize < 16384) {
-          sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
-        } else {
-          sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
-        }
+        int sz = ByteUtils.UTF16toUTF8(s, 0, end, brr, 0);
+
         brr.byteBuffer().limit(brr.byteBuffer().position());
         brr.byteBuffer().position(0);
         writeTag(STR, sz);
@@ -988,7 +984,7 @@ public class JavaBinCodec implements PushWriter {
       // double pass logic for large strings, see SOLR-7971
       int sz = ByteUtils.calcUTF16toUTF8Length(s, 0, end);
       writeTag(STR, sz);
-      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(-1, true);
       try {
         ByteUtils.writeUTF16toUTF8(s, 0, end, daos, brr);
       } finally {
@@ -1030,7 +1026,7 @@ public class JavaBinCodec implements PushWriter {
 
   private static CharSequence xreadStr(DataInputInputStream dis, StringCache stringCache) throws IOException {
     // if (sz == 0) {
-    MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+    MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(-1, true);
     int sz = readVInt(dis);
     try {
       for (int i = 0; i < sz; i++) {
@@ -1051,7 +1047,7 @@ public class JavaBinCodec implements PushWriter {
   private static CharSequence _readStr(DataInputInputStream dis, StringCache stringCache, int sz) throws IOException {
 
 
-    MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(32768, true);
+    MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(-1, true);
     try {
       for (int i = 0; i < sz; i++) {
 
@@ -1063,17 +1059,17 @@ public class JavaBinCodec implements PushWriter {
 
     brr.byteBuffer().limit(brr.byteBuffer().position());
     brr.byteBuffer().position(0);
-//
-//
-//////        if (stringCache != null) {
-//////          return stringCache.get(bytesRef.reset(b, 0, sz));
-//////        } else {
+    //
+    //
+    //////        if (stringCache != null) {
+    //////          return stringCache.get(bytesRef.reset(b, 0, sz));
+    //////        } else {
     CharArr arr = getCharArr(sz);
     ByteUtils.UTF8toUTF16(brr, 0, sz, arr);
     ExpandableBuffers.getInstance().release(brr);
     return arr.toString();
-      }
-//  }
+  }
+  //  }
 
   /////////// code to optimize reading UTF8
   static final int MAX_UTF8_SZ = 1024 << 6;//too big strings can cause too much memory allocation
@@ -1083,7 +1079,7 @@ public class JavaBinCodec implements PushWriter {
   protected CharSequence readUtf8(DataInputInputStream dis) throws IOException {
     int sz = readSize(dis);
     return readUtf8(dis, sz);
-   // return _readStr(dis, null, 0);
+    // return _readStr(dis, null, 0);
   }
 
   protected CharSequence readUtf8(DataInputInputStream dis, int sz) throws IOException {
@@ -1347,15 +1343,15 @@ public class JavaBinCodec implements PushWriter {
 
   public void writeUtf8CharSeq(Utf8CharSequence utf8) throws IOException {
     utf8.write(daos);
-   // writeStr(utf8, false);
+    // writeStr(utf8, false);
   }
 
-//  public long getTotalBytesWritten() {
-//    if (daos != null) {
-//      return daos.written;
-//    }
-//    return 0;
-//  }
+  //  public long getTotalBytesWritten() {
+  //    if (daos != null) {
+  //      return daos.written;
+  //    }
+  //    return 0;
+  //  }
 
   public void writeShortToOut(int v) throws IOException {
     daos.write((byte)v >>> 8);

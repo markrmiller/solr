@@ -46,7 +46,7 @@ public final class QueryResponseWriterUtil {
       SolrQueryResponse solrResponse, String contentType) throws IOException {
 
 
-    MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(32768, true);//ExpandableBuffers.buffer1.get();
+    MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);//ExpandableBuffers.buffer1.get();
     expandableBuffer1.byteBuffer().clear();
     ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     if (responseWriter instanceof BinaryQueryResponseWriter) {

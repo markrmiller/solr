@@ -17,7 +17,6 @@
 package org.apache.solr.util;
 
 import net.sf.saxon.event.PipelineConfiguration;
-import net.sf.saxon.event.Sender;
 import net.sf.saxon.lib.ParseOptions;
 import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.trans.XPathException;
@@ -25,7 +24,6 @@ import net.sf.saxon.tree.tiny.TinyDocumentImpl;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.XML;
 import org.apache.solr.core.SolrResourceLoader;
-import org.apache.solr.core.SolrTinyBuilder;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
@@ -38,7 +36,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 abstract public class BaseTestHarness {
 

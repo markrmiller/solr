@@ -130,9 +130,9 @@ public class ParWorkExecutor extends ThreadPoolExecutor {
     }
     JavaBinCodec.THREAD_LOCAL_ARR.remove();
 
-    for (ThreadLocal tl : SolrQTP.threadLocals) {
-      tl.remove();
-    }
+//    for (ThreadLocal tl : SolrQTP.threadLocals) {
+//      tl.remove();
+//    }
     MDCLoggingContext.reset();
   }
 

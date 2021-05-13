@@ -1226,12 +1226,12 @@ public class CoreContainer implements Closeable {
       closer.addCollect();
 
       closer.collect(shardHandlerFactory);
-      closer.collect(updateShardHandler);
       closer.collect(fieldCacheBean);
       closer.collect(solrClientCache);
 
       closer.collect(loader);
-
+      closer.collect();
+      closer.collect(updateShardHandler);
       closer.collect();
       closer.collect(zkSys);
     }

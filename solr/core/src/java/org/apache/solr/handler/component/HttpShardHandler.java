@@ -273,6 +273,7 @@ public class HttpShardHandler extends ShardHandler {
 //
         if (rsp == null) {
           if (pending.get() > 0 && httpShardHandlerFactory.isClosed()) {
+            cancelAll();
             throw new AlreadyClosedException();
           }
           continue;

@@ -162,7 +162,7 @@ public abstract class StatsCache implements PluginInfoInitialized {
   /**
    * Process shard responses that contain partial local stats. Usually this
    * entails combining per-shard stats for each term.
-   * <p>This method updates the cache metrics and calls {@link #doMergeToGlobalStats(SolrQueryRequest, List)}.</p>
+   * <p>This method updates the cache metrics and calls {@link #doMergeToGlobalStats(SolrQueryRequest, Set)}.</p>
    *
    * @param req       query request
    * @param responses responses from shards containing local stats for each shard

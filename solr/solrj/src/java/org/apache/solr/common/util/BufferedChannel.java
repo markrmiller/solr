@@ -34,7 +34,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
      */
     public BufferedChannel(FileChannel out, int size) {
         ch = out;
-        buff = ExpandableBuffers.getInstance().acquire(32768, true);
+        buff = ExpandableBuffers.getInstance().acquire(-1, true);
         pos = 0;
         buff.byteBuffer().limit(buff.byteBuffer().capacity());
     }

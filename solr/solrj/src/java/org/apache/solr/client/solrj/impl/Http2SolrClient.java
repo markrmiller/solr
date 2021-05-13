@@ -116,6 +116,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -531,7 +532,7 @@ public class Http2SolrClient extends SolrClient {
     boolean tracking = false;
 
     SolrInputStreamResponseListener listener = new SolrInputStreamResponseListener() {
-
+      AtomicReference<Throwable> thefail = new AtomicReference<>();
       volatile InputStream is;
 
       @Override public void onSuccess(Response response) {
@@ -563,8 +564,8 @@ public class Http2SolrClient extends SolrClient {
               //                return;
               //              }
               if (failure instanceof CancelledException) {
-                asyncListener.onFailure(failure, 0);
-                // asyncListener.onSuccess(new NamedList<>(), 0);
+                //asyncListener.onFailure(failure, 0);
+                 asyncListener.onSuccess(new NamedList<>(), 0);
                 return;
               }
               int status = response.getStatus();
@@ -574,13 +575,27 @@ public class Http2SolrClient extends SolrClient {
               if (failure instanceof ClosedChannelException) { // success but no response
 
                 //  response.getRequest().abort(new CancelledException());
-                asyncListener.onFailure(failure, 503);
+                thefail.getAndUpdate(throwable -> {
+                  if (throwable == null) {
+                    asyncListener.onFailure(failure, 503);
+                    return failure;
+                  }
+                  return throwable;
+                });
+
                 return;
               }
 
             }
 
-            asyncListener.onFailure(failure, response.getStatus());
+            thefail.getAndUpdate(throwable -> {
+              if (throwable == null) {
+                asyncListener.onFailure(failure, response.getStatus());
+                return failure;
+              }
+              return throwable;
+            });
+
 
           } finally {
             org.apache.solr.common.util.IOUtils.closeQuietly(getInputStream());
@@ -606,7 +621,14 @@ public class Http2SolrClient extends SolrClient {
             if (response.getStatus() == 200) {
               asyncListener.onSuccess(body, response.getStatus());
             } else {
-        //      asyncListener.onFailure(response.getRequest().getAbortCause(), response.getStatus());
+
+              thefail.getAndUpdate(throwable -> {
+                if (throwable == null) {
+                  asyncListener.onFailure(response.getRequest().getAbortCause(), response.getStatus());
+                  return response.getRequest().getAbortCause();
+                }
+                return throwable;
+              });
             }
             //  }
 
@@ -626,10 +648,18 @@ public class Http2SolrClient extends SolrClient {
               status = ((SolrException) e).code();
             }
             log.warn("Unexpected failure while inspecting response", e);
-            asyncListener.onFailure(e, status); // TODO handle response better
+
+            int finalStatus = status;
+            thefail.getAndUpdate(throwable -> {
+              if (throwable == null) {
+                asyncListener.onFailure(e, finalStatus); // TODO handle response better
+                return e;
+              }
+              return throwable;
+            });
 
           } finally {
-
+            org.apache.solr.common.util.IOUtils.closeQuietly(is);
           }
         });
       }
@@ -950,7 +980,7 @@ public class Http2SolrClient extends SolrClient {
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
 
-        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(32768, true);
+        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);
 
         //ExpandableBuffers.buffer2.get();
     //    expandableBuffer1.byteBuffer().clear();
@@ -1191,7 +1221,6 @@ public class Http2SolrClient extends SolrClient {
       }
 
       try {
-        is.mark(4);
         rsp = processor.processResponse(is, encoding);
       } catch (Exception e) {
         log.warn("Could not parse", e);
@@ -1205,7 +1234,6 @@ public class Http2SolrClient extends SolrClient {
             if (remoteHost == null) {
               remoteHost = serverBaseUrl;
             }
-            is.reset();
             String txt = IOUtils.toString(is, StandardCharsets.UTF_8);
             log.debug("Could not parse response, status={} txt={}", httpStatus, txt, e);
             throw new RemoteSolrException(remoteHost, httpStatus, txt == null || txt.isEmpty() ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : txt, failure);
@@ -1750,7 +1778,7 @@ public class Http2SolrClient extends SolrClient {
       ParWork.submitIO("Http2SolrClientAsync", () -> {
         try {
 
-          if (!(SolrException.getRootCause(failure) instanceof CancelledException)) {
+          if (SolrException.getRootCause(failure) instanceof CancelledException) {
             asyncListener.onFailure(failure, 0);
             return;
           }
@@ -1760,8 +1788,8 @@ public class Http2SolrClient extends SolrClient {
         } catch (Exception e) {
           log.error("Exception in async failure listener", e);
         } finally {
-          InputStream is = getInputStream();
-          org.apache.solr.common.util.IOUtils.closeQuietly(is);
+         // InputStream is = getInputStream();
+         // org.apache.solr.common.util.IOUtils.closeQuietly(is);
         }
       });
 

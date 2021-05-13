@@ -183,8 +183,10 @@ public interface ByteBufferPool
         {
             _lastUpdate.setOpaque(System.nanoTime());
 
-            buffer.byteBuffer().position(0);
-            buffer.byteBuffer().limit(0);
+            if (buffer.byteBuffer() != null) {
+                buffer.byteBuffer().position(0);
+                buffer.byteBuffer().limit(0);
+            }
 
             if (_size == null)
                 queueOffer(buffer);

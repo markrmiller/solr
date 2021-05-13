@@ -62,7 +62,7 @@ abstract class AbstractByteBufferPool implements ByteBufferPool
 
     private void updateMemory(MutableDirectBuffer buffer, boolean addOrSub)
     {
-        AtomicLong memory = buffer.byteBuffer().isDirect() ? _directMemory : _heapMemory;
+        AtomicLong memory = buffer.byteBuffer() != null ? _directMemory : _heapMemory;
         int capacity = buffer.capacity();
         memory.addAndGet(addOrSub ? capacity : -capacity);
     }
