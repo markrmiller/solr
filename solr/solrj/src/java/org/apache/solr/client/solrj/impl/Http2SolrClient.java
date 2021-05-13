@@ -20,7 +20,6 @@ import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
-import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -79,6 +78,7 @@ import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
 import org.eclipse.jetty.io.ClientConnectionFactory;
@@ -788,11 +788,6 @@ public class Http2SolrClient extends SolrClient {
     }
   }
 
-  private static ContentType getContentType(Response response) {
-    String contentType = response.getHeaders().get(HttpHeader.CONTENT_TYPE);
-    return StringUtils.isEmpty(contentType)? null : ContentType.parse(contentType);
-  }
-
   private static void setBasicAuthHeader(SolrRequest solrRequest, Request req) {
     if (solrRequest.getBasicAuthUser() != null && solrRequest.getBasicAuthPassword() != null) {
       String userPass = solrRequest.getBasicAuthUser() + ":" + solrRequest.getBasicAuthPassword();
@@ -1137,17 +1132,19 @@ public class Http2SolrClient extends SolrClient {
 
 
       if (response != null) {
-        ContentType contentType = getContentType(response);
+        String contentType = response.getHeaders().get(HttpHeader.CONTENT_TYPE);
+
 
         if (contentType != null) {
-          mimeType = contentType.getMimeType();
-          encoding = contentType.getCharset() != null ? contentType.getCharset().name() : null;
+          encoding = StringUtils.isEmpty(contentType) ? null : MimeTypes.getCharsetFromContentType(contentType);
+          mimeType = MimeTypes.getContentTypeWithoutCharset(contentType);
+
         }
       }
 
       String procCt = processor.getContentType();
       if (procCt != null && mimeType != null) {
-        String procMimeType = ContentType.parse(procCt).getMimeType().trim().toLowerCase(Locale.ROOT);
+        String procMimeType = MimeTypes.getContentTypeWithoutCharset(procCt).trim().toLowerCase(Locale.ROOT);
 
         if (!procMimeType.equalsIgnoreCase(mimeType)) {
           // unexpected mime type
