@@ -226,7 +226,9 @@ public class LogUpdateProcessorFactory extends UpdateRequestProcessorFactory imp
     }
 
     private String getLogStringAndClearRspToLog() {
-      StringBuilder sb = new StringBuilder(rsp.getToLogAsString(req.getCore().getLogId()));
+      String logIds = rsp.getToLogAsString(req.getCore().getLogId());
+      StringBuilder sb = new StringBuilder(logIds.length() + 32);
+      sb.append(logIds);
 
       rsp.getToLog().clear();   // make it so SolrCore.exec won't log this again
 

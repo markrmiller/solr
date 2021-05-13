@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
 
     factor = getCapacityFactor();
     if (minCapacity <= 0) minCapacity = 0;
-    if (maxCapacity <= 0) maxCapacity = 128 * 1024;
+    if (maxCapacity <= 0) maxCapacity = 64 * 1024;
     if ((maxCapacity % factor) != 0 || factor >= maxCapacity) throw new IllegalArgumentException("The capacity factor must be a divisor of maxCapacity");
     _minCapacity = minCapacity;
 
@@ -94,7 +94,7 @@ import org.slf4j.LoggerFactory;
 
   @Override public MutableDirectBuffer acquire(int size, boolean direct) {
     if (size == -1) {
-        size = 16384;
+        size = 8192;
     }
     int capacity = size < _minCapacity ? size : (bucketFor(size) + 1) * getCapacityFactor();
     ByteBufferPool.Bucket bucket = bucketFor(size, direct, null);

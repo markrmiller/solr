@@ -68,10 +68,10 @@ import java.util.concurrent.atomic.AtomicInteger;
      "-XX:ParallelGCThreads=3", "-XX:+UseG1GC", "-Djetty.insecurerandom=1", "-Djava.security.egd=file:/dev/./urandom", "-XX:-UseBiasedLocking",
     "-XX:+UseG1GC", "-XX:+PerfDisableSharedMem", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=250", "-Dsolr.enableMetrics=false", "-Dsolr.jettyRunnerThreadPoolMaxSize=200",
     "-Dsolr.enablePublicKeyHandler=false", "-Dzookeeper.nio.numSelectorThreads=6", "-Dzookeeper.nio.numWorkerThreads=6", "-Dzookeeper.commitProcessor.numWorkerThreads=6",
-    "-Dsolr.rootSharedThreadPoolCoreSize=120", "-Dlucene.cms.override_spins=false", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100",
-    "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true",
-    //"-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=jfr_results/,dumponexit=true,settings=profile,path-to-gc-roots=true"})
-    })
+    "-Dsolr.rootSharedThreadPoolCoreSize=20", "-Dlucene.cms.override_spins=false", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100",
+    "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=false", "-Dsolr.asyncIO=false",
+    "-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=jfr_results/,dumponexit=true,settings=profile,path-to-gc-roots=true"})
+    //})
 @Timeout(time = 60)
 public class CloudIndexing {
 
@@ -136,7 +136,8 @@ public class CloudIndexing {
 
       public int cnt;
 
-      @Setup(Level.Invocation) public void setupDoc() throws Exception {
+   //   @Setup(Level.Invocation)
+      public void setupDoc() throws Exception {
         doc = new SolrInputDocument();
         doc.addField("id", BenchState.id.incrementAndGet());
         doc.addField("int", cnt++);
@@ -149,20 +150,20 @@ public class CloudIndexing {
 
       public int cnt;
 
-      @Setup(Level.Invocation) public void setupDoc() throws Exception {
-        doc = new SolrInputDocument();
-        int total = BenchState.random.nextInt(300) + 1;
-        StringBuilder sb = new StringBuilder(512);
-        for (int i = 0; i < total; i++) {
-          if (sb.length() > 0) {
-            sb.append(' ');
-          }
-          sb.append(TestUtil.randomRealisticUnicodeString(random, BenchState.random.nextInt(50) + 1));
-        }
-        doc.addField("id", BenchState.id.incrementAndGet());
-        doc.addField("text", sb.toString());
-        doc.addField("int", cnt++);
-      }
+//      @Setup(Level.Invocation) public void setupDoc() throws Exception {
+//        doc = new SolrInputDocument();
+//        int total = BenchState.random.nextInt(300) + 1;
+//        StringBuilder sb = new StringBuilder(512);
+//        for (int i = 0; i < total; i++) {
+//          if (sb.length() > 0) {
+//            sb.append(' ');
+//          }
+//          sb.append(TestUtil.randomRealisticUnicodeString(random, BenchState.random.nextInt(50) + 1));
+//        }
+//        doc.addField("id", BenchState.id.incrementAndGet());
+//        doc.addField("text", sb.toString());
+//        doc.addField("int", cnt++);
+//      }
     }
 
     @TearDown(Level.Iteration)
@@ -176,9 +177,12 @@ public class CloudIndexing {
   @Benchmark
   @Timeout(time = 300)
   public static void indexSmallDoc(BenchState state, BenchState.Doc docState) throws Exception {
+
     UpdateRequest updateRequest = new UpdateRequest();
     updateRequest.setBasePath(state.nodes.get(state.random.nextInt(state.nodeCount)) + "/" + state.collectionName);
-    SolrInputDocument doc = docState.doc;
+    SolrInputDocument doc = new SolrInputDocument();
+    doc.addField("id", BenchState.id.incrementAndGet());
+    doc.addField("int", BenchState.id.get());
 
     updateRequest.add(doc);
 
