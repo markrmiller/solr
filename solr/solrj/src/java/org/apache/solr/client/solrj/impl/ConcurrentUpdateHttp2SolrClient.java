@@ -232,7 +232,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
                 break;
               }
 
-              InputStreamResponseListener responseListener = null;
+              SolrInputStreamResponseListener responseListener = null;
               try (Http2SolrClient.OutStream out = client.initOutStream(basePath, update.getRequest(),
                       update.getCollection())) {
                 Update upd = update;

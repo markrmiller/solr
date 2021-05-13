@@ -3,6 +3,7 @@ package org.apache.solr.common.util;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrThread;
 import org.apache.solr.logging.MDCLoggingContext;
+import org.eclipse.jetty.util.BlockingArrayQueue;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
@@ -46,7 +47,8 @@ public class SolrQTP extends QueuedThreadPool {
   }
 
   public static BlockingQueue<Runnable> getSolrQueue() {
-    return new LinkedTransferQueue<>();
+    //return new LinkedTransferQueue<>();
+    return new BlockingArrayQueue<>();
   }
 
   public static class JettyThread extends Thread {

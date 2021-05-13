@@ -1661,13 +1661,6 @@ public class IndexFetcher {
         throw e;
       } finally {
         if (is != null) {
-          while (true) {
-            try {
-              if (!(is.read() != -1)) break;
-            } catch (IOException e) {
-
-            }
-          }
           org.apache.solr.common.util.IOUtils.closeQuietly(is);
         }
         cleanup(null);
@@ -1710,6 +1703,13 @@ public class IndexFetcher {
           }
           //then read the packet of bytes
           fis.readFully(buf, 0, (int)Math.min(this.size, ReplicationHandler.PACKET_SZ));
+          try {
+            while (fis.read() != -1) {
+
+            }
+          } catch (IOException e) {
+
+          }
           //compare the checksum as sent from the master
           if (includeChecksum) {
             checksum.reset();
@@ -1833,7 +1833,7 @@ public class IndexFetcher {
           req.setResponseParser(new InputStreamResponseParser(FILE_STREAM));
           //response =
           if (stop || abort) {
-            throw new AlreadyClosedException();
+            throw new AlreadyClosedException("Stopped or aborted");
           }
           Cancellable resp = solrClient.asyncRequestRaw(req, null, new AsyncListener<>() {
             @Override public void onSuccess(InputStream is, int code) {
@@ -1843,7 +1843,7 @@ public class IndexFetcher {
             @Override public void onFailure(Throwable throwable, int code) {
               log.error("Exception fetching file code={}", code, throwable);
 
-              if (code == 403 || code == 500 || code == 503) {
+              if (code == 403 || code == 500 || code == 503 || code == 0) {
                 // try again
               } else {
                 stop = true;
@@ -1861,13 +1861,6 @@ public class IndexFetcher {
         } catch (Exception e) {
           //close stream on error
           if (is != null) {
-//            while (true) {
-//              try {
-//                if (!(is.read() != -1)) break;
-//              } catch (IOException e2) {
-//
-//              }
-//            }
             org.apache.solr.common.util.IOUtils.closeQuietly(is);
           }
           throw new IOException("Could not download file '" + fileName + "'", e);

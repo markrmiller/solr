@@ -29,6 +29,7 @@ import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.ZkController;
+import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.annotation.SolrSingleThreaded;
 import org.apache.solr.common.cloud.Replica;
@@ -75,7 +76,7 @@ public class HttpShardHandler extends ShardHandler {
 
   private final HttpShardHandlerFactory httpShardHandlerFactory;
   private final Map<ShardResponse,Cancellable> responseCancellableMap;
-  private final BlockingQueue<ShardResponse> responses;
+  private final LinkedTransferQueue<ShardResponse> responses;
   private final AtomicInteger pending;
   private final Map<String, List<String>> shardToURLs;
   private final LBHttp2SolrClient lbClient;
@@ -268,15 +269,15 @@ public class HttpShardHandler extends ShardHandler {
         //log.info("loop ing in httpshardhandler pending {}", pending.get());
 
 
-//        ShardResponse rsp = responses.poll(3, TimeUnit.SECONDS);
+        ShardResponse rsp = responses.poll(5, TimeUnit.SECONDS);
 //
-//        if (rsp == null) {
-////          if (pending.get() > 0 && httpShardHandlerFactory.isClosed()) {
-////            throw new AlreadyClosedException();
-////          }
-//          continue;
-//        }
-        ShardResponse rsp = responses.take();
+        if (rsp == null) {
+          if (pending.get() > 0 && httpShardHandlerFactory.isClosed()) {
+            throw new AlreadyClosedException();
+          }
+          continue;
+        }
+      //  ShardResponse rsp = responses.take();
         responseCancellableMap.remove(rsp);
 
         pending.decrementAndGet();

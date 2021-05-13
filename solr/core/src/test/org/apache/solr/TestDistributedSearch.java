@@ -996,7 +996,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
       downJettys.add(downJetty);
     }
     
-    Thread.sleep(100);
+    Thread.sleep(250);
 
     queryPartialResults(upShards, upClients,
         "q", "*:*",

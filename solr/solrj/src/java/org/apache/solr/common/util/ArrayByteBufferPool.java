@@ -91,7 +91,7 @@ public class ArrayByteBufferPool extends AbstractByteBufferPool
         if (minCapacity <= 0)
             minCapacity = 0;
         if (maxCapacity <= 0)
-            maxCapacity = 64 * 1024;
+            maxCapacity = 128 * 1024;
         if ((maxCapacity % factor) != 0 || factor >= maxCapacity)
             throw new IllegalArgumentException("The capacity factor must be a divisor of maxCapacity");
         _minCapacity = minCapacity;

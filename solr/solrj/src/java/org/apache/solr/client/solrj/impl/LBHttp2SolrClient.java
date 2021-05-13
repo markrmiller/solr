@@ -81,11 +81,11 @@ public class LBHttp2SolrClient extends LBSolrClient {
   public LBHttp2SolrClient(Http2SolrClient httpClient, boolean markInternal, String... baseSolrUrls) {
     super(Arrays.asList(baseSolrUrls));
     // MRM TODO: - should only be internal for us
-    Http2SolrClient.Builder builder = new Http2SolrClient.Builder().withHttpClient(httpClient);
-    if (markInternal) {
-      builder = builder.maxOutstandingAsyncRequests(300).markInternalRequest(); // MRM TODO configurable
-    }
-    this.httpClient = builder.build();
+//    Http2SolrClient.Builder builder = new Http2SolrClient.Builder().withHttpClient(httpClient);
+//    if (markInternal) {
+//      builder = builder.maxOutstandingAsyncRequests(300).markInternalRequest(); // MRM TODO configurable
+//    }
+    this.httpClient = httpClient;
   }
 
   public LBHttp2SolrClient(String... baseSolrUrls) {
@@ -98,7 +98,6 @@ public class LBHttp2SolrClient extends LBSolrClient {
   @Override
   public void close() {
     super.close();
-    httpClient.close();
   }
 
   @Override

@@ -505,7 +505,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
             CountDownLatch latch = new CountDownLatch(1);
             AtomicReference<NamedList> results = new AtomicReference<>();
             AtomicReference<Throwable> exp = new AtomicReference<>();
-            prevSendPreRecoveryRequest = client.asyncRequest(prepCmd, null, new PrepRecoveryAsyncListener(results, latch, exp, recoveryTask, core));
+            prevSendPreRecoveryRequest = client.asyncRequest(prepCmd, null, new PrepRecoveryAsyncListener(results, exp, recoveryTask, core));
             break;
           } catch (SolrException e) {
             Throwable cause = e.getRootCause();
@@ -526,14 +526,14 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
   private class PrepRecoveryAsyncListener implements AsyncListener<NamedList<Object>> {
     private final AtomicReference<NamedList> results;
-    private final CountDownLatch latch;
+
     private final AtomicReference<Throwable> exp;
     private final RecoveryTask recoveryTask;
     private final SolrCore core;
 
-    public PrepRecoveryAsyncListener(AtomicReference<NamedList> results, CountDownLatch latch, AtomicReference<Throwable> exp, RecoveryTask recoveryTask, SolrCore core) {
+    public PrepRecoveryAsyncListener(AtomicReference<NamedList> results, AtomicReference<Throwable> exp, RecoveryTask recoveryTask, SolrCore core) {
       this.results = results;
-      this.latch = latch;
+
       this.exp = exp;
       this.recoveryTask = recoveryTask;
       this.core = core;

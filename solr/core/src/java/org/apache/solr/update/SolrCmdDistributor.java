@@ -364,7 +364,7 @@ public class SolrCmdDistributor implements Closeable {
 
               log.error("Exception sending dist update code={}", code, t);
 
-              if (t == Http2SolrClient.CANCELLED_EXCEPTION) {
+              if (t instanceof Http2SolrClient.CancelledException) {
                 log.info("Stream cancelled code={}", code);
                 return;
               }
@@ -459,7 +459,7 @@ public class SolrCmdDistributor implements Closeable {
       log.error("Exception sending dist update", e);
        try {
 
-         if (e == Http2SolrClient.CANCELLED_EXCEPTION) {
+         if (e instanceof Http2SolrClient.CancelledException) {
            log.info("Stream cancelled msg={}", e.getMessage());
            return;
          }

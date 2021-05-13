@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -51,7 +50,7 @@ public class UpdateShardHandler implements SolrInfoBean {
 
   private CloseTracker closeTracker;
 
-  private final Http2SolrClient updateOnlyClient;
+  private final Http2SolrClient sharedHttpClient;
 
   private final Http2SolrClient solrCmdDistributorClient;
 
@@ -94,21 +93,21 @@ public class UpdateShardHandler implements SolrInfoBean {
 
    // httpRequestExecutor = new InstrumentedHttpRequestExecutor(getMetricNameStrategy(cfg));
 
-    Http2SolrClient.Builder updateOnlyClientBuilder = new Http2SolrClient.Builder();
+    Http2SolrClient.Builder sharedClientBuilder = new Http2SolrClient.Builder();
     if (cfg != null) {
-      updateOnlyClientBuilder
+      sharedClientBuilder
           .connectionTimeout(cfg.getDistributedConnectionTimeout())
           .idleTimeout(cfg.getDistributedSocketTimeout());
     }
-    updateOnlyClient = updateOnlyClientBuilder.name("Update").markInternalRequest().strictEventOrdering(false).build();
-    updateOnlyClient.enableCloseLock();
+    sharedHttpClient = sharedClientBuilder.name("Update").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(-1).build();
+    sharedHttpClient.enableCloseLock();
    // updateOnlyClient.addListenerFactory(updateHttpListenerFactory);
     Set<String> queryParams = new HashSet<>(2);
     queryParams.add(DistributedUpdateProcessor.DISTRIB_FROM);
     queryParams.add(DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM);
-    updateOnlyClient.setQueryParams(queryParams);
+    sharedHttpClient.setQueryParams(queryParams);
 
-    solrCmdDistributorClient = updateOnlyClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(SysStats.PROC_COUNT * 2).build();
+    solrCmdDistributorClient = sharedClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(SysStats.PROC_COUNT * 2).build();
     solrCmdDistributorClient.enableCloseLock();
     // updateOnlyClient.addListenerFactory(updateHttpListenerFactory);
     queryParams = new HashSet<>(2);
@@ -204,10 +203,9 @@ public class UpdateShardHandler implements SolrInfoBean {
   public SolrMetricsContext getSolrMetricsContext() {
     return solrMetricsContext;
   }
-  
-  // don't introduce a bug, this client is for sending updates only!
+
   public Http2SolrClient getTheSharedHttpClient() {
-    return updateOnlyClient;
+    return sharedHttpClient;
   }
 
   public Http2SolrClient getSolrCmdDistributorClient() {
@@ -237,7 +235,7 @@ public class UpdateShardHandler implements SolrInfoBean {
 
   public void close() {
     assert closeTracker != null ? closeTracker.close() : true;
-    if (updateOnlyClient != null) updateOnlyClient.disableCloseLock();
+    if (sharedHttpClient != null) sharedHttpClient.disableCloseLock();
     if (recoveryOnlyClient != null) recoveryOnlyClient.disableCloseLock();
     if (solrCmdDistributorClient != null) solrCmdDistributorClient.disableCloseLock();
     if (leaderCheckClient != null) leaderCheckClient.disableCloseLock();
@@ -247,7 +245,7 @@ public class UpdateShardHandler implements SolrInfoBean {
     try (ParWork closer = new ParWork(this, false)) {
       closer.collect(recoveryOnlyClient);
       closer.collect(searchOnlyClient);
-      closer.collect(updateOnlyClient);
+      closer.collect(sharedHttpClient);
       closer.collect(solrCmdDistributorClient);
       closer.collect(leaderCheckClient);
     }
@@ -270,7 +268,7 @@ public class UpdateShardHandler implements SolrInfoBean {
   }
 
   public void setSecurityBuilder(HttpClientBuilderPlugin builder) {
-    builder.setup(updateOnlyClient);
+    builder.setup(sharedHttpClient);
     builder.setup(recoveryOnlyClient);
     builder.setup(solrCmdDistributorClient);
     builder.setup(recoveryOnlyClient);

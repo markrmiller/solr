@@ -19,13 +19,16 @@ package org.apache.solr.common.util;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpClientTransport;
 import org.eclipse.jetty.client.HttpDestination;
+import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.api.Destination;
+import org.eclipse.jetty.client.api.Request;
 import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -59,13 +62,18 @@ public class SolrInternalHttpClient extends HttpClient {
 //
 //
   public boolean removeDestination(HttpDestination destination) {
-   // return super.removeDestination(destination);
+    super.removeDestination(destination);
     removeBean(destination);
     return dests.remove(destination.getOrigin(), destination);
   }
 
   public List<Destination> getDestinations() {
     return new ArrayList<>(dests.values());
+  }
+
+  public Request copyRequest(HttpRequest oldRequest, URI newURI)
+  {
+    return super.copyRequest(oldRequest, newURI);
   }
 
   @Override protected void doStop() throws Exception {

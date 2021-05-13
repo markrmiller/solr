@@ -1133,7 +1133,7 @@ public class CoreContainer implements Closeable {
 
 //    CalciteSolrDriver.INSTANCE.setSolrClientCache(null);
 
-    coreAdminExecutor.shutdown();
+    coreAdminExecutor.shutdownNow();
 
     IOUtils.closeQuietly(solrCores);
 

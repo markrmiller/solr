@@ -1622,7 +1622,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
     }
 
     protected void createOutputStream(OutputStream out) {
-      out = new CloseShieldOutputStream(out); // DeflaterOutputStream requires a close call, but don't close the request outputstream
+    //  out = new CloseShieldOutputStream(out); // DeflaterOutputStream requires a close call, but don't close the request outputstream
       if (Boolean.parseBoolean(compress)) {
         fos = new DataOutputStream(new DeflaterOutputStream(out));
       } else {

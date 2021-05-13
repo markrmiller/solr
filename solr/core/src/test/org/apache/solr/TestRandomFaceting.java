@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.lucene.util.TestUtil;
@@ -152,6 +153,7 @@ public class TestRandomFaceting extends SolrTestCaseJ4 {
 
   @Test
   public void testRandomFaceting() throws Exception {
+    IndexSearcher.setMaxClauseCount(2046);
     Random rand = random();
     int iter = SolrTestUtil.atLeast(100);
     init();

@@ -109,6 +109,7 @@ import org.apache.solr.util.StartupLoggingUtils;
 import org.apache.solr.util.configuration.SSLConfigurationsFactory;
 import org.apache.solr.util.tracing.GlobalTracer;
 import org.apache.zookeeper.KeeperException;
+import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.server.HttpOutput;
 import org.eclipse.jetty.util.Callback;
 import org.slf4j.Logger;
@@ -731,6 +732,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         log.info("Could not consume full client request", e);
       }
     }
+// ;
   }
   
   /**
