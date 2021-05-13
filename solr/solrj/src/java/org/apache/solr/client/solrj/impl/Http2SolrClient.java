@@ -251,7 +251,7 @@ public class Http2SolrClient extends SolrClient {
     //httpClientExecutor.setLowThreadsThreshold(-1);
     // section SolrQTP
     SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads);
-    httpClientExecutor.setStopTimeout(100);
+    httpClientExecutor.setStopTimeout(0);
 
         // SolrQTP httpClientExecutor = new SolrQTP("Http2SolrClient-" + builder.name, maxThreads, minThreads, new MPMCQueue.RunnableBlockingQueue());
 //    try {
@@ -358,11 +358,11 @@ public class Http2SolrClient extends SolrClient {
     assert closeTracker != null ? closeTracker.close() : true;
     boolean closed = true;
     try {
-      try {
-        waitForOutstandingRequests(30, TimeUnit.SECONDS);
-      } catch (TimeoutException timeoutException) {
-        log.info("Timeout waiting for outstanding requests on close");
-      }
+//      try {
+//        waitForOutstandingRequests(30, TimeUnit.SECONDS);
+//      } catch (TimeoutException timeoutException) {
+//        log.info("Timeout waiting for outstanding requests on close");
+//      }
       org.apache.solr.common.util.IOUtils.closeQuietly(asyncTracker);
 
       if (closeClient) {

@@ -335,7 +335,8 @@ public class SolrTestCase extends Assert {
       System.setProperty("urlScheme", "http");
     }
 
-    System.setProperty("lucene.cms.override_spins", "true"); // TODO: detecting spins for every core, every IW#ConcurrentMergeScheduler can be a bit costly, let's detect and cache somehow?
+    System.setProperty("lucene.cms.override_spins", "false"); // TODO: detecting spins for every core, every IW#ConcurrentMergeScheduler can be a bit costly, let's detect and cache somehow?
+    System.setProperty("solr.skipNrtDirSync", "true");
 
     System.setProperty("solr.jettyRunnerThreadPoolMaxSize", "128");
     System.setProperty("solr.waitForLeaderInZkRegSec", "5");
