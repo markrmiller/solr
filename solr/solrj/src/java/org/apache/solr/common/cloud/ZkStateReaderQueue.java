@@ -235,108 +235,84 @@ public class ZkStateReaderQueue implements Closeable {
         return CompletableFuture.completedFuture(null);
       }
 
-      //      Stat stat;
-      //      try {
-      //        stat = getZkClient().exists(stateUpdatesPath, null, true, false);
-      //        if (stat == null) {
-      //          log.debug("stateUpdatesPath not found {}", stateUpdatesPath);
-      //          return docCollection;
-      //        }
-      //      } catch (NoNodeException e) {
-      //        log.info("No node found for {}", stateUpdatesPath);
-      //        return docCollection;
-      //      }
-      //
-      //      Integer oldVersion = docCollection.getStateUpdatesZkVersion();
-      //      if (stat.getVersion() < oldVersion) {
-      //        if (log.isDebugEnabled())
-      //          log.debug("Will not apply state updates based on updates znode, they are for an older set of updates {}, ours is now {}", stat.getVersion(),
-      //              oldVersion);
-      //        return docCollection;
-      //      }
+      String stateUpdatesPath = ZkStateReader.getCollectionStateUpdatesPath(docCollection.getName());
+      CompletableFuture<DocCollection> future = new CompletableFuture<>();
+      zkClient.getData(stateUpdatesPath, null, (rc, path, ctx, zkdata, stat) -> {
+        if (rc != 0) {
+          KeeperException e = KeeperException.create(KeeperException.Code.get(rc), path);
+          future.completeExceptionally(e);
+        } else {
+            if (zkdata == null) {
+              log.debug("No data found for {}", stateUpdatesPath);
+              future.complete(docCollection);
+            }
 
-      return CompletableFuture.supplyAsync(() -> {
+            Map<Integer,Integer> m = null;
+            try {
+              m = Collections.unmodifiableMap(new LinkedHashMap<>((Map) Utils.fromJavabin(zkdata)));
+            } catch (IOException e) {
+              log.error("Exception parsing return data for state updates", e);
+              throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception parsing return data for state updates", e);
+            }
+            log.debug("Got additional state updates {}", m);
 
-        String stateUpdatesPath = ZkStateReader.getCollectionStateUpdatesPath(docCollection.getName());
-        byte[] data = EMPTY_BYTES;
-        Stat stat2 = new Stat();
+            if (m.size() == 0) {
+              log.debug("No updates found at {} {} {} {}", stateUpdatesPath, zkdata.length, new String(zkdata), stat.getVersion());
+              future.complete(docCollection);
+            }
 
-        try {
-          data = zkClient.getData(stateUpdatesPath, null, stat2, true, false);
-        } catch (KeeperException e) {
-          log.error("Exception fetching state updates from ZK", e);
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception fetching state updates from ZK", e);
-        } catch (InterruptedException e) {
-          log.error("Exception fetching state updates from ZK", e);
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception fetching state updates from ZK", e);
-        }
+            log.debug("Got additional state updates for {} with znode version {} current DocCollection version is {} updates={}", docCollection, stat.getVersion(),
+                    docCollection.getStateUpdatesZkVersion(), m);
 
-        if (data == null) {
-          log.debug("No data found for {}", stateUpdatesPath);
-          return docCollection;
-        }
+            int stateUpdatesVersion = stat.getVersion();
 
-        Map<Integer,Integer> m = null;
-        try {
-          m = Collections.unmodifiableMap(new LinkedHashMap<>((Map) Utils.fromJavabin(data)));
-        } catch (IOException e) {
-          log.error("Exception parsing return data for state updates", e);
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception parsing return data for state updates", e);
-        }
-        log.debug("Got additional state updates {}", m);
+            if (stateUpdatesVersion <= docCollection.getStateUpdatesZkVersion()) {
+              log.debug("Will not apply state updates based on state state updates version, they are for an older state.json {}, ours is now {}",
+                      stat.getVersion(), docCollection.getStateUpdatesZkVersion());
+              future.complete(docCollection);
+            }
 
-        if (m.size() == 0) {
-          log.debug("No updates found at {} {} {} {}", stateUpdatesPath, data.length, new String(data), stat2.getVersion());
-          return docCollection;
-        }
+            Set<Map.Entry<Integer,Integer>> entrySet = m.entrySet();
 
-        log.debug("Got additional state updates for {} with znode version {} current DocCollection version is {} updates={}", docCollection, stat2.getVersion(),
-            docCollection.getStateUpdatesZkVersion(), m);
+            for (Map.Entry<Integer,Integer> entry : entrySet) {
+              if (log.isTraceEnabled()) {
+                log.trace("update state for {} replica id={} state={} zkversion={}", docCollection.toString(), entry.getKey(), entry.getValue(),
+                        stateUpdatesVersion);
+              }
 
-        int stateUpdatesVersion = stat2.getVersion();
+              Integer state = entry.getValue();
 
-        if (stateUpdatesVersion <= docCollection.getStateUpdatesZkVersion()) {
-          log.debug("Will not apply state updates based on state state updates version, they are for an older state.json {}, ours is now {}",
-              stat2.getVersion(), docCollection.getStateUpdatesZkVersion());
-          return docCollection;
-        }
-
-        Set<Map.Entry<Integer,Integer>> entrySet = m.entrySet();
-
-        for (Map.Entry<Integer,Integer> entry : entrySet) {
-          if (log.isTraceEnabled()) {
-            log.trace("update state for {} replica id={} state={} zkversion={}", docCollection.toString(), entry.getKey(), entry.getValue(),
-                stateUpdatesVersion);
-          }
-
-          Integer state = entry.getValue();
-
-          if (state == 1) {
-            Replica replica = docCollection.getReplicaById(entry.getKey());
-            if (replica != null) {
-              String sliceName = replica.getSlice();
-              if (sliceName != null) {
-                Slice slice = docCollection.getSlice(sliceName);
-                if (slice != null) {
-                  Collection<Replica> replicas = slice.getReplicas();
-                  for (Replica r : replicas) {
-                    if (!r.getInternalId().equals(entry.getKey()) && r.getRawState() == Replica.State.LEADER) {
-                      docCollection.updateState(r.getInternalId(), 5);
+              if (state == 1) {
+                Replica replica = docCollection.getReplicaById(entry.getKey());
+                if (replica != null) {
+                  String sliceName = replica.getSlice();
+                  if (sliceName != null) {
+                    Slice slice = docCollection.getSlice(sliceName);
+                    if (slice != null) {
+                      Collection<Replica> replicas = slice.getReplicas();
+                      for (Replica r : replicas) {
+                        if (!r.getInternalId().equals(entry.getKey()) && r.getRawState() == Replica.State.LEADER) {
+                          docCollection.updateState(r.getInternalId(), 5);
+                        }
+                      }
                     }
                   }
                 }
               }
+
+              docCollection.updateState(entry.getKey(), entry.getValue());
             }
+
+            log.debug("finished a new doc state based on state update diff {}", docCollection);
+
+            docCollection.setStateUpdatesZkVersion(stateUpdatesVersion);
+
+            future.complete(docCollection);
           }
+        }, true);
 
-          docCollection.updateState(entry.getKey(), entry.getValue());
-        }
+      return future;
 
-        log.debug("finished a new doc state based on state update diff {}", docCollection);
-
-        docCollection.setStateUpdatesZkVersion(stateUpdatesVersion);
-        return docCollection;
-      }, ParWork.getRootSharedExecutor()); // uses common pool, no IO
     } catch (Exception e) {
       log.error("{} exception trying to process additional state updates", docCollection == null ? "(null)" : docCollection.getName(), e);
       return CompletableFuture.failedFuture(new SolrException(SolrException.ErrorCode.SERVER_ERROR, e));
@@ -363,28 +339,40 @@ public class ZkStateReaderQueue implements Closeable {
   }
 
   // region fetch
-  CompletableFuture<DocCollection> fetchCollectionState(String collection) {
+  CompletableFuture<DocCollection> fetchCollectionState(String collection) throws InterruptedException, KeeperException {
     String collectionPath = ZkStateReader.getCollectionPath(collection);
     if (log.isDebugEnabled()) log.debug("Looking at fetching full clusterstate collection={}", collection);
 
     docCollUpdateRequests.mark();
 
     log.debug("getting latest state.json for {}", collection);
-
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        Stat stat = new Stat();
-        byte[] data = zkClient.getData(collectionPath, null, stat);
-        return ClusterState.createDocCollectionFromJson(stat.getVersion(), data);
-
-      } catch (KeeperException.NoNodeException e) {
-        log.debug("no state.json znode found");
-        return null;
-      } catch (Exception e) {
-        log.debug("Exception getting and parsing state.json");
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception getting and parsing state.json", e);
+    CompletableFuture<DocCollection> future = new CompletableFuture<>();
+    CompletableFuture<DocCollection> returnFuture = future.thenCompose(docCollection -> getAndProcessStateUpdates(docCollection));
+    zkClient.getData(collectionPath, null, (rc, path, ctx, zkdata, stat) -> {
+      if (rc != 0) {
+        KeeperException e = KeeperException.create(KeeperException.Code.get(rc), path);
+        future.completeExceptionally(e);
+      } else {
+        future.complete(ClusterState.createDocCollectionFromJson(stat.getVersion(), zkdata));
       }
-    }, ParWork.getRootSharedExecutor()).thenCompose(docCollection -> getAndProcessStateUpdates(docCollection));
+
+    }, true);
+
+    return returnFuture;
+//    return CompletableFuture.supplyAsync(() -> {
+//      try {
+//        Stat stat = new Stat();
+//        byte[] data = zkClient.getData(collectionPath, null, stat);
+//        return ClusterState.createDocCollectionFromJson(stat.getVersion(), data);
+//
+//      } catch (KeeperException.NoNodeException e) {
+//        log.debug("no state.json znode found");
+//        return null;
+//      } catch (Exception e) {
+//        log.debug("Exception getting and parsing state.json");
+//        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Exception getting and parsing state.json", e);
+//      }
+//    }, ParWork.getRootSharedExecutor()).thenCompose(docCollection -> getAndProcessStateUpdates(docCollection));
   }
 
 //  private void processDocCollection(FetchStateUpdatesRequest fetchStateUpdatesRequest, DocCollection docCollection) {

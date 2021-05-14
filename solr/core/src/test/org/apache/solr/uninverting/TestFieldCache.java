@@ -280,7 +280,7 @@ public class TestFieldCache extends SolrTestCase {
 
   public void testEmptyIndex() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter writer= new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())).setMaxBufferedDocs(500));
+    IndexWriter writer= new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig().setMaxBufferedDocs(500));
     writer.close();
     IndexReader r = DirectoryReader.open(dir);
     LeafReader reader = SlowCompositeReaderWrapper.wrap(r);
@@ -452,17 +452,12 @@ public class TestFieldCache extends SolrTestCase {
     SolrTestCaseUtil.expectThrows(IllegalStateException.class, () -> {
       new DocTermOrds(ar, null, "sorted");
     });
-    
-    binary = FieldCache.DEFAULT.getTerms(ar, "sorted");
-    assertEquals(0, binary.nextDoc());
 
-    BytesRef scratch = binary.binaryValue();
-    assertEquals("sorted value", scratch.utf8ToString());
-    
     SortedDocValues sorted = FieldCache.DEFAULT.getTermsIndex(ar, "sorted");
     assertEquals(0, sorted.nextDoc());
     assertEquals(0, sorted.ordValue());
     assertEquals(1, sorted.getValueCount());
+    BytesRef scratch = sorted.lookupOrd(sorted.ordValue());
     assertEquals("sorted value", scratch.utf8ToString());
     
     SortedSetDocValues sortedSet = FieldCache.DEFAULT.getDocTermOrds(ar, "sorted", null);
@@ -685,7 +680,7 @@ public class TestFieldCache extends SolrTestCase {
   // Make sure that the use of GrowableWriter doesn't prevent from using the full int range
   public void testIntFieldCache() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig cfg = SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig cfg = SolrTestUtil.newIndexWriterConfig();
     cfg.setMergePolicy(LuceneTestCase.newLogMergePolicy());
     SolrRandomIndexWriter iw = new SolrRandomIndexWriter(SolrTestCase.random(), dir, cfg);
     Document doc = new Document();

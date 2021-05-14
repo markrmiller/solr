@@ -1601,7 +1601,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   
   public void testEmptyStringVsNullStringSort() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter w = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
+    IndexWriter w = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("f", "", Field.Store.NO));
     doc.add(SolrTestUtil.newStringField("t", "1", Field.Store.NO));

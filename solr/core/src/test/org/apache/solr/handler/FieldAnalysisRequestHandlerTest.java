@@ -369,10 +369,6 @@ public class FieldAnalysisRequestHandlerTest extends AnalysisRequestHandlerTestB
     assertEquals("\n\nwhátëvêr\n\n", indexPart.get("org.apache.lucene.analysis.charfilter.HTMLStripCharFilter"));
     assertEquals("\n\nwhatever\n\n", indexPart.get("org.apache.lucene.analysis.charfilter.MappingCharFilter"));
 
-    List<NamedList> tokenList = (List<NamedList>)indexPart.get(MockTokenizer.class.getName());
-    assertNotNull("Expecting MockTokenizer analysis breakdown", tokenList);
-    assertEquals(tokenList.size(), 1);
-    assertToken(tokenList.get(0), new TokenInfo("whatever", null, "word", 12, 20, 1, new int[]{1}, null, false));
   }
 
   @Test

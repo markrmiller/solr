@@ -267,7 +267,7 @@ public class TestLegacyFieldCache extends SolrTestCase {
   
   public void testDocValuesIntegration() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig(null);
+    IndexWriterConfig iwc = SolrTestUtil.newIndexWriterConfig(null);
     SolrRandomIndexWriter iw = new SolrRandomIndexWriter(SolrTestCase.random(), dir, iwc);
     Document doc = new Document();
     doc.add(new BinaryDocValuesField("binary", new BytesRef("binary value")));

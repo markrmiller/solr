@@ -271,7 +271,7 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
 
     cluster.waitForActiveCollection(COLLECTION, 1, 3);
 
-    assertDocsExistInAllReplicas(leader, notLeaders, COLLECTION, 1, TEST_NIGHTLY ? 1000 : 100, deletedDocs);
+    assertDocsExistInAllReplicas(leader, notLeaders, COLLECTION, 1, TEST_NIGHTLY ? 500 : 100, deletedDocs);
 
   }
 

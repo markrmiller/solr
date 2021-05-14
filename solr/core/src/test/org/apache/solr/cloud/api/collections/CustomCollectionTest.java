@@ -128,6 +128,7 @@ public class CustomCollectionTest extends SolrCloudTestCase {
   @Ignore // MRM TODO: something flkey here on doc counts at the end
   public void testRouteFieldForImplicitRouter() throws Exception {
 
+    int numShards = 4;
     int replicationFactor = TestUtil.nextInt(random(), 0, 3) + 2;
 
     String shard_fld = "shard_s";
@@ -144,8 +145,6 @@ public class CustomCollectionTest extends SolrCloudTestCase {
         .add("id", "8", shard_fld, "b")
         .commit(cluster.getSolrClient(), collection);
 
-   // new UpdateRequest().commit(cluster.getSolrClient(), collection);
-
     assertEquals(3, cluster.getSolrClient().query(collection, new SolrQuery("*:*")).getResults().getNumFound());
     assertEquals(1, cluster.getSolrClient().query(collection, new SolrQuery("*:*").setParam(_ROUTE_, "b")).getResults().getNumFound());
     assertEquals(2, cluster.getSolrClient().query(collection, new SolrQuery("*:*").setParam(_ROUTE_, "a")).getResults().getNumFound());
@@ -158,11 +157,9 @@ public class CustomCollectionTest extends SolrCloudTestCase {
     String collectionName = "routeFieldColl";
     int numShards = 4;
     int replicationFactor = 2;
-    int maxShardsPerNode = ((numShards * replicationFactor) / NODE_COUNT) + 1;
     String shard_fld = "shard_s";
 
     CollectionAdminRequest.createCollection(collectionName, "conf", numShards, replicationFactor)
-        .setMaxShardsPerNode(maxShardsPerNode)
         .setRouterField(shard_fld)
         .process(cluster.getSolrClient());
 
