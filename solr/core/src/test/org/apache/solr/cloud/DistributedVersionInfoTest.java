@@ -48,10 +48,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -147,8 +145,8 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
     final Set<Integer> deletedDocs = ConcurrentHashMap.newKeySet();
     final AtomicInteger docsSent = new AtomicInteger(0);
     final Random rand = new Random(5150);
-    Thread docSenderThread = new Thread() {
-      public void run() {
+    Callable docSenderThread = new Callable() {
+      public Object call() {
 
         // brief delay before sending docs
         try {
@@ -174,11 +172,12 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
             log.error("Fail id=" + docId, e);
           }
         }
+        return null;
       }
     };
 
-    Thread reloaderThread = new Thread() {
-      public void run() {
+    Callable reloaderThread = new Callable() {
+      public Object call()  {
         try {
           Thread.sleep(rand.nextInt(300)+1);
         } catch (InterruptedException e) {}
@@ -194,11 +193,12 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
             Thread.sleep(rand.nextInt(300)+300);
           } catch (InterruptedException e) {}
         }
+        return null;
       }
     };
 
-    Thread deleteThread = new Thread() {
-      public void run() {
+    Callable deleteThread = new Callable() {
+      public Object call() {
 
         // brief delay before sending docs
         try {
@@ -222,11 +222,12 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
             }
           }
         }
+        return null;
       }
     };
 
-    Thread committerThread = new Thread() {
-      public void run() {
+    Callable committerThread = new Callable() {
+      public Object call() {
         try {
           Thread.sleep(rand.nextInt(200)+1);
         } catch (InterruptedException e) {}
@@ -241,20 +242,14 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
           try {
             Thread.sleep(rand.nextInt(100)+100);
           } catch (InterruptedException e) {}
+          return null;
         }
+        return null;
       }
     };
 
 
-    docSenderThread.start();
-    reloaderThread.start();
-    committerThread.start();
-    deleteThread.start();
-
-    docSenderThread.join();
-    reloaderThread.join();
-    committerThread.join();
-    deleteThread.join();
+    getTestExecutor().invokeAll(Arrays.<Callable<Object>>asList(new Callable[]{committerThread,docSenderThread,reloaderThread,deleteThread}));
 
     cluster.getSolrClient().commit(COLLECTION);
 

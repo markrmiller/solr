@@ -185,7 +185,7 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
     throws Exception {
     
     final int softCommitWaitMillis = 50;
-    final int hardCommitWaitMillis = 400;
+    final int hardCommitWaitMillis = 200;
     final int commitWithin = commitWithinType.useValue(softCommitWaitMillis, hardCommitWaitMillis);
     
     CommitTracker hardTracker = updater.commitTracker;
@@ -314,8 +314,8 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
   private void doTestSoftAndHardCommitMaxTimeDelete(final CommitWithinType commitWithinType)
     throws Exception {
     
-    final int softCommitWaitMillis = 100;
-    final int hardCommitWaitMillis = 400;
+    final int softCommitWaitMillis = 50;
+    final int hardCommitWaitMillis = 200;
     final int commitWithin = commitWithinType.useValue(softCommitWaitMillis, hardCommitWaitMillis);
 
     CommitTracker hardTracker = updater.commitTracker;
@@ -388,11 +388,11 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
                searcher529 <= hard529);
 
     // ensure we wait for the last searcher we triggered with 550
-    monitor.searcher.poll(2000, MILLISECONDS);
+    monitor.searcher.poll(500, MILLISECONDS);
     
     // ensure we wait for the commits on 550
-    monitor.hard.poll(2000, MILLISECONDS);
-    monitor.soft.poll(2000, MILLISECONDS);
+    monitor.hard.poll(500, MILLISECONDS);
+    monitor.soft.poll(500, MILLISECONDS);
     
     // clear commits
     monitor.hard.clear();
