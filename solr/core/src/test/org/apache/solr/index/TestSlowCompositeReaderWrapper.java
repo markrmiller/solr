@@ -44,7 +44,7 @@ import org.apache.solr.SolrTestUtil;
 public class TestSlowCompositeReaderWrapper extends SolrTestCase {
 
   public void testCoreListenerOnSlowCompositeReaderWrapper() throws IOException {
-    RandomIndexWriter w = new RandomIndexWriter(random(), SolrTestUtil.newDirectory());
+    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), SolrTestUtil.newDirectory(), SolrTestUtil.newIndexWriterConfig());
     final int numDocs = TestUtil.nextInt(random(), 1, 5);
     for (int i = 0; i < numDocs; ++i) {
       w.addDocument(new Document());
@@ -128,7 +128,7 @@ public class TestSlowCompositeReaderWrapper extends SolrTestCase {
 
   public void testTermsAreCached() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, LuceneTestCase.newIndexWriterConfig().setMergePolicy(NoMergePolicy.INSTANCE));
+    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig().setMergePolicy(NoMergePolicy.INSTANCE));
     Document doc = new Document();
     doc.add(new TextField("text", "hello world", Field.Store.NO));
     w.addDocument(doc);

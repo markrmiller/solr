@@ -67,7 +67,7 @@ public class TestLegacyTerms extends SolrTestCase {
   
   public void testLongFieldMinMax() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir);
+    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
     int numDocs = SolrTestUtil.atLeast(100);
     long minValue = Long.MAX_VALUE;
     long maxValue = Long.MIN_VALUE;

@@ -224,8 +224,8 @@ public class TestOrdValues extends SolrTestCase {
     }
     // prepare a small index with just a few documents.
     dir = SolrTestUtil.newDirectory();
-    anlzr = new MockAnalyzer(SolrTestCase.random());
-    IndexWriterConfig iwc = SolrTestUtil.newIndexWriterConfig(anlzr).setMergePolicy(LuceneTestCase.newLogMergePolicy());
+
+    IndexWriterConfig iwc = SolrTestUtil.newIndexWriterConfig().setMergePolicy(SolrTestUtil.newLogMergePolicy());
     if (doMultiSegment) {
       iwc.setMaxBufferedDocs(TestUtil.nextInt(random(), 2, 7));
     }

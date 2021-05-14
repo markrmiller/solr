@@ -161,7 +161,7 @@ public class TestFilteredDocIdSet extends SolrTestCase {
 
   public void testNullIteratorFilteredDocIdSet() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("c", "val", Field.Store.NO));
     writer.addDocument(doc);

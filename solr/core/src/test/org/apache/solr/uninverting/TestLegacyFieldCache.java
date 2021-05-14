@@ -68,7 +68,7 @@ public class TestLegacyFieldCache extends SolrTestCase {
   public static void beforeTestLegacyFieldCache() throws Exception {
     NUM_DOCS = SolrTestUtil.atLeast(500);
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer= new RandomIndexWriter(SolrTestCase.random(), directory, LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())).setMergePolicy(LuceneTestCase.newLogMergePolicy()));
+    RandomIndexWriter writer= new RandomIndexWriter(SolrTestCase.random(), directory, SolrTestUtil.newIndexWriterConfig().setMergePolicy(LuceneTestCase.newLogMergePolicy()));
     long theLong = Long.MAX_VALUE;
     double theDouble = Double.MAX_VALUE;
     int theInt = Integer.MAX_VALUE;

@@ -254,7 +254,7 @@ public class TestDocTermOrds extends SolrTestCase {
     
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
 
-    IndexWriterConfig conf = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig conf = LuceneTestCase.newIndexWriterConfig();
 
     // Sometimes swap in codec that impls ord():
     if (random().nextInt(10) == 7) {

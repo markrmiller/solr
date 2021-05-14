@@ -108,7 +108,7 @@ public class TestStressLucene extends TestRTGBase {
 
     Directory dir = SolrTestUtil.newDirectory();
 
-    final RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
+    final RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
     writer.setDoRandomForceMergeAssert(false);
 
     // writer.commit();

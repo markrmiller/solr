@@ -532,7 +532,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int, specifying the missing value should be treated as Integer.MAX_VALUE */
   public void testIntMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
