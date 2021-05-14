@@ -96,7 +96,7 @@
 
        solr.StandardDirectoryFactory is filesystem
        based and tries to pick the best implementation for the current
-       JVM and platform.  solr.NRTCachingDirectoryFactory, the default,
+       JVM and platform.  solr.NRTCachingDirectoryFactory
        wraps solr.StandardDirectoryFactory and caches small files in memory
        for better NRT performance.
 
@@ -106,7 +106,7 @@
        solr.RAMDirectoryFactory is memory based and not persistent.
     -->
   <directoryFactory name="DirectoryFactory"
-                    class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
+                    class="${solr.directoryFactory:solr.StandardDirectoryFactory}"/>
 
   <!-- The CodecFactory for defining the format of the inverted index.
        The default implementation is SchemaCodecFactory, which is the official Lucene

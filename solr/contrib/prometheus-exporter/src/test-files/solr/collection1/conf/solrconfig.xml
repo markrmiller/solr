@@ -23,7 +23,7 @@
   <dataDir>${solr.data.dir:}</dataDir>
 
   <directoryFactory name="DirectoryFactory"
-                    class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
+                    class="${solr.directoryFactory:solr.StandardDirectoryFactory}"/>
 
   <codecFactory class="solr.SchemaCodecFactory"/>
 

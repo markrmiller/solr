@@ -411,15 +411,19 @@ public abstract class SolrCall {
           out.sendContent(buffer, new Callback() {
             @Override public void succeeded() {
               Callback.super.succeeded();
-              ExpandableBuffers.getInstance().release(outStream.buffer());
-              req.getAsyncContext().complete();
+              try {
+                ExpandableBuffers.getInstance().release(outStream.buffer());
+              } finally {
+                req.getAsyncContext().complete();
+              }
             }
 
             @Override public void failed(Throwable t) {
               Callback.super.failed(t);
-              ExpandableBuffers.getInstance().release(outStream.buffer());
+
               log.error("Solr ran into an unexpected problem", t);
               try {
+                ExpandableBuffers.getInstance().release(outStream.buffer());
               //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
                 SolrDispatchFilter.sendException(t, SolrCall.this, req, response);
               } catch (IOException ioException) {

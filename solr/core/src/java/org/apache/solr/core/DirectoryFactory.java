@@ -333,8 +333,7 @@ gget   * @throws IOException If there is a low-level I/O error.
       dirFactory.initCoreContainer(cc);
       dirFactory.init(info.initArgs);
     } else {
-      log.debug("solr.NRTCachingDirectoryFactory");
-      dirFactory = new NRTCachingDirectoryFactory();
+      dirFactory = new StandardDirectoryFactory();
       dirFactory.initCoreContainer(cc);
     }
     return dirFactory;
