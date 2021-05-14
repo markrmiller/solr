@@ -66,7 +66,7 @@ public class TestDocTermOrds extends SolrTestCase {
 
   public void testEmptyIndex() throws IOException {
     final Directory dir = SolrTestUtil.newDirectory();
-    final IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
+    final IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig());
     iw.close();
     
     final DirectoryReader ir = DirectoryReader.open(dir);
@@ -155,7 +155,7 @@ public class TestDocTermOrds extends SolrTestCase {
     
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
 
-    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig();
 
     // Sometimes swap in codec that impls ord():
     if (random().nextInt(10) == 7) {

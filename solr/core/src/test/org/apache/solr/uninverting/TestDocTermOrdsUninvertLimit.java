@@ -54,7 +54,7 @@ public class TestDocTermOrdsUninvertLimit extends SolrTestCase {
     // disk based Directory and IWC settings to reduce risk of OOM
     Directory dir = LuceneTestCase.newFSDirectory(SolrTestUtil.createTempDir("TestDocTermOrdsUninvertLimit"));
     final IndexWriter w = new IndexWriter(dir,
-                                          new IndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
+                                          new IndexWriterConfig()
                                           .setMaxBufferedDocs(IndexWriterConfig.DISABLE_AUTO_FLUSH)
                                           .setRAMBufferSizeMB(256.0)
                                           .setMergeScheduler(new ConcurrentMergeScheduler())
