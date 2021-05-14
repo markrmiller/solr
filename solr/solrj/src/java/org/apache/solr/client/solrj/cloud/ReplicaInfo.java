@@ -175,28 +175,7 @@ public class ReplicaInfo implements MapWriter {
     }
   }
 
-  @Override
-  public boolean equals(Object o) {
-    if (o == null) {
-      return false;
-    }
-    if (!(o instanceof ReplicaInfo)) {
-      return false;
-    }
-    ReplicaInfo other = (ReplicaInfo)o;
-    if (
-        name.equals(other.name) &&
-        collection.equals(other.collection) &&
-        isLeader == other.isLeader &&
-        node.equals(other.node) &&
-        shard.equals(other.shard) &&
-        type == other.type &&
-        variables.equals(other.variables)) {
-      return true;
-    } else {
-      return false;
-    }
-  }
+
 
   @Override
   public String toString() {
@@ -205,5 +184,18 @@ public class ReplicaInfo implements MapWriter {
 
   public String getNode() {
     return node;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    ReplicaInfo that = (ReplicaInfo) o;
+    return isLeader == that.isLeader && name.equals(that.name) && collection.equals(that.collection) && shard.equals(that.shard) && type == that.type && node.equals(that.node) && variables.equals(that.variables);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(name, collection, shard, type, node, isLeader, variables);
   }
 }

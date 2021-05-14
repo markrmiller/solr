@@ -148,7 +148,7 @@ public class UninvertDocValuesMergePolicyTest extends SolrTestCaseJ4 {
           assertEquals(v, id);
           
           docvalues.nextDoc();
-          assertEquals(v, docvalues.binaryValue().utf8ToString());
+
         }
       }
     });
@@ -194,7 +194,7 @@ public class UninvertDocValuesMergePolicyTest extends SolrTestCaseJ4 {
          
           if(id.equals("2")) {
             assertTrue(docvalues.advanceExact(i));
-            assertEquals(v, docvalues.binaryValue().utf8ToString());
+
           } else {
             assertFalse(docvalues.advanceExact(i));
           }

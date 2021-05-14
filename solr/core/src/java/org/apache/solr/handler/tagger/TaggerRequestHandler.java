@@ -36,9 +36,9 @@ import java.util.concurrent.Callable;
 
 import com.google.common.io.CharStreams;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenFilterFactory;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.core.StopFilterFactory;
-import org.apache.lucene.analysis.util.TokenFilterFactory;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.Terms;

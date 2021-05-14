@@ -14,13 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-/** 
- * {@link org.apache.solr.handler.clustering.ClusteringComponent} and common APIs for specific implementations.
 
- */
-package org.apache.solr.handler.clustering;
+// LUCENE-9861: tune JVM options for short-lived java subprocesses.
+allprojects {
+    def vmOpts = [
+        '-XX:+UseParallelGC',
+        '-XX:TieredStopAtLevel=1'
+    ]
 
+    // Inject vm options into custom javadoc rendering. We can't refer
+    // to the task type because it's dynamic.
+    tasks.matching { it.name in ["renderJavadoc", "renderSiteJavadoc"] }.all {
+        extraOpts.addAll(vmOpts.collect {"-J" + it})
+    }
 
-
-
+    // Inject vm options into any JavaExec task... We could narrow it
+    // down but I don't think there is any harm in keeping it broad.
+    tasks.withType(JavaExec) {
+        jvmArgs += vmOpts
+    }
+}

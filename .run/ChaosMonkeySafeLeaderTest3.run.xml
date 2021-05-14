@@ -1,6 +1,5 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="ChaosMonkeySafeLeaderTest3" type="JUnit" factoryName="JUnit">
-    <module name="lucene-solr.solr.core.test" />
     <useClassPathOnly />
     <extension name="History Recorder Settings" includeConstructors="false" includeGettersSetters="false" minMethodSize="2" maxBreakpointsPerMethod="5" maxBreakpoints="200" maxDepthVariables="3" mode="1" nrCollectionItems="5" includeCollections="true" nrFieldsToShow="10" />
     <extension name="coverage">

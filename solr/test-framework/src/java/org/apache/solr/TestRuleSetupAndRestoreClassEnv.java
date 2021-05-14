@@ -34,8 +34,7 @@ import org.apache.lucene.codecs.asserting.AssertingDocValuesFormat;
 import org.apache.lucene.codecs.asserting.AssertingPostingsFormat;
 import org.apache.lucene.codecs.cheapbastard.CheapBastardCodec;
 import org.apache.lucene.codecs.compressing.CompressingCodec;
-import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat;
-import org.apache.lucene.codecs.lucene86.Lucene86Codec;
+import org.apache.lucene.codecs.lucene90.Lucene90StoredFieldsFormat;
 import org.apache.lucene.codecs.mockrandom.MockRandomPostingsFormat;
 import org.apache.lucene.codecs.simpletext.SimpleTextCodec;
 import org.apache.lucene.index.RandomCodec;
@@ -178,9 +177,6 @@ final class TestRuleSetupAndRestoreClassEnv extends AbstractBeforeAfterRule {
       codec = new AssertingCodec();
     } else if ("Compressing".equals(TEST_CODEC) || ("random".equals(TEST_CODEC) && randomVal == 6 && !shouldAvoidCodec("Compressing"))) {
       codec = CompressingCodec.randomInstance(random);
-    } else if ("Lucene84".equals(TEST_CODEC) || ("random".equals(TEST_CODEC) && randomVal == 5 && !shouldAvoidCodec("Lucene84"))) {
-      codec = new Lucene86Codec(RandomPicks.randomFrom(random, Lucene50StoredFieldsFormat.Mode.values())
-      );
     } else if (!"random".equals(TEST_CODEC)) {
       codec = Codec.forName(TEST_CODEC);
     } else if ("random".equals(TEST_POSTINGSFORMAT)) {
@@ -214,25 +210,6 @@ final class TestRuleSetupAndRestoreClassEnv extends AbstractBeforeAfterRule {
           Arrays.toString(avoidCodecs.toArray()));
       throw e;
     }
-
-    // We have "stickiness" so that sometimes all we do is vary the RAM buffer size, other times just the doc count to flush by, else both.
-    // This way the assertMemory in DocumentsWriterFlushControl sometimes runs (when we always flush by RAM).
-    LuceneTestCase.LiveIWCFlushMode flushMode;
-    switch (SolrTestCase.random().nextInt(3)) {
-    case 0:
-      flushMode = LuceneTestCase.LiveIWCFlushMode.BY_RAM;
-      break;
-    case 1:
-      flushMode = LuceneTestCase.LiveIWCFlushMode.BY_DOCS;
-      break;
-    case 2:
-      flushMode = LuceneTestCase.LiveIWCFlushMode.EITHER;
-      break;
-    default:
-      throw new AssertionError();
-    }
-
-    LuceneTestCase.setLiveIWCFlushMode(flushMode);
 
     initialized = true;
   }

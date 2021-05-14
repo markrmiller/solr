@@ -203,7 +203,7 @@ abstract public class SolrJettyTestBase extends SolrTestCaseJ4
 
     String legacyExampleSolrHome = null;
     try {
-      File tempSolrHome = LuceneTestCase.createTempDir().toFile();
+      File tempSolrHome = SolrTestUtil.createTempDir().toFile();
       org.apache.commons.io.FileUtils.copyFileToDirectory(new File(sourceHome, "server/solr/solr.xml"), tempSolrHome);
       File collection1Dir = new File(tempSolrHome, "collection1");
       org.apache.commons.io.FileUtils.forceMkdir(collection1Dir);

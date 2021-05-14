@@ -16,19 +16,19 @@
  */
 package org.apache.solr.util;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
-import java.nio.charset.StandardCharsets;
-
-import org.apache.lucene.analysis.util.ResourceLoader;
+import org.apache.lucene.util.ResourceLoader;
 import org.apache.solr.SolrTestCase;
 import org.apache.solr.SolrTestCaseUtil;
 import org.junit.Ignore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.nio.charset.StandardCharsets;
 
 @Ignore // MRM TODO: fix good XML object reuse change to work with this test
 public class TestSafeXMLParsing extends SolrTestCase {

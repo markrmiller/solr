@@ -31,6 +31,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.RandomIndexWriter;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCase;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.legacy.LegacyFloatField;
 import org.apache.solr.legacy.LegacyIntField;
 import org.apache.lucene.queries.function.FunctionQuery;
@@ -222,9 +223,9 @@ public class TestOrdValues extends SolrTestCase {
       System.out.println("TEST: setUp");
     }
     // prepare a small index with just a few documents.
-    dir = LuceneTestCase.newDirectory();
+    dir = SolrTestUtil.newDirectory();
     anlzr = new MockAnalyzer(SolrTestCase.random());
-    IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig(anlzr).setMergePolicy(LuceneTestCase.newLogMergePolicy());
+    IndexWriterConfig iwc = SolrTestUtil.newIndexWriterConfig(anlzr).setMergePolicy(LuceneTestCase.newLogMergePolicy());
     if (doMultiSegment) {
       iwc.setMaxBufferedDocs(TestUtil.nextInt(random(), 2, 7));
     }

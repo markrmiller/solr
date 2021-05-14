@@ -32,14 +32,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
-import org.apache.lucene.document.LazyDocument;
+import org.apache.lucene.document.FieldType;
+import org.apache.lucene.misc.document.LazyDocument;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.DocValuesType;
@@ -62,6 +66,7 @@ import org.apache.solr.common.SolrDocumentBase;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.response.DocsStreamer;
+import org.apache.solr.response.ResultContext;
 import org.apache.solr.schema.AbstractEnumField;
 import org.apache.solr.schema.BoolField;
 import org.apache.solr.schema.LatLonPointSpatialField;
@@ -97,7 +102,7 @@ public class SolrDocumentFetcher {
   /** Contains the names/patterns of all docValues=true,stored=false fields, excluding those that are copyField targets in the schema. */
   private final Set<String> nonStoredDVsWithoutCopyTargets;
 
-  private final static int largeValueLengthCacheThreshold = Integer.getInteger("solr.largeField.cacheThreshold", 512 * 1024); // internal setting
+  private static int largeValueLengthCacheThreshold = Integer.getInteger("solr.largeField.cacheThreshold", 512 * 1024); // internal setting
 
   private final Set<String> largeFields;
 
@@ -155,7 +160,7 @@ public class SolrDocumentFetcher {
 
   // Does this field have both stored=true and docValues=true and is otherwise
   // eligible for getting the field's value from DV?
-  private static boolean canSubstituteDvForStored(FieldInfo fieldInfo, SchemaField schemaField) {
+  private boolean canSubstituteDvForStored(FieldInfo fieldInfo, SchemaField schemaField) {
     if (!schemaField.hasDocValues() || !schemaField.stored()) return false;
     if (schemaField.multiValued()) return false;
     DocValuesType docValuesType = fieldInfo.getDocValuesType();
@@ -305,7 +310,18 @@ public class SolrDocumentFetcher {
 
     @Override
     public void stringField(FieldInfo fieldInfo, String value) throws IOException {
-      super.stringField(fieldInfo, value);
+      Predicate<String> readAsBytes = ResultContext.READASBYTES.get();
+      if (readAsBytes != null && readAsBytes.test(fieldInfo.name)) {
+        final FieldType ft = new FieldType(TextField.TYPE_STORED);
+        ft.setStoreTermVectors(fieldInfo.hasVectors());
+        ft.setOmitNorms(fieldInfo.omitsNorms());
+        ft.setIndexOptions(fieldInfo.getIndexOptions());
+        Objects.requireNonNull(value, "String value should not be null");
+        doc.add(new StoredField(fieldInfo.name, value, ft));
+      } else {
+        super.stringField(fieldInfo, value);
+      }
+
     }
 
     @Override
@@ -372,7 +388,7 @@ public class SolrDocumentFetcher {
     }
   }
 
-  private static byte[] toByteArrayUnwrapIfPossible(BytesRef bytesRef) {
+  private byte[] toByteArrayUnwrapIfPossible(BytesRef bytesRef) {
     if (bytesRef.offset == 0 && bytesRef.bytes.length == bytesRef.length) {
       return bytesRef.bytes;
     } else {
@@ -380,7 +396,7 @@ public class SolrDocumentFetcher {
     }
   }
 
-  private static String toStringUnwrapIfPossible(BytesRef bytesRef) {
+  private String toStringUnwrapIfPossible(BytesRef bytesRef) {
     if (bytesRef.offset == 0 && bytesRef.bytes.length == bytesRef.length) {
       return new String(bytesRef.bytes, StandardCharsets.UTF_8);
     } else {
@@ -534,7 +550,7 @@ public class SolrDocumentFetcher {
         if (!ndv.advanceExact(localId)) {
           return null;
         }
-        long val = ndv.longValue();
+        Long val = ndv.longValue();
         return decodeNumberFromDV(schemaField, val, false);
       case BINARY:
         BinaryDocValues bdv = leafReader.getBinaryDocValues(fieldName);
@@ -545,7 +561,7 @@ public class SolrDocumentFetcher {
       case SORTED:
         SortedDocValues sdv = leafReader.getSortedDocValues(fieldName);
         if (sdv != null && sdv.advanceExact(localId)) {
-          final BytesRef bRef = sdv.binaryValue();
+          final BytesRef bRef = sdv.lookupOrd(sdv.ordValue());
           // Special handling for Boolean fields since they're stored as 'T' and 'F'.
           if (schemaField.getType() instanceof BoolField) {
             return schemaField.getType().toObject(schemaField, bRef);
@@ -594,7 +610,7 @@ public class SolrDocumentFetcher {
     }
   }
 
-  private static Object decodeNumberFromDV(SchemaField schemaField, long value, boolean sortableNumeric) {
+  private Object decodeNumberFromDV(SchemaField schemaField, long value, boolean sortableNumeric) {
     // note: This special-case is unfortunate; if we have to add any more than perhaps the fieldType should
     //  have this method so that specific field types can customize it.
     if (schemaField.getType() instanceof LatLonPointSpatialField) {
@@ -784,7 +800,7 @@ public class SolrDocumentFetcher {
       SolrDocument sdoc = null;
       try {
         if (returnStoredFields()) {
-          Document doc = doc(luceneDocId, storedFields);
+          Document doc = doc(luceneDocId, getStoredFields());
           // make sure to use the schema from the searcher and not the request (cross-core)
           sdoc = DocsStreamer.convertLuceneDocToSolrDoc(doc, searcher.getSchema(), getReturnFields());
           if (returnDVFields() == false) {
@@ -801,7 +817,7 @@ public class SolrDocumentFetcher {
 
         // decorate the document with non-stored docValues fields
         if (returnDVFields()) {
-          decorateDocValueFields(sdoc, luceneDocId, dvFields);
+          decorateDocValueFields(sdoc, luceneDocId, getDvFields());
         }
       } catch (IOException e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error reading document with docId " + luceneDocId, e);

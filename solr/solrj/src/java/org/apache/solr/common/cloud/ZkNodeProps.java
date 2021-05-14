@@ -17,11 +17,7 @@
 package org.apache.solr.common.cloud;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.Utils;
@@ -171,12 +167,21 @@ public class ZkNodeProps implements JSONWriter.Writable {
     return Boolean.parseBoolean(o.toString());
   }
 
-  @Override
-  public boolean equals(Object that) {
-    return that instanceof ZkNodeProps && ((ZkNodeProps)that).propMap.equals(this.propMap);
-  }
 
   public int size() {
     return propMap.size();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    ZkNodeProps that = (ZkNodeProps) o;
+    return propMap.equals(that.propMap);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(propMap);
   }
 }

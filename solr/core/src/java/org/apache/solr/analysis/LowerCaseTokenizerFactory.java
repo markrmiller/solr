@@ -18,9 +18,9 @@ package org.apache.solr.analysis;
 
 import java.util.Map;
 
+import org.apache.lucene.analysis.TokenizerFactory;
 import org.apache.lucene.analysis.core.LowerCaseFilterFactory;
 import org.apache.lucene.analysis.util.CharTokenizer;
-import org.apache.lucene.analysis.util.TokenizerFactory;
 import org.apache.lucene.util.AttributeFactory;
 import org.apache.solr.core.CoreContainer;
 

@@ -21,10 +21,10 @@
 plugins {
   id 'base'
   id 'distribution'
-  id "org.beryx.runtime" version "1.11.7"
+  id 'signing'
 }
 
-description = 'Solr packaging'
+description = 'Solr distribution packaging'
 
 ext {
   distDir = file("$buildDir/solr-${version}")
@@ -39,6 +39,15 @@ configurations {
   contrib
   example
   server
+  docs
+  docker
+ // solrTgz
+  solrZip
+}
+
+artifacts {
+//  solrTgz(distTar)
+ // solrZip(distZip)
 }
 
 dependencies {
@@ -48,30 +57,35 @@ dependencies {
    ":solr:contrib:analytics",
    ":solr:contrib:extraction",
    ":solr:contrib:clustering",
-   ":solr:contrib:dataimporthandler",
-   ":solr:contrib:dataimporthandler-extras",
    ":solr:contrib:jaegertracer-configurator",
    ":solr:contrib:langid",
    ":solr:contrib:ltr",
    ":solr:contrib:prometheus-exporter",
-   ":solr:contrib:velocity",
   ].each { contribName ->
     distSolr project(contribName)
     contrib  project(path: contribName, configuration: "packaging")
   }
 
   distSolr project(":solr:core")
+  distSolr project(":solr:server")
   distSolr project(":solr:solrj")
   distSolr project(":solr:test-framework")
 
   example project(path: ":solr:example", configuration: "packaging")
   server project(path: ":solr:server", configuration: "packaging")
+
+  // Copy files from documentation output
+  docs project(path: ':solr:documentation', configuration: 'minimalSite')
+
+  docker project(path: ':solr:docker', configuration: 'packaging')
 }
 
 distributions {
   main {
     distributionBaseName = 'solr'
     contents {
+      // TODO: This is missing module README files, as compared to 8x
+
       // Manually correct posix permissions (matters when packaging on Windows).
       filesMatching([
           "**/*.sh",
@@ -80,8 +94,9 @@ distributions {
           "**/bin/solr",
           "**/bin/init.d/solr",
           "**/bin/solr-exporter",
-      ]) {
-        setMode 0755
+          "**/docker/scripts/*",
+      ]) { copy ->
+        copy.setMode(0755)
       }
 
       from(project(":solr").projectDir, {
@@ -94,10 +109,13 @@ distributions {
         include "README.md"
       })
 
-      from(project(":lucene").projectDir, {
-        include "CHANGES.txt"
-        rename { file -> 'LUCENE_CHANGES.txt' }
-      })
+      // Should we include Lucene changes?
+      /*
+        from(project(":lucene").projectDir, {
+          include "CHANGES.txt"
+          rename { file -> 'LUCENE_CHANGES.txt' }
+        })
+      */
 
       from(configurations.contrib, {
         into "contrib"
@@ -119,13 +137,16 @@ distributions {
         into "server"
       })
 
-      // docs/   - TODO: this is assembled via XSLT... leaving out for now.
+      from(configurations.docs, {
+        into "docs"
+      })
+
+      from(configurations.docker, {
+        into "docker"
+      })
+
     }
   }
-}
-
-distTar {
-  compression = Compression.GZIP
 }
 
 installDist {
@@ -140,17 +161,43 @@ task dev(type: Copy) {
   into devDir
 }
 
-runtime {
-  javaHome = System.getProperty("java.home")
-  options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
-  modules = ['java.base', 'jdk.management', 'java.naming', 'java.xml', 'java.instrument', 'java.desktop', 'java.sql']
-}
+assemble.dependsOn installDist
 
-tasks.runtime.doLast {
-  copy {
-    from installDist.outputs
-    into("$buildDir/image/bin")
+
+// NOTE: we don't use the convinence DSL of the 'signing' extension to define our 'Sign' tasks because
+// that (by default) adds our signature files to the 'archives' configuration -- which is what
+// assemble & installDist try to copy/sync, so they wouldn't work w/o GPG installed (which would be bad).
+//
+// We also want to hook in our own property check dependency since the default error message from Sign task
+// refers to the wrong (internal only) property name ("signatory.keyId")
+signing {
+  useGpgCmd() // so gpg-agent can be used
+}
+task failUnlessGpgKeyProperty {
+  // placeholder that can be depended on by any task needing GPG key which will 'fail fast' if it's not set.
+  def propName = 'signing.gnupg.keyName'
+
+  // This explicitly checks the taskGraph (instead of a simple 'doFirst') so it can fail the user's gradle
+  // invocation immediately before any unrelated build tasks may run in parallel
+  if ( ! project.hasProperty(propName) ) {
+    gradle.taskGraph.whenReady { graph ->
+      if ( graph.hasTask(failUnlessGpgKeyProperty) ) {
+        // TODO: it would be really nice if taskGraph was an actual graph and we could report what tasks in (transitive) depend on us
+        throw new GradleException("'$propName' property must be set for GPG signing, please see help/gpgSigning.txt")
+      }
+    }
   }
 }
-
-assemble.dependsOn installDist
+//task signDistTar(type: Sign) {
+//  dependsOn failUnlessGpgKeyProperty
+//  sign configurations.solrTgz
+//}
+//task signDistZip(type: Sign) {
+//  dependsOn failUnlessGpgKeyProperty
+//  sign configurations.solrZip
+//}
+//task signDist {
+//  group = 'Distribution'
+//  description = 'GPG Signs the main distributions'
+//  dependsOn signDistTar, signDistZip
+//}

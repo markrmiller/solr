@@ -49,12 +49,7 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.FilterCollector;
 import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.grouping.AllGroupHeadsCollector;
-import org.apache.lucene.search.grouping.AllGroupsCollector;
-import org.apache.lucene.search.grouping.FacetEntry;
-import org.apache.lucene.search.grouping.GroupedFacetResult;
-import org.apache.lucene.search.grouping.TermGroupFacetCollector;
-import org.apache.lucene.search.grouping.TermGroupSelector;
+import org.apache.lucene.search.grouping.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.CharsRefBuilder;
@@ -715,7 +710,7 @@ public class SimpleFacets {
     searcher.search(base.getTopFilter(), fieldWrapper);
     
     boolean orderByCount = sort.equals(FacetParams.FACET_SORT_COUNT) || sort.equals(FacetParams.FACET_SORT_COUNT_LEGACY);
-    GroupedFacetResult result
+    GroupFacetCollector.GroupedFacetResult result
       = collector.mergeSegmentResults(limit < 0 ? Integer.MAX_VALUE : 
                                       (offset + limit), 
                                       mincount, orderByCount);
@@ -723,9 +718,9 @@ public class SimpleFacets {
     CharsRefBuilder charsRef = new CharsRefBuilder();
     FieldType facetFieldType = searcher.getSchema().getFieldType(field);
     NamedList<Integer> facetCounts = new NamedList<>();
-    List<FacetEntry> scopedEntries
+    List<GroupFacetCollector.FacetEntry> scopedEntries
       = result.getFacetEntries(offset, limit < 0 ? Integer.MAX_VALUE : limit);
-    for (FacetEntry facetEntry : scopedEntries) {
+    for (GroupFacetCollector.FacetEntry facetEntry : scopedEntries) {
       //:TODO:can we filter earlier than this to make it more efficient?
       if (termFilter != null && !termFilter.test(facetEntry.getValue())) {
         continue;

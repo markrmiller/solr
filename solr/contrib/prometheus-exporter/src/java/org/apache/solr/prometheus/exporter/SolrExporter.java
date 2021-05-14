@@ -19,10 +19,10 @@ package org.apache.solr.prometheus.exporter;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.InetSocketAddress;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Locale;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.HTTPServer;
@@ -30,15 +30,14 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.solr.common.ParWork;
+import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
-import org.apache.solr.core.SolrResourceLoader;
-import org.apache.solr.core.XmlConfigFile;
 import org.apache.solr.prometheus.collector.MetricsCollectorFactory;
 import org.apache.solr.prometheus.collector.SchedulerMetricsCollector;
 import org.apache.solr.prometheus.scraper.SolrCloudScraper;
 import org.apache.solr.prometheus.scraper.SolrScraper;
 import org.apache.solr.prometheus.scraper.SolrStandaloneScraper;
+import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,9 +101,13 @@ public class SolrExporter {
       MetricsConfiguration metricsConfiguration) {
     this.port = port;
 
-    this.metricCollectorExecutor = ParWork.getExecutorService("metricCollectorExecutor", numberThreads, false);
+    this.metricCollectorExecutor = Executors.newFixedThreadPool(
+            numberThreads,
+            new SolrNamedThreadFactory("solr-exporter-collectors"));
 
-    this.requestExecutor = ParWork.getExecutorService("requestExecutor", numberThreads, false);
+    this.requestExecutor = Executors.newFixedThreadPool(
+        numberThreads,
+        new SolrNamedThreadFactory("solr-exporter-requests"));
 
     this.solrScraper = createScraper(scrapeConfiguration, metricsConfiguration.getSettings());
     this.metricsCollector = new MetricsCollectorFactory(metricCollectorExecutor, scrapeInterval, solrScraper, metricsConfiguration).create();
@@ -140,7 +143,7 @@ public class SolrExporter {
     switch (configuration.getType()) {
       case STANDALONE:
         return new SolrStandaloneScraper(
-            SolrClientFactory.createStandaloneSolrClient(configuration.getSolrHost().get()), requestExecutor);
+            factory.createStandaloneSolrClient(configuration.getSolrHost().get()), requestExecutor);
       case CLOUD:
         return new SolrCloudScraper(
             factory.createCloudSolrClient(configuration.getZookeeperConnectionString().get()), requestExecutor, factory);
@@ -182,29 +185,22 @@ public class SolrExporter {
 
       SolrScrapeConfiguration scrapeConfiguration = null;
 
-      if (!res.getString(ARG_ZK_HOST_DEST).isEmpty()) {
+      if (!res.getString(ARG_ZK_HOST_DEST).equals("")) {
         scrapeConfiguration = SolrScrapeConfiguration.solrCloud(res.getString(ARG_ZK_HOST_DEST));
-      } else if (!res.getString(ARG_BASE_URL_DEST).isEmpty()) {
+      } else if (!res.getString(ARG_BASE_URL_DEST).equals("")) {
         scrapeConfiguration = SolrScrapeConfiguration.standalone(res.getString(ARG_BASE_URL_DEST));
       }
 
       if (scrapeConfiguration == null) {
         log.error("Must provide either {} or {}", ARG_BASE_URL_FLAGS, ARG_ZK_HOST_FLAGS);
       }
-      String configDest = res.getString(ARG_CONFIG_DEST);
-
-      if (configDest == null) {
-        throw new IllegalArgumentException("No config dest found for " + ARG_CONFIG_DEST);
-      }
-
-      MetricsConfiguration mc = loadMetricsConfiguration(Paths.get(configDest));
-
 
       SolrExporter solrExporter = new SolrExporter(
           res.getInt(ARG_PORT_DEST),
           res.getInt(ARG_NUM_THREADS_DEST),
           res.getInt(ARG_SCRAPE_INTERVAL_DEST),
-          scrapeConfiguration, mc);
+          scrapeConfiguration,
+          loadMetricsConfiguration(res.getString(ARG_CONFIG_DEST)));
 
       log.info("Starting Solr Prometheus Exporting");
       solrExporter.start();
@@ -216,12 +212,11 @@ public class SolrExporter {
     }
   }
 
-  private static MetricsConfiguration loadMetricsConfiguration(Path configPath) {
-    try (SolrResourceLoader loader = new SolrResourceLoader(configPath.getParent())) {
-      XmlConfigFile config = new XmlConfigFile(loader, configPath.getFileName().toString(), null, null, null);
-      return MetricsConfiguration.from(config);
+  private static MetricsConfiguration loadMetricsConfiguration(String configPath) {
+    try {
+      return MetricsConfiguration.from(configPath);
     } catch (Exception e) {
-      log.error("Could not load scrape configuration from {}", configPath.toAbsolutePath());
+      log.error("Could not load scrape configuration from {}", configPath);
       throw new RuntimeException(e);
     }
   }

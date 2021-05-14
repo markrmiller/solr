@@ -537,7 +537,7 @@
         <tokenizer name="standard"/>
         <filter name="stop" ignoreCase="true" words="stopwords.txt" />
         <filter name="lowercase"/>
-        <filter name="reversedWildcard" withOriginal="true"
+        <filter class="solr.ReversedWildcardFilter" withOriginal="true"
            maxPosAsterisk="3" maxPosQuestion="2" maxFractionAsterisk="0.33"/>
       </analyzer>
       <analyzer type="query">

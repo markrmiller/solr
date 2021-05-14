@@ -1,6 +1,5 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="All in OSX lucene-solr.solr.core.test" type="JUnit" factoryName="JUnit">
-    <module name="lucene-solr.solr.core.test" />
     <option name="PACKAGE_NAME" value="" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />

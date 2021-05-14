@@ -55,7 +55,7 @@ public class TestSweetSpotSimilarityFactory extends BaseSimilarityTestCase {
   private static float computeNorm(Similarity sim, int length) throws IOException {
     String value = IntStream.range(0, length).mapToObj(i -> "a").collect(Collectors.joining(" "));
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter w = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig().setSimilarity(sim));
+    IndexWriter w = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig().setSimilarity(sim));
     w.addDocument(Collections.singleton(LuceneTestCase.newTextField("foo", value, Store.NO)));
     DirectoryReader reader = DirectoryReader.open(w);
     w.close();

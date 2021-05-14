@@ -19,7 +19,8 @@ package org.apache.solr.pkg;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
-import org.apache.lucene.analysis.util.ResourceLoaderAware;
+
+import org.apache.lucene.util.ResourceLoaderAware;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.core.*;
 import org.apache.solr.handler.RequestHandlerBase;

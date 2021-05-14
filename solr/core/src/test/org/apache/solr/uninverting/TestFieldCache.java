@@ -192,7 +192,7 @@ public class TestFieldCache extends SolrTestCase {
         termsIndex.advance(i);
       }
       if (i == termsIndex.docID()) {
-        s = termsIndex.binaryValue().utf8ToString();
+        s = termsIndex.lookupOrd(termsIndex.ordValue()).utf8ToString();
       } else {
         s = null;
       }
@@ -280,7 +280,7 @@ public class TestFieldCache extends SolrTestCase {
 
   public void testEmptyIndex() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter writer= new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())).setMaxBufferedDocs(500));
+    IndexWriter writer= new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())).setMaxBufferedDocs(500));
     writer.close();
     IndexReader r = DirectoryReader.open(dir);
     LeafReader reader = SlowCompositeReaderWrapper.wrap(r);
@@ -463,7 +463,6 @@ public class TestFieldCache extends SolrTestCase {
     assertEquals(0, sorted.nextDoc());
     assertEquals(0, sorted.ordValue());
     assertEquals(1, sorted.getValueCount());
-    scratch = sorted.binaryValue();
     assertEquals("sorted value", scratch.utf8ToString());
     
     SortedSetDocValues sortedSet = FieldCache.DEFAULT.getDocTermOrds(ar, "sorted", null);

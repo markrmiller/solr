@@ -40,7 +40,7 @@ dependencies {
     exclude module: "xml-apis"
   })
 
-  runtimeOnly project(':lucene:analysis:icu')
+  runtimeOnly "org.apache.lucene:lucene-analysis-icu"
 
   testImplementation project(':lucene:test-framework')
 }

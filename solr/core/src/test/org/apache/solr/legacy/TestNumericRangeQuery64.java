@@ -60,7 +60,7 @@ public class TestNumericRangeQuery64 extends SolrTestCase {
     distance = (1L << 60) / noDocs;
     directory = SolrTestUtil.newDirectory();
     RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
-        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
+        SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
         .setMaxBufferedDocs(TEST_NIGHTLY ? TestUtil.nextInt(random(), 100, 1000) : 1000)
         .setMergePolicy(LuceneTestCase.newLogMergePolicy()));
 

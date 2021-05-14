@@ -361,7 +361,7 @@ public abstract class SolrTestCaseJ4 extends SolrTestCase {
    *  and base schema.xml (Point Fields)
    */
   public static void newRandomConfig() {
-    IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig iwc = SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
 
     System.setProperty("useCompoundFile", String.valueOf(iwc.getUseCompoundFile()));
 

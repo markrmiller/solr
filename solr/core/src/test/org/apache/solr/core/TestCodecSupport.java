@@ -20,8 +20,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.lucene.codecs.Codec;
-import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat;
-import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat.Mode;
+import org.apache.lucene.codecs.lucene90.Lucene90Codec;
+import org.apache.lucene.codecs.lucene90.Lucene90StoredFieldsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldDocValuesFormat;
 import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
 import org.apache.lucene.index.SegmentInfo;
@@ -134,8 +134,8 @@ public class TestCodecSupport extends SolrTestCaseJ4 {
       SegmentInfos infos = SegmentInfos.readLatestCommit(searcher.getIndexReader().directory());
       SegmentInfo info = infos.info(infos.size() - 1).info;
       assertEquals(
-          "Expecting compression mode string to be " + expectedModeString + " but got: " + info.getAttribute(Lucene50StoredFieldsFormat.MODE_KEY) + "\n SegmentInfo: " + info + "\n SegmentInfos: "
-              + infos + "\n Codec: " + core.getCodec(), expectedModeString, info.getAttribute(Lucene50StoredFieldsFormat.MODE_KEY));
+          "Expecting compression mode string to be " + expectedModeString + " but got: " + info.getAttribute(Lucene90StoredFieldsFormat.MODE_KEY) + "\n SegmentInfo: " + info + "\n SegmentInfos: "
+              + infos + "\n Codec: " + core.getCodec(), expectedModeString, info.getAttribute(Lucene90StoredFieldsFormat.MODE_KEY));
       return null;
     });
   }
@@ -227,7 +227,7 @@ public class TestCodecSupport extends SolrTestCaseJ4 {
   @LuceneTestCase.Nightly // non nightly changes this
   public void testCompressionModeDefault()
       throws IOException, XPathExpressionException {
-    assertEquals("Default Solr compression mode changed. Is this expected?", SchemaCodecFactory.SOLR_DEFAULT_COMPRESSION_MODE, Mode.valueOf("BEST_SPEED"));
+    assertEquals("Default Solr compression mode changed. Is this expected?", SchemaCodecFactory.SOLR_DEFAULT_COMPRESSION_MODE, Lucene90Codec.Mode.valueOf("BEST_SPEED"));
 
     String previousCoreName = h.coreName;
     String newCoreName = "core_with_default_compression";

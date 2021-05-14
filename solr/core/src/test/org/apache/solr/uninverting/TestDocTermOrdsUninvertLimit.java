@@ -58,7 +58,7 @@ public class TestDocTermOrdsUninvertLimit extends SolrTestCase {
                                           .setMaxBufferedDocs(IndexWriterConfig.DISABLE_AUTO_FLUSH)
                                           .setRAMBufferSizeMB(16)
                                           .setMergeScheduler(new ConcurrentMergeScheduler())
-                                          .setMergePolicy(LuceneTestCase.newLogMergePolicy(false, 10))
+                                          .setMergePolicy(SolrTestUtil.newLogMergePolicy(false, 10))
                                           .setOpenMode(IndexWriterConfig.OpenMode.CREATE)
                                           .setCodec(TestUtil.getDefaultCodec()));
     

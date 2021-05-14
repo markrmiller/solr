@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import net.sf.saxon.BasicTransformerFactory;
 import org.apache.commons.io.IOUtils;
-import org.apache.lucene.analysis.util.ResourceLoader;
+import org.apache.lucene.util.ResourceLoader;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.common.util.XMLErrorLogger;
@@ -93,7 +93,7 @@ public class TransformerProvider {
   }
   
   /** Return a Templates object for the given filename */
-  private Templates getTemplates(ResourceLoader loader, String filename,int cacheLifetimeSeconds) throws IOException {
+  private Templates getTemplates(ResourceLoader loader, String filename, int cacheLifetimeSeconds) throws IOException {
     
     Templates result = null;
     lastFilename = null;

@@ -101,7 +101,7 @@ public class TestSlowCompositeReaderWrapper extends SolrTestCase {
 
   public void testOrdMapsAreCached() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, LuceneTestCase.newIndexWriterConfig().setMergePolicy(NoMergePolicy.INSTANCE));
+    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig().setMergePolicy(NoMergePolicy.INSTANCE));
     Document doc = new Document();
     doc.add(new SortedDocValuesField("sorted", new BytesRef("a")));
     doc.add(new SortedSetDocValuesField("sorted_set", new BytesRef("b")));

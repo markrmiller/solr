@@ -21,8 +21,8 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.LazyDocument;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.misc.document.LazyDocument;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.schema.IndexSchema;

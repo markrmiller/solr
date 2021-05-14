@@ -758,7 +758,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type long with a missing value */
   public void testLongMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -790,7 +790,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type long, specifying the missing value should be treated as Long.MAX_VALUE */
   public void testLongMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -889,7 +889,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy long with a missing value */
   public void testLegacyLongMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1116,7 +1116,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy float */
   public void testLegacyFloat() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyFloatField("value", 30.1f, Field.Store.YES));
     writer.addDocument(doc);

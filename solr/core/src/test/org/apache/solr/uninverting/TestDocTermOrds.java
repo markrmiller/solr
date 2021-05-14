@@ -155,7 +155,7 @@ public class TestDocTermOrds extends SolrTestCase {
     
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
 
-    IndexWriterConfig conf = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
 
     // Sometimes swap in codec that impls ord():
     if (random().nextInt(10) == 7) {
@@ -635,8 +635,8 @@ public class TestDocTermOrds extends SolrTestCase {
   
   public void testActuallySingleValued() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig iwconfig =  LuceneTestCase.newIndexWriterConfig(null);
-    iwconfig.setMergePolicy(LuceneTestCase.newLogMergePolicy());
+    IndexWriterConfig iwconfig =  SolrTestUtil.newIndexWriterConfig(null);
+    iwconfig.setMergePolicy(SolrTestUtil.newLogMergePolicy());
     IndexWriter iw = new IndexWriter(dir, iwconfig);
     
     Document doc = new Document();

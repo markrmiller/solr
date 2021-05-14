@@ -377,7 +377,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
    */
   private void prepareTrainedIndexMonoClass() throws Exception {
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), directory);
+    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory, SolrTestUtil.newIndexWriterConfig());
 
     //class1
     addDoc(writer, buildLuceneDocument(ID, "1",
@@ -450,7 +450,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
 
   private void prepareTrainedIndexMultiClass() throws Exception {
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), directory);
+    RandomIndexWriter writer = new RandomIndexWriter(random(), directory, SolrTestUtil.newIndexWriterConfig());
 
     //class1
     addDoc(writer, buildLuceneDocument(ID, "1",

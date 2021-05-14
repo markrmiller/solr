@@ -1975,7 +1975,7 @@ This filter reverses tokens to provide faster leading wildcard and prefix querie
 ----
 <analyzer type="index">
   <tokenizer name="whitespace"/>
-  <filter name="reversedWildcard" withOriginal="true"
+  <filter class="reversedWildcard" withOriginal="true"
     maxPosAsterisk="2" maxPosQuestion="1" minTrailing="2" maxFractionAsterisk="0"/>
 </analyzer>
 ----

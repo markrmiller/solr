@@ -292,14 +292,6 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
         segmentInfoMap.add("largestFiles", topFiles);
       }
     }
-    if (seg != null && withSizeInfo) {
-      SimpleOrderedMap<Object> ram = new SimpleOrderedMap<>();
-      ram.add("total", seg.ramBytesUsed());
-      for (Accountable ac : seg.getChildResources()) {
-        accountableToMap(ac, ram::add);
-      }
-      segmentInfoMap.add("ramBytesUsed", ram);
-    }
     if (withFieldInfos) {
       if (seg == null) {
         log.debug("Skipping segment info - not available as a SegmentReader: {}", segmentCommitInfo);
@@ -314,20 +306,6 @@ public class SegmentsInfoRequestHandler extends RequestHandlerBase {
     }
 
     return segmentInfoMap;
-  }
-
-  private static void accountableToMap(Accountable accountable, BiConsumer<String,Object> consumer) {
-    Collection<Accountable> children = accountable.getChildResources();
-    if (children != null && !children.isEmpty()) {
-      LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-      map.put("total", accountable.ramBytesUsed());
-      for (Accountable child : children) {
-        accountableToMap(child, map::put);
-      }
-      consumer.accept(accountable.toString(), map);
-    } else {
-      consumer.accept(accountable.toString(), accountable.ramBytesUsed());
-    }
   }
 
   private static SimpleOrderedMap<Object> getFieldInfo(SegmentReader reader, FieldInfo fi, IndexSchema schema) {

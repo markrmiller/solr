@@ -58,7 +58,7 @@ public class TestUninvertingReader extends SolrTestCase {
   
   public void testSortedSetInteger() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(new LegacyIntField("foo", 5, Field.Store.NO));
@@ -351,7 +351,7 @@ public class TestUninvertingReader extends SolrTestCase {
 
   public void testFieldInfos() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
 
     Document doc = new Document();
     BytesRef idBytes = new BytesRef("id");

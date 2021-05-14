@@ -19,17 +19,9 @@ package org.apache.solr;
 import com.carrotsearch.randomizedtesting.RandomizedContext;
 import com.carrotsearch.randomizedtesting.generators.RandomPicks;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.index.IndexFileNames;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.index.LogByteSizeMergePolicy;
-import org.apache.lucene.index.LogDocMergePolicy;
-import org.apache.lucene.index.LogMergePolicy;
-import org.apache.lucene.index.MergePolicy;
-import org.apache.lucene.index.MockRandomMergePolicy;
-import org.apache.lucene.index.TieredMergePolicy;
+import org.apache.lucene.index.*;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.BaseDirectoryWrapper;
 import org.apache.lucene.store.ByteBuffersDirectory;
@@ -244,7 +236,88 @@ public class SolrTestUtil {
   }
 
   public static IndexWriterConfig newIndexWriterConfig(Analyzer a) {
-    return LuceneTestCase.newIndexWriterConfig(SolrTestCase.random(), a);
+    return newIndexWriterConfig(SolrTestCase.random(), a);
+  }
+
+  public static IndexWriterConfig newIndexWriterConfig(Random r, Analyzer a) {
+    IndexWriterConfig c = new IndexWriterConfig(a);
+//    c.setSimilarity(classEnvRule.similarity);
+//    if (VERBOSE) {
+//      // Even though TestRuleSetupAndRestoreClassEnv calls
+//      // InfoStream.setDefault, we do it again here so that
+//      // the PrintStreamInfoStream.messageID increments so
+//      // that when there are separate instances of
+//      // IndexWriter created we see "IW 0", "IW 1", "IW 2",
+//      // ... instead of just always "IW 0":
+//      c.setInfoStream(
+//              new org.apache.lucene.util.TestRuleSetupAndRestoreClassEnv.ThreadNameFixingPrintStreamInfoStream(System.out));
+//    }
+
+    if (rarely(r)) {
+      c.setMergeScheduler(new SerialMergeScheduler());
+    } else if (rarely(r)) {
+      ConcurrentMergeScheduler cms;
+      if (r.nextBoolean()) {
+        cms = new ConcurrentMergeScheduler();
+      } else {
+        cms =
+                new ConcurrentMergeScheduler() {
+                  @Override
+                  protected synchronized boolean maybeStall(MergeSource mergeSource) {
+                    return true;
+                  }
+                };
+      }
+      int maxThreadCount = TestUtil.nextInt(r, 1, 4);
+      int maxMergeCount = TestUtil.nextInt(r, maxThreadCount, maxThreadCount + 4);
+      cms.setMaxMergesAndThreads(maxMergeCount, maxThreadCount);
+      if (SolrTestCase.random().nextBoolean()) {
+        cms.disableAutoIOThrottle();
+        //assertFalse(cms.getAutoIOThrottle());
+      }
+      cms.setForceMergeMBPerSec(10 + 10 * SolrTestCase.random().nextDouble());
+      c.setMergeScheduler(cms);
+    } else {
+      // Always use consistent settings, else CMS's dynamic (SSD or not)
+      // defaults can change, hurting reproducibility:
+      ConcurrentMergeScheduler cms = new ConcurrentMergeScheduler();
+
+      // Only 1 thread can run at once (should maybe help reproducibility),
+      // with up to 3 pending merges before segment-producing threads are
+      // stalled:
+      cms.setMaxMergesAndThreads(3, 1);
+      c.setMergeScheduler(cms);
+    }
+
+    if (r.nextBoolean()) {
+      if (rarely(r)) {
+        // crazy value
+        c.setMaxBufferedDocs(TestUtil.nextInt(r, 2, 15));
+      } else {
+        // reasonable value
+        c.setMaxBufferedDocs(TestUtil.nextInt(r, 16, 1000));
+      }
+    }
+
+    c.setMergePolicy(newMergePolicy(r));
+
+    //avoidPathologicalMerging(c);
+
+    if (rarely(r)) {
+      c.setMergedSegmentWarmer(new SimpleMergedSegmentWarmer(c.getInfoStream()));
+    }
+    c.setUseCompoundFile(r.nextBoolean());
+    c.setReaderPooling(r.nextBoolean());
+    if (rarely(r)) {
+      c.setCheckPendingFlushUpdate(false);
+    }
+
+    if (rarely(r)) {
+      c.setIndexWriterEventListener(new MockIndexWriterEventListener());
+    }
+
+    c.setMaxFullFlushMergeWaitMillis(SolrTestUtil.rarely(SolrTestCase.random()) ? atLeast(1000) : atLeast(200));
+    return c;
   }
 
   public static String getSaferTestName() {
@@ -355,6 +428,10 @@ public class SolrTestUtil {
 
   public static int atLeast(int i) {
     return LuceneTestCase.atLeast(i);
+  }
+
+  public static IndexWriterConfig newIndexWriterConfig() {
+    return newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
   }
 
 

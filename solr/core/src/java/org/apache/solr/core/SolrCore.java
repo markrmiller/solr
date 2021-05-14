@@ -20,7 +20,6 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.Timer;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.MapMaker;
-import org.apache.lucene.analysis.util.ResourceLoader;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexDeletionPolicy;
@@ -32,8 +31,8 @@ import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockObtainFailedException;
+import org.apache.lucene.util.ResourceLoader;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
-import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.RecoveryStrategy;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.AlreadyClosedException;
@@ -1422,14 +1421,6 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       parentContext.gauge(() -> dataDirFile.getTotalSpace(), true, "totalSpace", Category.CORE.toString(), "fs");
       parentContext.gauge(() -> dataDirFile.getUsableSpace(), true, "usableSpace", Category.CORE.toString(), "fs");
       parentContext.gauge(() -> dataDirPath.toAbsolutePath().toString(), true, "path", Category.CORE.toString(), "fs");
-      parentContext.gauge(() -> {
-        try {
-          return org.apache.lucene.util.IOUtils.spins(dataDirPath.toAbsolutePath());
-        } catch (IOException e) {
-          // default to spinning
-          return true;
-        }
-      }, true, "spins", Category.CORE.toString(), "fs");
     }
 
     public String getMetricTag () {

@@ -326,7 +326,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
   private static ObjectBuilder getObjectBuilder(final JSONParser jp) throws IOException {
     return new ObjectBuilder(jp) {
       @Override
-      public Object newObject() throws IOException {
+      public Object newObject() {
         return new ValidatingJsonMap(32);
       }
     };
@@ -394,7 +394,7 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
   }
 
   @SuppressWarnings({"unchecked"})
-  public static final ValidatingJsonMap EMPTY = new ValidatingJsonMap(Collections.EMPTY_MAP);
+  public static final ValidatingJsonMap EMPTY = new ValidatingJsonMap(Collections.emptyMap());
 
   public interface PredicateWithErrMsg<T> {
 

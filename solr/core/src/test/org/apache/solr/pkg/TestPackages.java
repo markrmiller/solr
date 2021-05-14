@@ -23,9 +23,10 @@ import java.util.*;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.lucene.analysis.util.ResourceLoader;
-import org.apache.lucene.analysis.util.ResourceLoaderAware;
+
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.ResourceLoader;
+import org.apache.lucene.util.ResourceLoaderAware;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;

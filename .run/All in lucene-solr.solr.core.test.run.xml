@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="All in lucene-solr.solr.core.test" type="JUnit" factoryName="JUnit" nameIsGenerated="true">
-    <module name="lucene-solr.solr.core.test" />
+  <configuration default="false" name="All in solr-root.solr.test-framework" type="JUnit" factoryName="JUnit" nameIsGenerated="true">
+    <module name="solr-root.solr.test-framework" />
     <option name="PACKAGE_NAME" value="" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />

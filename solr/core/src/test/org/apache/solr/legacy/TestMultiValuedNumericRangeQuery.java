@@ -46,7 +46,7 @@ public class TestMultiValuedNumericRangeQuery extends SolrTestCase {
   public void testMultiValuedNRQ() throws Exception {
     Directory directory = SolrTestUtil.newDirectory();
     RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
-        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(random()))
+        SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(random()))
         .setMaxBufferedDocs(TestUtil.nextInt(random(), 50, 1000)));
     
     DecimalFormat format = new DecimalFormat("00000000000", new DecimalFormatSymbols(Locale.ROOT));

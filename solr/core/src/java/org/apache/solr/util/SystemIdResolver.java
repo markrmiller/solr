@@ -16,7 +16,8 @@
  */
 package org.apache.solr.util;
 
-import org.apache.lucene.analysis.util.ResourceLoader;
+
+import org.apache.lucene.util.ResourceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.EntityResolver;

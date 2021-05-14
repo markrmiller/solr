@@ -73,11 +73,11 @@ public class TestFieldCacheSortRandom extends SolrTestCase {
   }
 
   private void testRandomStringSort(SortField.Type type) throws Exception {
-    Random random = new Random(random().nextLong());
+    Random random = new Random(SolrTestCase.random().nextLong());
 
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
     final Directory dir = SolrTestUtil.newDirectory();
-    final RandomIndexWriter writer = new RandomIndexWriter(random, dir);
+    final RandomIndexWriter writer = new RandomIndexWriter(random, dir, SolrTestUtil.newIndexWriterConfig());
     final boolean allowDups = random.nextBoolean();
     final Set<String> seen = new HashSet<>();
     final int maxLength = TestUtil.nextInt(random, 5, 100);

@@ -144,7 +144,7 @@ public interface MapWriter extends MapSerializable , NavigableObject {
       if (v instanceof MapWriter) v = ((MapWriter) v).toMap(new LinkedHashMap<>());
       if (v instanceof IteratorWriter) v = ((IteratorWriter) v).toList(new ArrayList<>());
       if (v instanceof Iterable) {
-        List lst = new ArrayList();
+        List<Object> lst = new ArrayList<>();
         for (Object vv : (Iterable)v) {
           if (vv instanceof MapWriter) vv = ((MapWriter) vv).toMap(new LinkedHashMap<>());
           if (vv instanceof IteratorWriter) vv = ((IteratorWriter) vv).toList(new ArrayList<>());
@@ -153,7 +153,7 @@ public interface MapWriter extends MapSerializable , NavigableObject {
         v = lst;
       }
       if (v instanceof Map) {
-        Map map = new LinkedHashMap();
+        Map map = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : ((Map<?, ?>)v).entrySet()) {
           Object vv = entry.getValue();
           if (vv instanceof MapWriter) vv = ((MapWriter) vv).toMap(new LinkedHashMap<>());

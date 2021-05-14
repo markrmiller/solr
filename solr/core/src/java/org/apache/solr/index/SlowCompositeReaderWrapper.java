@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.lucene.index.*;
 import org.apache.lucene.index.MultiDocValues.MultiSortedDocValues;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.Version;
 import org.jctools.maps.NonBlockingHashMap;
@@ -89,7 +90,8 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
           minVersion = leafVersion;
         }
       }
-      metaData = new LeafMetaData(reader.leaves().get(0).reader().getMetaData().getCreatedVersionMajor(), minVersion, null);
+      int createdVersionMajor = reader.leaves().get(0).reader().getMetaData().getCreatedVersionMajor();
+      metaData = new LeafMetaData(createdVersionMajor, minVersion, null);
     }
     fieldInfos = FieldInfos.getMergedFieldInfos(in);
   }
@@ -116,26 +118,13 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   public Terms terms(String field) throws IOException {
     ensureOpen();
     try {
-
-      Terms ct = cachedTerms.get(field);
-      if (ct != null) {
-        return ct;
-      }
-
-      Terms nt = MultiTerms.getTerms(in, field);
-      if (nt == null) {
-        return null;
-      }
-      cachedTerms.put(field, nt);
-      return nt;
-
-      //      return cachedTerms.computeIfAbsent(field, f -> {
-      //        try {
-      //          return MultiTerms.getTerms(in, f);
-      //        } catch (IOException e) { // yuck!  ...sigh... checked exceptions with built-in lambdas are a pain
-      //          throw new RuntimeException("unwrapMe", e);
-      //        }
-      //      });
+      return cachedTerms.computeIfAbsent(field, f -> {
+        try {
+          return MultiTerms.getTerms(in, f);
+        } catch (IOException e) { // yuck!  ...sigh... checked exceptions with built-in lambdas are a pain
+          throw new RuntimeException("unwrapMe", e);
+        }
+      });
     } catch (RuntimeException e) {
       if (e.getMessage() != null && e.getCause() != null && e.getMessage().equals("unwrapMe") && e.getCause() instanceof IOException) {
         throw (IOException) e.getCause();
@@ -286,6 +275,19 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
 
   @Override
   public PointValues getPointValues(String field) {
+    ensureOpen();
+    return null; // because not supported.  Throw UOE?
+  }
+
+  @Override
+  public VectorValues getVectorValues(String field) {
+    ensureOpen();
+    return null; // because not supported.  Throw UOE?
+  }
+
+  @Override
+  public TopDocs searchNearestVectors(String field, float[] target, int k, int fanout)
+      throws IOException {
     ensureOpen();
     return null; // because not supported.  Throw UOE?
   }

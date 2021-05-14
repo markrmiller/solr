@@ -917,25 +917,9 @@ public class CoreContainer implements Closeable {
       solrMetricsContext.gauge(() -> dataHome.toFile().getTotalSpace(), true, "totalSpace", SolrInfoBean.Category.CONTAINER.toString(), "fs");
       solrMetricsContext.gauge(() -> dataHome.toFile().getUsableSpace(), true, "usableSpace", SolrInfoBean.Category.CONTAINER.toString(), "fs");
       solrMetricsContext.gauge(() -> dataHome.toAbsolutePath().toString(), true, "path", SolrInfoBean.Category.CONTAINER.toString(), "fs");
-      solrMetricsContext.gauge(() -> {
-        try {
-          return org.apache.lucene.util.IOUtils.spins(dataHome.toAbsolutePath());
-        } catch (IOException e) {
-          // default to spinning
-          return true;
-        }
-      }, true, "spins", SolrInfoBean.Category.CONTAINER.toString(), "fs");
       solrMetricsContext.gauge(() -> cfg.getCoreRootDirectory().toFile().getTotalSpace(), true, "totalSpace", SolrInfoBean.Category.CONTAINER.toString(), "fs", "coreRoot");
       solrMetricsContext.gauge(() -> cfg.getCoreRootDirectory().toFile().getUsableSpace(), true, "usableSpace", SolrInfoBean.Category.CONTAINER.toString(), "fs", "coreRoot");
       solrMetricsContext.gauge(() -> cfg.getCoreRootDirectory().toAbsolutePath().toString(), true, "path", SolrInfoBean.Category.CONTAINER.toString(), "fs", "coreRoot");
-      solrMetricsContext.gauge(() -> {
-        try {
-          return org.apache.lucene.util.IOUtils.spins(cfg.getCoreRootDirectory().toAbsolutePath());
-        } catch (IOException e) {
-          // default to spinning
-          return true;
-        }
-      }, true, "spins", SolrInfoBean.Category.CONTAINER.toString(), "fs", "coreRoot");
       // add version information
       solrMetricsContext.gauge(() -> this.getClass().getPackage().getSpecificationVersion(), true, "specification", SolrInfoBean.Category.CONTAINER.toString(), "version");
       solrMetricsContext.gauge(() -> this.getClass().getPackage().getImplementationVersion(), true, "implementation", SolrInfoBean.Category.CONTAINER.toString(), "version");

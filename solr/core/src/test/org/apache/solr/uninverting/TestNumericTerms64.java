@@ -61,7 +61,7 @@ public class TestNumericTerms64 extends SolrTestCase {
     distance = (1L << 60) / noDocs;
     directory = SolrTestUtil.newDirectory();
     RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
-        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
+        SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
         .setMaxBufferedDocs(TestUtil.nextInt(random(), TEST_NIGHTLY ? 100 : 990, 1000))
         .setMergePolicy(LuceneTestCase.newLogMergePolicy()));
 
