@@ -535,9 +535,8 @@ public class Http2SolrClient extends SolrClient {
 
     BufferingResponseListener listener = new BufferingResponseListener(8 * 1024 * 1024) {
       @Override public void onComplete(Result result) {
-        InputStream is = getContentAsInputStream();
         ParWork.submitIO("Http2SolrClientAsync", () -> {
-
+          InputStream is = getContentAsInputStream();
           try {
             Response response = result.getResponse();
             if (result.isSucceeded()) {

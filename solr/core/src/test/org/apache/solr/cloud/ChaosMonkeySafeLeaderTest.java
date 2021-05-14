@@ -150,7 +150,7 @@ public class ChaosMonkeySafeLeaderTest extends SolrCloudBridgeTestCase {
         int[] runTimes;
         if (TEST_NIGHTLY) {
           runTimes = new int[] {5000, 6000, 10000, 15000, 25000, 30000,
-              30000, 45000, 90000};
+              30000, 45000};
         } else {
           runTimes = new int[] {15000};
         }

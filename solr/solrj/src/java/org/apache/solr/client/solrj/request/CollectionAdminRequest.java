@@ -883,13 +883,23 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
   }
 
   /**
-   * Return a SolrRequest for low-level detailed status of the collection.
+   * Return a SolrRequest for low-level detailed status of the specified collection.
+   * @param collection the collection to get the status of.
    */
   public static ColStatus collectionStatus(String collection) {
+    checkNotNull(CoreAdminParams.COLLECTION, collection);
     return new ColStatus(collection);
   }
 
-  public static class ColStatus extends AsyncCollectionSpecificAdminRequest {
+  /**
+   * Return a SolrRequest for low-level detailed status of all collections on the cluster.
+   */
+  public static ColStatus collectionStatuses() {
+    return new ColStatus();
+  }
+
+  public static class ColStatus extends AsyncCollectionAdminRequest {
+    protected String collection = null;
     protected Boolean withSegments = null;
     protected Boolean withFieldInfo = null;
     protected Boolean withCoreInfo = null;
@@ -900,7 +910,12 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     protected Float rawSizeSamplingPercent = null;
 
     private ColStatus(String collection) {
-      super(CollectionAction.COLSTATUS, collection);
+      super(CollectionAction.COLSTATUS);
+      this.collection = collection;
+    }
+
+    private ColStatus() {
+      super(CollectionAction.COLSTATUS);
     }
 
     public ColStatus setWithSegments(boolean withSegments) {
@@ -946,6 +961,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     @Override
     public SolrParams getParams() {
       ModifiableSolrParams params = (ModifiableSolrParams)super.getParams();
+      params.setNonNull(CoreAdminParams.COLLECTION, collection);
       params.setNonNull("segments", withSegments);
       params.setNonNull("fieldInfo", withFieldInfo);
       params.setNonNull("coreInfo", withCoreInfo);
@@ -985,6 +1001,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     protected String location;
     protected Optional<String> commitName = Optional.empty();
     protected Optional<String> indexBackupStrategy = Optional.empty();
+    protected boolean incremental = true;
+    protected Optional<Integer> maxNumBackupPoints = Optional.empty();
 
     public Backup(String collection, String name) {
       super(CollectionAction.BACKUP, collection);
@@ -1060,7 +1078,6 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
 
     // in common with collection creation:
     protected String configName;
-    protected Integer maxShardsPerNode;
     protected Integer replicationFactor;
     protected Integer nrtReplicas;
     protected Integer tlogReplicas;
@@ -1113,9 +1130,6 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     public Restore setConfigName(String config) { this.configName = config; return this; }
     public String getConfigName()  { return configName; }
 
-    public Integer getMaxShardsPerNode() { return maxShardsPerNode; }
-    public Restore setMaxShardsPerNode(int maxShardsPerNode) { this.maxShardsPerNode = maxShardsPerNode; return this; }
-
     public Integer getReplicationFactor() { return replicationFactor; }
     public Restore setReplicationFactor(Integer replicationFactor) { this.replicationFactor = replicationFactor; return this; }
 
@@ -1127,9 +1141,6 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
 
     public Integer getPullReplicas() { return pullReplicas; }
     public Restore setPullReplicas(Integer pullReplicas) { this.pullReplicas = pullReplicas; return this; }
-
-    public Boolean getAutoAddReplicas() { return autoAddReplicas; }
-    public Restore setAutoAddReplicas(boolean autoAddReplicas) { this.autoAddReplicas = autoAddReplicas; return this; }
 
     public Properties getProperties() {
       return properties;
@@ -1145,9 +1156,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
       params.set(CoreAdminParams.NAME, backupName);
       params.set(CoreAdminParams.BACKUP_LOCATION, location); //note: optional
       params.set("collection.configName", configName); //note: optional
-      if (maxShardsPerNode != null) {
-        params.set( ZkStateReader.MAX_SHARDS_PER_NODE, maxShardsPerNode);
-      }
+
       if (replicationFactor != null && nrtReplicas != null) {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
             "Cannot set both replicationFactor and nrtReplicas as they mean the same thing");
@@ -1176,6 +1185,9 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
       if (createNodeSetShuffle.isPresent()) {
         params.set(CREATE_NODE_SET_SHUFFLE_PARAM, createNodeSetShuffle.get());
       }
+//      if (backupId != null) {
+//        params.set(CoreAdminParams.BACKUP_ID, backupId);
+//      }
 
       return params;
     }

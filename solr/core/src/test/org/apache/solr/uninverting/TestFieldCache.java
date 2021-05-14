@@ -48,7 +48,7 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LogDocMergePolicy;
 import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.TermsEnum;
@@ -406,8 +406,8 @@ public class TestFieldCache extends SolrTestCase {
   
   public void testDocValuesIntegration() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig iwc = LuceneTestCase.newIndexWriterConfig(null);
-    RandomIndexWriter iw = new RandomIndexWriter(SolrTestCase.random(), dir, iwc);
+    IndexWriterConfig iwc = SolrTestUtil.newIndexWriterConfig(null);
+    SolrRandomIndexWriter iw = new SolrRandomIndexWriter(SolrTestCase.random(), dir, iwc);
     Document doc = new Document();
     doc.add(new BinaryDocValuesField("binary", new BytesRef("binary value")));
     doc.add(new SortedDocValuesField("sorted", new BytesRef("sorted value")));
@@ -531,7 +531,7 @@ public class TestFieldCache extends SolrTestCase {
   
   public void testNonexistantFields() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter iw = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter iw = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     iw.addDocument(doc);
     DirectoryReader ir = iw.getReader();
@@ -575,7 +575,7 @@ public class TestFieldCache extends SolrTestCase {
   
   public void testNonIndexedFields() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter iw = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter iw = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new StoredField("bogusbytes", "bogus"));
     doc.add(new StoredField("bogusshorts", "bogus"));
@@ -630,9 +630,9 @@ public class TestFieldCache extends SolrTestCase {
   // Make sure that the use of GrowableWriter doesn't prevent from using the full long range
   public void testLongFieldCache() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig cfg = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig cfg = SolrTestUtil.newIndexWriterConfig();
     cfg.setMergePolicy(LuceneTestCase.newLogMergePolicy());
-    RandomIndexWriter iw = new RandomIndexWriter(SolrTestCase.random(), dir, cfg);
+    SolrRandomIndexWriter iw = new SolrRandomIndexWriter(SolrTestCase.random(), dir, cfg);
     Document doc = new Document();
     LongPoint field = new LongPoint("f", 0L);
     StoredField field2 = new StoredField("f", 0L);
@@ -685,9 +685,9 @@ public class TestFieldCache extends SolrTestCase {
   // Make sure that the use of GrowableWriter doesn't prevent from using the full int range
   public void testIntFieldCache() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig cfg = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
+    IndexWriterConfig cfg = SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
     cfg.setMergePolicy(LuceneTestCase.newLogMergePolicy());
-    RandomIndexWriter iw = new RandomIndexWriter(SolrTestCase.random(), dir, cfg);
+    SolrRandomIndexWriter iw = new SolrRandomIndexWriter(SolrTestCase.random(), dir, cfg);
     Document doc = new Document();
     IntPoint field = new IntPoint("f", 0);
     doc.add(field);

@@ -17,7 +17,6 @@
 package org.apache.solr.search.function;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
@@ -28,7 +27,7 @@ import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCase;
 import org.apache.solr.SolrTestUtil;
@@ -229,7 +228,7 @@ public class TestOrdValues extends SolrTestCase {
     if (doMultiSegment) {
       iwc.setMaxBufferedDocs(TestUtil.nextInt(random(), 2, 7));
     }
-    RandomIndexWriter iw = new RandomIndexWriter(SolrTestCase.random(), dir, iwc);
+    SolrRandomIndexWriter iw = new SolrRandomIndexWriter(SolrTestCase.random(), dir, iwc);
     // add docs not exactly in natural ID order, to verify we do check the order of docs by scores
     int remaining = N_DOCS;
     boolean done[] = new boolean[N_DOCS];
@@ -255,7 +254,7 @@ public class TestOrdValues extends SolrTestCase {
     }
   }
 
-  private static void addDoc(RandomIndexWriter iw, int i) throws Exception {
+  private static void addDoc(SolrRandomIndexWriter iw, int i) throws Exception {
     Document d = new Document();
     Field f;
     int scoreAndID = i + 1;

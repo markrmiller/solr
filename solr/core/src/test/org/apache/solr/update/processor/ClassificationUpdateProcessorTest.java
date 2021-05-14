@@ -25,7 +25,7 @@ import org.apache.lucene.analysis.MockTokenizer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -377,7 +377,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
    */
   private void prepareTrainedIndexMonoClass() throws Exception {
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), directory, SolrTestUtil.newIndexWriterConfig());
 
     //class1
     addDoc(writer, buildLuceneDocument(ID, "1",
@@ -450,7 +450,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
 
   private void prepareTrainedIndexMultiClass() throws Exception {
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), directory, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), directory, SolrTestUtil.newIndexWriterConfig());
 
     //class1
     addDoc(writer, buildLuceneDocument(ID, "1",
@@ -524,7 +524,7 @@ public class ClassificationUpdateProcessorTest extends SolrTestCaseJ4 {
     return luceneDoc;
   }
 
-  private int addDoc(RandomIndexWriter writer, Document doc) throws IOException {
+  private int addDoc(SolrRandomIndexWriter writer, Document doc) throws IOException {
     writer.addDocument(doc);
     return writer.getDocStats().numDocs - 1;
   }

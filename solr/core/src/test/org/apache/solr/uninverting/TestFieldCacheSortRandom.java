@@ -28,16 +28,12 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.IntPoint;
-import org.apache.lucene.document.StoredField;
-import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.*;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.ConstantScoreScorer;
 import org.apache.lucene.search.ConstantScoreWeight;
@@ -77,7 +73,7 @@ public class TestFieldCacheSortRandom extends SolrTestCase {
 
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
     final Directory dir = SolrTestUtil.newDirectory();
-    final RandomIndexWriter writer = new RandomIndexWriter(random, dir, SolrTestUtil.newIndexWriterConfig());
+    final SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random, dir);
     final boolean allowDups = random.nextBoolean();
     final Set<String> seen = new HashSet<>();
     final int maxLength = TestUtil.nextInt(random, 5, 100);
@@ -112,7 +108,12 @@ public class TestFieldCacheSortRandom extends SolrTestCase {
           System.out.println("  " + numDocs + ": s=" + s);
         }
 
-        doc.add(new StringField("stringdv", s, Field.Store.NO));
+        if (type == SortField.Type.STRING) {
+          doc.add(new StringField("stringdv", s, Field.Store.NO));
+        } else {
+          assert type == SortField.Type.STRING_VAL;
+          doc.add(new BinaryDocValuesField("stringdv", new BytesRef(s)));
+        }
         docValues.add(new BytesRef(s));
 
       } else {
@@ -143,7 +144,7 @@ public class TestFieldCacheSortRandom extends SolrTestCase {
       System.out.println("  reader=" + r);
     }
     
-    final IndexSearcher s = LuceneTestCase.newSearcher(r, false);
+    final IndexSearcher s = SolrTestUtil.newSearcher(r, false);
     final int ITERS = SolrTestUtil.atLeast(100);
     for(int iter=0;iter<ITERS;iter++) {
       final boolean reverse = random.nextBoolean();

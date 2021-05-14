@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
@@ -95,7 +96,7 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     doc.addField("id", "2");
     doc.addField(fieldName, "val1");
     UpdateRequest ureq = new UpdateRequest().add(doc);
-    cloudClient.request(ureq, collection);;
+    cloudClient.request(ureq, collection);
   }
 
   private void addStringField(String fieldName, String collection, CloudHttp2SolrClient cloudClient) throws IOException, SolrServerException {
@@ -110,18 +111,20 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     log.info("added new field={}", fieldName);
   }
 
-  private void testModifyField(String collection) throws IOException, SolrServerException {
+  private void testModifyField(String collection) throws Exception {
     CloudHttp2SolrClient cloudClient = cluster.getSolrClient();
+    // assumption: in this schema, the id field is docValues=false, uninvertible=true
 
     SolrInputDocument doc = new SolrInputDocument("id", "3");
     cloudClient.add(collection, doc);
     cloudClient.commit(collection);
+    cloudClient.query(collection, params("q", "*:*", "sort", "id asc")); // does not throw
 
     String fieldName = "id";
     SchemaRequest.Field getFieldRequest = new SchemaRequest.Field(fieldName);
     SchemaResponse.FieldResponse getFieldResponse = getFieldRequest.process(cloudClient, collection);
     Map<String, Object> field = getFieldResponse.getField();
-    field.put("docValues", true);
+    field.put("uninvertible", false); // and because this field does not have docValues, can't sort.
     SchemaRequest.ReplaceField replaceRequest = new SchemaRequest.ReplaceField(field);
     SchemaResponse.UpdateResponse replaceResponse = replaceRequest.process(cloudClient, collection);
     assertNull(replaceResponse.getResponse().get("errors"));
@@ -130,6 +133,10 @@ public class TestManagedSchemaAPI extends SolrCloudTestCase {
     assertEquals(0, response.getStatus());
     assertTrue(response.isSuccess());
 
+    Exception e = LuceneTestCase.expectThrows(Exception.class, () -> {
+      cloudClient.query(collection, params("q", "*:*", "sort", "id asc"));
+    });
+    assertTrue("Should fail because needs docValues", e.getMessage().contains("docValues"));
   }
 
 }

@@ -21,17 +21,15 @@ import java.util.Locale;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 
-import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.TermRangeQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCase;
 import org.apache.solr.SolrTestUtil;
@@ -45,7 +43,7 @@ public class TestMultiValuedNumericRangeQuery extends SolrTestCase {
    */
   public void testMultiValuedNRQ() throws Exception {
     Directory directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), directory,
         SolrTestUtil.newIndexWriterConfig()
         .setMaxBufferedDocs(TestUtil.nextInt(random(), 50, 1000)));
     

@@ -35,7 +35,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.Term;
@@ -138,7 +138,7 @@ public class TestFieldCacheVsDocValues extends SolrTestCase {
       } else {
         numDocs = TestUtil.nextInt(random(), 100, 200);
       }
-      try (IndexWriter w = new IndexWriter(d, LuceneTestCase.newIndexWriterConfig(analyzer))) {
+      try (IndexWriter w = new IndexWriter(d, SolrTestUtil.newIndexWriterConfig(analyzer))) {
         List<byte[]> docBytes = new ArrayList<>();
         long totalBytes = 0;
         for (int docID = 0; docID < numDocs; docID++) {
@@ -192,8 +192,8 @@ public class TestFieldCacheVsDocValues extends SolrTestCase {
 
   private void doTestSortedVsFieldCache(int minLength, int maxLength) throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig conf = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, conf);
+    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig();
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir, conf);
     Document doc = new Document();
     Field idField = new StringField("id", "", Field.Store.NO);
     Field indexedField = new StringField("indexed", "", Field.Store.NO);
@@ -244,7 +244,7 @@ public class TestFieldCacheVsDocValues extends SolrTestCase {
   private void doTestSortedSetVsUninvertedField(int minLength, int maxLength) throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
     IndexWriterConfig conf = new IndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, conf);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir, conf);
     
     // index some docs
     int numDocs = SolrTestUtil.atLeast(300);
@@ -313,8 +313,8 @@ public class TestFieldCacheVsDocValues extends SolrTestCase {
   
   private void doTestMissingVsFieldCache(LongProducer longs) throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriterConfig conf = LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()));
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, conf);
+    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig();
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir, conf);
     Field idField = new StringField("id", "", Field.Store.NO);
     Field indexedField = LuceneTestCase.newStringField("indexed", "", Field.Store.NO);
     Field dvField = new NumericDocValuesField("dv", 0);

@@ -80,10 +80,6 @@
         <AsyncLogger name="com.google.inject.servlet" level="INFO"/>
         <AsyncLogger name="org.apache.solr.client.solrj.impl.Http2SolrClient" level="INFO"/>
 
-        <AsyncLogger name="org.apache.solr.common.SkyHook" level="INFO" additivity="false">
-            <AppenderRef ref="SkyHookLogFile"/>
-        </AsyncLogger>
-
 
         <AsyncRoot level="INFO">
             <AppenderRef ref="STDERR"/>

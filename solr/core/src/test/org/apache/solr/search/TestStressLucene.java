@@ -29,18 +29,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCase;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.ParWork;
@@ -108,7 +106,7 @@ public class TestStressLucene extends TestRTGBase {
 
     Directory dir = SolrTestUtil.newDirectory();
 
-    final RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
+    final SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
     writer.setDoRandomForceMergeAssert(false);
 
     // writer.commit();

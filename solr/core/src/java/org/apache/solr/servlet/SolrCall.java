@@ -261,8 +261,9 @@ public abstract class SolrCall {
           if (replica.getState() == Replica.State.ACTIVE) {
             return core;
           }
+          // MRM TODO: keep?
           try {
-            cores.getZkController().getZkStateReader().waitForState(core.getCoreDescriptor().getCollectionName(), 3, TimeUnit.SECONDS, (liveNodes1, coll) -> {
+            cores.getZkController().getZkStateReader().waitForState(core.getCoreDescriptor().getCollectionName(), 1, TimeUnit.SECONDS, (liveNodes1, coll) -> {
               if (coll == null) {
                 return false;
               }

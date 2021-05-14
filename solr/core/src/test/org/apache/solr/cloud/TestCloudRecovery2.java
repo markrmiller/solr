@@ -119,7 +119,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
           .commit(client1, COLLECTION);
 
       // can be stale (eventually consistent) but should catch up
-      for (int i = 0; i < 30; i++) {
+      for (int i = 0; i < 10; i++) {
         try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
           Object v = client.query(COLLECTION, new SolrQuery("q","id:1", "distrib", "true")).getResults().get(0).get("num");
           try {

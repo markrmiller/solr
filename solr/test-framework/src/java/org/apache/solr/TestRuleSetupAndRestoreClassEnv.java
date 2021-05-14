@@ -49,15 +49,7 @@ import org.apache.lucene.util.NullInfoStream;
 import org.apache.lucene.util.PrintStreamInfoStream;
 import org.junit.internal.AssumptionViolatedException;
 
-import static org.apache.lucene.util.LuceneTestCase.INFOSTREAM;
-import static org.apache.lucene.util.LuceneTestCase.TEST_CODEC;
-import static org.apache.lucene.util.LuceneTestCase.TEST_DOCVALUESFORMAT;
-import static org.apache.lucene.util.LuceneTestCase.TEST_POSTINGSFORMAT;
-import static org.apache.lucene.util.LuceneTestCase.VERBOSE;
-import static org.apache.lucene.util.LuceneTestCase.assumeFalse;
-import static org.apache.lucene.util.LuceneTestCase.localeForLanguageTag;
-import static org.apache.lucene.util.LuceneTestCase.randomLocale;
-import static org.apache.lucene.util.LuceneTestCase.randomTimeZone;
+import static org.apache.lucene.util.LuceneTestCase.*;
 
 /**
  * Setup and restore suite-level environment (fine grained junk that 

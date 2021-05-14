@@ -38,7 +38,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
@@ -46,7 +46,6 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCase;
-import org.apache.solr.SolrTestCaseUtil;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.ParWork;
 
@@ -153,7 +152,7 @@ public class TestFieldCacheWithThreads extends SolrTestCase {
     Random random = random();
     final int NUM_DOCS = TEST_NIGHTLY ? SolrTestUtil.atLeast(100) : 20;
     final Directory dir = new ByteBuffersDirectory();
-    final RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
+    final SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
     final boolean allowDups = random.nextBoolean();
     final Set<String> seen = new HashSet<>();
     if (VERBOSE) {

@@ -27,7 +27,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.DocIdSet;
@@ -117,7 +117,7 @@ public class TestFilteredDocIdSet extends SolrTestCase {
     // Tests that if a Filter produces a null DocIdSet, which is given to
     // IndexSearcher, everything works fine. This came up in LUCENE-1754.
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("c", "val", Field.Store.NO));
     writer.addDocument(doc);
@@ -161,7 +161,7 @@ public class TestFilteredDocIdSet extends SolrTestCase {
 
   public void testNullIteratorFilteredDocIdSet() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("c", "val", Field.Store.NO));
     writer.addDocument(doc);

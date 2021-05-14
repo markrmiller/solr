@@ -213,7 +213,7 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
 
   private final static int DEFAULT_MAX_SHARD_COUNT = 3;
 
-  private int shardCount = -1;      // the actual number of solr cores that will be created in the cluster
+  private int shardCount = 1;      // the actual number of solr cores that will be created in the cluster
   public int getShardCount() {
     return shardCount;
   }
@@ -1103,17 +1103,21 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
 
       @Override
       public void callStatement() throws Throwable {
-        
-        for (shardCount = min; shardCount <= max; shardCount++) {
-          RandVal.uniqueValues = new HashSet(); //reset random values
-          createServers(shardCount);
-          try {
-            statement.evaluate();
-          } finally {
-            destroyServers();
-          }
+        int cnt;
+        if (shardCount > 0) {
+          cnt = SolrTestCase.random().nextInt(shardCount) + 1;
+        } else {
+          cnt = 0;
+        }
+        RandVal.uniqueValues = new HashSet(); //reset random values
+        createServers(cnt);
+        try {
+          statement.evaluate();
+        } finally {
+          destroyServers();
         }
       }
+
     }
 
     @Override

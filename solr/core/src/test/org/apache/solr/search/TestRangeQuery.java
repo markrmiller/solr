@@ -415,7 +415,7 @@ public class TestRangeQuery extends SolrTestCaseJ4 {
   }
 
   public void testCompareTypesRandomRangeQueries() throws Exception {
-    int cardinality = TEST_NIGHTLY ? 6700 : 100;
+    int cardinality = TEST_NIGHTLY ? 3703 : 100;
     Map<NumberType,String[]> types = new HashMap<>(); //single and multivalued field types
     Map<NumberType,String[]> typesMv = new HashMap<>(); // multivalued field types only
     types.put(NumberType.INTEGER, new String[]{"ti", "ti_dv", "ti_ni_dv", "i_p", "i_ni_p", "i_ndv_p", "tis", "tis_dv", "tis_ni_dv", "is_p", "is_ni_p", "is_ndv_p"});

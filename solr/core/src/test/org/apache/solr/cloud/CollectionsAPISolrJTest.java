@@ -608,27 +608,67 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
     CollectionAdminResponse rsp = req.process(cluster.getSolrClient());
     assertEquals(0, rsp.getStatus());
     log.info("response={}", rsp.getResponse());
+    @SuppressWarnings({"unchecked"})
     List<Object> nonCompliant = (List<Object>)rsp.getResponse().findRecursive(collectionName, "schemaNonCompliant");
     assertNotNull(rsp.getResponse().toString(), nonCompliant);
     assertEquals(nonCompliant.toString(), 1, nonCompliant.size());
     assertTrue(nonCompliant.toString(), nonCompliant.contains("(NONE)"));
+    @SuppressWarnings({"unchecked"})
     NamedList<Object> segInfos = (NamedList<Object>) rsp.getResponse().findRecursive(collectionName, "shards", "s1", "leader", "segInfos");
     assertNotNull(Utils.toJSONString(rsp), segInfos.findRecursive("info", "core", "startTime"));
     assertNotNull(Utils.toJSONString(rsp), segInfos.get("fieldInfoLegend"));
     assertNotNull(Utils.toJSONString(rsp), segInfos.findRecursive("segments", "_0", "fields", "id", "flags"));
-    assertNotNull(Utils.toJSONString(rsp), segInfos.findRecursive("segments", "_0", "ramBytesUsed"));
     // test for replicas not active - SOLR-13882
     DocCollection coll = cluster.getSolrClient().getClusterStateProvider().getClusterState().getCollection(collectionName);
     Replica firstReplica = coll.getSlice("s1").getReplicas().iterator().next();
     String firstNode = firstReplica.getNodeName();
 
-    JettySolrRunner jetty = cluster.getJettyForShard(collectionName, "s1");
-    jetty.stop();
+    for (JettySolrRunner jetty : cluster.getJettySolrRunners()) {
+      if (jetty.getNodeName().equals(firstNode)) {
+        cluster.stopJettySolrRunner(jetty);
+      }
+    }
     rsp = req.process(cluster.getSolrClient());
     assertEquals(0, rsp.getStatus());
     Number down = (Number) rsp.getResponse().findRecursive(collectionName, "shards", "s1", "replicas", "down");
     assertTrue("should be some down replicas, but there were none in shard1:" + rsp, down.intValue() > 0);
-   // jetty.start();
+  }
+
+  @Test
+  public void testColStatusCollectionName() throws Exception {
+    final String[] collectionNames = {"collectionStatusTest_1", "collectionStatusTest_2"};
+    for (String collectionName : collectionNames) {
+      CollectionAdminRequest.createCollection(collectionName, "conf2", 1, 1)
+              .process(cluster.getSolrClient());
+      cluster.waitForActiveCollection(collectionName, 1, 1);
+    }
+    // assert only one collection is returned using the solrj colstatus interface
+    CollectionAdminRequest.ColStatus req = CollectionAdminRequest.collectionStatus(collectionNames[0]);
+    CollectionAdminResponse rsp = req.process(cluster.getSolrClient());
+    assertNotNull(rsp.getResponse().get(collectionNames[0]));
+    assertNull(rsp.getResponse().get(collectionNames[1]));
+
+    req = CollectionAdminRequest.collectionStatus(collectionNames[1]);
+    rsp = req.process(cluster.getSolrClient());
+    assertNotNull(rsp.getResponse().get(collectionNames[1]));
+    assertNull(rsp.getResponse().get(collectionNames[0]));
+
+    // assert passing null collection fails
+    LuceneTestCase.expectThrows(NullPointerException.class,
+            "Passing null to collectionStatus should result in an NPE",
+            () -> CollectionAdminRequest.collectionStatus(null));
+
+    // assert passing non-existent collection returns no collections
+    req = CollectionAdminRequest.collectionStatus("doesNotExist");
+    rsp = req.process(cluster.getSolrClient());
+    assertNull(rsp.getResponse().get(collectionNames[0]));
+    assertNull(rsp.getResponse().get(collectionNames[1]));
+
+    // assert collectionStatuses returns all collections
+    req = CollectionAdminRequest.collectionStatuses();
+    rsp = req.process(cluster.getSolrClient());
+    assertNotNull(rsp.getResponse().get(collectionNames[1]));
+    assertNotNull(rsp.getResponse().get(collectionNames[0]));
   }
 
   @Test

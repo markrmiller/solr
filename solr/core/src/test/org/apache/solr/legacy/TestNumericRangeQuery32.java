@@ -22,7 +22,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MultiTermQuery;
 import org.apache.lucene.search.Query;
@@ -60,10 +60,10 @@ public class TestNumericRangeQuery32 extends SolrTestCase {
     noDocs = SolrTestUtil.atLeast(4096);
     distance = (1 << 30) / noDocs;
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), directory,
         SolrTestUtil.newIndexWriterConfig()
         .setMaxBufferedDocs(TestUtil.nextInt(random(), 100, 1000))
-        .setMergePolicy(LuceneTestCase.newLogMergePolicy()));
+        .setMergePolicy(SolrTestUtil.newLogMergePolicy()));
     
     final LegacyFieldType storedInt = new LegacyFieldType(LegacyIntField.TYPE_NOT_STORED);
     storedInt.setStored(true);
@@ -292,8 +292,8 @@ public class TestNumericRangeQuery32 extends SolrTestCase {
   @Test
   public void testInfiniteValues() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir,
-        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir,
+        SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
     Document doc = new Document();
     doc.add(new LegacyFloatField("float", Float.NEGATIVE_INFINITY, Field.Store.NO));
     doc.add(new LegacyIntField("int", Integer.MIN_VALUE, Field.Store.NO));

@@ -324,7 +324,7 @@ public class TestCloudJSONFacetSKG extends SolrCloudTestCase {
     // we get a really big one early on, we can test as much as possible, skip other iterations.
     //
     // (deeply nested facets may contain more buckets then the max, but we won't *check* all of them)
-    final int maxBucketsAllowed = LuceneTestCase.atLeast(TEST_NIGHTLY ? 2000 : 200);
+    final int maxBucketsAllowed = LuceneTestCase.atLeast(TEST_NIGHTLY ? 1131 : 200);
     final AtomicInteger maxBucketsToCheck = new AtomicInteger(maxBucketsAllowed);
     
     final int numIters = LuceneTestCase.atLeast(TEST_NIGHTLY ? 9 : 4) + 1;

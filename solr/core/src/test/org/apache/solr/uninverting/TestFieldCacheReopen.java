@@ -39,7 +39,7 @@ public class TestFieldCacheReopen extends SolrTestCase {
     Directory dir = SolrTestUtil.newDirectory();
     IndexWriter writer = new IndexWriter(
         dir,
-        LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())).
+        SolrTestUtil.newIndexWriterConfig().
             setMergePolicy(LuceneTestCase.newLogMergePolicy(10))
     );
     Document doc = new Document();

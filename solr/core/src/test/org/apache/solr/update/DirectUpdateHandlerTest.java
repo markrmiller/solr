@@ -380,6 +380,7 @@ public class DirectUpdateHandlerTest extends SolrTestCaseJ4 {
 
     SolrQueryRequest sr = req();
     DirectoryReader r = sr.getSearcher().getIndexReader();
+
     Directory d = r.directory();
 
     if (log.isInfoEnabled()) {
@@ -397,7 +398,8 @@ public class DirectUpdateHandlerTest extends SolrTestCaseJ4 {
     if (log.isInfoEnabled()) {
       log.info("FILES after prepareCommit={}", Arrays.asList(d.listAll()));
     }
-    assertTrue( d.listAll().length > nFiles);  // make sure new index files were actually written
+    int ln = d.listAll().length;
+    assertTrue(ln + ":" + nFiles, ln > nFiles);  // make sure new index files were actually written
     
     assertJQ(req("q", "id:1")
         , "/response/numFound==0"

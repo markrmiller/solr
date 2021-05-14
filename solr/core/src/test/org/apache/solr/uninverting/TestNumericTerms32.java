@@ -19,11 +19,9 @@ package org.apache.solr.uninverting;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.RandomIndexWriter;
-import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.legacy.LegacyFieldType;
 import org.apache.solr.legacy.LegacyIntField;
@@ -59,10 +57,10 @@ public class TestNumericTerms32 extends SolrTestCase {
     noDocs = TEST_NIGHTLY ? SolrTestUtil.atLeast(4096) : 406;
     distance = (1 << 30) / noDocs;
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), directory,
         SolrTestUtil.newIndexWriterConfig()
             .setMaxBufferedDocs(TEST_NIGHTLY ? TestUtil.nextInt(random(), 100, 1000) : 1000)
-            .setMergePolicy(LuceneTestCase.newLogMergePolicy()));
+            .setMergePolicy(SolrTestUtil.newLogMergePolicy()));
     
     final LegacyFieldType storedInt = new LegacyFieldType(LegacyIntField.TYPE_NOT_STORED);
     storedInt.setStored(true);

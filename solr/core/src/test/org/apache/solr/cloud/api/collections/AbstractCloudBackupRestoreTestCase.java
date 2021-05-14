@@ -199,10 +199,7 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
     {
       CollectionAdminRequest.Restore restore = CollectionAdminRequest.restoreCollection(restoreCollectionName, backupName)
           .setLocation(backupLocation).setRepositoryName(getBackupRepoName());
-      if (backupCollection.getReplicas().size() > cluster.getJettySolrRunners().size()) {
-        // may need to increase maxShardsPerNode (e.g. if it was shard split, then now we need more)
-        restore.setMaxShardsPerNode((int)Math.ceil(backupCollection.getReplicas().size()/cluster.getJettySolrRunners().size()));
-      }
+
 
       restore.setConfigName("confFaulty");
       assertEquals(RequestStatusState.FAILED, restore.processAndWait(solrClient, 30));
@@ -348,14 +345,6 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
         log.info("numShards={} restoreReplFactor={} maxShardsPerNode={} totalNodes={}",
             numShards, restoreReplFactor, computeRestoreMaxShardsPerNode, cluster.getJettySolrRunners().size());
       }
-
-      if (random().nextBoolean()) { //set it to -1
-        isMaxShardsUnlimited = true;
-        restore.setMaxShardsPerNode(-1);
-      } else {
-        isMaxShardsPerNodeExternal = true;
-        restore.setMaxShardsPerNode(computeRestoreMaxShardsPerNode);
-      }
     }
 
     if (LuceneTestCase.rarely()) { // Try with createNodeSet configuration
@@ -364,7 +353,6 @@ public abstract class AbstractCloudBackupRestoreTestCase extends SolrCloudTestCa
       // we need to double maxShardsPerNode value since we reduced number of available nodes by half.
       isMaxShardsPerNodeExternal = true;
       computeRestoreMaxShardsPerNode = origShardToDocCount.size() * restoreReplFactor;
-      restore.setMaxShardsPerNode(computeRestoreMaxShardsPerNode);
     }
 
     final int restoreMaxShardsPerNode = computeRestoreMaxShardsPerNode;

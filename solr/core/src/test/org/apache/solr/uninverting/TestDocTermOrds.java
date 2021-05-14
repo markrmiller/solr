@@ -38,7 +38,7 @@ import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.MultiTerms;
 import org.apache.lucene.index.NumericDocValues;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
@@ -66,7 +66,7 @@ public class TestDocTermOrds extends SolrTestCase {
 
   public void testEmptyIndex() throws IOException {
     final Directory dir = SolrTestUtil.newDirectory();
-    final IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
+    final IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
     iw.close();
     
     final DirectoryReader ir = DirectoryReader.open(dir);
@@ -96,7 +96,7 @@ public class TestDocTermOrds extends SolrTestCase {
 
   public void testSimple() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    final RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())).setMergePolicy(LuceneTestCase.newLogMergePolicy()));
+    final SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig().setMergePolicy(SolrTestUtil.newLogMergePolicy()));
     Document doc = new Document();
     Field field = LuceneTestCase.newTextField("field", "", Field.Store.NO);
     doc.add(field);
@@ -164,7 +164,7 @@ public class TestDocTermOrds extends SolrTestCase {
       conf.setCodec(codec);
     }
     
-    final RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, conf);
+    final SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, conf);
 
     final int[][] idToOrds = new int[NUM_DOCS][];
     final Set<Integer> ordsForDocSet = new HashSet<>();
@@ -254,7 +254,7 @@ public class TestDocTermOrds extends SolrTestCase {
     
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
 
-    IndexWriterConfig conf = LuceneTestCase.newIndexWriterConfig();
+    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig();
 
     // Sometimes swap in codec that impls ord():
     if (random().nextInt(10) == 7) {
@@ -262,7 +262,7 @@ public class TestDocTermOrds extends SolrTestCase {
       conf.setCodec(codec);
     }
     
-    final RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, conf);
+    final SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, conf);
 
     final int[][] idToOrds = new int[NUM_DOCS][];
     final Set<Integer> ordsForDocSet = new HashSet<>();
@@ -437,7 +437,7 @@ public class TestDocTermOrds extends SolrTestCase {
   
   public void testBackToTheFuture() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("foo", "bar", Field.Store.NO));
@@ -469,7 +469,7 @@ public class TestDocTermOrds extends SolrTestCase {
   
   public void testNumericEncoded32() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(new LegacyIntField("foo", 5, Field.Store.NO));
@@ -510,7 +510,7 @@ public class TestDocTermOrds extends SolrTestCase {
   
   public void testNumericEncoded64() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(new LegacyLongField("foo", 5, Field.Store.NO));
@@ -552,9 +552,9 @@ public class TestDocTermOrds extends SolrTestCase {
   public void testSortedTermsEnum() throws IOException {
     Directory directory = SolrTestUtil.newDirectory();
     Analyzer analyzer = new MockAnalyzer(SolrTestCase.random());
-    IndexWriterConfig iwconfig = LuceneTestCase.newIndexWriterConfig(analyzer);
-    iwconfig.setMergePolicy(LuceneTestCase.newLogMergePolicy());
-    RandomIndexWriter iwriter = new RandomIndexWriter(SolrTestCase.random(), directory, iwconfig);
+    IndexWriterConfig iwconfig = SolrTestUtil.newIndexWriterConfig(analyzer);
+    iwconfig.setMergePolicy(SolrTestUtil.newLogMergePolicy());
+    SolrRandomIndexWriter iwriter = new SolrRandomIndexWriter(SolrTestCase.random(), directory, iwconfig);
     
     Document doc = new Document();
     doc.add(new StringField("field", "hello", Field.Store.NO));

@@ -20,7 +20,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.MultiTerms;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.store.Directory;
@@ -37,7 +37,7 @@ public class TestLegacyTerms extends SolrTestCase {
   
   public void testIntFieldMinMax() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter w = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     int numDocs = SolrTestUtil.atLeast(100);
     int minValue = Integer.MAX_VALUE;
     int maxValue = Integer.MIN_VALUE;
@@ -67,7 +67,7 @@ public class TestLegacyTerms extends SolrTestCase {
   
   public void testLongFieldMinMax() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
     int numDocs = SolrTestUtil.atLeast(100);
     long minValue = Long.MAX_VALUE;
     long maxValue = Long.MIN_VALUE;
@@ -93,7 +93,7 @@ public class TestLegacyTerms extends SolrTestCase {
 
   public void testFloatFieldMinMax() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter w = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     int numDocs = SolrTestUtil.atLeast(100);
     float minValue = Float.POSITIVE_INFINITY;
     float maxValue = Float.NEGATIVE_INFINITY;
@@ -118,7 +118,7 @@ public class TestLegacyTerms extends SolrTestCase {
 
   public void testDoubleFieldMinMax() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter w = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter w = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     int numDocs = SolrTestUtil.atLeast(100);
     double minValue = Double.POSITIVE_INFINITY;
     double maxValue = Double.NEGATIVE_INFINITY;

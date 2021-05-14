@@ -29,7 +29,7 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FloatDocValuesField;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
@@ -174,7 +174,7 @@ public class TestLTRScoringQuery extends SolrTestCase {
   @Test
   public void testLTRScoringQuery() throws IOException, ModelException {
     final Directory dir = LuceneTestCase.newDirectory();
-    final RandomIndexWriter w = new RandomIndexWriter(random(), dir);
+    final SolrRandomIndexWriter w = new SolrRandomIndexWriter(random(), dir);
 
     Document doc = new Document();
     doc.add(LuceneTestCase.newStringField("id", "0", Field.Store.YES));

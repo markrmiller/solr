@@ -157,7 +157,7 @@ public class DistributedVersionInfoTest extends SolrCloudTestCase {
           log.error("Fail", e);
         }
 
-        for (int i=1; i < (TEST_NIGHTLY ? 1000 : 100); i++) {
+        for (int i=1; i < (TEST_NIGHTLY ? 500 : 100); i++) {
           if (i % (rand.nextInt(20)+1) == 0) {
             try {
               Thread.sleep(rand.nextInt(50)+1);

@@ -22,7 +22,10 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.*;
+import org.apache.lucene.search.AssertingIndexSearcher;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.similarities.AssertingSimilarity;
+import org.apache.lucene.search.similarities.RandomSimilarity;
 import org.apache.lucene.store.BaseDirectoryWrapper;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
@@ -34,11 +37,7 @@ import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.store.MockDirectoryWrapper;
 import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.lucene.store.RawDirectoryWrapper;
-import org.apache.lucene.util.CommandLineUtil;
-import org.apache.lucene.util.Constants;
-import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.Rethrow;
-import org.apache.lucene.util.TestUtil;
+import org.apache.lucene.util.*;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -54,17 +53,14 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class SolrTestUtil {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final boolean VERBOSE = false;
 
   public SolrTestUtil() {
   }
@@ -235,13 +231,229 @@ public class SolrTestUtil {
 
   }
 
+
+  /** Create a new searcher over the reader. This searcher might randomly use threads. */
+  public static IndexSearcher newSearcher(IndexReader r) {
+    return newSearcher(r, true);
+  }
+
+  /** Create a new searcher over the reader. This searcher might randomly use threads. */
+  public static IndexSearcher newSearcher(IndexReader r, boolean maybeWrap) {
+    return newSearcher(r, maybeWrap, true);
+  }
+
+  /**
+   * Create a new searcher over the reader. This searcher might randomly use threads. if <code>
+   * maybeWrap</code> is true, this searcher might wrap the reader with one that returns null for
+   * getSequentialSubReaders. If <code>wrapWithAssertions</code> is true, this searcher might be an
+   * {@link AssertingIndexSearcher} instance.
+   */
+  public static IndexSearcher newSearcher(
+          IndexReader r, boolean maybeWrap, boolean wrapWithAssertions) {
+    Random random = SolrTestCase.random();
+    if (usually()) {
+      if (maybeWrap) {
+        try {
+          r = maybeWrapReader(r);
+        } catch (IOException e) {
+          Rethrow.rethrow(e);
+        }
+      }
+      // TODO: this whole check is a coverage hack, we should move it to tests for various
+      // filterreaders.
+      // ultimately whatever you do will be checkIndex'd at the end anyway.
+      if (random.nextInt(500) == 0 && r instanceof LeafReader) {
+        // TODO: not useful to check DirectoryReader (redundant with checkindex)
+        // but maybe sometimes run this on the other crazy readers maybeWrapReader creates?
+        try {
+          TestUtil.checkReader(r);
+        } catch (IOException e) {
+          Rethrow.rethrow(e);
+        }
+      }
+      final IndexSearcher ret;
+      if (wrapWithAssertions) {
+        ret =
+                random.nextBoolean()
+                        ? new AssertingIndexSearcher(random, r)
+                        : new AssertingIndexSearcher(random, r.getContext());
+      } else {
+        ret = random.nextBoolean() ? new IndexSearcher(r) : new IndexSearcher(r.getContext());
+      }
+      ret.setSimilarity(new AssertingSimilarity(new RandomSimilarity(SolrTestCase.random())));
+      return ret;
+    } else {
+      int threads = 0;
+      final ThreadPoolExecutor ex;
+      if (r.getReaderCacheHelper() == null || random.nextBoolean()) {
+        ex = null;
+      } else {
+        threads = TestUtil.nextInt(random, 1, 8);
+        ex =
+                new ThreadPoolExecutor(
+                        threads,
+                        threads,
+                        0L,
+                        TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        new NamedThreadFactory("LuceneTestCase"));
+        // uncomment to intensify LUCENE-3840
+        // ex.prestartAllCoreThreads();
+      }
+      if (ex != null) {
+        if (VERBOSE) {
+          System.out.println(
+                  "NOTE: newSearcher using ExecutorService with " + threads + " threads");
+        }
+        r.getReaderCacheHelper()
+                .addClosedListener(cacheKey -> TestUtil.shutdownExecutorService(ex));
+      }
+      IndexSearcher ret;
+      if (wrapWithAssertions) {
+        ret =
+                random.nextBoolean()
+                        ? new AssertingIndexSearcher(random, r, ex)
+                        : new AssertingIndexSearcher(random, r.getContext(), ex);
+      } else if (random.nextBoolean()) {
+        int maxDocPerSlice = 1 + random.nextInt(100000);
+        int maxSegmentsPerSlice = 1 + random.nextInt(20);
+        ret =
+                new IndexSearcher(r, ex) {
+                  @Override
+                  protected LeafSlice[] slices(List<LeafReaderContext> leaves) {
+                    return slices(leaves, maxDocPerSlice, maxSegmentsPerSlice);
+                  }
+                };
+      } else {
+        ret =
+                random.nextBoolean() ? new IndexSearcher(r, ex) : new IndexSearcher(r.getContext(), ex);
+      }
+      ret.setSimilarity(new AssertingSimilarity(new RandomSimilarity(SolrTestCase.random())));
+      ret.setQueryCachingPolicy(LuceneTestCase.MAYBE_CACHE_POLICY);
+      return ret;
+    }
+  }
+
+  public static IndexReader wrapReader(IndexReader r) throws IOException {
+    Random random = SolrTestCase.random();
+
+    for (int i = 0, c = random.nextInt(6) + 1; i < c; i++) {
+      switch (random.nextInt(5)) {
+        case 0:
+          // will create no FC insanity in atomic case, as ParallelLeafReader has own cache key:
+          if (VERBOSE) {
+            System.out.println(
+                    "NOTE: LuceneTestCase.wrapReader: wrapping previous reader="
+                            + r
+                            + " with ParallelLeaf/CompositeReader");
+          }
+          r =
+                  (r instanceof LeafReader)
+                          ? new ParallelLeafReader((LeafReader) r)
+                          : new ParallelCompositeReader((CompositeReader) r);
+          break;
+        case 1:
+          if (r instanceof LeafReader) {
+            final LeafReader ar = (LeafReader) r;
+            final List<String> allFields = new ArrayList<>();
+            for (FieldInfo fi : ar.getFieldInfos()) {
+              allFields.add(fi.name);
+            }
+            Collections.shuffle(allFields, random);
+            final int end = allFields.isEmpty() ? 0 : random.nextInt(allFields.size());
+            final Set<String> fields = new HashSet<>(allFields.subList(0, end));
+            // will create no FC insanity as ParallelLeafReader has own cache key:
+            if (VERBOSE) {
+              System.out.println(
+                      "NOTE: LuceneTestCase.wrapReader: wrapping previous reader="
+                              + r
+                              + " with ParallelLeafReader");
+            }
+            r =
+                    new ParallelLeafReader(
+                            new FieldFilterLeafReader(ar, fields, false),
+                            new FieldFilterLeafReader(ar, fields, true));
+          }
+          break;
+        case 2:
+          // Häckidy-Hick-Hack: a standard Reader will cause FC insanity, so we use
+          // QueryUtils' reader with a fake cache key, so insanity checker cannot walk
+          // along our reader:
+          if (VERBOSE) {
+            System.out.println(
+                    "NOTE: LuceneTestCase.wrapReader: wrapping previous reader="
+                            + r
+                            + " with AssertingLeaf/DirectoryReader");
+          }
+          if (r instanceof LeafReader) {
+            r = new AssertingLeafReader((LeafReader) r);
+          } else if (r instanceof DirectoryReader) {
+            r = new AssertingDirectoryReader((DirectoryReader) r);
+          }
+          break;
+        case 3:
+          if (VERBOSE) {
+            System.out.println(
+                    "NOTE: LuceneTestCase.wrapReader: wrapping previous reader="
+                            + r
+                            + " with MismatchedLeaf/DirectoryReader");
+          }
+          if (r instanceof LeafReader) {
+            r = new MismatchedLeafReader((LeafReader) r, random);
+          } else if (r instanceof DirectoryReader) {
+            r = new MismatchedDirectoryReader((DirectoryReader) r, random);
+          }
+          break;
+        case 4:
+          if (VERBOSE) {
+            System.out.println(
+                    "NOTE: LuceneTestCase.wrapReader: wrapping previous reader="
+                            + r
+                            + " with MergingCodecReader");
+          }
+          if (r instanceof CodecReader) {
+            r = new MergingCodecReader((CodecReader) r);
+          } else if (r instanceof DirectoryReader) {
+            boolean allLeavesAreCodecReaders = true;
+            for (LeafReaderContext ctx : r.leaves()) {
+              if (ctx.reader() instanceof CodecReader == false) {
+                allLeavesAreCodecReaders = false;
+                break;
+              }
+            }
+            if (allLeavesAreCodecReaders) {
+              r = new MergingDirectoryReaderWrapper((DirectoryReader) r);
+            }
+          }
+          break;
+        default:
+          LuceneTestCase.fail("should not get here");
+      }
+    }
+
+    if (VERBOSE) {
+      System.out.println("wrapReader wrapped: " + r);
+    }
+
+    return r;
+  }
+
+  /** Sometimes wrap the IndexReader as slow, parallel or filter reader (or combinations of that) */
+  public static IndexReader maybeWrapReader(IndexReader r) throws IOException {
+    if (rarely(SolrTestCase.random())) {
+      r = wrapReader(r);
+    }
+    return r;
+  }
+
+
   public static IndexWriterConfig newIndexWriterConfig(Analyzer a) {
     return newIndexWriterConfig(SolrTestCase.random(), a);
   }
 
   public static IndexWriterConfig newIndexWriterConfig(Random r, Analyzer a) {
     IndexWriterConfig c = new IndexWriterConfig(a);
-//    c.setSimilarity(classEnvRule.similarity);
+    c.setSimilarity(new AssertingSimilarity(new RandomSimilarity(SolrTestCase.random())));
 //    if (VERBOSE) {
 //      // Even though TestRuleSetupAndRestoreClassEnv calls
 //      // InfoStream.setDefault, we do it again here so that
@@ -418,10 +630,6 @@ public class SolrTestUtil {
     return LuceneTestCase.newTextField(value, foo_bar_bar_bar_bar, no);
   }
 
-  public static IndexSearcher newSearcher(IndexReader ir) {
-    return LuceneTestCase.newSearcher(ir);
-  }
-
   public static IndexableField newStringField(String value, String bar, Field.Store yes) {
     return LuceneTestCase.newStringField(value, bar, yes);
   }
@@ -549,6 +757,13 @@ public class SolrTestUtil {
     return d;
   }
 
+  public static boolean usually(Random random) {
+    return !rarely(random);
+  }
+
+  public static boolean usually() {
+    return usually(SolrTestCase.random());
+  }
 
   public static boolean rarely(Random random) {
     int p = LuceneTestCase.TEST_NIGHTLY ? 10 : 1;

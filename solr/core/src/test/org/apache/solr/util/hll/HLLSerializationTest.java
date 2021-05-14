@@ -47,7 +47,7 @@ public class HLLSerializationTest extends SolrTestCase {
   @LuceneTestCase.Nightly
   public void serializationSmokeTest() throws Exception {
     final Random random = new Random(randomLong());
-    final int randomCount = 150;
+    final int randomCount = 57;
     final List<Long> randoms = new ArrayList<Long>(randomCount);
     for (int i=0; i<randomCount; i++) {
       randoms.add(random.nextLong());

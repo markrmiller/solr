@@ -22,7 +22,7 @@ import java.util.Map;
 import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.legacy.LegacyFieldType;
@@ -60,7 +60,7 @@ public class TestNumericTerms64 extends SolrTestCase {
     noDocs = SolrTestUtil.atLeast(TEST_NIGHTLY ? 4096 : 256);
     distance = (1L << 60) / noDocs;
     directory = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), directory,
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), directory,
         SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
         .setMaxBufferedDocs(TestUtil.nextInt(random(), TEST_NIGHTLY ? 100 : 990, 1000))
         .setMergePolicy(LuceneTestCase.newLogMergePolicy()));

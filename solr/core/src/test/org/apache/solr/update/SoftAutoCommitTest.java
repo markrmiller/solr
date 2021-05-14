@@ -184,8 +184,8 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
   private void doTestSoftAndHardCommitMaxTimeMixedAdds(final CommitWithinType commitWithinType)
     throws Exception {
     
-    final int softCommitWaitMillis = 100;
-    final int hardCommitWaitMillis = 600;
+    final int softCommitWaitMillis = 50;
+    final int hardCommitWaitMillis = 400;
     final int commitWithin = commitWithinType.useValue(softCommitWaitMillis, hardCommitWaitMillis);
     
     CommitTracker hardTracker = updater.commitTracker;
@@ -315,7 +315,7 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
     throws Exception {
     
     final int softCommitWaitMillis = 100;
-    final int hardCommitWaitMillis = 600;
+    final int hardCommitWaitMillis = 400;
     final int commitWithin = commitWithinType.useValue(softCommitWaitMillis, hardCommitWaitMillis);
 
     CommitTracker hardTracker = updater.commitTracker;
@@ -423,7 +423,7 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
     throws Exception {
  
     final int softCommitWaitMillis = 100;
-    final int hardCommitWaitMillis = 600;
+    final int hardCommitWaitMillis = 400;
     final int commitWithin = commitWithinType.useValue(softCommitWaitMillis, hardCommitWaitMillis);
 
     CommitTracker hardTracker = updater.commitTracker;

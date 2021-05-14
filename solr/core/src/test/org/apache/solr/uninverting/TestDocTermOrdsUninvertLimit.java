@@ -51,12 +51,12 @@ public class TestDocTermOrdsUninvertLimit extends SolrTestCase {
     final int DOCS = (1<<16)-1;                  // The number of documents within a single pass (simplified)
     final int TERMS = REF_LIMIT/DOCS;            // Each document must have this many references aka terms hit limit
 
-    // disk based DiLuceneTestCase.rectory and IWC settings to reduce risk of OOM
+    // disk based Directory and IWC settings to reduce risk of OOM
     Directory dir = LuceneTestCase.newFSDirectory(SolrTestUtil.createTempDir("TestDocTermOrdsUninvertLimit"));
     final IndexWriter w = new IndexWriter(dir,
                                           new IndexWriterConfig(new MockAnalyzer(SolrTestCase.random()))
                                           .setMaxBufferedDocs(IndexWriterConfig.DISABLE_AUTO_FLUSH)
-                                          .setRAMBufferSizeMB(16)
+                                          .setRAMBufferSizeMB(256.0)
                                           .setMergeScheduler(new ConcurrentMergeScheduler())
                                           .setMergePolicy(SolrTestUtil.newLogMergePolicy(false, 10))
                                           .setOpenMode(IndexWriterConfig.OpenMode.CREATE)
@@ -66,7 +66,7 @@ public class TestDocTermOrdsUninvertLimit extends SolrTestCase {
     Field field = LuceneTestCase.newTextField("field", "", Field.Store.NO);
     doc.add(field);
 
-    StringBuilder sb = new StringBuilder(128);
+    StringBuilder sb = new StringBuilder(TERMS*(Integer.toString(TERMS).length()+1));
     for (int i = 0 ; i < TERMS ; i++) {
       sb.append(" ").append(Integer.toString(i));
     }

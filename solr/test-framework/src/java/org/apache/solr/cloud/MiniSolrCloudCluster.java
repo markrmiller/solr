@@ -293,7 +293,7 @@ public class MiniSolrCloudCluster {
         if (log.isInfoEnabled()) {
           log.info("Using zkClient host={} to create solr.xml", zkClient.getZkServerAddress());
         }
-        zkClient.mkdir("/solr" + SOLR_XML, solrXml.getBytes(Charset.defaultCharset()));
+        zkClient.mkDirs("/solr" + SOLR_XML, solrXml.getBytes(Charset.defaultCharset()));
 
         if (jettyConfig.sslConfig != null && jettyConfig.sslConfig.isSSLMode()) {
           zkClient.mkdir("/solr" + ZkStateReader.CLUSTER_PROPS,

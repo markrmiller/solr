@@ -35,7 +35,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.MultiReader;
-import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.SolrRandomIndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
@@ -83,7 +83,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type string */
   private void testString(SortField.Type sortType) throws IOException {
     Directory dir = LuceneTestCase.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(LuceneTestCase.newStringField("value", "foo", Field.Store.YES));
     writer.addDocument(doc);
@@ -119,8 +119,8 @@ public class TestFieldCacheSort extends SolrTestCase {
   
   /** Tests sorting on type string with a missing value */
   private void testStringMissing(SortField.Type sortType) throws IOException {
-    Directory dir = LuceneTestCase.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    Directory dir = SolrTestUtil.newDirectory();
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -158,8 +158,8 @@ public class TestFieldCacheSort extends SolrTestCase {
   
   /** Tests reverse sorting on type string */
   private void testStringReverse(SortField.Type sortType) throws IOException {
-    Directory dir = LuceneTestCase.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    Directory dir = SolrTestUtil.newDirectory();
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(LuceneTestCase.newStringField("value", "bar", Field.Store.YES));
     writer.addDocument(doc);
@@ -171,7 +171,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", type));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir);
     Sort sort = new Sort(new SortField("value", sortType, true));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -196,7 +196,7 @@ public class TestFieldCacheSort extends SolrTestCase {
    *  value sorted first */
   private void testStringMissingSortedFirst(SortField.Type sortType) throws IOException {
     Directory dir = LuceneTestCase.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -236,8 +236,8 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests reverse sorting on type string with a missing
    *  value sorted first */
   private void testStringMissingSortedFirstReverse(SortField.Type sortType) throws IOException {
-    Directory dir = LuceneTestCase.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    Directory dir = SolrTestUtil.newDirectory();
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -278,7 +278,7 @@ public class TestFieldCacheSort extends SolrTestCase {
    *  value sorted last */
   private void testStringMissingSortedLast(SortField.Type sortType) throws IOException {
     Directory dir = LuceneTestCase.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -320,7 +320,7 @@ public class TestFieldCacheSort extends SolrTestCase {
    *  value sorted last */
   private void testStringMissingSortedLastReverse(SortField.Type sortType) throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -353,7 +353,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on internal docid order */
   public void testFieldDoc() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("value", "foo", Field.Store.NO));
     writer.addDocument(doc);
@@ -379,7 +379,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on reverse internal docid order */
   public void testFieldDocReverse() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("value", "foo", Field.Store.NO));
     writer.addDocument(doc);
@@ -405,7 +405,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests default sort (by score) */
   public void testFieldScore() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(LuceneTestCase.newTextField("value", "foo bar bar bar bar", Field.Store.NO));
     writer.addDocument(doc);
@@ -435,7 +435,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests default sort (by score) in reverse */
   public void testFieldScoreReverse() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(LuceneTestCase.newTextField("value", "foo bar bar bar bar", Field.Store.NO));
     writer.addDocument(doc);
@@ -466,7 +466,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int */
   public void testInt() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new IntPoint("value", 300000));
     doc.add(new StoredField("value", 300000));
@@ -500,7 +500,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int with a missing value */
   public void testIntMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -532,7 +532,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int, specifying the missing value should be treated as Integer.MAX_VALUE */
   public void testIntMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -566,7 +566,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int in reverse */
   public void testIntReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new IntPoint("value", 300000));
     doc.add(new StoredField("value", 300000));
@@ -600,7 +600,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy int */
   public void testLegacyInt() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new LegacyIntField("value", 300000, Field.Store.YES));
     writer.addDocument(doc);
@@ -631,7 +631,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy int with a missing value */
   public void testLegacyIntMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -661,7 +661,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy int, specifying the missing value should be treated as Integer.MAX_VALUE */
   public void testLegacyIntMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -693,7 +693,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy int in reverse */
   public void testLegacyIntReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyIntField("value", 300000, Field.Store.YES));
     writer.addDocument(doc);
@@ -724,7 +724,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type long */
   public void testLong() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LongPoint("value", 3000000000L));
     doc.add(new StoredField("value", 3000000000L));
@@ -758,7 +758,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type long with a missing value */
   public void testLongMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(SolrTestCase.random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -790,7 +790,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type long, specifying the missing value should be treated as Long.MAX_VALUE */
   public void testLongMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -824,7 +824,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type long in reverse */
   public void testLongReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new LongPoint("value", 3000000000L));
     doc.add(new StoredField("value", 3000000000L));
@@ -858,7 +858,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy long */
   public void testLegacyLong() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyLongField("value", 3000000000L, Field.Store.YES));
     writer.addDocument(doc);
@@ -889,7 +889,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy long with a missing value */
   public void testLegacyLongMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -919,7 +919,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy long, specifying the missing value should be treated as Long.MAX_VALUE */
   public void testLegacyLongMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -951,7 +951,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy long in reverse */
   public void testLegacyLongReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyLongField("value", 3000000000L, Field.Store.YES));
     writer.addDocument(doc);
@@ -982,7 +982,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type float */
   public void testFloat() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new FloatPoint("value", 30.1f));
     doc.add(new StoredField("value", 30.1f));
@@ -1016,7 +1016,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type float with a missing value */
   public void testFloatMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1048,7 +1048,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type float, specifying the missing value should be treated as Float.MAX_VALUE */
   public void testFloatMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1082,7 +1082,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type float in reverse */
   public void testFloatReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new FloatPoint("value", 30.1f));
     doc.add(new StoredField("value", 30.1f));
@@ -1116,7 +1116,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy float */
   public void testLegacyFloat() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyFloatField("value", 30.1f, Field.Store.YES));
     writer.addDocument(doc);
@@ -1147,7 +1147,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy float with a missing value */
   public void testLegacyFloatMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1177,7 +1177,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy float, specifying the missing value should be treated as Float.MAX_VALUE */
   public void testLegacyFloatMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1209,7 +1209,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy float in reverse */
   public void testLegacyFloatReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyFloatField("value", 30.1f, Field.Store.YES));
     writer.addDocument(doc);
@@ -1240,7 +1240,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type double */
   public void testDouble() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new DoublePoint("value", 30.1));
     doc.add(new StoredField("value", 30.1));
@@ -1279,7 +1279,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type double with +/- zero */
   public void testDoubleSignedZero() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new DoublePoint("value", +0d));
     doc.add(new StoredField("value", +0d));
@@ -1314,7 +1314,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type double with a missing value */
   public void testDoubleMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1351,7 +1351,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type double, specifying the missing value should be treated as Double.MAX_VALUE */
   public void testDoubleMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1390,7 +1390,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type double in reverse */
   public void testDoubleReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new DoublePoint("value", 30.1));
     doc.add(new StoredField("value", 30.1));
@@ -1429,7 +1429,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double */
   public void testLegacyDouble() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new LegacyDoubleField("value", 30.1, Field.Store.YES));
     writer.addDocument(doc);
@@ -1464,7 +1464,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double with +/- zero */
   public void testLegacyDoubleSignedZero() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyDoubleField("value", +0d, Field.Store.YES));
     writer.addDocument(doc);
@@ -1497,7 +1497,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double with a missing value */
   public void testLegacyDoubleMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1531,7 +1531,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double, specifying the missing value should be treated as Double.MAX_VALUE */
   public void testLegacyDoubleMissingLast() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1567,7 +1567,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double in reverse */
   public void testLegacyDoubleReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(new LegacyDoubleField("value", 30.1, Field.Store.YES));
     writer.addDocument(doc);
@@ -1628,7 +1628,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** test that we throw exception on multi-valued field, creates corrupt reader, use SORTED_SET instead */
   public void testMultiValuedField() throws IOException {
     Directory indexStore = SolrTestUtil.newDirectory();
-    IndexWriter writer = new IndexWriter(indexStore, LuceneTestCase.newIndexWriterConfig(new MockAnalyzer(SolrTestCase.random())));
+    IndexWriter writer = new IndexWriter(indexStore, SolrTestUtil.newIndexWriterConfig());
     for(int i=0; i<5; i++) {
         Document doc = new Document();
         doc.add(new StringField("string", "a"+i, Field.Store.NO));
@@ -1713,7 +1713,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting a single document */
   public void testSortOneDocument() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("value", "foo", Field.Store.YES));
     writer.addDocument(doc);
@@ -1735,7 +1735,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting a single document with scores */
   public void testSortOneDocumentWithScores() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("value", "foo", Field.Store.YES));
     writer.addDocument(doc);
@@ -1760,7 +1760,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting with two fields */
   public void testSortTwoFields() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("tievalue", "tied", Field.Store.NO));
     doc.add(SolrTestUtil.newStringField("value", "foo", Field.Store.YES));
@@ -1793,7 +1793,7 @@ public class TestFieldCacheSort extends SolrTestCase {
 
   public void testScore() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("value", "bar", Field.Store.NO));
     writer.addDocument(doc);

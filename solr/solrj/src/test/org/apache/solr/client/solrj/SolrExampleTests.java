@@ -1736,6 +1736,8 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
   @Test
   public void testUpdateField() throws Exception {
     //no versions
+    // Use a simple float field.  "price"->"price_c" has problems: SOLR-15357 & SOLR-15358
+    final String field = "price_f";
     SolrClient client = getSolrClient(jetty);
 
     client.deleteByQuery("*:*");
@@ -1745,15 +1747,18 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     doc.addField("id", "unique");
     doc.addField("name", "gadget");
     doc.addField("price", 1);
+    doc.addField(field, 1);
     client.add(doc);
     client.commit();
     SolrQuery q = new SolrQuery("*:*");
     q.setFields("id","price","name", "_version_");
+    q.setFields("id", field,"name", "_version_");
     QueryResponse resp = client.query(q);
     assertEquals("Doc count does not match", 1, resp.getResults().getNumFound());
     Long version = (Long)resp.getResults().get(0).getFirstValue("_version_");
     assertNotNull("no version returned", version);
     assertEquals(1.0f, resp.getResults().get(0).getFirstValue("price"));
+    assertEquals(1.0f, resp.getResults().get(0).getFirstValue(field));
 
     //update "price" with incorrect version (optimistic locking)
     HashMap<String, Object> oper = new HashMap<>();  //need better api for this???
@@ -1763,6 +1768,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     doc.addField("id", "unique");
     doc.addField("_version_", version+1);
     doc.addField("price", oper);
+    doc.addField(field, oper);
     try {
       client.add(doc);
       if(client instanceof HttpSolrClient) { //XXX concurrent client reports exceptions differently
@@ -1792,6 +1798,7 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     resp = client.query(q);
     assertEquals("Doc count does not match", 1, resp.getResults().getNumFound());
     assertEquals("price was not updated?", 100.0f, resp.getResults().get(0).getFirstValue("price"));
+    assertEquals("price was not updated?", 100.0f, resp.getResults().get(0).getFirstValue(field));
     assertEquals("no name?", "gadget", resp.getResults().get(0).getFirstValue("name"));
 
     //update "price", no version
@@ -1799,12 +1806,13 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     doc = new SolrInputDocument();
     doc.addField("id", "unique");
     doc.addField("price", oper);
+    doc.addField(field, oper);
     client.add(doc);
     client.commit();
     resp = client.query(q);
     assertEquals("Doc count does not match", 1, resp.getResults().getNumFound());
-    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue("price"));
-    assertEquals("no name?", "gadget", resp.getResults().get(0).getFirstValue("name"));
+    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue("price"));    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue("price"));
+    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue(field));    assertEquals("no name?", "gadget", resp.getResults().get(0).getFirstValue("name"));
   }
 
   @Test

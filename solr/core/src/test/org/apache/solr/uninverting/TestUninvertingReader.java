@@ -99,7 +99,7 @@ public class TestUninvertingReader extends SolrTestCase {
   
   public void testSortedSetFloat() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(new LegacyIntField("foo", Float.floatToRawIntBits(5f), Field.Store.NO));
@@ -141,7 +141,7 @@ public class TestUninvertingReader extends SolrTestCase {
   
   public void testSortedSetLong() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(new LegacyLongField("foo", 5, Field.Store.NO));
@@ -182,7 +182,7 @@ public class TestUninvertingReader extends SolrTestCase {
   
   public void testSortedSetDouble() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     Document doc = new Document();
     doc.add(new LegacyLongField("foo", Double.doubleToRawLongBits(5d), Field.Store.NO));
@@ -225,7 +225,7 @@ public class TestUninvertingReader extends SolrTestCase {
   /** Tests {@link Type#SORTED_SET_INTEGER} using Integer based fields, with and w/o precision steps */
   public void testSortedSetIntegerManyValues() throws IOException {
     final Directory dir = SolrTestUtil.newDirectory();
-    final IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    final IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     
     final LegacyFieldType NO_TRIE_TYPE = new LegacyFieldType(LegacyIntField.TYPE_NOT_STORED);
     NO_TRIE_TYPE.setNumericPrecisionStep(Integer.MAX_VALUE);
@@ -315,7 +315,7 @@ public class TestUninvertingReader extends SolrTestCase {
   
   public void testSortedSetEmptyIndex() throws IOException {
     final Directory dir = SolrTestUtil.newDirectory();
-    final IndexWriter iw = new IndexWriter(dir, LuceneTestCase.newIndexWriterConfig(null));
+    final IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
     iw.close();
     
     final Map<String,Type> UNINVERT_MAP = new LinkedHashMap<String,Type>();
