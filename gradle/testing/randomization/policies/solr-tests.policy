@@ -22,7 +22,7 @@
 grant {
   // 3rd party jar resources (where symlinks are not supported), test-files/ resources
   permission java.io.FilePermission "${common.dir}${/}-", "read";
-  permission java.io.FilePermission "${common.dir}${/}..${/}solr${/}-", "read";
+  permission java.io.FilePermission "${common-solr.dir}${/}-", "read";
 
   // system jar resources
   permission java.io.FilePermission "${java.home}${/}-", "read";
@@ -52,11 +52,6 @@ grant {
   // Basic permissions needed for Lucene to work:
   permission java.util.PropertyPermission "*", "read,write";
 
-  //permission java.util.PropertyPermission "StreamingExpressionMacros", "read";
-  //permission java.util.PropertyPermission "authenticationPlugin", "read";
-
-  permission java.lang.RuntimePermission "modifyThread";
-
   // needed by randomizedtesting runner to identify test methods.
   permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
   permission java.lang.RuntimePermission "accessDeclaredMembers";
@@ -72,7 +67,7 @@ grant {
   permission java.lang.RuntimePermission "getStackTrace";
   // needed for mock filesystems in tests
   permission java.lang.RuntimePermission "fileSystemProvider";
-  // needed for test of IOUtils.spins (maybe it can be avoided)
+  // needed by IndexFetcher
   permission java.lang.RuntimePermission "getFileStoreAttributes";
   // analyzers/uima: needed by lucene expressions' JavascriptCompiler
   permission java.lang.RuntimePermission "createClassLoader";
@@ -113,7 +108,7 @@ grant {
   // needed by hadoop htrace
   permission java.net.NetPermission "getNetworkInformation";
 
-  // needed by DIH
+  // needed by DIH - possibly even after DIH is a package
   permission java.sql.SQLPermission "deregisterDriver";
 
   permission java.util.logging.LoggingPermission "control";
@@ -152,6 +147,10 @@ grant {
 
   // SASL/Kerberos related properties for Solr tests
   permission javax.security.auth.PrivateCredentialPermission "javax.security.auth.kerberos.KerberosTicket * \"*\"", "read";
+
+  // Needed by zookeeper to configure SASL Auth in tests
+  permission javax.security.auth.AuthPermission "createLoginContext.Server";
+  permission javax.security.auth.AuthPermission "createLoginContext.Client";
   
   // may only be necessary with Java 7?
   permission javax.security.auth.PrivateCredentialPermission "javax.security.auth.kerberos.KeyTab * \"*\"", "read";
@@ -166,8 +165,6 @@ grant {
 
   // used by solr to create sandboxes (e.g. script execution)
   permission java.security.SecurityPermission "createAccessControlContext";
-
-  permission java.net.NetPermission "getProxySelector";
 };
 
 // additional permissions based on system properties set by /bin/solr
