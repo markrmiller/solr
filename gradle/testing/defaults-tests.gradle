@@ -43,7 +43,7 @@ allprojects {
           [propName: 'tests.heapsize', value: "512m", description: "Heap size for test JVMs"],
           // Test forks
           [propName: 'tests.jvms',
-           value: { -> ((int) Math.max(4l, Math.round(Runtime.runtime.availableProcessors() / 2))) },
+           value: { -> ((int) Math.max(1, Math.min(Runtime.runtime.availableProcessors() / 2.0, 4.0))) },
            description: "Number of forked test JVMs"],
           [propName: 'tests.haltonfailure', value: true, description: "Halt processing on test failure."],
           [propName: 'tests.jvmargs',
@@ -62,7 +62,7 @@ allprojects {
 
       testsCwd = file("${buildDir}/tmp/tests-cwd")
       testsTmpDir = file(resolvedTestOption("tests.workDir"))
-      commonDir = project(":lucene").projectDir
+
       commonSolrDir = project(":solr").projectDir
     }
 
@@ -86,12 +86,9 @@ allprojects {
     }
 
     tasks.withType(Test) {
-      reports.junitXml.destination file(propertyOrDefault("reports.dest", "${reports.junitXml.destination.toString()}"))
-
       ext {
         testOutputsDir = file("${reports.junitXml.destination}/outputs")
       }
-      binaryResultsDirectory = file(propertyOrDefault("binaryResultsDirectory", binaryResultsDirectory))
 
       maxParallelForks = resolvedTestOption("tests.jvms") as Integer
       if (verboseMode && maxParallelForks != 1) {
@@ -99,21 +96,16 @@ allprojects {
         maxParallelForks = 1
       }
 
-
-
       workingDir testsCwd
       useJUnit()
 
-      minHeapSize = propertyOrDefault("tests.minheapsize", "256m")
-      maxHeapSize = propertyOrDefault("tests.heapsize", "512m")
-
-      jvmArgs Commandline.translateCommandline(propertyOrDefault(
-              "tests.jvmargs", "-XX:TieredStopAtLevel=1 -XX:+UseParallelGC -XX:-UseBiasedLocking -Djava.net.preferIPv4Stack=true" +
-              " -Dlog4j2.is.webapp=false -Dlog4j2.garbagefreeThreadContextMap=true -Dlog4j2.enableDirectEncoders=true -Dlog4j2.enable.threadlocals=true" +
-              " -Dzookeeper.jmx.log4j.disable=true -Dlog4j2.disable.jmx=true -DconfigurationFile=log4j2.xml" +
-              " -Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManagerDefault -XX:+MaxFDLimit"));
+      minHeapSize = resolvedTestOption("tests.minheapsize")
+      maxHeapSize = resolvedTestOption("tests.heapsize")
 
       ignoreFailures = resolvedTestOption("tests.haltonfailure").toBoolean() == false
+
+      jvmArgs Commandline.translateCommandline(resolvedTestOption("tests.jvmargs"))
+      jvmArgs '--illegal-access=deny'
 
       systemProperty 'java.util.logging.config.file', file("${resources}/logging.properties")
       systemProperty 'java.awt.headless', 'true'

@@ -55,8 +55,7 @@ allprojects {
       ]
 
       if (propertyOrDefault("javac.failOnWarnings", true).toBoolean()) {
-        // nocommit ~ TJP, remove this for now as there are too many warnings in this branch
-        // options.compilerArgs += "-Werror"
+        options.compilerArgs += "-Werror"
       }
     }
   }
