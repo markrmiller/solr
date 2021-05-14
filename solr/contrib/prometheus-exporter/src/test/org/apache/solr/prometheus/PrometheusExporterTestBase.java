@@ -20,6 +20,7 @@ package org.apache.solr.prometheus;
 import com.google.common.collect.ImmutableMap;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
+import org.apache.solr.cloud.AbstractDistribZkTestBase;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.prometheus.utils.Helpers;
 import org.junit.BeforeClass;
@@ -31,8 +32,7 @@ public class PrometheusExporterTestBase extends SolrCloudTestCase {
   public static final String CONF_DIR = SolrTestUtil.getFile("solr/" + COLLECTION + "/conf").getAbsolutePath();
   public static final int NUM_SHARDS = 2;
   public static final int NUM_REPLICAS = 2;
-  public static final int MAX_SHARDS_PER_NODE = 3;
-  public static final int NUM_NODES = (NUM_SHARDS * NUM_REPLICAS + (MAX_SHARDS_PER_NODE - 1)) / MAX_SHARDS_PER_NODE;
+  public static final int NUM_NODES = NUM_SHARDS * NUM_REPLICAS;
   public static final int TIMEOUT = 60;
 
   public static final ImmutableMap<String, Double> FACET_VALUES = ImmutableMap.<String, Double>builder()
@@ -60,14 +60,17 @@ public class PrometheusExporterTestBase extends SolrCloudTestCase {
 
   @BeforeClass
   public static void setupCluster() throws Exception {
+    System.setProperty("metricsEnabled", "true");
     configureCluster(NUM_NODES)
         .addConfig(CONF_NAME, SolrTestUtil.getFile(CONF_DIR).toPath())
         .configure();
 
     CollectionAdminRequest
         .createCollection(COLLECTION, CONF_NAME, NUM_SHARDS, NUM_REPLICAS)
-        .setMaxShardsPerNode(MAX_SHARDS_PER_NODE)
         .process(cluster.getSolrClient());
+
+    AbstractDistribZkTestBase
+        .waitForRecoveriesToFinish(COLLECTION, cluster.getSolrClient().getZkStateReader(), true, true, TIMEOUT);
 
     Helpers.indexAllDocs(cluster.getSolrClient());
   }

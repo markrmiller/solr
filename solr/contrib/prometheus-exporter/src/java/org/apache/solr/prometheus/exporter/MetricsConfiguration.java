@@ -17,7 +17,6 @@
 
 package org.apache.solr.prometheus.exporter;
 
-import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
@@ -87,11 +86,6 @@ public class MetricsConfiguration {
 
     // See solr-core XmlConfigFile
     final DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-    dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-    dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-    dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-    dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-    dbf.setExpandEntityReferences(false);
     try {
       dbf.setXIncludeAware(true);
       dbf.setNamespaceAware(true);

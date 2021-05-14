@@ -157,7 +157,7 @@ public class DocTermOrds implements Accountable {
   // TODO: This seems like an obvious candidate for using BytesRefArray extended with binarySearch
   // This would save heap space as well as avoid a lot of small Objects (BytesRefs).
   // This would also increase data locality for binarySearch lookups, potentially making it faster.
-  protected BytesRef[] indexedTermsArray = Utils.EMPTY_BYTES_REFS;
+  protected BytesRef[] indexedTermsArray = new BytesRef[0];
 
   /** If non-null, only terms matching this prefix were
    *  indexed. */
@@ -182,14 +182,14 @@ public class DocTermOrds implements Accountable {
     // can cache the mem size since it shouldn't change
     if (memsz!=0) return memsz;
     long sz = 8*8 + 32; // local fields
-    if (index != null) sz += index.length * 4L;
+    if (index != null) sz += index.length * 4;
     if (tnums!=null) {
       for (byte[] arr : tnums)
         if (arr != null) sz += arr.length;
     }
     if (indexedTermsArray != null) {
       // assume 8 byte references?
-      sz += 8+8+8+8+((long) indexedTermsArray.length <<3)+sizeOfIndexedStrings;
+      sz += 8+8+8+8+(indexedTermsArray.length<<3)+sizeOfIndexedStrings;
     }
     memsz = sz;
     return sz;
@@ -537,7 +537,7 @@ public class DocTermOrds implements Accountable {
       }
 
     }
-    indexedTermsArray = indexedTerms.toArray(Utils.EMPTY_BYTES_REFS);
+    indexedTermsArray = indexedTerms.toArray(new BytesRef[indexedTerms.size()]);
 
     long endTime = System.nanoTime();
 
@@ -579,7 +579,7 @@ public class DocTermOrds implements Accountable {
     if (a != 0) {
       arr[pos++] = (byte)(a | 0x80);
     }
-    a = (x >>> (7));
+    a = (x >>> (7*1));
     if (a != 0) {
       arr[pos++] = (byte)(a | 0x80);
     }
@@ -658,7 +658,7 @@ public class DocTermOrds implements Accountable {
         // we hit the term exactly... lucky us!
         TermsEnum.SeekStatus seekStatus = termsEnum.seekCeil(target);
         assert seekStatus == TermsEnum.SeekStatus.FOUND;
-        ord = (long) startIdx << indexIntervalBits;
+        ord = startIdx << indexIntervalBits;
         setTerm();
         assert term != null;
         return SeekStatus.FOUND;
@@ -687,7 +687,7 @@ public class DocTermOrds implements Accountable {
         // seek to the right block
         TermsEnum.SeekStatus seekStatus = termsEnum.seekCeil(indexedTermsArray[startIdx]);
         assert seekStatus == TermsEnum.SeekStatus.FOUND;
-        ord = (long) startIdx << indexIntervalBits;
+        ord = startIdx << indexIntervalBits;
         setTerm();
         assert term != null;  // should be non-null since it's in the index
       }
@@ -718,7 +718,7 @@ public class DocTermOrds implements Accountable {
         final int idx = (int) (targetOrd >>> indexIntervalBits);
         final BytesRef base = indexedTermsArray[idx];
         //System.out.println("  do seek term=" + base.utf8ToString());
-        ord = (long) idx << indexIntervalBits;
+        ord = idx << indexIntervalBits;
         delta = (int) (targetOrd - ord);
         final TermsEnum.SeekStatus seekStatus = termsEnum.seekCeil(base);
         assert seekStatus == TermsEnum.SeekStatus.FOUND;
@@ -751,7 +751,7 @@ public class DocTermOrds implements Accountable {
 
   /** Returns the term ({@link BytesRef}) corresponding to
    *  the provided ordinal. */
-  public static BytesRef lookupTerm(TermsEnum termsEnum, int ord) throws IOException {
+  public BytesRef lookupTerm(TermsEnum termsEnum, int ord) throws IOException {
     termsEnum.seekExact(ord);
     return termsEnum.term();
   }
@@ -896,7 +896,7 @@ public class DocTermOrds implements Accountable {
     @Override
     public BytesRef lookupOrd(long ord) {
       try {
-        return DocTermOrds.lookupTerm(te, (int) ord);
+        return DocTermOrds.this.lookupTerm(te, (int) ord);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

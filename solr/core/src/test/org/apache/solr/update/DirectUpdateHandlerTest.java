@@ -38,6 +38,7 @@ import org.apache.solr.index.TieredMergePolicyFactory;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.search.SolrIndexSearcher;
+import org.apache.solr.util.RefCounted;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -379,8 +380,13 @@ public class DirectUpdateHandlerTest extends SolrTestCaseJ4 {
     assertU(optimize("maxSegments", "1"));     // make sure there's just one segment
     assertU(commit());       // commit a second time to make sure index files aren't still referenced by the old searcher
 
-    SolrQueryRequest sr = req();
-    DirectoryReader r = sr.getSearcher().getIndexReader();
+   // SolrQueryRequest sr = req();
+    DirectoryReader r;
+    try (SolrCore core = h.getCore()) {
+      RefCounted<SolrIndexSearcher> s = core.getSearcher();
+       r = s.get().getIndexReader();
+       s.decref();
+    }
 
     Directory d = r.directory();
 
@@ -396,6 +402,7 @@ public class DirectUpdateHandlerTest extends SolrTestCaseJ4 {
 
     updateJ("", params("prepareCommit", "true"));
 
+    d = r.directory();
     if (log.isInfoEnabled()) {
       log.info("FILES after prepareCommit={}", Arrays.asList(d.listAll()));
     }
@@ -426,7 +433,6 @@ public class DirectUpdateHandlerTest extends SolrTestCaseJ4 {
         , "/response/numFound==1"
     );
 
-    sr.close();
   }
 
   @Test

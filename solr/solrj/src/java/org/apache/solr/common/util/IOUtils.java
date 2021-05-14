@@ -95,7 +95,7 @@ public class IOUtils {
 
     files.forEach(file -> {
       try {
-        Files.delete(file);
+        Files.deleteIfExists(file);
       }  catch (NoSuchFileException e) {
         // ignore
       } catch (IOException e) {

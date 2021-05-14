@@ -195,7 +195,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type string with a missing
    *  value sorted first */
   private void testStringMissingSortedFirst(SortField.Type sortType) throws IOException {
-    Directory dir = LuceneTestCase.newDirectory();
+    Directory dir = SolrTestUtil.newDirectory();
     SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
     Document doc = new Document();
     writer.addDocument(doc);
@@ -210,7 +210,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", type));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir);
     SortField sf = new SortField("value", sortType);
     Sort sort = new Sort(sf);
 
@@ -251,7 +251,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", type));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir);
     SortField sf = new SortField("value", sortType, true);
     Sort sort = new Sort(sf);
 
@@ -277,7 +277,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type string with a missing
    *  value sorted last */
   private void testStringMissingSortedLast(SortField.Type sortType) throws IOException {
-    Directory dir = LuceneTestCase.newDirectory();
+    Directory dir = SolrTestUtil.newDirectory();
     SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
@@ -405,12 +405,12 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests default sort (by score) */
   public void testFieldScore() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
-    doc.add(LuceneTestCase.newTextField("value", "foo bar bar bar bar", Field.Store.NO));
+    doc.add(SolrTestUtil.newTextField("value", "foo bar bar bar bar", Field.Store.NO));
     writer.addDocument(doc);
     doc = new Document();
-    doc.add(LuceneTestCase.newTextField("value", "foo foo foo foo foo", Field.Store.NO));
+    doc.add(SolrTestUtil.newTextField("value", "foo foo foo foo foo", Field.Store.NO));
     writer.addDocument(doc);
     IndexReader ir = writer.getReader();
     writer.close();
@@ -437,10 +437,10 @@ public class TestFieldCacheSort extends SolrTestCase {
     Directory dir = SolrTestUtil.newDirectory();
     SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
-    doc.add(LuceneTestCase.newTextField("value", "foo bar bar bar bar", Field.Store.NO));
+    doc.add(SolrTestUtil.newTextField("value", "foo bar bar bar bar", Field.Store.NO));
     writer.addDocument(doc);
     doc = new Document();
-    doc.add(LuceneTestCase.newTextField("value", "foo foo foo foo foo", Field.Store.NO));
+    doc.add(SolrTestUtil.newTextField("value", "foo foo foo foo foo", Field.Store.NO));
     writer.addDocument(doc);
     IndexReader ir = writer.getReader();
     writer.close();
@@ -466,7 +466,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int */
   public void testInt() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new IntPoint("value", 300000));
     doc.add(new StoredField("value", 300000));
@@ -515,7 +515,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.INTEGER_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.INT));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -547,7 +547,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.INTEGER_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     SortField sortField = new SortField("value", SortField.Type.INT);
     sortField.setMissingValue(Integer.MAX_VALUE);
     Sort sort = new Sort(sortField);
@@ -566,7 +566,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type int in reverse */
   public void testIntReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new IntPoint("value", 300000));
     doc.add(new StoredField("value", 300000));
@@ -583,7 +583,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.INTEGER_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.INT, true));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -841,7 +841,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.LONG_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.LONG, true));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -858,7 +858,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy long */
   public void testLegacyLong() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new LegacyLongField("value", 3000000000L, Field.Store.YES));
     writer.addDocument(doc);
@@ -999,7 +999,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.FLOAT_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.FLOAT));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -1099,7 +1099,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.FLOAT_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.FLOAT, true));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -1293,7 +1293,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.DOUBLE_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.DOUBLE));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -1314,7 +1314,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type double with a missing value */
   public void testDoubleMissing() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();
@@ -1333,7 +1333,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.DOUBLE_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.DOUBLE));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -1370,7 +1370,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.DOUBLE_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     SortField sortField = new SortField("value", SortField.Type.DOUBLE);
     sortField.setMissingValue(Double.MAX_VALUE);
     Sort sort = new Sort(sortField);
@@ -1411,7 +1411,7 @@ public class TestFieldCacheSort extends SolrTestCase {
                      Collections.singletonMap("value", Type.DOUBLE_POINT));
     writer.close();
     
-    IndexSearcher searcher = LuceneTestCase.newSearcher(ir, false);
+    IndexSearcher searcher = SolrTestUtil.newSearcher(ir, false);
     Sort sort = new Sort(new SortField("value", SortField.Type.DOUBLE, true));
 
     TopDocs td = searcher.search(new MatchAllDocsQuery(), 10, sort);
@@ -1464,7 +1464,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double with +/- zero */
   public void testLegacyDoubleSignedZero() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new LegacyDoubleField("value", +0d, Field.Store.YES));
     writer.addDocument(doc);
@@ -1567,7 +1567,7 @@ public class TestFieldCacheSort extends SolrTestCase {
   /** Tests sorting on type legacy double in reverse */
   public void testLegacyDoubleReverse() throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     doc.add(new LegacyDoubleField("value", 30.1, Field.Store.YES));
     writer.addDocument(doc);
@@ -1664,7 +1664,7 @@ public class TestFieldCacheSort extends SolrTestCase {
           sb.append(' ');
           sb.append("text");
         }
-        doc.add(LuceneTestCase.newTextField("body", sb.toString(), Field.Store.NO));
+        doc.add(SolrTestUtil.newTextField("body", sb.toString(), Field.Store.NO));
         w.addDocument(doc);
         id++;
       }

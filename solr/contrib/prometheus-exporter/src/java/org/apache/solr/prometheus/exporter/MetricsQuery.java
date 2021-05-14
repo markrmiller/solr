@@ -41,11 +41,11 @@ public class MetricsQuery {
   private final List<JsonQuery> jsonQueries;
 
   private MetricsQuery(
-          String path,
-          ModifiableSolrParams parameters,
-          String core,
-          String collection,
-          List<JsonQuery> jsonQueries) {
+      String path,
+      ModifiableSolrParams parameters,
+      String core,
+      String collection,
+      List<JsonQuery> jsonQueries) {
     this.path = path;
     this.parameters = parameters;
     this.core = core;
@@ -55,21 +55,21 @@ public class MetricsQuery {
 
   public MetricsQuery withCore(String core) {
     return new MetricsQuery(
-            getPath(),
-            getParameters(),
-            core,
-            getCollection().orElse(null),
-            getJsonQueries()
+        getPath(),
+        getParameters(),
+        core,
+        getCollection().orElse(null),
+        getJsonQueries()
     );
   }
 
   public MetricsQuery withCollection(String collection) {
     return new MetricsQuery(
-            getPath(),
-            getParameters(),
-            getCore().orElse(null),
-            collection,
-            getJsonQueries()
+        getPath(),
+        getParameters(),
+        getCore().orElse(null),
+        collection,
+        getJsonQueries()
     );
   }
 
@@ -140,11 +140,11 @@ public class MetricsQuery {
       }
 
       metricsQueries.add(new MetricsQuery(
-              path,
-              params,
-              core,
-              collection,
-              compiledQueries));
+          path,
+          params,
+          core,
+          collection,
+          compiledQueries));
     }
 
     return metricsQueries;

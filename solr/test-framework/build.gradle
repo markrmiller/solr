@@ -26,17 +26,17 @@ sourceSets {
   }
 }
 
-forbiddenApisJmh {
-  bundledSignatures += [
-          'jdk-unsafe',
-          'jdk-deprecated',
-          'jdk-non-portable',
-  ]
-
-  suppressAnnotations += [
-          "**.SuppressForbidden"
-  ]
-}
+//forbiddenApisJmh {
+//  bundledSignatures += [
+//          'jdk-unsafe',
+//          'jdk-deprecated',
+//          'jdk-non-portable',
+//  ]
+//
+//  suppressAnnotations += [
+//          "**.SuppressForbidden"
+//  ]
+//}
 
 task jmh(type: JavaExec) {
   dependsOn("jmhClasses")
@@ -113,10 +113,9 @@ dependencies {
 
   api 'org.apache.logging.log4j:log4j-core'
   api 'io.opentracing:opentracing-mock'
-  api 'io.opentracing:opentracing-api'
 
   implementation 'io.dropwizard.metrics:metrics-jetty9'
   implementation 'com.lmax:disruptor'
-  api 'org.awaitility:awaitility'
+  //api 'org.awaitility:awaitility'
 }
 

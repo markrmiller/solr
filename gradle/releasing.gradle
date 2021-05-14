@@ -37,14 +37,14 @@ allprojects {
             }
         }
 
-//        distZip {
-//            doLast checksum
-//        }
+        distZip {
+            doLast checksum
+        }
 
-//        distTar {
-//            compression = Compression.GZIP
-//            doLast checksum
-//        }
+        distTar {
+            compression = Compression.GZIP
+            doLast checksum
+        }
 
         installDist {
             doLast {

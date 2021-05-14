@@ -17,7 +17,7 @@
 
 rootProject.name = "solr-root"
 
-//includeBuild("dev-tools/missing-doclet")
+includeBuild("dev-tools/missing-doclet")
 
 if (!(System.getProperty("skip.solr") as Boolean)) {
   include "solr:solrj"
@@ -30,8 +30,9 @@ if (!(System.getProperty("skip.solr") as Boolean)) {
   include "solr:contrib:langid"
   include "solr:contrib:jaegertracer-configurator"
   include "solr:contrib:prometheus-exporter"
+  //include "solr:contrib:scripting"
   include "solr:contrib:ltr"
-  include "solr:contrib:gcs-repository"
+//  include "solr:contrib:gcs-repository"
   include "solr:webapp"
   include "solr:test-framework"
   include "solr:solr-ref-guide"

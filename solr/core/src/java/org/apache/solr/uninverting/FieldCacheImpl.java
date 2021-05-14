@@ -860,7 +860,8 @@ public class FieldCacheImpl implements FieldCache {
     public long ramBytesUsed() {
       return bytes.ramBytesUsed() + 
              termOrdToBytesOffset.ramBytesUsed() + 
-             docToTermOrd.ramBytesUsed() + 3L *RamUsageEstimator.NUM_BYTES_OBJECT_REF +
+             docToTermOrd.ramBytesUsed() +
+             3*RamUsageEstimator.NUM_BYTES_OBJECT_REF +
              Integer.BYTES;
     }
     
@@ -1055,7 +1056,7 @@ public class FieldCacheImpl implements FieldCache {
 
     @Override
     public long ramBytesUsed() {
-      return bytes.ramBytesUsed() + docToOffset.ramBytesUsed() + 2L *RamUsageEstimator.NUM_BYTES_OBJECT_REF;
+      return bytes.ramBytesUsed() + docToOffset.ramBytesUsed() + 2*RamUsageEstimator.NUM_BYTES_OBJECT_REF;
     }
 
     @Override
@@ -1170,31 +1171,21 @@ public class FieldCacheImpl implements FieldCache {
       }
 
       final PackedInts.Reader offsetReader = docToOffset.getMutable();
-      Bits docsWithField = new MyBits(offsetReader, maxDoc);
+      Bits docsWithField = new Bits() {
+        @Override
+        public boolean get(int index) {
+          return offsetReader.get(index) != 0;
+        }
+
+        @Override
+        public int length() {
+          return maxDoc;
+        }
+      };
 
       wrapper.setDocsWithField(reader, key.field, docsWithField, null);
       // maybe an int-only impl?
       return new BinaryDocValuesImpl(bytes.freeze(true), offsetReader, docsWithField);
-    }
-
-    private static class MyBits implements Bits {
-      private final PackedInts.Reader offsetReader;
-      private final int maxDoc;
-
-      public MyBits(PackedInts.Reader offsetReader, int maxDoc) {
-        this.offsetReader = offsetReader;
-        this.maxDoc = maxDoc;
-      }
-
-      @Override
-      public boolean get(int index) {
-        return offsetReader.get(index) != 0;
-      }
-
-      @Override
-      public int length() {
-        return maxDoc;
-      }
     }
   }
 

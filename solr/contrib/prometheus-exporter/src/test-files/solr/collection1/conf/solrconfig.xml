@@ -23,7 +23,7 @@
   <dataDir>${solr.data.dir:}</dataDir>
 
   <directoryFactory name="DirectoryFactory"
-                    class="${solr.directoryFactory:solr.StandardDirectoryFactory}"/>
+                    class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
 
   <codecFactory class="solr.SchemaCodecFactory"/>
 
@@ -71,7 +71,7 @@
                    autowarmCount="0"/>
 
     <cache name="perSegFilter"
-           class="solr.CaffeineCache"
+           class="solr.search.CaffeineCache"
            size="10"
            initialSize="0"
            autowarmCount="10"
@@ -220,13 +220,5 @@
     <processor class="solr.DistributedUpdateProcessorFactory"/>
     <processor class="solr.RunUpdateProcessorFactory"/>
   </updateRequestProcessorChain>
-
-  <queryResponseWriter name="json" class="solr.JSONResponseWriter">
-    <!-- For the purposes of the tutorial, JSON responses are written as
-     plain text so that they are easy to read in *any* browser.
-     If you expect a MIME type of "application/json" just remove this override.
-    -->
-    <str name="content-type">text/plain; charset=UTF-8</str>
-  </queryResponseWriter>
 
 </config>

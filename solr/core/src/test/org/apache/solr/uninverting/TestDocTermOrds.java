@@ -98,7 +98,7 @@ public class TestDocTermOrds extends SolrTestCase {
     Directory dir = SolrTestUtil.newDirectory();
     final SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig().setMergePolicy(SolrTestUtil.newLogMergePolicy()));
     Document doc = new Document();
-    Field field = LuceneTestCase.newTextField("field", "", Field.Store.NO);
+    Field field = LuceneTestCase.newTextField(SolrTestCase.random(), "field", "", Field.Store.NO);
     doc.add(field);
     field.setStringValue("a b c");
     w.addDocument(doc);
@@ -116,7 +116,7 @@ public class TestDocTermOrds extends SolrTestCase {
     TestUtil.checkReader(ar);
     final DocTermOrds dto = new DocTermOrds(ar, ar.getLiveDocs(), "field");
     SortedSetDocValues iter = dto.iterator(ar);
-    
+
     assertEquals(0, iter.nextDoc());
     assertEquals(0, iter.nextOrd());
     assertEquals(1, iter.nextOrd());

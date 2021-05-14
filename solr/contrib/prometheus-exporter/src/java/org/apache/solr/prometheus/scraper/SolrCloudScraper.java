@@ -20,15 +20,15 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.util.IOUtils;
@@ -42,9 +42,9 @@ public class SolrCloudScraper extends SolrScraper {
   private final CloudSolrClient solrClient;
   private final SolrClientFactory solrClientFactory;
 
-  private Cache<String, Http2SolrClient> hostClientCache = CacheBuilder.newBuilder().build();
+  private Cache<String,Http2SolrClient> hostClientCache = Caffeine.newBuilder().build();
 
-  public SolrCloudScraper(CloudSolrClient solrClient, Executor executor, SolrClientFactory solrClientFactory) {
+  public SolrCloudScraper(CloudSolrClient solrClient, ExecutorService executor, SolrClientFactory solrClientFactory) {
     super(executor);
     this.solrClient = solrClient;
     this.solrClientFactory = solrClientFactory;
@@ -83,15 +83,8 @@ public class SolrCloudScraper extends SolrScraper {
 
   private Map<String, Http2SolrClient> createHttpSolrClients() throws IOException {
     return getBaseUrls().stream()
-        .map(url -> {
-          try {
-            return hostClientCache.get(url, () -> SolrClientFactory.createStandaloneSolrClient(url));
-          } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-          }
-        })
+        .map(url -> hostClientCache.get(url, solrClientFactory::createStandaloneSolrClient))
         .collect(Collectors.toMap(Http2SolrClient::getBaseURL, Function.identity()));
-
   }
 
   @Override
@@ -133,7 +126,7 @@ public class SolrCloudScraper extends SolrScraper {
         .stream()
         .map(DocCollection::getReplicas)
         .flatMap(List::stream)
-        .map(replica -> replica.getBaseUrl())
+        .map(Replica::getBaseUrl)
         .collect(Collectors.toSet());
   }
 

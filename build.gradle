@@ -19,13 +19,13 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
-  id "base"
-  id "com.palantir.consistent-versions" version "1.14.0"
-  id "org.owasp.dependencycheck" version "5.3.0"
-  id 'de.thetaphi.forbiddenapis' version '3.1' apply false
-  id "de.undercouch.download" version "4.0.2" apply false
-  id "net.ltgt.errorprone" version "1.2.1" apply false
-  id 'com.diffplug.spotless' version "5.8.2" apply false
+    id "base"
+    id "com.palantir.consistent-versions" version "1.14.0"
+    id "org.owasp.dependencycheck" version "5.3.0"
+    id 'de.thetaphi.forbiddenapis' version '3.1' apply false
+    id "de.undercouch.download" version "4.0.2" apply false
+    id "net.ltgt.errorprone" version "1.2.1" apply false
+    id 'com.diffplug.spotless' version "5.8.2" apply false
 }
 
 apply from: file('gradle/defaults.gradle')
@@ -34,71 +34,71 @@ apply from: file('gradle/defaults.gradle')
 
 // Calculate project version:
 version = {
-  // Release manager: update base version here after release:
-  String baseVersion = '9.0.0'
+    // Release manager: update base version here after release:
+    String baseVersion = '9.0.0'
 
-  // On a release explicitly set release version in one go:
-  //  -Dversion.release=x.y.z
+    // On a release explicitly set release version in one go:
+    //  -Dversion.release=x.y.z
 
-  // Jenkins can just set just a suffix, overriding SNAPSHOT, e.g. using build id:
-  //  -Dversion.suffix=jenkins123
+    // Jenkins can just set just a suffix, overriding SNAPSHOT, e.g. using build id:
+    //  -Dversion.suffix=jenkins123
 
-  String versionSuffix = propertyOrDefault('version.suffix', 'SNAPSHOT')
-  return propertyOrDefault('version.release', "${baseVersion}-${versionSuffix}")
+    String versionSuffix = propertyOrDefault('version.suffix', 'SNAPSHOT')
+    return propertyOrDefault('version.release', "${baseVersion}-${versionSuffix}")
 }()
 description = 'Grandparent project for Apache Lucene Core and Apache Solr'
 
 // Propagate version and derived properties across projects.
 allprojects {
-  version = rootProject.version
+    version = rootProject.version
 }
 
 ext {
-  // "base" version is stripped of the qualifier. Compute it.
-  baseVersion = {
-    def m = (version =~ /^(\d+\.\d+\.\d+)(-(.+))?/)
-    if (!m) {
-      throw GradleException("Can't strip version to just x.y.z: " + rootProject.version)
+    // "base" version is stripped of the qualifier. Compute it.
+    baseVersion = {
+        def m = (version =~ /^(\d+\.\d+\.\d+)(-(.+))?/)
+        if (!m) {
+            throw GradleException("Can't strip version to just x.y.z: " + rootProject.version)
+        }
+        return m[0][1]
+    }()
+    // "majorVersion" is an integer with just the major version. Compute it.
+    majorVersion = {
+        def m = (version =~ /^(\d+)\.\d+\.\d+(-(.+))?/)
+        if (!m) {
+            throw GradleException("Can't strip version to just major version: " + rootProject.version)
+        }
+        return m[0][1] as int
     }
-    return m[0][1]
-  }()
-  // "majorVersion" is an integer with just the major version. Compute it.
-  majorVersion = {
-    def m = (version =~ /^(\d+)\.\d+\.\d+(-(.+))?/)
-    if (!m) {
-      throw GradleException("Can't strip version to just major version: " + rootProject.version)
+    // snapshot build marker used in scripts.
+    snapshotBuild = version.contains("SNAPSHOT")
+
+    // Build timestamp.
+    def tstamp = ZonedDateTime.now()
+    buildDate = DateTimeFormatter.ofPattern("yyyy-MM-dd").format(tstamp)
+    buildTime = DateTimeFormatter.ofPattern("HH:mm:ss").format(tstamp)
+    buildYear = DateTimeFormatter.ofPattern("yyyy").format(tstamp)
+
+    minJavaVersion = JavaVersion.VERSION_11
+
+    // Declare script dependency versions outside of palantir's
+    // version unification control. These are not our main dependencies.
+    scriptDepVersions = [
+            "apache-rat": "0.11",
+            "commons-codec": "1.13",
+            "ecj": "3.19.0",
+            "javacc": "7.0.4",
+            "jflex": "1.7.0",
+            "jgit": "5.9.0.202009080501-r",
+            "flexmark": "0.61.24",
+    ]
+
+    // Allow definiting external tool locations using system props.
+    externalTool = { name ->
+        def resolved = propertyOrDefault("${name}.exe", name as String)
+        logger.info("External tool '${name}' resolved to: ${resolved}")
+        return resolved
     }
-    return m[0][1] as int
-  }
-  // snapshot build marker used in scripts.
-  snapshotBuild = version.contains("SNAPSHOT")
-
-  // Build timestamp.
-  def tstamp = ZonedDateTime.now()
-  buildDate = DateTimeFormatter.ofPattern("yyyy-MM-dd").format(tstamp)
-  buildTime = DateTimeFormatter.ofPattern("HH:mm:ss").format(tstamp)
-  buildYear = DateTimeFormatter.ofPattern("yyyy").format(tstamp)
-
-  minJavaVersion = JavaVersion.VERSION_11
-
-  // Declare script dependency versions outside of palantir's
-  // version unification control. These are not our main dependencies.
-  scriptDepVersions = [
-      "apache-rat": "0.11",
-      "commons-codec": "1.13",
-      "ecj": "3.19.0",
-      "javacc": "7.0.4",
-      "jflex": "1.7.0",
-      "jgit": "5.9.0.202009080501-r",
-      "flexmark": "0.61.24",
-  ]
-
-  // Allow definiting external tool locations using system props.
-  externalTool = { name ->
-    def resolved = propertyOrDefault("${name}.exe", name as String)
-    logger.info("External tool '${name}' resolved to: ${resolved}")
-    return resolved
-  }
 }
 
 // Include smaller chunks configuring dedicated build areas.
@@ -147,7 +147,7 @@ apply from: file('gradle/validation/gradlew-scripts-tweaked.gradle')
 apply from: file('gradle/validation/validate-log-calls.gradle')
 apply from: file('gradle/validation/check-broken-links.gradle')
 
-//apply from: file('gradle/validation/solr.config-file-sanity.gradle')
+apply from: file('gradle/validation/solr.config-file-sanity.gradle')
 
 // Source or data regeneration tasks
 apply from: file('gradle/generation/javacc.gradle')
@@ -176,13 +176,13 @@ apply from: file('gradle/documentation/markdown.gradle')
 apply from: file('gradle/documentation/render-javadoc.gradle')
 
 apply from: file('gradle/hacks/gradle-archives.gradle')
-apply from: file('gradle/hacks/findbugs.gradle')
+apply from: file('gradle/hacks/solr.findbugs.gradle')
 
-//apply from: file('gradle/hacks/wipe-temp.gradle')
+apply from: file('gradle/hacks/gradle.gradle')
 apply from: file('gradle/hacks/hashmapAssertions.gradle')
 apply from: file('gradle/hacks/turbocharge-jvm-opts.gradle')
 
 apply from: file('gradle/solr/packaging.gradle')
 apply from: file('gradle/solr/solr-forbidden-apis.gradle')
 
-apply from: file('gradle/ant-compat/post-jar.gradle')
+apply from: file('gradle/ant-compat/solr.post-jar.gradle')

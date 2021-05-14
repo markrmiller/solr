@@ -198,7 +198,12 @@ public class UninvertingReader extends FilterLeafReader {
     final Function<String, Type> mapper;
     
     public UninvertingDirectoryReader(DirectoryReader in, final Function<String, Type> mapper) throws IOException {
-      super(in, new MySubReaderWrapper(mapper));
+      super(in, new FilterDirectoryReader.SubReaderWrapper() {
+        @Override
+        public LeafReader wrap(LeafReader reader) {
+          return UninvertingReader.wrap(reader, mapper);
+        }
+      });
       this.mapper = mapper;
     }
 
@@ -214,19 +219,6 @@ public class UninvertingReader extends FilterLeafReader {
     @Override
     public CacheHelper getReaderCacheHelper() {
       return in.getReaderCacheHelper();
-    }
-
-    private static class MySubReaderWrapper extends SubReaderWrapper {
-      private final Function<String,Type> mapper;
-
-      public MySubReaderWrapper(Function<String,Type> mapper) {
-        this.mapper = mapper;
-      }
-
-      @Override
-      public LeafReader wrap(LeafReader reader) {
-        return UninvertingReader.wrap(reader, mapper);
-      }
     }
   }
 
@@ -303,7 +295,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (!wrap) {
       return in;
     } else {
-      FieldInfos fieldInfos = new FieldInfos(newFieldInfos.toArray(EMPTY_FIELD_INFOS));
+      FieldInfos fieldInfos = new FieldInfos(newFieldInfos.toArray(new FieldInfo[newFieldInfos.size()]));
       return new UninvertingReader(in, mapping, fieldInfos);
     }
   }
@@ -328,7 +320,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = mapping.apply(field);
+    Type v = getType(field);
     if (v != null) {
       switch (v) {
         case INTEGER_POINT: return FieldCache.DEFAULT.getNumerics(in, field, FieldCache.INT_POINT_PARSER);
@@ -358,7 +350,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = mapping.apply(field);
+    Type v = getType(field);
     if (v == Type.BINARY) {
       return FieldCache.DEFAULT.getTerms(in, field);
     } else {
@@ -372,7 +364,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = mapping.apply(field);
+    Type v = getType(field);
     if (v == Type.SORTED) {
       return FieldCache.DEFAULT.getTermsIndex(in, field);
     } else {
@@ -386,7 +378,7 @@ public class UninvertingReader extends FilterLeafReader {
     if (values != null) {
       return values;
     }
-    Type v = mapping.apply(field);
+    Type v = getType(field);
     if (v != null) {
       switch (v) {
         case SORTED_SET_INTEGER:
@@ -417,9 +409,9 @@ public class UninvertingReader extends FilterLeafReader {
    * Returns the field's uninversion type, or null 
    * if the field doesn't exist or doesn't have a mapping.
    */
-//  private Type getType(String field) {
-//    return mapping.apply(field);
-//  }
+  private Type getType(String field) {
+    return mapping.apply(field);
+  }
 
   // NOTE: delegating the cache helpers is wrong since this wrapper alters the
   // content of the reader, it is only fine to do that because Solr ALWAYS

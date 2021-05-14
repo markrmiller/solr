@@ -54,7 +54,7 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   // also have a cached FieldInfos instance so this is consistent. SOLR-12878
   private final FieldInfos fieldInfos;
 
-  final Map<String,Terms> cachedTerms = new NonBlockingHashMap<>(64);
+  final Map<String,Terms> cachedTerms = new ConcurrentHashMap<>();
 
   // TODO: consider ConcurrentHashMap ?
   // TODO: this could really be a weak map somewhere else on the coreCacheKey,

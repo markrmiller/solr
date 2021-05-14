@@ -247,7 +247,7 @@ final class TestRuleTemporaryFilesCleanup extends TestRuleAdapter {
 
           files.forEach(path -> {
             try {
-              Files.delete(path);
+              Files.deleteIfExists(path);
             } catch (NoSuchFileException e) {
               // ignore
             } catch (IOException e2) {

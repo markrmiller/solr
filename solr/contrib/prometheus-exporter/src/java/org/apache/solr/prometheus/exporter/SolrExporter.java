@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.InetSocketAddress;
 import java.util.Locale;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -101,9 +100,7 @@ public class SolrExporter {
       MetricsConfiguration metricsConfiguration) {
     this.port = port;
 
-    this.metricCollectorExecutor = Executors.newFixedThreadPool(
-            numberThreads,
-            new SolrNamedThreadFactory("solr-exporter-collectors"));
+    this.metricCollectorExecutor = Executors.newFixedThreadPool(numberThreads, new SolrNamedThreadFactory("solr-exporter-collectors"));
 
     this.requestExecutor = Executors.newFixedThreadPool(
         numberThreads,
