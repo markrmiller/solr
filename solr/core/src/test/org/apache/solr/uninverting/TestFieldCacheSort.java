@@ -320,7 +320,7 @@ public class TestFieldCacheSort extends SolrTestCase {
    *  value sorted last */
   private void testStringMissingSortedLastReverse(SortField.Type sortType) throws IOException {
     Directory dir = SolrTestUtil.newDirectory();
-    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir, SolrTestUtil.newIndexWriterConfig());
+    SolrRandomIndexWriter writer = new SolrRandomIndexWriter(random(), dir);
     Document doc = new Document();
     writer.addDocument(doc);
     doc = new Document();

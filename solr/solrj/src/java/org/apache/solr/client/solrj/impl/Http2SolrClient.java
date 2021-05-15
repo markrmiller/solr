@@ -551,9 +551,13 @@ public class Http2SolrClient extends SolrClient {
 
               Throwable failure = result.getRequestFailure();
 
+              if (failure == null) {
+                failure = result.getResponseFailure();
+              }
+
 
               if (failure instanceof CancelledException) {
-                asyncListener.onSuccess(new NamedList<>(), 0);
+                asyncListener.onFailure(failure, 0);
                // asyncListener.onSuccess(new NamedList<>(), 0);
                 return;
               }
@@ -562,8 +566,11 @@ public class Http2SolrClient extends SolrClient {
               log.error("Request exception code={} request={}", status, req, failure);
 
               if (failure instanceof ClosedChannelException) { // success but no response
-                asyncListener.onFailure(failure, 503);
+                asyncListener.onFailure(failure, 0);
                 return;
+              }
+              if (failure == null) {
+                processErrorsAndResponse(req, solrRequest, parser, response, is);
               }
 
               asyncListener.onFailure(failure, status);
@@ -643,6 +650,14 @@ public class Http2SolrClient extends SolrClient {
     if (response.getStatus() != 200) {
       InputStream is = mysl.getInputStream();
       if (is != null) {
+        while (true) {
+          try {
+            if (!(is.read() != -1)) break;
+          } catch (IOException e) {
+
+          }
+
+        }
         org.apache.solr.common.util.IOUtils.closeQuietly(is);
       }
       throw new SolrServerException("Request failed with status " + response.getStatus());
@@ -666,7 +681,7 @@ public class Http2SolrClient extends SolrClient {
 
     Response response;
     if (wantStream(parser)) {
-      InputStreamResponseListener listener = new RequestInputStreamResponseListener();
+      SolrInputStreamResponseListener listener = new SolrInputStreamResponseListener();
       req.send(listener);
       try {
         response = listener.get(30000, TimeUnit.MILLISECONDS);
@@ -682,6 +697,13 @@ public class Http2SolrClient extends SolrClient {
         rsp.add("stream", listener.getInputStream());
         return rsp;
       }
+      InputStream is = listener.getInputStream();
+      if (is != null) {
+        while (is.read() != -1) {
+
+        }
+      }
+      org.apache.solr.common.util.IOUtils.closeQuietly(is);
       throw new SolrServerException("Request failed with status " + response.getStatus());
     }
 
