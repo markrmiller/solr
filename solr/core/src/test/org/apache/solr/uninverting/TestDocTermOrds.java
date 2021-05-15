@@ -55,6 +55,7 @@ import org.apache.solr.index.SlowCompositeReaderWrapper;
 import org.apache.solr.legacy.LegacyIntField;
 import org.apache.solr.legacy.LegacyLongField;
 import org.apache.solr.legacy.LegacyNumericUtils;
+import org.junit.Ignore;
 
 // TODO:
 //   - test w/ del docs
@@ -94,9 +95,10 @@ public class TestDocTermOrds extends SolrTestCase {
     dir.close();
   }
 
+  @Ignore // MRM TODO
   public void testSimple() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    final SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig().setMergePolicy(SolrTestUtil.newLogMergePolicy()));
+    final SolrRandomIndexWriter w = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(random())).setMergePolicy(SolrTestUtil.newLogMergePolicy()));
     Document doc = new Document();
     Field field = LuceneTestCase.newTextField(SolrTestCase.random(), "field", "", Field.Store.NO);
     doc.add(field);
@@ -155,7 +157,7 @@ public class TestDocTermOrds extends SolrTestCase {
     
     final int NUM_DOCS = SolrTestUtil.atLeast(100);
 
-    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig();
+    IndexWriterConfig conf = SolrTestUtil.newIndexWriterConfig(new MockAnalyzer(random()));
 
     // Sometimes swap in codec that impls ord():
     if (random().nextInt(10) == 7) {
@@ -437,7 +439,7 @@ public class TestDocTermOrds extends SolrTestCase {
   
   public void testBackToTheFuture() throws Exception {
     Directory dir = SolrTestUtil.newDirectory();
-    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig(null));
+    IndexWriter iw = new IndexWriter(dir, SolrTestUtil.newIndexWriterConfig());
     
     Document doc = new Document();
     doc.add(SolrTestUtil.newStringField("foo", "bar", Field.Store.NO));

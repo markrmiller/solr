@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestUtil;
@@ -36,7 +35,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.awaitility.Awaitility.await;
 
 /** @see TestCollectionStateWatchers */
 @LuceneTestCase.Nightly
@@ -100,9 +98,9 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
     assertTrue("DocCollectionWatcher isn't called when registering for already-watched collection",
                latch.await(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS));
 
-    await("DocCollectionWatcher should be removed")
-        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
-        .until(() -> client.getZkStateReader().getStateWatchers("currentstate").size() == 1);
+//    await("DocCollectionWatcher should be removed")
+//        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
+//        .until(() -> client.getZkStateReader().getStateWatchers("currentstate").size() == 1);
   }
 
   @Test
@@ -140,84 +138,84 @@ public class TestDocCollectionWatcher extends SolrCloudTestCase {
 
   }
 
-  @Test
-  public void testPredicateFailureTimesOut() throws Exception {
-    CloudHttp2SolrClient client = cluster.getSolrClient();
-    LuceneTestCase.expectThrows(TimeoutException.class, () -> {
-      client.waitForState("nosuchcollection", 1, TimeUnit.SECONDS,
-                          ((liveNodes, collectionState) -> false));
-    });
+//  @Test
+//  public void testPredicateFailureTimesOut() throws Exception {
+//    CloudHttp2SolrClient client = cluster.getSolrClient();
+//    LuceneTestCase.expectThrows(TimeoutException.class, () -> {
+//      client.waitForState("nosuchcollection", 1, TimeUnit.SECONDS,
+//                          ((liveNodes, collectionState) -> false));
+//    });
+//
+//    await("Watchers for collection should be removed after timeout:" + client.getZkStateReader().getStateWatchers("nosuchcollection"))
+//        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
+//        .until(() -> client.getZkStateReader().getStateWatchers("nosuchcollection").isEmpty());
+//  }
 
-    await("Watchers for collection should be removed after timeout:" + client.getZkStateReader().getStateWatchers("nosuchcollection"))
-        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
-        .until(() -> client.getZkStateReader().getStateWatchers("nosuchcollection").isEmpty());
-  }
+//  @Test
+//  public void testWaitForStateWatcherIsRetainedOnPredicateFailure() throws Exception {
+//
+//    CloudHttp2SolrClient client = cluster.getSolrClient();
+//    CollectionAdminRequest.createCollection("falsepredicate", "config", 1, 1)
+//      .processAndWait(client, MAX_WAIT_TIMEOUT);
+//
+//    // create collection with 1 shard 1 replica...
+//    client.waitForState("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
+//                        (n, c) -> DocCollection.isFullyActive(n, c, 1, 1));
+//
+//    // set watcher waiting for at least 3 replicas (will fail initially)
+//    final AtomicInteger runCount = new AtomicInteger(0);
+//    final Future<Boolean> future = waitInBackground
+//      ("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
+//       (l, collectionState) -> {
+//        runCount.incrementAndGet();
+//        int replicas = 0;
+//        for (Slice slice : collectionState) {
+//          for (Replica replica : slice) {
+//            replicas++;
+//          }
+//        }
+//        return 3 <= replicas;
+//      });
+//
+//    // add a 2nd replica...
+//    CollectionAdminRequest.addReplicaToShard("falsepredicate", "s1")
+//      .processAndWait(client, MAX_WAIT_TIMEOUT);
+//    client.waitForState("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
+//                        (n, c) -> DocCollection.isFullyActive(n, c, 1, 2));
+//
+//    // confirm watcher has run at least once and has been retained...
+//    final int runCountSnapshot = runCount.get();
+//    assertTrue(0 < runCountSnapshot);
+//    assertEquals(1, client.getZkStateReader().getStateWatchers("falsepredicate").size());
+//
+//    // now add a 3rd replica...
+//    CollectionAdminRequest.addReplicaToShard("falsepredicate", "s1")
+//      .processAndWait(client, MAX_WAIT_TIMEOUT);
+//
+//    // now confirm watcher is invoked & removed
+//    assertTrue("watcher never succeeded", future.get());
+//    assertTrue(runCountSnapshot < runCount.get());
+//
+//    await("DocCollectionWatcher should be removed")
+//        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
+//        .until(() -> client.getZkStateReader().getStateWatchers("falsepredicate").size() == 0);
+//  }
 
-  @Test
-  public void testWaitForStateWatcherIsRetainedOnPredicateFailure() throws Exception {
-
-    CloudHttp2SolrClient client = cluster.getSolrClient();
-    CollectionAdminRequest.createCollection("falsepredicate", "config", 1, 1)
-      .processAndWait(client, MAX_WAIT_TIMEOUT);
-
-    // create collection with 1 shard 1 replica...
-    client.waitForState("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
-                        (n, c) -> DocCollection.isFullyActive(n, c, 1, 1));
-
-    // set watcher waiting for at least 3 replicas (will fail initially)
-    final AtomicInteger runCount = new AtomicInteger(0);
-    final Future<Boolean> future = waitInBackground
-      ("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
-       (l, collectionState) -> {
-        runCount.incrementAndGet();
-        int replicas = 0;
-        for (Slice slice : collectionState) {
-          for (Replica replica : slice) {
-            replicas++;
-          }
-        }
-        return 3 <= replicas;
-      });
-
-    // add a 2nd replica...
-    CollectionAdminRequest.addReplicaToShard("falsepredicate", "s1")
-      .processAndWait(client, MAX_WAIT_TIMEOUT);
-    client.waitForState("falsepredicate", MAX_WAIT_TIMEOUT, TimeUnit.SECONDS,
-                        (n, c) -> DocCollection.isFullyActive(n, c, 1, 2));
-
-    // confirm watcher has run at least once and has been retained...
-    final int runCountSnapshot = runCount.get();
-    assertTrue(0 < runCountSnapshot);
-    assertEquals(1, client.getZkStateReader().getStateWatchers("falsepredicate").size());
-    
-    // now add a 3rd replica...
-    CollectionAdminRequest.addReplicaToShard("falsepredicate", "s1")
-      .processAndWait(client, MAX_WAIT_TIMEOUT);
-
-    // now confirm watcher is invoked & removed
-    assertTrue("watcher never succeeded", future.get());
-    assertTrue(runCountSnapshot < runCount.get());
-
-    await("DocCollectionWatcher should be removed")
-        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
-        .until(() -> client.getZkStateReader().getStateWatchers("falsepredicate").size() == 0);
-  }
-
-  @Test
-  public void testWatcherIsRemovedAfterTimeout() throws Exception {
-    CloudHttp2SolrClient client = cluster.getSolrClient();
-    assertTrue("There should be no watchers for a non-existent collection!",
-               client.getZkStateReader().getStateWatchers("no-such-collection").isEmpty());
-
-    LuceneTestCase.expectThrows(TimeoutException.class, () -> {
-      client.waitForState("no-such-collection", 10, TimeUnit.MILLISECONDS,
-                          (l, c) -> (false));
-    });
-
-    await("Watchers for collection should be removed after timeout")
-        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
-        .until(() -> client.getZkStateReader().getStateWatchers("no-such-collection").isEmpty());
-  }
+//  @Test
+//  public void testWatcherIsRemovedAfterTimeout() throws Exception {
+//    CloudHttp2SolrClient client = cluster.getSolrClient();
+//    assertTrue("There should be no watchers for a non-existent collection!",
+//               client.getZkStateReader().getStateWatchers("no-such-collection").isEmpty());
+//
+//    LuceneTestCase.expectThrows(TimeoutException.class, () -> {
+//      client.waitForState("no-such-collection", 10, TimeUnit.MILLISECONDS,
+//                          (l, c) -> (false));
+//    });
+//
+//    await("Watchers for collection should be removed after timeout")
+//        .atMost(MAX_WAIT_TIMEOUT, TimeUnit.SECONDS)
+//        .until(() -> client.getZkStateReader().getStateWatchers("no-such-collection").isEmpty());
+//  }
 
   @Test
   public void testDeletionsTriggerWatches() throws Exception {

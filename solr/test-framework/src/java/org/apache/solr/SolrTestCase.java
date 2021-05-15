@@ -355,7 +355,6 @@ public class SolrTestCase extends Assert {
     System.setProperty("solr.zkclienttimeout", "30000");
     System.setProperty("solr.v2RealPath", "true");
     System.setProperty("zookeeper.forceSync", "no");
-    System.setProperty("jetty.testMode", "true");
     System.setProperty("tests.shardhandler.randomSeed", Long.toString(random().nextLong()));
     System.setProperty("solr.clustering.enabled", "false");
     System.setProperty("solr.peerSync.useRangeVersions", String.valueOf(random().nextBoolean()));
@@ -372,8 +371,8 @@ public class SolrTestCase extends Assert {
     System.setProperty("solr.tests.EnumFieldType", "org.apache.solr.schema.EnumFieldType");
     System.setProperty("solr.tests.numeric.dv", "true");
 
-    System.setProperty("solr.tests.ramBufferSizeMB", "100");
-    System.setProperty("solr.tests.ramPerThreadHardLimitMB", "200");
+    System.setProperty("solr.tests.ramBufferSizeMB", "120");
+    System.setProperty("solr.tests.ramPerThreadHardLimitMB", "1000");
 
 
    // System.setProperty("solr.tests.mergePolicyFactory", "org.apache.solr.index.NoMergePolicyFactory");
@@ -465,8 +464,6 @@ public class SolrTestCase extends Assert {
       System.setProperty("solr.rootSharedThreadPoolCoreSize", "12");
       System.setProperty("solr.rootSharedThreadPoolMaxSize", "24");
       System.setProperty("solr.jettyRunnerThreadPoolMaxSize", "32");
-
-      System.setProperty("solr.minHttp2ClientThreads", "6");
 
       System.setProperty("solr.containerThreadsIdleTimeout", "60000");
       System.setProperty("solr.containerThreadsIdle", "60000");

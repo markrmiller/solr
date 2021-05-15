@@ -44,6 +44,7 @@ import org.apache.solr.servlet.cache.HttpCacheHeaderUtil;
 import org.apache.solr.servlet.cache.Method;
 import org.apache.solr.util.RTimerTree;
 import org.apache.solr.util.tracing.GlobalTracer;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
 import static org.apache.solr.common.params.CollectionAdminParams.SYSTEM_COLL;
@@ -438,23 +440,41 @@ public class HttpSolrCall extends SolrCall {
                * Content-Type)
                */
             SolrRequestInfo.setRequestInfo(new SolrRequestInfo(solrReq, solrRsp, action));
-            execute(solrRsp);
-            if (shouldAudit(cores)) {
-              EventType eventType = solrRsp.getException() == null ? EventType.COMPLETED : EventType.ERROR;
-              if (shouldAudit(cores, eventType)) {
-                cores.getAuditLoggerPlugin().doAudit(
-                    new AuditEvent(eventType, req, getAuthCtx(solrReq, req, path, requestType), solrReq.getRequestTimer().getTime(), solrRsp.getException()));
+
+            SolrQueryResponse finalSolrRsp = solrRsp;
+            QueryResponseWriter finalResponseWriter = responseWriter;
+            Runnable runWhenFinished = () -> {
+              if (shouldAudit(cores)) {
+                EventType eventType = finalSolrRsp.getException() == null ? EventType.COMPLETED : EventType.ERROR;
+                if (shouldAudit(cores, eventType)) {
+                  cores.getAuditLoggerPlugin().doAudit(
+                      new AuditEvent(eventType, req, getAuthCtx(solrReq, req, path, requestType), solrReq.getRequestTimer().getTime(), finalSolrRsp.getException()));
+                }
               }
-            }
-            HttpCacheHeaderUtil.checkHttpCachingVeto(solrRsp, resp, reqMethod);
-            Iterator<Map.Entry<String, String>> headers = solrRsp.httpHeaders();
-            while (headers.hasNext()) {
-              Map.Entry<String, String> entry = headers.next();
-              resp.addHeader(entry.getKey(), entry.getValue());
+              HttpCacheHeaderUtil.checkHttpCachingVeto(finalSolrRsp, resp, reqMethod);
+              Iterator<Map.Entry<String, String>> headers = finalSolrRsp.httpHeaders();
+              while (headers.hasNext()) {
+                Map.Entry<String, String> entry = headers.next();
+                resp.addHeader(entry.getKey(), entry.getValue());
+              }
+
+              if (invalidStates != null) solrReq.getContext().put(BaseCloudSolrClient.STATE_VERSION, invalidStates);
+              try {
+                writeResponse(solrReq, finalSolrRsp, req, response, finalResponseWriter, reqMethod);
+              } catch (IOException e) {
+                log.error("IOException writing response", e);
+                throw new RuntimeIOException(e);
+              }
+            };
+
+            solrRsp.onFinished(runWhenFinished);
+
+            execute(solrRsp);
+
+            if (!solrRsp.isAsync()) {
+              runWhenFinished.run();
             }
 
-            if (invalidStates != null) solrReq.getContext().put(BaseCloudSolrClient.STATE_VERSION, invalidStates);
-            writeResponse(solrReq, solrRsp, req, response, responseWriter, reqMethod);
           }
           return RETURN;
         default: return action;

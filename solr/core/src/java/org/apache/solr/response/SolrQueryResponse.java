@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -104,6 +105,11 @@ public class SolrQueryResponse {
    * Should this response be tagged with HTTP caching headers?
    */
   protected boolean httpCaching=true;
+
+  private CompletableFuture<Void> future = null;
+
+  private volatile boolean async;
+  private volatile Runnable finished = () -> {};
   
   /***
    // another way of returning an error
@@ -364,5 +370,42 @@ public class SolrQueryResponse {
 
   public NamedList<String> getHeaders() {
     return headers;
+  }
+
+  public void onFinished(Runnable finished) {
+    if (this.finished == null) {
+      this.finished = finished;
+    } else {
+      this.finished = new Finished(this.finished, finished);
+    }
+  }
+
+  public void startAsync() {
+    this.async = true;
+  }
+
+  public void asyncDone() {
+    this.finished.run();
+  }
+
+  public boolean isAsync() {
+    return async;
+  }
+
+  private static class Finished implements Runnable {
+
+    private final Runnable finish1;
+    private final Runnable finish2;
+
+    Finished(Runnable finish1, Runnable finish2) {
+      this.finish1 = finish1;
+      this.finish2 = finish2;
+    }
+
+    @Override
+    public void run() {
+       finish1.run();
+       finish2.run();
+    }
   }
 }

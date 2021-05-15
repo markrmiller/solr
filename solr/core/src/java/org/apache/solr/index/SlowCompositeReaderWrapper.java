@@ -26,7 +26,6 @@ import org.apache.lucene.index.MultiDocValues.MultiSortedDocValues;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.Version;
-import org.jctools.maps.NonBlockingHashMap;
 
 /**
  * This class forces a composite reader (eg a {@link
@@ -59,7 +58,7 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   // TODO: consider ConcurrentHashMap ?
   // TODO: this could really be a weak map somewhere else on the coreCacheKey,
   // but do we really need to optimize slow-wrapper any more?
-  final Map<String,OrdinalMap> cachedOrdMaps = new HashMap<>();
+  final Map<String,OrdinalMap> cachedOrdMaps = new ConcurrentHashMap<>();
 
   /** This method is sugar for getting an {@link LeafReader} from
    * an {@link IndexReader} of any kind. If the reader is already atomic,
