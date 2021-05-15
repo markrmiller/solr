@@ -566,7 +566,7 @@ public class Http2SolrClient extends SolrClient {
               log.error("Request exception code={} request={}", status, req, failure);
 
               if (failure instanceof ClosedChannelException) { // success but no response
-                asyncListener.onFailure(failure, 0);
+                asyncListener.onFailure(failure, 503);
                 return;
               }
               if (failure == null) {
