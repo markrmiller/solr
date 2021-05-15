@@ -389,7 +389,7 @@ public class SolrQueryResponse {
   }
 
   public boolean isAsync() {
-    return async;
+    return async && finished != null;
   }
 
   private static class Finished implements Runnable {

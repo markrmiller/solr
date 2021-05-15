@@ -43,10 +43,13 @@ import org.jctools.maps.NonBlockingHashMap;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 
 /**
  * This class is experimental and will be changing in the future.
@@ -58,6 +61,7 @@ public class ResponseBuilder
 {
   public static final int[] EMPTY_INTS = {};
   public static final float[] EMPTY_FLOATS = {};
+  private final SearchHandler searchHandler;
   public SolrQueryRequest req;
   public SolrQueryResponse rsp;
   public boolean doHighlights;
@@ -96,13 +100,15 @@ public class ResponseBuilder
   public List<SearchComponent> components;
 
   SolrRequestInfo requestInfo;
+  private ShardHandler shardHandler;
 
-  public ResponseBuilder(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components)
+  public ResponseBuilder(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components, SearchHandler searchHandler)
   {
     this.req = req;
     this.rsp = rsp;
     this.components = components;
     this.requestInfo = SolrRequestInfo.getRequestInfo();
+    this.searchHandler = searchHandler;
   }
 
   //////////////////////////////////////////////////////////
@@ -140,7 +146,7 @@ public class ResponseBuilder
   public String[] slices; // the optional logical ids of the shards
   public int shards_rows = -1;
   public int shards_start = -1;
-  public List<ShardRequest> outgoing;  // requests to be sent
+  public Queue<ShardRequest> outgoing;  // requests to be sent
   public List<ShardRequest> finished;  // requests that have received responses from all shards
   public String shortCircuitedURL;
 
@@ -168,6 +174,8 @@ public class ResponseBuilder
         }
       }
     }
+   // searchHandler.sendRequest(req, this, shardHandler,sreq);
+
   }
 
   public Map<Object, ShardDoc> resultIds;
@@ -511,5 +519,9 @@ public class ResponseBuilder
 
   public boolean isOlapAnalytics() {
     return this._isOlapAnalytics;
+  }
+
+  public void setShardHandler(ShardHandler shardHandler1) {
+    this.shardHandler = shardHandler1;
   }
 }

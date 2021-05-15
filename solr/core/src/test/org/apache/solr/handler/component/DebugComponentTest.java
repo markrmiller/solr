@@ -165,7 +165,7 @@ public class DebugComponentTest extends SolrTestCaseJ4 {
     for(int i = 0; i < 10; i++) {
       SolrQueryRequest req = req("q", "test query", "distrib", "true", CommonParams.REQUEST_ID, "123456-my_rid");
       SolrQueryResponse resp = new SolrQueryResponse();
-      ResponseBuilder rb = new ResponseBuilder(req, resp, components);
+      ResponseBuilder rb = new ResponseBuilder(req, resp, components, null);
       ShardRequest sreq = new ShardRequest();
       sreq.params = new ModifiableSolrParams();
       sreq.purpose = ShardRequest.PURPOSE_GET_FIELDS;
@@ -203,7 +203,7 @@ public class DebugComponentTest extends SolrTestCaseJ4 {
     ResponseBuilder rb;
     for(int i = 0; i < 10; i++) {
       req = req("q", "test query", "distrib", "true");
-      rb = new ResponseBuilder(req, new SolrQueryResponse(), components);
+      rb = new ResponseBuilder(req, new SolrQueryResponse(), components, null);
       rb.isDistrib = true;
       //expecting the same results with debugQuery=true or debug=track
       if(random().nextBoolean()) {
@@ -222,7 +222,7 @@ public class DebugComponentTest extends SolrTestCaseJ4 {
     }
    
     req = req("q", "test query", "distrib", "true", CommonParams.REQUEST_ID, "123");
-    rb = new ResponseBuilder(req, new SolrQueryResponse(), components);
+    rb = new ResponseBuilder(req, new SolrQueryResponse(), components, null);
     rb.isDistrib = true;
     rb.setDebug(true);
     component.prepare(rb);

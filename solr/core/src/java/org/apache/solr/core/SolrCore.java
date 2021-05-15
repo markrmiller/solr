@@ -3035,22 +3035,34 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       // if (req.getParams().getBool(ShardParams.IS_SHARD,false) && !(handler instanceof SearchHandler))
       //   throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,"isShard is only acceptable with search handlers");
 
-      handler.handleRequest(req, rsp);
-      postDecorateResponse(handler, req, rsp);
+      Runnable finish = () -> {
+        postDecorateResponse(handler, req, rsp);
 
-      if (rsp.getToLog().size() > 0) {
-        if (requestLog.isInfoEnabled()) {
-          requestLog.info(rsp.getToLogAsString(logid));
-        }
+        if (rsp.getToLog().size() > 0) {
+          if (requestLog.isInfoEnabled()) {
+            requestLog.info(rsp.getToLogAsString(logid));
+          }
 
-        /* slowQueryThresholdMillis defaults to -1 in SolrConfig -- not enabled.*/
-        if (log.isWarnEnabled() && slowQueryThresholdMillis >= 0) {
-          final long qtime = (long) (req.getRequestTimer().getTime());
-          if (qtime >= slowQueryThresholdMillis) {
-            slowLog.warn("slow: {}", rsp.getToLogAsString(logid));
+          /* slowQueryThresholdMillis defaults to -1 in SolrConfig -- not enabled.*/
+          if (log.isWarnEnabled() && slowQueryThresholdMillis >= 0) {
+            final long qtime = (long) (req.getRequestTimer().getTime());
+            if (qtime >= slowQueryThresholdMillis) {
+              slowLog.warn("slow: {}", rsp.getToLogAsString(logid));
+            }
           }
         }
+      };
+
+      if (rsp.isAsync()) {
+        rsp.onFinished(finish);
       }
+
+      handler.handleRequest(req, rsp);
+
+      if (!rsp.isAsync()) {
+        finish.run();
+      }
+
     }
 
     public static void preDecorateResponse (SolrQueryRequest req, SolrQueryResponse rsp) {

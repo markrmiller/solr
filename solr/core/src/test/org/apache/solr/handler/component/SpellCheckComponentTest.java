@@ -274,7 +274,7 @@ public class SpellCheckComponentTest extends SolrTestCaseJ4 {
     for (String name : h.getCore().getSearchComponents().keySet()) {
       components.add(h.getCore().getSearchComponent(name));
     }
-    ResponseBuilder rb = new ResponseBuilder(request, new SolrQueryResponse(), components);
+    ResponseBuilder rb = new ResponseBuilder(request, new SolrQueryResponse(), components, null);
     checker.prepare(rb);
 
     try {

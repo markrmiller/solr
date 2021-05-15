@@ -299,7 +299,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
 //                ParWork.propagateInterrupt(e);
 //                log.error("Error consuming and closing http response stream.", e);
 //              }
-              //IOUtils.closeQuietly(rspBody);
+              IOUtils.closeQuietly(rspBody);
               notifyQueueAndRunnersIfEmptyQueue();
             }
           }

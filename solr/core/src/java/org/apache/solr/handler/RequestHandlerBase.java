@@ -218,15 +218,28 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
         SolrPluginUtils.setDefaults(this, req, defaults, appends, invariants);
         req.getContext().remove(USEPARAM);
         rsp.setHttpCaching(httpCaching);
+
+        Runnable finish = () -> {
+          @SuppressWarnings({"rawtypes"}) NamedList header = rsp.getResponseHeader();
+          if (header != null) {
+            if (Boolean.TRUE.equals(header.getBooleanArg(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY))) {
+              numTimeouts.mark();
+              rsp.setHttpCaching(false);
+            }
+          }
+        };
+
+        if (rsp.isAsync()) {
+          rsp.onFinished(finish);
+        }
+
         handleRequestBody(req, rsp);
         // count timeouts
-        @SuppressWarnings({"rawtypes"}) NamedList header = rsp.getResponseHeader();
-        if (header != null) {
-          if (Boolean.TRUE.equals(header.getBooleanArg(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY))) {
-            numTimeouts.mark();
-            rsp.setHttpCaching(false);
-          }
+
+        if (!rsp.isAsync()) {
+          finish.run();
         }
+
       } catch (InterruptedException e) {
         ParWork.propagateInterrupt(e);
         throw new AlreadyClosedException(e);

@@ -24,6 +24,7 @@ import org.apache.solr.handler.component.TrackingShardHandlerFactory.RequestTrac
 
 import java.util.List;
 import java.util.Collections;
+import java.util.Set;
 
 /**
  * super simple sanity check that SimpleTrackingShardHandler can be used in a 
@@ -45,7 +46,7 @@ public class TestSimpleTrackingShardHandler extends BaseDistributedSearchTestCas
     QueryResponse ignored = query("q","*:*", "fl", "id", "sort", "id asc");
 
     int numShardRequests = 0;
-    for (List<ShardRequestAndParams> shard : trackingQueue.getAllRequests().values()) {
+    for (Set<ShardRequestAndParams> shard : trackingQueue.getAllRequests().values()) {
       for (ShardRequestAndParams shardReq : shard) {
         numShardRequests++;
       }

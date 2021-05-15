@@ -216,11 +216,11 @@ public class TestReplicationHandler extends SolrTestCaseJ4 {
     UpdateRequest req = new UpdateRequest();
     req.add(doc);
     s.asyncRequest(req, null, new AsyncListener<>() {
-      @Override public void onSuccess(NamedList<Object> entries, int code) {
+      @Override public void onSuccess(NamedList<Object> entries, int code, Object context) {
 
       }
 
-      @Override public void onFailure(Throwable throwable, int code) {
+      @Override public void onFailure(Throwable throwable, int code, Object context) {
         log.error("Error indexing", throwable);
       }
     });

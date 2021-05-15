@@ -301,11 +301,11 @@ public class CreateCollectionsIndexAndRestartTest extends SolrCloudTestCase {
   }
 
   private static class CollectionCreateAsyncListener implements AsyncListener<NamedList<Object>> {
-    @Override public void onSuccess(NamedList<Object> objectNamedList, int code) {
+    @Override public void onSuccess(NamedList<Object> objectNamedList, int code, Object context) {
 
     }
 
-    @Override public void onFailure(Throwable throwable, int code) {
+    @Override public void onFailure(Throwable throwable, int code, Object context) {
       log.error("Collection create call failed!", throwable);
     }
   }

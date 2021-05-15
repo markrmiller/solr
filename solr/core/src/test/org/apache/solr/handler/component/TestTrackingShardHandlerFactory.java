@@ -29,6 +29,7 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Test for {@link org.apache.solr.handler.component.TrackingShardHandlerFactory}
@@ -107,8 +108,8 @@ public class TestTrackingShardHandlerFactory extends SolrCloudBridgeTestCase {
     assertNotNull(getFieldsRequest);
 
     int numRequests = 0;
-    Map<String, List<TrackingShardHandlerFactory.ShardRequestAndParams>> allRequests = trackingQueue.getAllRequests();
-    for (Map.Entry<String, List<TrackingShardHandlerFactory.ShardRequestAndParams>> entry : allRequests.entrySet()) {
+    Map<String,Set<TrackingShardHandlerFactory.ShardRequestAndParams>> allRequests = trackingQueue.getAllRequests();
+    for (Map.Entry<String, Set<TrackingShardHandlerFactory.ShardRequestAndParams>> entry : allRequests.entrySet()) {
       numRequests += entry.getValue().size();
     }
     // 4 shard requests + 2 core admin requests (invoked by create collection API)
@@ -130,7 +131,7 @@ public class TestTrackingShardHandlerFactory extends SolrCloudBridgeTestCase {
     client.query(new SolrQuery("*:*"));
     numRequests = 0;
     allRequests = trackingQueue.getAllRequests();
-    for (Map.Entry<String, List<TrackingShardHandlerFactory.ShardRequestAndParams>> entry : allRequests.entrySet()) {
+    for (Map.Entry<String, Set<TrackingShardHandlerFactory.ShardRequestAndParams>> entry : allRequests.entrySet()) {
       numRequests += entry.getValue().size();
     }
     // should still be 6

@@ -1109,7 +1109,7 @@ public class StatsComponentTest extends SolrTestCaseJ4 {
         "foo_i", "{!func}field(\"foo_i\")", "{!lucene}_val_:\"field(foo_i)\""
       }) {
       try (SolrQueryRequest req = req(common)){
-        ResponseBuilder rb = new ResponseBuilder(req, new SolrQueryResponse(), components);
+        ResponseBuilder rb = new ResponseBuilder(req, new SolrQueryResponse(), components, null);
         
         StatsField sf = new StatsField(rb, param);
         
@@ -1126,7 +1126,7 @@ public class StatsComponentTest extends SolrTestCaseJ4 {
         "{!lucene}foo_t:cow", "{!func}query($nested)", "{!field f=foo_t}cow", 
       }) {
       try (SolrQueryRequest req = req(common)) {
-        ResponseBuilder rb = new ResponseBuilder(req, new SolrQueryResponse(), components);
+        ResponseBuilder rb = new ResponseBuilder(req, new SolrQueryResponse(), components, null);
         
         StatsField sf = new StatsField(rb, param);
         

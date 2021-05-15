@@ -245,6 +245,7 @@ public class ZkStateReaderQueue implements Closeable {
             if (zkdata == null) {
               log.debug("No data found for {}", stateUpdatesPath);
               future.complete(docCollection);
+              return;
             }
 
             Map<Integer,Integer> m = null;
@@ -259,6 +260,7 @@ public class ZkStateReaderQueue implements Closeable {
             if (m.size() == 0) {
               log.debug("No updates found at {} {} {} {}", stateUpdatesPath, zkdata.length, new String(zkdata), stat.getVersion());
               future.complete(docCollection);
+              return;
             }
 
             log.debug("Got additional state updates for {} with znode version {} current DocCollection version is {} updates={}", docCollection, stat.getVersion(),
@@ -270,6 +272,7 @@ public class ZkStateReaderQueue implements Closeable {
               log.debug("Will not apply state updates based on state state updates version, they are for an older state.json {}, ours is now {}",
                       stat.getVersion(), docCollection.getStateUpdatesZkVersion());
               future.complete(docCollection);
+              return;
             }
 
             Set<Map.Entry<Integer,Integer>> entrySet = m.entrySet();

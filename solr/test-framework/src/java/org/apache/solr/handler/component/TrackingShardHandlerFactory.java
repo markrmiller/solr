@@ -22,6 +22,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedTransferQueue;
 
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
@@ -48,7 +52,7 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
     super();
   }
 
-  private Queue<ShardRequestAndParams> queue;
+  private volatile Queue<ShardRequestAndParams> queue;
 
   /**
    * Set the tracking queue for this factory. All the ShardHandler instances
@@ -231,14 +235,14 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
    *
    * @see org.apache.solr.handler.component.TrackingShardHandlerFactory#setTrackingQueue(java.util.List, java.util.Queue)
    */
-  public static class RequestTrackingQueue extends LinkedList<ShardRequestAndParams> {
-    private final Map<String, List<ShardRequestAndParams>> requests = new NonBlockingHashMap<>();
+  public static class RequestTrackingQueue extends LinkedTransferQueue<ShardRequestAndParams> {
+    private final Map<String, Set<ShardRequestAndParams>> requests = new NonBlockingHashMap<>();
 
     @Override
     public boolean offer(ShardRequestAndParams shardRequestAndParams) {
-      List<ShardRequestAndParams> list = requests.get(shardRequestAndParams.shard);
+      Set<ShardRequestAndParams> list = requests.get(shardRequestAndParams.shard);
       if (list == null) {
-        list = new ArrayList<>();
+        list = ConcurrentHashMap.newKeySet();
       }
       list.add(shardRequestAndParams);
       requests.put(shardRequestAndParams.shard, list);
@@ -290,7 +294,7 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
       Slice slice = collection.getSlice(shardId);
       assert slice != null;
 
-      for (Map.Entry<String, List<ShardRequestAndParams>> entry : requests.entrySet()) {
+      for (Map.Entry<String, Set<ShardRequestAndParams>> entry : requests.entrySet()) {
         // multiple shard addresses may be present separated by '|'
         List<String> list = StrUtils.splitSmart(entry.getKey(), '|');
         for (Map.Entry<String, Replica> replica : slice.getReplicasMap().entrySet()) {
@@ -311,8 +315,8 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
      */
     public List<ShardRequestAndParams> getCoreAdminRequests() {
       List<ShardRequestAndParams> results = new ArrayList<>();
-      Map<String, List<ShardRequestAndParams>> map = requests;
-      for (Map.Entry<String, List<ShardRequestAndParams>> entry : map.entrySet()) {
+      Map<String, Set<ShardRequestAndParams>> map = requests;
+      for (Map.Entry<String, Set<ShardRequestAndParams>> entry : map.entrySet()) {
         for (ShardRequestAndParams shardRequestAndParams : entry.getValue()) {
           if (shardRequestAndParams.sreq.purpose == ShardRequest.PURPOSE_PRIVATE) {
             results.add(shardRequestAndParams);
@@ -329,7 +333,7 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
      * @return a {@link java.util.concurrent.ConcurrentHashMap} of url strings to {@link org.apache.solr.handler.component.TrackingShardHandlerFactory.ShardRequestAndParams} objects
      * or empty map if none have been recorded
      */
-    public Map<String, List<ShardRequestAndParams>> getAllRequests() {
+    public Map<String, Set<ShardRequestAndParams>> getAllRequests() {
       return requests;
     }
   }

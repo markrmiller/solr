@@ -352,7 +352,7 @@ public class SolrCmdDistributor implements Closeable {
       asyncTracker.register();
       AtomicReference<Cancellable> asyncReq = new AtomicReference<>();
       asyncReq.set(requestSolrClient.asyncRequest(req.uReq, null, new AsyncListener<>() {
-        @Override public void onSuccess(NamedList result, int code) {
+        @Override public void onSuccess(NamedList result, int code, Object context) {
           if (log.isTraceEnabled()) {
             log.trace("Success for distrib update {}", result);
           }
@@ -362,7 +362,7 @@ public class SolrCmdDistributor implements Closeable {
           asyncTracker.arrive();
         }
 
-        @Override public void onFailure(Throwable t, int code) {
+        @Override public void onFailure(Throwable t, int code, Object context) {
           try {
             if (asyncReq.get() != null) {
               asyncRequests.remove(asyncReq.get());

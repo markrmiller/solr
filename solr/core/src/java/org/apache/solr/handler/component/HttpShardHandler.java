@@ -30,6 +30,7 @@ import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.AlreadyClosedException;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.annotation.SolrSingleThreaded;
 import org.apache.solr.common.cloud.Replica;
@@ -80,6 +81,7 @@ public class HttpShardHandler extends ShardHandler {
   private final AtomicInteger pending;
   private final Map<String, List<String>> shardToURLs;
   private final LBHttp2SolrClient lbClient;
+  private volatile Runnable finish;
 
   SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
 
@@ -94,7 +96,23 @@ public class HttpShardHandler extends ShardHandler {
     // This is primarily to keep track of what order we should use to query the replicas of a shard
     // so that we use the same replica for all phases of a distributed request.
     shardToURLs = new ConcurrentHashMap<>();
+    finish = null;
   }
+
+  public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory, Runnable finish) {
+    this.httpShardHandlerFactory = httpShardHandlerFactory;
+    this.lbClient = httpShardHandlerFactory.loadbalancer;
+    this.pending = new AtomicInteger(0);
+    this.responses = new LinkedTransferQueue<>();
+    this.responseCancellableMap = new ConcurrentHashMap<>(32);
+
+    // maps "localhost:8983|localhost:7574" to a shuffled List("http://localhost:8983","http://localhost:7574")
+    // This is primarily to keep track of what order we should use to query the replicas of a shard
+    // so that we use the same replica for all phases of a distributed request.
+    shardToURLs = new ConcurrentHashMap<>();
+    this.finish = finish;
+  }
+
 
   public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory, LBHttp2SolrClient lb) {
     this.httpShardHandlerFactory = httpShardHandlerFactory;
@@ -107,6 +125,7 @@ public class HttpShardHandler extends ShardHandler {
     // This is primarily to keep track of what order we should use to query the replicas of a shard
     // so that we use the same replica for all phases of a distributed request.
     shardToURLs = new NonBlockingHashMap<>();
+    finish = null;
   }
 
 
@@ -213,18 +232,37 @@ public class HttpShardHandler extends ShardHandler {
       }
 
       @Override
-      public void onSuccess(LBSolrClient.Rsp rsp, int code) {
+      public void onSuccess(LBSolrClient.Rsp rsp, int code, Object context) {
         ssr.nl = rsp.getResponse();
         srsp.setShardAddress(rsp.getServer());
         ssr.elapsedTime = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
         responses.add(srsp);
+
+        if (finish != null) {
+          pending.getAndUpdate(operand -> {
+            int newOperand = operand - 1;
+            if (newOperand == 0) {
+              ParWork.submitIO("HttpShardHandlerDone", finish);
+            }
+            return newOperand;
+          });
+        }
       }
 
-      public void onFailure(Throwable throwable, int code) {
+      public void onFailure(Throwable throwable, int code, Object context) {
         ssr.elapsedTime = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
         srsp.setException(throwable);
         srsp.setResponseCode(code);
         responses.add(srsp);
+        if (finish != null) {
+          pending.getAndUpdate(operand -> {
+            int newOperand = operand - 1;
+            if (newOperand == 0) {
+              ParWork.submitIO("HttpShardHandlerDone", finish);
+            }
+            return newOperand;
+          });
+        }
       }
     }));
   }
@@ -281,7 +319,9 @@ public class HttpShardHandler extends ShardHandler {
       //  ShardResponse rsp = responses.take();
         responseCancellableMap.remove(rsp);
 
-        pending.decrementAndGet();
+        if (finish == null) {
+          pending.decrementAndGet();
+        }
 
         // add response to the response list... we do this after the take() and
         // not after the completion of "call" so we know when the last response
@@ -422,6 +462,10 @@ public class HttpShardHandler extends ShardHandler {
 
   public ShardHandlerFactory getShardHandlerFactory() {
     return httpShardHandlerFactory;
+  }
+
+  public void setFinish(Runnable runnable) {
+    this.finish = runnable;
   }
 
 }

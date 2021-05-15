@@ -1263,7 +1263,7 @@ public class HighlighterTest extends SolrTestCaseJ4 {
     SolrQueryRequest req = req("hl", "true", "hl.fl", FIELD_NAME, HighlightParams.USE_PHRASE_HIGHLIGHTER, "true");
     try {
       SolrQueryResponse resp = new SolrQueryResponse();
-      ResponseBuilder rb = new ResponseBuilder(req, resp, Collections.singletonList(hlComp));
+      ResponseBuilder rb = new ResponseBuilder(req, resp, Collections.singletonList(hlComp), null);
       rb.setHighlightQuery(query);
       rb.setResults(req.getSearcher().getDocListAndSet(query, (DocSet) null, null, 0, 1));
       //highlight:

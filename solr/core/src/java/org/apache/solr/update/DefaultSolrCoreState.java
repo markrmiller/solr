@@ -539,21 +539,21 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
       this.core = core;
     }
 
-    @Override public void onSuccess(NamedList<Object> entries, int code) {
+    @Override public void onSuccess(NamedList<Object> entries, int code, Object context) {
       results.set(entries);
       String prepSuccess = entries._getStr(CoreAdminHandler.RESPONSE_STATUS, null);
       if (prepSuccess != null) {
         boolean success = Integer.parseInt(prepSuccess) == 0;
         if (!success) {
           log.info("Not the valid leader according to prep recovery");
-          onFailure(new IllegalStateException("Not the valid leader"), 503);
+          onFailure(new IllegalStateException("Not the valid leader"), 503, context);
           return;
         }
       }
       CompletableFuture.runAsync(recoveryTask, core.getCoreContainer().getUpdateShardHandler().getRecoveryExecutor());
     }
 
-    @Override public void onFailure(Throwable throwable, int code) {
+    @Override public void onFailure(Throwable throwable, int code, Object context) {
       log.info("Prep recovery failed", throwable);
       try {
         sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask);

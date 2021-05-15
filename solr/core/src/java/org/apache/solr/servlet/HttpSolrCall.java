@@ -29,6 +29,7 @@ import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.ContentStreamHandlerBase;
 import org.apache.solr.handler.admin.PrepRecoveryOp;
+import org.apache.solr.handler.component.SearchHandler;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestHandler;
@@ -467,12 +468,15 @@ public class HttpSolrCall extends SolrCall {
               }
             };
 
-            solrRsp.onFinished(runWhenFinished);
+            if (req.isAsyncStarted() && handler != null && handler instanceof SearchHandler) {
+     //         solrRsp.startAsync();
+       //       solrRsp.onFinished(runWhenFinished);
+            }
 
             execute(solrRsp);
 
             if (!solrRsp.isAsync()) {
-              runWhenFinished.run();
+              runWhenFinished.run();y
             }
 
           }

@@ -28,7 +28,7 @@ public interface AsyncListener<T> {
 
   }
 
-  void onSuccess(T t, int code);
-  void onFailure(Throwable throwable, int code);
+  void onSuccess(T t, int code, Object context);
+  void onFailure(Throwable throwable, int code, Object context);
 
 }

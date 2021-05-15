@@ -235,7 +235,7 @@ public class DistributedQueryComponentOptimizationTest extends SolrCloudTestCase
     // let's add debug=track to such requests so we can use DebugComponent responses for assertions
     QueryResponse response = cluster.getSolrClient().query(COLLECTION, new SolrQuery("debug", "track", q));
 
-    Map<String, List<TrackingShardHandlerFactory.ShardRequestAndParams>> requests = trackingQueue.getAllRequests();
+    Map<String, Set<TrackingShardHandlerFactory.ShardRequestAndParams>> requests = trackingQueue.getAllRequests();
     int numRequests = getNumRequests(requests);
 
     boolean distribSinglePass = false;
@@ -305,9 +305,9 @@ public class DistributedQueryComponentOptimizationTest extends SolrCloudTestCase
     return response;
   }
 
-  private int getNumRequests(Map<String, List<TrackingShardHandlerFactory.ShardRequestAndParams>> requests) {
+  private int getNumRequests(Map<String, Set<TrackingShardHandlerFactory.ShardRequestAndParams>> requests) {
     int beforeNumRequests = 0;
-    for (Map.Entry<String, List<TrackingShardHandlerFactory.ShardRequestAndParams>> entry : requests.entrySet()) {
+    for (Map.Entry<String, Set<TrackingShardHandlerFactory.ShardRequestAndParams>> entry : requests.entrySet()) {
       beforeNumRequests += entry.getValue().size();
     }
     return beforeNumRequests;

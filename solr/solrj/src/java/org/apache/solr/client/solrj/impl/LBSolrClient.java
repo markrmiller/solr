@@ -69,7 +69,7 @@ public abstract class LBSolrClient extends SolrClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // defaults
-  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 444));
+  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503));
   private static final int CHECK_INTERVAL = 30 * 1000; //30 seconds between checks
   private static final int NONSTANDARD_PING_LIMIT = 10;  // number of times we'll ping dead servers not in the server list
   public static final ServerWrapper[] EMPTY_SERVER_WRAPPER = new ServerWrapper[0];
@@ -149,11 +149,11 @@ public abstract class LBSolrClient extends SolrClient {
   }
 
   protected static class ServerIterator {
-    String serverStr;
-    List<String> skipped;
-    int numServersTried;
-    Iterator<String> it;
-    Iterator<String> skippedIt;
+    volatile String serverStr;
+    volatile List<String> skipped;
+    final AtomicInteger numServersTried = new AtomicInteger();
+    volatile Iterator<String> it;
+    volatile Iterator<String> skippedIt;
     String exceptionMessage;
     long timeAllowedNano;
     long timeOutTime;
@@ -176,7 +176,7 @@ public abstract class LBSolrClient extends SolrClient {
 
     private void fetchNext() {
       serverStr = null;
-      if (req.numServersToTry != null && numServersTried > req.numServersToTry) {
+      if (req.numServersToTry != null && numServersTried.get() > req.numServersToTry) {
         exceptionMessage = "Time allowed to handle this request exceeded";
         return;
       }
@@ -235,8 +235,8 @@ public abstract class LBSolrClient extends SolrClient {
 
         throw new SolrServerException("No live SolrServers available to handle this request"+suffix, previousEx);
       }
-      numServersTried++;
-      if (req.getNumServersToTry() != null && numServersTried > req.getNumServersToTry()) {
+      numServersTried.incrementAndGet();
+      if (req.getNumServersToTry() != null && numServersTried.get() > req.getNumServersToTry()) {
         throw new SolrServerException("No live SolrServers available to handle this request:"
             + " numServersTried="+numServersTried
             + " numServersToTry="+req.getNumServersToTry()+suffix, previousEx);
@@ -252,6 +252,8 @@ public abstract class LBSolrClient extends SolrClient {
     protected List<String> servers;
     protected int numDeadServersToTry;
     private final Integer numServersToTry;
+
+    protected AtomicInteger retryCount = new AtomicInteger();
 
     public Req(SolrRequest request, List<String> servers) {
       this(request, servers, null);

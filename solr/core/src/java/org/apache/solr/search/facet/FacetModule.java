@@ -19,9 +19,12 @@ package org.apache.solr.search.facet;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.common.SolrException;
@@ -152,7 +155,7 @@ public class FacetModule extends SearchComponent {
   }
 
 
-  private static void clearFaceting(List<ShardRequest> outgoing) {
+  private static void clearFaceting(Queue<ShardRequest> outgoing) {
     // turn off faceting for requests not marked as being for faceting refinements
     for (ShardRequest sreq : outgoing) {
       if ((sreq.purpose & PURPOSE_REFINE_JSON_FACETS) != 0) continue;

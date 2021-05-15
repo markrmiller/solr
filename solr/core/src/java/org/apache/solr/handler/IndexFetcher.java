@@ -1836,11 +1836,11 @@ public class IndexFetcher {
             throw new AlreadyClosedException("Stopped or aborted");
           }
           Cancellable resp = solrClient.asyncRequestRaw(req, null, new AsyncListener<>() {
-            @Override public void onSuccess(InputStream is, int code) {
+            @Override public void onSuccess(InputStream is, int code, Object context) {
               log.debug("success for file index fetch {}", code);
             }
 
-            @Override public void onFailure(Throwable throwable, int code) {
+            @Override public void onFailure(Throwable throwable, int code, Object context) {
               log.error("Exception fetching file code={}", code, throwable);
 
               if (code == 403 || code == 500 || code == 503 || code == 0) {

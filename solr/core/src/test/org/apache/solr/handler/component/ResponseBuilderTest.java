@@ -51,12 +51,12 @@ public class ResponseBuilderTest extends SolrTestCaseJ4 {
 
   //This test is being added to verify responseBuilder.isDistributed() exists and is visible.
   public void testIsDistrib(){
-    ResponseBuilder responseBuilder = new ResponseBuilder(req, rsp, new ArrayList<>(0));
+    ResponseBuilder responseBuilder = new ResponseBuilder(req, rsp, new ArrayList<>(0), null);
     assertFalse(responseBuilder.isDistributed());
   }
 
   public void testDoAnalyticsAccessors() {
-    ResponseBuilder rb = new ResponseBuilder(req, rsp, new ArrayList<>(0));
+    ResponseBuilder rb = new ResponseBuilder(req, rsp, new ArrayList<>(0), null);
     assertFalse(rb.isAnalytics());
     rb.setAnalytics(true);
     assertTrue(rb.isAnalytics());
@@ -65,7 +65,7 @@ public class ResponseBuilderTest extends SolrTestCaseJ4 {
   }
 
   public void testIsOlapAnalyticsAccessors() {
-    ResponseBuilder rb = new ResponseBuilder(req, rsp, new ArrayList<>(0));
+    ResponseBuilder rb = new ResponseBuilder(req, rsp, new ArrayList<>(0), null);
     assertFalse(rb.isOlapAnalytics());
     rb.setOlapAnalytics(true);
     assertTrue(rb.isOlapAnalytics());
@@ -74,7 +74,7 @@ public class ResponseBuilderTest extends SolrTestCaseJ4 {
   }
 
   public void testAnalyticsRequestManagerAccessors() {
-    ResponseBuilder rb = new ResponseBuilder(req, rsp, new ArrayList<>(0));
+    ResponseBuilder rb = new ResponseBuilder(req, rsp, new ArrayList<>(0), null);
     assertNull(rb.getAnalyticsRequestManager());
     rb.setAnalyticsRequestManager(this);
     assertNotNull(rb.getAnalyticsRequestManager());

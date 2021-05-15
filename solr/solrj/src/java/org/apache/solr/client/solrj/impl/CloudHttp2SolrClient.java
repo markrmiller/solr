@@ -352,14 +352,14 @@ public class CloudHttp2SolrClient extends BaseCloudSolrClient {
     }
 
     @Override
-    public void onSuccess(NamedList result, int status) {
+    public void onSuccess(NamedList result, int status, Object context) {
 
       tsResponses.put(url, result);
       latch.countDown();
     }
 
     @Override
-    public void onFailure(Throwable t, int code) {
+    public void onFailure(Throwable t, int code, Object context) {
       tsExceptions.put(url, t);
       latch.countDown();
     }
