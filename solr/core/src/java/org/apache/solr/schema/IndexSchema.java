@@ -85,6 +85,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -144,7 +145,7 @@ public class IndexSchema {
   protected final SolrResourceLoader loader;
   protected final Properties substitutableProperties;
 
-  protected volatile Map<String,SchemaField> fields = new HashMap<>();
+  protected volatile Map<String,SchemaField> fields = new NonBlockingHashMap<>();
   protected volatile Map<String,FieldType> fieldTypes = new HashMap<>();
 
   protected final List<SchemaField> fieldsWithDefaultValue = new ArrayList<>();
@@ -588,7 +589,7 @@ public class IndexSchema {
       version = schemaConf.getFloat(exp, path, 1.0f);
 
       StopWatch timeLoadTypeFields = new StopWatch(SCHEMA + "-loadTypeFields");
-      this.fieldTypes = new NonBlockingHashMap<>();
+      this.fieldTypes = new HashMap<>();
 
      // Map<String,FieldType> loadFieldTypes = new HashMap<>();
       // load the Field Types
@@ -826,7 +827,8 @@ public class IndexSchema {
     
     dynamicFields = dynamicFieldListToSortedArray(dFields);
 
-    this.fields = fields;
+    this.fields = new NonBlockingHashMap<String,SchemaField>(fields.size());
+    this.fields.putAll(fields);
 
     return explicitRequiredProp;
   }

@@ -213,10 +213,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
       StartupLoggingUtils.checkLogDir();
 
-      if (log.isInfoEnabled()) {
-        log.info("Using logger factory {}", StartupLoggingUtils.getLoggerImplStr());
-      }
-
       logWelcomeBanner();
       String muteConsole = System.getProperty(SOLR_LOG_MUTECONSOLE);
       if (muteConsole != null && (!muteConsole.equalsIgnoreCase("false"))  && !Arrays.asList("false", "0", "off", "no").contains(muteConsole.toLowerCase(Locale.ROOT))) {

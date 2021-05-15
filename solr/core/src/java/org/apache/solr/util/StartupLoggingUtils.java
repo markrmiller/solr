@@ -32,7 +32,6 @@ import org.apache.solr.common.ParWork;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.impl.StaticLoggerBinder;
 
 /**
  * Handles programmatic modification of logging during startup
@@ -43,7 +42,7 @@ import org.slf4j.impl.StaticLoggerBinder;
  */
 public final class StartupLoggingUtils {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private final static StaticLoggerBinder binder = StaticLoggerBinder.getSingleton();
+
 
   /**
    * Checks whether mandatory log dir is given
@@ -52,10 +51,6 @@ public final class StartupLoggingUtils {
     if (System.getProperty("solr.log.dir") == null) {
       log.error("Missing Java Option solr.log.dir. Logging may be missing or incomplete.");
     }
-  }
-
-  public static String getLoggerImplStr() {
-    return binder.getLoggerFactoryClassStr();
   }
 
   /**
@@ -119,7 +114,7 @@ public final class StartupLoggingUtils {
       // Make sure we have log4j LogManager in classpath
       Class.forName("org.apache.logging.log4j.LogManager");
       // Make sure that log4j is really selected as logger in slf4j - we could have LogManager in the bridge class :)
-      return binder.getLoggerFactoryClassStr().contains("Log4jLoggerFactory");
+      return true;
     } catch (Exception e) {
       ParWork.propagateInterrupt(e, true);
       return false;

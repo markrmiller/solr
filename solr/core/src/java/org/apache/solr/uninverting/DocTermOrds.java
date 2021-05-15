@@ -120,6 +120,7 @@ public class DocTermOrds implements Accountable {
 
   /** Every 128th term is indexed, by default. */
   public final static int DEFAULT_INDEX_INTERVAL_BITS = 7; // decrease to a low number like 2 for testing
+  public static final BytesRef[] EMPTY_BYTESREF = new BytesRef[0];
 
   private int indexIntervalBits;
   private int indexIntervalMask;
@@ -537,7 +538,7 @@ public class DocTermOrds implements Accountable {
       }
 
     }
-    indexedTermsArray = indexedTerms.toArray(new BytesRef[indexedTerms.size()]);
+    indexedTermsArray = indexedTerms.toArray(EMPTY_BYTESREF);
 
     long endTime = System.nanoTime();
 

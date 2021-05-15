@@ -58,8 +58,8 @@ public class TrieIntField extends TrieField implements IntValueFieldType {
     try {
       if (val instanceof CharSequence) return Integer.parseInt(val.toString());
     } catch (NumberFormatException e) {
-      Float v = Float.parseFloat(val.toString());
-      return v.intValue();
+      float v = Float.parseFloat(val.toString());
+      return (int) v;
     }
     return super.toNativeType(val);
   }

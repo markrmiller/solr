@@ -550,7 +550,7 @@ public class SolrDocumentFetcher {
         if (!ndv.advanceExact(localId)) {
           return null;
         }
-        Long val = ndv.longValue();
+        long val = ndv.longValue();
         return decodeNumberFromDV(schemaField, val, false);
       case BINARY:
         BinaryDocValues bdv = leafReader.getBinaryDocValues(fieldName);

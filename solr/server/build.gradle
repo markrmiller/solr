@@ -74,7 +74,7 @@ dependencies {
   libExt 'org.apache.logging.log4j:log4j-1.2-api'
   libExt 'org.apache.logging.log4j:log4j-api'
   libExt 'org.apache.logging.log4j:log4j-core'
-  libExt 'org.apache.logging.log4j:log4j-slf4j-impl'
+  libExt 'org.apache.logging.log4j:log4j-slf4j18-impl'
   libExt 'org.apache.logging.log4j:log4j-web'
   libExt 'com.vlkan.log4j2:log4j2-logstash-layout'
 

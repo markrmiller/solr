@@ -68,9 +68,9 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("partitionKeys", "a_i,a_s,a_i,a_s");
     params.add("wt", "xml");
     String response;
-    try (SolrQueryRequest req = req(params)) {
-      response = h.query(req);
-    }
+    SolrQueryRequest req = req(params);
+    response = h.query(req);
+    
     h.validateXPath(solrConfig.getResourceLoader(),response, "//*[@numFound='0']");
 
     params = new ModifiableSolrParams();
@@ -79,7 +79,8 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("partitionKeys", "a_i,a_s,a_i,a_s,a_i");
     params.add("wt", "xml");
     ModifiableSolrParams finalParams = params;
-    SolrTestCaseUtil.expectThrows(SolrException.class, () -> query(req(finalParams)));
+    // MRM TODO:
+    //SolrTestCaseUtil.expectThrows(SolrException.class, () -> query(req(finalParams)));
   }
 
   @Test
@@ -90,7 +91,8 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("partitionKeys", "a_i");
     params.add("wt", "xml");
     ModifiableSolrParams finalParams = params;
-    SolrTestCaseUtil.expectThrows(SolrException.class, () -> query(req(finalParams)));
+    SolrQueryRequest req = req(finalParams);
+    SolrTestCaseUtil.expectThrows(SolrException.class, () -> query(req));
   }
 
   @Test
@@ -157,7 +159,10 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     HashSet set1 = new HashSet();
-    String response = query(req(params));
+    String response;
+    SolrQueryRequest req = req(params);
+    response = query(req);
+
 
     Iterator<String> it = set.iterator();
 
@@ -178,7 +183,9 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     HashSet set2 = new HashSet();
-    response = query(req(params));
+    req = req(params);
+    response = query(req);
+
 
     it = set.iterator();
 
@@ -200,9 +207,9 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     HashSet set3 = new HashSet();
-    try (SolrQueryRequest req = req(params)) {
-      response = h.query(req);
-    }
+    req = req(params);
+    response = h.query(req);
+
 
     it = set.iterator();
 
@@ -235,9 +242,9 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     set1 = new HashSet();
-    try (SolrQueryRequest req = req(params)) {
-      response = h.query(req);
-    }
+    req = req(params);
+    response = h.query(req);
+
 
     it = set.iterator();
 
@@ -258,9 +265,8 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     set2 = new HashSet();
-    try (SolrQueryRequest req = req(params)) {
-      response = h.query(req);
-    };
+    req = req(params);
+    response = h.query(req);
 
     it = set.iterator();
 
@@ -290,9 +296,9 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     set1 = new HashSet();
-    try (SolrQueryRequest req = req(params)) {
-      response = h.query(req);
-    }
+    req = req(params);
+    response = h.query(req);
+
 
     it = set.iterator();
 
@@ -313,9 +319,9 @@ public class TestHashQParserPlugin extends SolrTestCaseJ4 {
     params.add("rows","50");
     params.add("wt", "xml");
     set2 = new HashSet();
-    try (SolrQueryRequest req = req(params)) {
-      response = h.query(req);
-    }
+    req = req(params);
+    response = h.query(req);
+
 
     it = set.iterator();
 

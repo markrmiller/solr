@@ -54,6 +54,7 @@ import org.apache.solr.util.RTimer;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
+import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
@@ -79,6 +80,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -93,6 +95,7 @@ public final class ManagedIndexSchema extends IndexSchema {
 
   private final ManagedIndexSchemaFactory managedIndexSchemaFactory;
   private volatile Future<?> informFuture;
+  private Collection<SchemaField> newFields;
 
   @Override public boolean isMutable() { return isMutable; }
 
@@ -486,8 +489,10 @@ public final class ManagedIndexSchema extends IndexSchema {
           copyFieldNames = Collections.emptyMap();
         }
         newSchema = shallowCopy(true);
-
-        newSchema.fields = (HashMap<String,SchemaField>) ((HashMap<String,SchemaField>) newSchema.fields).clone();
+        HashMap<String,SchemaField> h = new HashMap<>(newSchema.fields);
+        HashMap<String,SchemaField> f = (HashMap<String,SchemaField>) h.clone();
+        newSchema.fields = new NonBlockingHashMap<>(f.size());
+        newSchema.fields.putAll(f);
 
         for (SchemaField newField : newFields) {
           if (null != newSchema.fields.get(newField.getName())) {

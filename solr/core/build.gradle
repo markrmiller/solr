@@ -104,7 +104,7 @@ dependencies {
 
   implementation 'org.apache.logging.log4j:log4j-api'
   implementation 'org.apache.logging.log4j:log4j-core'
-  implementation 'org.apache.logging.log4j:log4j-slf4j-impl'
+  implementation 'org.apache.logging.log4j:log4j-slf4j18-impl'
   implementation 'com.vlkan.log4j2:log4j2-logstash-layout'
 
   api 'org.bitbucket.b_c:jose4j'

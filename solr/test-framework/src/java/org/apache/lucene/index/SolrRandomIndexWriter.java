@@ -28,6 +28,7 @@ import org.apache.solr.SolrTestUtil;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -284,7 +285,7 @@ public class SolrRandomIndexWriter implements Closeable {
       if (r.nextInt(5) == 3) {
         seqNo =
             w.softUpdateDocuments(
-                t, Arrays.asList(doc), new NumericDocValuesField(config.getSoftDeletesField(), 1));
+                t, Collections.singletonList(doc), new NumericDocValuesField(config.getSoftDeletesField(), 1));
       } else {
         seqNo =
             w.softUpdateDocument(
@@ -292,7 +293,7 @@ public class SolrRandomIndexWriter implements Closeable {
       }
     } else {
       if (r.nextInt(5) == 3) {
-        seqNo = w.updateDocuments(t, Arrays.asList(doc));
+        seqNo = w.updateDocuments(t, Collections.singletonList(doc));
       } else {
         seqNo = w.updateDocument(t, doc);
       }
