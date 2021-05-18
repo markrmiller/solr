@@ -97,11 +97,11 @@ public class PointsVsTrieQuery {
     int rows = 100;
 
     private static class RequestAsyncListener implements AsyncListener<NamedList<Object>> {
-      @Override public void onSuccess(NamedList<Object> objectNamedList, int code) {
+      @Override public void onSuccess(NamedList<Object> objectNamedList, int code, Object context) {
 
       }
 
-      @Override public void onFailure(Throwable throwable, int code) {
+      @Override public void onFailure(Throwable throwable, int code, Object context) {
         System.err.println("Request call failed! " + throwable);
       }
     }
@@ -167,11 +167,11 @@ public class PointsVsTrieQuery {
 
         int finalBatch = batch;
         client.asyncRequest(updateRequest, collectionName, new AsyncListener<>() {
-          @Override public void onSuccess(NamedList<Object> entries, int code) {
+          @Override public void onSuccess(NamedList<Object> entries, int code, Object context) {
             System.out.println("doc update batch success batch=" + finalBatch + " perBatch=" + perBatch);
           }
 
-          @Override public void onFailure(Throwable throwable, int code) {
+          @Override public void onFailure(Throwable throwable, int code, Object context) {
             System.out.println("doc update batch failure");
             throwable.printStackTrace();
           }

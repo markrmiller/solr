@@ -107,7 +107,7 @@ public class UpdateShardHandler implements SolrInfoBean {
     queryParams.add(DistributingUpdateProcessorFactory.DISTRIB_UPDATE_PARAM);
     sharedHttpClient.setQueryParams(queryParams);
 
-    solrCmdDistributorClient = sharedClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(1000).build();
+    solrCmdDistributorClient = sharedClientBuilder.name("SolrCmdDistributor").markInternalRequest().strictEventOrdering(false).maxOutstandingAsyncRequests(500).build();
     solrCmdDistributorClient.enableCloseLock();
     // updateOnlyClient.addListenerFactory(updateHttpListenerFactory);
     queryParams = new HashSet<>(2);

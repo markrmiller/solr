@@ -17,6 +17,7 @@
 package org.apache.solr.common.params;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,7 +43,7 @@ import org.apache.solr.common.util.StrUtils;
  * It's basically a MultiMap of String keys to one or more String values.  Neither keys nor values may be null.
  * Unlike a general Map/MultiMap, the size is unknown without iterating over each parameter name.
  */
-public abstract class SolrParams implements MapWriter, Iterable<Map.Entry<String, String[]>> {
+public abstract class SolrParams implements Serializable, MapWriter, Iterable<Map.Entry<String, String[]>> {
 
   /**
    * Returns the first String value of a param, or null if not set.

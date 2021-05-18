@@ -35,7 +35,7 @@ public class SolrFormEncoder extends StringRequestContent {
 
   public static String convert(Fields fields) {
     // Assume 32 chars between name and value.
-    StringBuilder builder = new StringBuilder(fields.getSize() * 64);
+    StringBuilder builder = new StringBuilder(fields.getSize() * 32);
     for (Fields.Field field : fields) {
       for (String value : field.getValues()) {
         if (builder.length() > 0) builder.append('&');

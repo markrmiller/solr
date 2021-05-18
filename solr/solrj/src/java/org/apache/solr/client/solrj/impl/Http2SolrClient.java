@@ -941,16 +941,16 @@ public class Http2SolrClient extends SolrClient {
           if (name == null) {
             name = "";
           }
-          HttpFields.Mutable fields = HttpFields.build(1);
+          HttpFields.Mutable fields = HttpFields.build();
           fields.add(HttpHeader.CONTENT_TYPE, contentType);
           Long sz = contentStream.getSize();
 //          if (sz != null) {
 //            fields.add(HttpHeader.CONTENT_LENGTH, sz.toString());
 //          }
-          content.addFilePart(name, contentStream.getName(), new InputStreamRequestContent(contentStream.getStream()), fields);
+          content.addFilePart(name, contentStream.getName(), new InputStreamRequestContent(contentType, contentStream.getStream()), fields);
         }
       }
-
+      content.close();
       req = req.body(content);
     } else {
       // application/x-www-form-urlencoded

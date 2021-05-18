@@ -94,11 +94,11 @@ public class CloudIndexing {
     static AtomicInteger id = new AtomicInteger();
 
     private static class RequestAsyncListener implements AsyncListener<NamedList<Object>> {
-      @Override public void onSuccess(NamedList<Object> objectNamedList, int code) {
+      @Override public void onSuccess(NamedList<Object> objectNamedList, int code, Object context) {
 
       }
 
-      @Override public void onFailure(Throwable throwable, int code) {
+      @Override public void onFailure(Throwable throwable, int code, Object context) {
         System.err.println("Request call failed! " + throwable);
       }
     }

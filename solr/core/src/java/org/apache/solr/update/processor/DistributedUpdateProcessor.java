@@ -22,10 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -39,11 +36,8 @@ import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.client.solrj.response.SimpleSolrResponse;
-import org.apache.solr.common.SkyHook;
-import org.apache.solr.common.SolrException;
+import org.apache.solr.common.*;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.params.CommonParams;
@@ -955,19 +949,19 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     Future future = versionDeleteByQuery(cmd, replicas, coll);
 
     if (future != null) {
-//      try {
-//        future.get();
-//      } catch (InterruptedException e) {
-//        ParWork.propagateInterrupt(e, true);
-//        throw new SolrException(ErrorCode.SERVER_ERROR, e);
-//      } catch (ExecutionException e) {
-//        Throwable t;
-//        t = e.getCause();
-//        if (t instanceof RuntimeException) {
-//          throw (RuntimeException) t;
-//        }
-//        throw new SolrException(ErrorCode.SERVER_ERROR, t);
-//      }
+      try {
+        future.get();
+      } catch (InterruptedException e) {
+        ParWork.propagateInterrupt(e, true);
+        throw new SolrException(ErrorCode.SERVER_ERROR, e);
+      } catch (ExecutionException e) {
+        Throwable t;
+        t = e.getCause();
+        if (t instanceof RuntimeException) {
+          throw (RuntimeException) t;
+        }
+        throw new SolrException(ErrorCode.SERVER_ERROR, t);
+      }
     }
 
     if (returnVersions && rsp != null) {

@@ -27,6 +27,7 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.solr.servlet.SolrDispatchFilter;
 import org.apache.solr.servlet.SolrQoSFilter;
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
+import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http2.HTTP2Cipher;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.http2.server.HTTP2ServerConnectionFactory;
@@ -331,7 +332,7 @@ public class JettySolrRunner implements Closeable {
       if (sslContextFactory != null) {
 
         alpn = new ALPNServerConnectionFactory();
-        alpn.setDefaultProtocol("h2");
+        alpn.setDefaultProtocol(HttpVersion.HTTP_1_1.asString());
 
         // HTTP Configuration
       //  httpConfig.setSecureScheme("https");
@@ -366,9 +367,9 @@ public class JettySolrRunner implements Closeable {
 
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, null, scheduler, null, 1, 1, h2);
+        connector = new ServerConnector(server, null, scheduler, null, 1, 1, httpFactory, h2);
       } else {
-        connector = new ServerConnector(server, null, scheduler, null, 1, 1, ssl, alpn, h2);
+        connector = new ServerConnector(server, null, scheduler, null, 1, 1, ssl, alpn, httpFactory, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());
       }
 

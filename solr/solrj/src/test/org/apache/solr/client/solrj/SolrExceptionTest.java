@@ -49,7 +49,7 @@ public class SolrExceptionTest extends SolrTestCase {
         SolrQuery query = new SolrQuery("test123");
         client.query(query);
       }
-    } catch (SolrException sse) {
+    } catch (Exception sse) {
       gotExpectedError = true;
       /***
       assertTrue(UnknownHostException.class == sse.getRootCause().getClass()

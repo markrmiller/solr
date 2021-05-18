@@ -1740,24 +1740,21 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     final String field = "price_f";
     SolrClient client = getSolrClient(jetty);
 
-    client.deleteByQuery("*:*");
-    client.commit();
+//    client.deleteByQuery("*:*");
+//    client.commit();
 
     SolrInputDocument doc = new SolrInputDocument();
     doc.addField("id", "unique");
     doc.addField("name", "gadget");
-    doc.addField("price", 1);
     doc.addField(field, 1);
     client.add(doc);
     client.commit();
     SolrQuery q = new SolrQuery("*:*");
-    q.setFields("id","price","name", "_version_");
     q.setFields("id", field,"name", "_version_");
     QueryResponse resp = client.query(q);
     assertEquals("Doc count does not match", 1, resp.getResults().getNumFound());
     Long version = (Long)resp.getResults().get(0).getFirstValue("_version_");
     assertNotNull("no version returned", version);
-    assertEquals(1.0f, resp.getResults().get(0).getFirstValue("price"));
     assertEquals(1.0f, resp.getResults().get(0).getFirstValue(field));
 
     //update "price" with incorrect version (optimistic locking)
@@ -1767,7 +1764,6 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     doc = new SolrInputDocument();
     doc.addField("id", "unique");
     doc.addField("_version_", version+1);
-    doc.addField("price", oper);
     doc.addField(field, oper);
     try {
       client.add(doc);
@@ -1792,12 +1788,11 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     doc = new SolrInputDocument();
     doc.addField("id", "unique");
     doc.addField("_version_", version);
-    doc.addField("price", oper);
+    doc.addField(field, oper);
     client.add(doc);
     client.commit();
     resp = client.query(q);
     assertEquals("Doc count does not match", 1, resp.getResults().getNumFound());
-    assertEquals("price was not updated?", 100.0f, resp.getResults().get(0).getFirstValue("price"));
     assertEquals("price was not updated?", 100.0f, resp.getResults().get(0).getFirstValue(field));
     assertEquals("no name?", "gadget", resp.getResults().get(0).getFirstValue("name"));
 
@@ -1805,14 +1800,13 @@ abstract public class SolrExampleTests extends SolrExampleTestsBase
     oper.put("set", 200);
     doc = new SolrInputDocument();
     doc.addField("id", "unique");
-    doc.addField("price", oper);
     doc.addField(field, oper);
     client.add(doc);
     client.commit();
     resp = client.query(q);
     assertEquals("Doc count does not match", 1, resp.getResults().getNumFound());
-    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue("price"));    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue("price"));
-    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue(field));    assertEquals("no name?", "gadget", resp.getResults().get(0).getFirstValue("name"));
+    assertEquals("price was not updated?", 200.0f, resp.getResults().get(0).getFirstValue(field));
+    assertEquals("no name?", "gadget", resp.getResults().get(0).getFirstValue("name"));
   }
 
   @Test

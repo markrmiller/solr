@@ -57,7 +57,7 @@ public class DirectJsonQueryRequestFacetingEmbeddedTest extends EmbeddedSolrServ
   public static void beforeDirectJsonQueryRequestFacetingEmbeddedTest() throws Exception {
     final String sourceHome = ExternalPaths.SOURCE_HOME;
 
-    final File tempSolrHome = LuceneTestCase.createTempDir().toFile();
+    final File tempSolrHome = SolrTestUtil.createTempDir().toFile();
     FileUtils.copyFileToDirectory(new File(sourceHome, "server/solr/solr.xml"), tempSolrHome);
     final File collectionDir = new File(tempSolrHome, COLLECTION_NAME);
     FileUtils.forceMkdir(collectionDir);

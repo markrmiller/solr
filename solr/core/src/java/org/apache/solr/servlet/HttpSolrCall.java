@@ -476,7 +476,7 @@ public class HttpSolrCall extends SolrCall {
             execute(solrRsp);
 
             if (!solrRsp.isAsync()) {
-              runWhenFinished.run();y
+              runWhenFinished.run();
             }
 
           }

@@ -467,7 +467,17 @@ public class HttpSolrClient extends BaseHttpSolrClient {
       break;
     }
     Long size = contentStream[0].getSize();
-    postOrPut.setEntity(new MyInputStreamEntity(contentStream, size));
+    postOrPut.setEntity(new InputStreamEntity(contentStream[0].getStream(), size == null ? -1 : size) {
+      @Override
+      public Header getContentType() {
+        return new BasicHeader("Content-Type", contentStream[0].getContentType());
+      }
+
+      @Override
+      public boolean isRepeatable() {
+        return false;
+      }
+    });
 
   }
 
@@ -565,7 +575,7 @@ public class HttpSolrClient extends BaseHttpSolrClient {
       
       // Read the contents
       entity = response.getEntity();
-      respBody = new CloseShieldInputStream(entity.getContent());
+      respBody = entity.getContent();
       String mimeType = null;
       Charset charset = null;
       String charsetName = null;

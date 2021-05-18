@@ -135,7 +135,7 @@ abstract public class EmbeddedSolrServerTestBase extends SolrTestCaseJ4 {
     if (sourceHome == null)
       throw new IllegalStateException("No source home! Cannot create the legacy example solr home directory.");
 
-    final File tempSolrHome = LuceneTestCase.createTempDir().toFile();
+    final File tempSolrHome = SolrTestUtil.createTempDir().toFile();
     FileUtils.copyFileToDirectory(new File(sourceHome, "server/solr/solr.xml"), tempSolrHome);
     final File collectionDir = new File(tempSolrHome, DEFAULT_CORE_NAME);
     FileUtils.forceMkdir(collectionDir);
