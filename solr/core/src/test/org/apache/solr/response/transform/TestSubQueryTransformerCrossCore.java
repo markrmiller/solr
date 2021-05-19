@@ -16,7 +16,9 @@
  */
 package org.apache.solr.response.transform;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.core.CoreContainer;
@@ -29,6 +31,8 @@ import org.junit.Test;
 
 import com.google.common.collect.ImmutableMap;
 
+import java.io.File;
+
 public class TestSubQueryTransformerCrossCore extends SolrTestCaseJ4 {
 
   private static SolrCore fromCore;
@@ -36,7 +40,11 @@ public class TestSubQueryTransformerCrossCore extends SolrTestCaseJ4 {
   @BeforeClass
   public static void beforeTestSubQueryTransformerCrossCore() throws Exception {
     System.setProperty("enable.update.log", "false"); // schema12 doesn't support _version_
-    initCore("solrconfig-basic.xml","schema-docValuesJoin.xml");
+
+    File testHome = SolrTestUtil.createTempDir().toFile();
+    FileUtils.copyDirectory(SolrTestUtil.getFile(SolrTestUtil.TEST_HOME()), testHome);
+
+    initCore("solrconfig-basic.xml","schema-docValuesJoin.xml", testHome.getAbsolutePath(), "collection1");
     final CoreContainer coreContainer = h.getCoreContainer();
 
     fromCore = coreContainer.create("fromCore", //FileSystems.getDefault().getPath( TEST_HOME()), ImmutableMap.of("config","solrconfig-basic.xml","schema","schema-docValuesJoin.xml"
