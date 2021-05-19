@@ -279,7 +279,7 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
     checkShardConsistency(params("q","*:*", "rows", "99","_trace","two_docs"));
   }
 
-  /**  NOTE: uses the cluster's CloudSolrClient and asumes default collection has been set */
+  /**  NOTE: uses the cluster's CloudSolrClient and assumes default collection has been set */
   private static void addUpdateDelete(String collection, String docId) throws Exception {
     final CloudHttp2SolrClient cloudClient = cluster.getSolrClient();
 

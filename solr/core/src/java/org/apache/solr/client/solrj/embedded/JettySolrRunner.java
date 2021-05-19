@@ -361,7 +361,7 @@ public class JettySolrRunner implements Closeable {
       h2.setMaxConcurrentStreams(512);
       h2.setInputBufferSize(8192);
       httpFactory.setInputBufferSize(8192);
-      //h2.setStreamIdleTimeout(idleTimeout);
+      h2.setStreamIdleTimeout(idleTimeout);
 
     //  NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
 

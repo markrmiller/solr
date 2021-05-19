@@ -139,7 +139,7 @@ public class TestStressThreadBackup extends SolrCloudTestCase {
   }
 
   public void testSnapshotsAndBackupsDuringConcurrentCommitsAndOptimizes(final BackupAPIImpl impl) throws Exception {
-    final int numBackupIters = 15; // don't use 'atLeast', we don't want to blow up on nightly
+    final int numBackupIters = 7; // don't use 'atLeast', we don't want to blow up on nightly
     
     final AtomicReference<Throwable> heavyCommitFailure = new AtomicReference<>();
     final AtomicBoolean keepGoing = new AtomicBoolean(true);
