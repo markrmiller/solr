@@ -55,7 +55,7 @@ public class DistributedFacetPivotSmallTest extends BaseDistributedSearchTestCas
     // NOTE: we use the literal (4 character) string "null" as a company name
     // to help ensure there isn't any bugs where the literal string is treated as if it 
     // were a true NULL value.
-    index(id, 19, "place_t", "cardiff dublin", "company_t", "microsoft polecat", "price_ti", "1TestDistributedMissingSort5");
+    index(id, 19, "place_t", "cardiff dublin", "company_t", "microsoft polecat", "price_ti", "15");
     index(id, 20, "place_t", "dublin", "company_t", "polecat microsoft null", "price_ti", "19",
           // this is the only doc to have solo_* fields, therefore only 1 shard has them
           // TODO: add enum field - blocked by SOLR-6682
@@ -1527,6 +1527,7 @@ public class DistributedFacetPivotSmallTest extends BaseDistributedSearchTestCas
     assertEquals(msg + " stats max", val, stats.getMax());
   }
 
+  @SuppressWarnings({"rawtypes"})
   private List<RangeFacet> createExpectedRange(String key, int start, int end,
                                                int gap, int... values) {
     List<RangeFacet> expectedRanges = new ArrayList<>();
@@ -1574,9 +1575,9 @@ public class DistributedFacetPivotSmallTest extends BaseDistributedSearchTestCas
         if (other.getFacetRanges() != null) return false;
       } else {
         if (getFacetRanges().size() != other.getFacetRanges().size()) return false;
-        for (RangeFacet entry : getFacetRanges()) {
+        for (@SuppressWarnings({"rawtypes"})RangeFacet entry : getFacetRanges()) {
           boolean found = false;
-          for (RangeFacet otherRange : other.getFacetRanges()) {
+          for (@SuppressWarnings({"rawtypes"})RangeFacet otherRange : other.getFacetRanges()) {
             if (otherRange.getName().equals(entry.getName())) {
               found = true;
 
@@ -1584,7 +1585,9 @@ public class DistributedFacetPivotSmallTest extends BaseDistributedSearchTestCas
               if (!entry.getStart().equals(otherRange.getStart()))  return false;
               if (!entry.getEnd().equals(otherRange.getEnd()))  return false;
 
+              @SuppressWarnings({"unchecked"})
               List<RangeFacet.Count> myCounts = entry.getCounts();
+              @SuppressWarnings({"unchecked"})
               List<RangeFacet.Count> otherRangeCounts = otherRange.getCounts();
               if ( (myCounts == null && otherRangeCounts != null)
                   || (myCounts != null && otherRangeCounts == null)
@@ -1610,10 +1613,20 @@ public class DistributedFacetPivotSmallTest extends BaseDistributedSearchTestCas
       }
       return true;
     }
+
+    @Override
+    public int hashCode() {
+      throw new UnsupportedOperationException("Calling hashCode in ComparablePivotField");
+    }
   }
   
   public static class UnorderedEqualityArrayList<T> extends ArrayList<T> {
-    
+
+    @Override
+    public int hashCode() {
+      throw new UnsupportedOperationException("Calling hashCode in UnorderedEqualityArrayList");
+    }
+
     @Override
     public boolean equals(Object o) {
       boolean equal = false;
@@ -1663,9 +1676,9 @@ public class DistributedFacetPivotSmallTest extends BaseDistributedSearchTestCas
         }
       }
       if (compare == 0) {
-        for (RangeFacet entry : o1.getFacetRanges()) {
+        for (@SuppressWarnings({"rawtypes"})RangeFacet entry : o1.getFacetRanges()) {
           boolean found = false;
-          for (RangeFacet otherRangeFacet : o2.getFacetRanges()) {
+          for (@SuppressWarnings({"rawtypes"})RangeFacet otherRangeFacet : o2.getFacetRanges()) {
             if (otherRangeFacet.getName().equals(entry.getName()))  {
               found = true;
             }

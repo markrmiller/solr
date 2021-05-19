@@ -49,12 +49,7 @@ import java.util.Locale;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -211,7 +206,7 @@ final class TestRuleTemporaryFilesCleanup extends TestRuleAdapter {
     // was successful. Otherwise just report the path of temporary files
     // and leave them there.
     if (failureMarker.wasSuccessful()) {
-      ExecutorService pool = new ThreadPoolExecutor(2, 4, 1, TimeUnit.SECONDS, new SynchronousQueue<>(), new ThreadPoolExecutor.CallerRunsPolicy());
+      ExecutorService pool = new ThreadPoolExecutor(0, 4, 1, TimeUnit.SECONDS, new LinkedTransferQueue<>(), new ThreadPoolExecutor.CallerRunsPolicy());
       try {
 
       List<Future> futures = new ArrayList<>(everything.length);
