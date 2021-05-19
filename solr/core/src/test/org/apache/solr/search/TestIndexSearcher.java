@@ -16,6 +16,7 @@
  */
 package org.apache.solr.search;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Metric;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.io.FileUtils;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexReaderContext;
 import org.apache.lucene.index.LeafReaderContext;
@@ -37,6 +39,7 @@ import org.apache.lucene.queries.function.FunctionValues;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
+import org.apache.solr.SolrTestUtil;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeSource;
@@ -364,13 +367,16 @@ public class TestIndexSearcher extends SolrTestCaseJ4 {
 
     CoreContainer cores = h.getCoreContainer();
 
+    File testHome = SolrTestUtil.createTempDir().toFile();
+    FileUtils.copyDirectory(SolrTestUtil.getFile(SolrTestUtil.TEST_HOME()), testHome);
+
     final SolrCore newCore;
     boolean coreCreated = false;
     try (SolrCore core = h.getCore()) {
       CoreDescriptor cd = core.getCoreDescriptor();
       System.setProperty("tests.solr.useColdSearcher", "true");
       // Create a new core, this should call all the firstSearcherListeners
-      newCore = cores.create("core1", cd.getInstanceDir(), ImmutableMap.of("config", "solrconfig-searcher-listeners1.xml"), false, true);
+      newCore = cores.create("core1", testHome.toPath(), ImmutableMap.of("config", "solrconfig-searcher-listeners1.xml"), false, true);
       coreCreated = true;
 
       //validate that the new core was created with the correct solrconfig
