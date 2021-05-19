@@ -374,6 +374,7 @@ public class TestIndexSearcher extends SolrTestCaseJ4 {
     boolean coreCreated = false;
     try (SolrCore core = h.getCore()) {
       CoreDescriptor cd = core.getCoreDescriptor();
+      FileUtils.copyDirectory(cd.getInstanceDir().toFile(), testHome);
       System.setProperty("tests.solr.useColdSearcher", "true");
       // Create a new core, this should call all the firstSearcherListeners
       newCore = cores.create("core1", testHome.toPath(), ImmutableMap.of("config", "solrconfig-searcher-listeners1.xml"), false, true);
