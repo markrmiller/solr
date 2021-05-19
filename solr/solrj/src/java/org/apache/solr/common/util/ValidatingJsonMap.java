@@ -22,14 +22,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.solr.common.NavigableObject;
 import org.apache.solr.common.ParWork;
@@ -391,6 +384,11 @@ public class ValidatingJsonMap implements Map<String, Object>, NavigableObject {
   @Override
   public boolean equals(Object that) {
     return that instanceof Map && this.delegate.equals(that);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(delegate);
   }
 
   @SuppressWarnings({"unchecked"})

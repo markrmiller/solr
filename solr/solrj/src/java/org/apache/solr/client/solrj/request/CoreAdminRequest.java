@@ -378,7 +378,7 @@ public class CoreAdminRequest extends SolrRequest<CoreAdminResponse> {
       action = CoreAdminAction.MERGEINDEXES;
     }
 
-    public void setIndexDirs(List<String> indpreexDirs) {
+    public void setIndexDirs(List<String> indexDirs) {
       this.indexDirs = indexDirs;
     }
 

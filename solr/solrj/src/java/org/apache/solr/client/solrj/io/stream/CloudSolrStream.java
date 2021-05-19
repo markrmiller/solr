@@ -153,11 +153,6 @@ public class CloudSolrStream extends TupleStream implements Expressible {
     else if(zkHostExpression.getParameter() instanceof StreamExpressionValue){
       zkHost = ((StreamExpressionValue)zkHostExpression.getParameter()).getValue();
     }
-    /*
-    if(null == zkHost){
-      throw new IOException(String.format(Locale.ROOT,"invalid expression %s - zkHost not found for collection '%s'",expression,collectionName));
-    }
-    */
 
     // We've got all the required items
     init(collectionName, zkHost, mParams);
@@ -238,7 +233,7 @@ public class CloudSolrStream extends TupleStream implements Expressible {
 
     // If the comparator is null then it was not explicitly set so we will create one using the sort parameter
     // of the query. While doing this we will also take into account any aliases such that if we are sorting on
-    // fieldA but fieldA is aliased to alias.fieldA then the comparater will be against alias.fieldA.
+    // fieldA but fieldA is aliased to alias.fieldA then the comparator will be against alias.fieldA.
 
     if (params.get("q") == null) {
       throw new IOException("q param expected for search function");
@@ -486,6 +481,11 @@ public class CloudSolrStream extends TupleStream implements Expressible {
 
     public boolean equals(Object o) {
       return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(tuple);
     }
 
     public Tuple getTuple() {

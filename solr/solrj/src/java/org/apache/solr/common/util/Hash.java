@@ -239,6 +239,7 @@ public class Hash {
   /** Returns the MurmurHash3_x86_32 hash.
    * Original source/tests at https://github.com/yonik/java_util/
    */
+  @SuppressWarnings({"fallthrough"})
   public static int murmurhash3_x86_32(byte[] data, int offset, int len, int seed) {
 
     final int c1 = 0xcc9e2d51;
@@ -356,7 +357,7 @@ public class Hash {
       } else {
         // surrogate pair
         // int utf32 = pos < end ? (int) data.charAt(pos++) : 0;
-        int utf32 = data.charAt(pos++);
+        int utf32 = (int) data.charAt(pos++);
         utf32 = ((code - 0xD7C0) << 10) + (utf32 & 0x3FF);
         k2 = (0xff & (0xF0 | (utf32 >> 18)))
             | ((0x80 | ((utf32 >> 12) & 0x3F))) << 8
@@ -456,6 +457,7 @@ public class Hash {
 
 
   /** Returns the MurmurHash3_x64_128 hash, placing the result in "out". */
+  @SuppressWarnings({"fallthrough"})
   public static void murmurhash3_x64_128(byte[] key, int offset, int len, int seed, LongPair out) {
     // The original algorithm does have a 32 bit unsigned seed.
     // We have to mask to match the behavior of the unsigned types and prevent sign extension.

@@ -428,6 +428,11 @@ public class DeepRandomStream extends TupleStream implements Expressible {
       return this == o;
     }
 
+    @Override
+    public int hashCode() {
+      return Objects.hash(tuple);
+    }
+
     public Tuple getTuple() {
       return tuple;
     }
