@@ -208,6 +208,11 @@ public class PackageAPI {
     }
 
     @Override
+    public int hashCode() {
+      return Objects.hash(version);
+    }
+
+    @Override
     public String toString() {
       try {
         return Utils.writeJson(this, new StringWriter(), false).toString() ;
