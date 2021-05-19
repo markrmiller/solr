@@ -50,6 +50,7 @@ allprojects { prj ->
         options.errorprone.disableWarningsInGeneratedCode = true
         options.errorprone.errorproneArgs = [
             // test
+            '-Xep:BanSerializableRead:OFF',    // MRM TODO: remove
             '-Xep:ExtendingJUnitAssert:OFF',
             '-Xep:UseCorrectAssertInTests:OFF',
             '-Xep:DefaultPackage:OFF',
