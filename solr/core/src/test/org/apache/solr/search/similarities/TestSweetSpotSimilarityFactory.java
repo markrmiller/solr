@@ -16,11 +16,13 @@
  */
 package org.apache.solr.search.similarities;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
@@ -43,7 +45,9 @@ public class TestSweetSpotSimilarityFactory extends BaseSimilarityTestCase {
 
   @BeforeClass
   public static void beforeTestSweetSpotSimilarityFactory() throws Exception {
-    initCore("solrconfig-basic.xml","schema-sweetspot.xml");
+    File testHome = SolrTestUtil.createTempDir().toFile();
+    FileUtils.copyDirectory(SolrTestUtil.getFile(SolrTestUtil.TEST_HOME()), testHome);
+    initCore("solrconfig-basic.xml","schema-sweetspot.xml", testHome.getAbsolutePath());
   }
 
   @AfterClass
