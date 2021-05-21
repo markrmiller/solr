@@ -20,10 +20,7 @@ import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.util.Constants;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 
 import java.util.Map;
 
@@ -43,10 +40,10 @@ public class TestSolrDeletionPolicy1 extends SolrTestCaseJ4 {
   }
 
   @Override
-  @Before
-  public void setUp() throws Exception {
-    super.setUp();
+  @After
+  public void tearDown() throws Exception {
     clearIndex();
+    super.tearDown();
   }
   
   private void addDocs() {

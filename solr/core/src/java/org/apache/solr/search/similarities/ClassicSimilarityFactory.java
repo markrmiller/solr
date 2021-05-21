@@ -47,7 +47,7 @@ public class ClassicSimilarityFactory extends SimilarityFactory {
    * Controls the value of {@link ClassicSimilarity#setDiscountOverlaps(boolean)} 
    * on newly constructed instances of {@link ClassicSimilarity}
    */
-  protected boolean discountOverlaps = true;
+  protected volatile boolean discountOverlaps = true;
 
   @Override
   public void init(SolrParams params) {

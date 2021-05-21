@@ -199,7 +199,7 @@ public class SolrDeletionPolicy extends IndexDeletionPolicy implements NamedList
     } // end synchronized
   }
 
-  private static String getId(IndexCommit commit) {
+  private String getId(IndexCommit commit) {
     StringBuilder sb = new StringBuilder();
     Directory dir = commit.getDirectory();
 

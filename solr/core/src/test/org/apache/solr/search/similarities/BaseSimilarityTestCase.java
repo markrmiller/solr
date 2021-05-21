@@ -28,7 +28,7 @@ public abstract class BaseSimilarityTestCase extends SolrTestCaseJ4 {
 
   /** returns the similarity in use for the field */
   protected Similarity getSimilarity(String field) {
-    Similarity sim = null;
+    Similarity sim;
     try (SolrCore core = h.getCore()) {
       sim = core.withSearcher(IndexSearcher::getSimilarity);
     } catch (IOException e) {

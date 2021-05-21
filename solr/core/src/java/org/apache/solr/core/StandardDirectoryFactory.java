@@ -100,10 +100,6 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
     return true;
   }
 
-  @Override public void release(String directory) throws IOException {
-
-  }
-
   @Override
   public boolean isAbsolute(String path) {
     // back compat

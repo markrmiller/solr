@@ -152,12 +152,17 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
 
   @Override
   public void remove(Directory dir) throws IOException {
-    String fullPath = byDirCache.get(dir);
+    String fullPath = byDirCache.remove(dir);
     IOUtils.closeQuietly(dir);
     byPathCache.remove(fullPath);
     if (fullPath != null) {
       remove(fullPath);
     }
+  }
+
+  @Override public void release(String fullPath) throws IOException {
+    Directory dir = byPathCache.remove(fullPath);
+    byDirCache.remove(dir);
   }
 
 
