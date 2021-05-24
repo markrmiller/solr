@@ -41,13 +41,13 @@ configurations {
   server
   docs
   docker
- // solrTgz
+  solrTgz
   solrZip
 }
 
 artifacts {
-//  solrTgz(distTar)
- // solrZip(distZip)
+  solrTgz(distTar)
+  solrZip(distZip)
 }
 
 dependencies {

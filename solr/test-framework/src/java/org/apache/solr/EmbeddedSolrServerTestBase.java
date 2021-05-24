@@ -33,7 +33,6 @@ import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
-import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;

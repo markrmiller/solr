@@ -52,7 +52,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -61,15 +64,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Threads(6)
-@Warmup(iterations = 8)
+@Warmup(iterations = 4)
 @Measurement(iterations = 5)
-@Fork(value = 1, jvmArgs = {"-Xmx4g", "-Dorg.apache.xml.dtm.DTMManager=org.apache.xml.dtm.ref.DTMManager", "-Dlog4j2.is.webapp=false", "-Dlog4j2.garbagefreeThreadContextMap=true", "-Dlog4j2.enableDirectEncoders=true", "-Dlog4j2.enable.threadlocals=true",
-    "-Dzookeeper.jmx.log4j.disable=true", "-Dlog4j2.disable.jmx=true", "-XX:ConcGCThreads=2",
-     "-XX:ParallelGCThreads=3", "-XX:+UseG1GC", "-Djetty.insecurerandom=1", "-Djava.security.egd=file:/dev/./urandom", "-XX:-UseBiasedLocking",
-    "-XX:+UseG1GC", "-XX:+PerfDisableSharedMem", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=250", "-Dsolr.enableMetrics=false", "-Dsolr.perThreadPoolSize=6", "-Dsolr.maxHttp2ClientThreads=64", "-Dsolr.jettyRunnerThreadPoolMaxSize=200",
-    "-Dsolr.enablePublicKeyHandler=false", "-Dzookeeper.nio.numSelectorThreads=6", "-Dzookeeper.nio.numWorkerThreads=6", "-Dzookeeper.commitProcessor.numWorkerThreads=4", "-Dzookeeper.nio.shutdownTimeout=1000",
-    "-Dsolr.rootSharedThreadPoolCoreSize=120", "-Dlucene.cms.override_spins=false", "-Dsolr.enablePublicKeyHandler=false", "-Dsolr.tests.ramBufferSizeMB=100",
-    "-Dlog4j.configurationFile=logconf/log4j2-std.xml", "-Dsolr.asyncDispatchFilter=true", "-Dsolr.asyncIO=true", "-Djava.util.concurrent.ForkJoinPool.common.threadFactory=org.apache.commons.SolrForkJoinThreadFactory"
+@Fork(value = 1, jvmArgsPrepend = {"-Dlog4j.configurationFile=logconf/log4j2-std.xml"
   //  "-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=jfr_results/,dumponexit=true,settings=profile,path-to-gc-roots=true"})
     })
 @Timeout(time = 60)
@@ -97,6 +94,7 @@ public class PointsVsTrieIndex {
 
     static AtomicInteger id = new AtomicInteger();
 
+
     private static class RequestAsyncListener implements AsyncListener<NamedList<Object>> {
       @Override public void onSuccess(NamedList<Object> objectNamedList, int code, Object context) {
 
@@ -108,10 +106,27 @@ public class PointsVsTrieIndex {
     }
 
     @Setup(Level.Iteration)
-    public void doSetup() throws Exception {
+    public void setupCluster() throws Exception {
       Path currentRelativePath = Paths.get("");
       String s = currentRelativePath.toAbsolutePath().toString();
-      System.out.println("Current relative path is: " + s);
+      //System.out.println("Current relative path is: " + s);
+
+
+      System.setProperty("solr.tests.ramBufferSizeMB","100");
+
+
+      System.setProperty("solr.enableMetrics","false");
+      System.setProperty("solr.perThreadPoolSize","6");
+      System.setProperty("solr.maxHttp2ClientThreads","64");
+      System.setProperty("solr.jettyRunnerThreadPoolMaxSize","200");
+      System.setProperty("solr.enablePublicKeyHandler","false");
+      System.setProperty("zookeeper.nio.numSelectorThreads","6");
+      System.setProperty("zookeeper.commitProcessor.numWorkerThreads","4");
+      System.setProperty("zookeeper.nio.shutdownTimeout","1000");
+      System.setProperty("solr.rootSharedThreadPoolCoreSize","120");
+      System.setProperty("lucene.cms.override_spins","false");
+      System.setProperty("solr.asyncDispatchFilter","true");
+      System.setProperty("solr.asyncIO","true");
 
       System.setProperty("solr.tests.numeric.stored", "true");
       if (docValues.equals("disabled")) {
@@ -143,7 +158,7 @@ public class PointsVsTrieIndex {
       }
 
       cluster = new SolrCloudTestCase.Builder(nodeCount, SolrTestUtil.createTempDir()).
-          addConfig("conf", Paths.get("solr/test-framework/src/resources/configs/number-fields/conf")).formatZk(true).configure();
+          addConfig("conf", Paths.get("src/resources/configs/number-fields/conf")).formatZk(true).configure();
       System.out.println("cluster base path=" + cluster.getBaseDir());
       client = cluster.getSolrClient().getHttpClient();
       nodes = new ArrayList<>(nodeCount);
@@ -161,15 +176,32 @@ public class PointsVsTrieIndex {
     }
 
     @State(Scope.Thread)
-    public static class Doc {
-      public SolrInputDocument doc;
+    public static class Docs {
+      private int numDocs = 5000;
+      public Queue<SolrInputDocument> docs = new LinkedList<>();
+
+      private Iterator<SolrInputDocument> it = docs.iterator();
 
       public int cnt;
 
-      @Setup(Level.Invocation) public void setupDoc() throws Exception {
-        doc = new SolrInputDocument();
-        doc.addField("id", PointsVsTrieIndex.BenchState.id.incrementAndGet());
-        doc.addField("number_i", cnt++);
+      @Setup(Level.Trial)
+      public void setupDoc() throws Exception {
+        docs = new LinkedList<>();
+
+        for (int i = 0; i < numDocs; i++) {
+          SolrInputDocument doc = new SolrInputDocument();
+          doc.addField("id", PointsVsTrieIndex.BenchState.id.incrementAndGet());
+          doc.addField("number_i", cnt++);
+          docs.add(doc);
+        }
+        it = docs.iterator();
+      }
+
+      public SolrInputDocument getDoc() {
+        if (!it.hasNext()) {
+          it = docs.iterator();
+        }
+        return it.next();
       }
     }
 
@@ -182,10 +214,10 @@ public class PointsVsTrieIndex {
 
   @Benchmark
   @Timeout(time = 300)
-  public static void indexSmallDoc(PointsVsTrieIndex.BenchState state, PointsVsTrieIndex.BenchState.Doc docState) throws Exception {
+  public static void indexSmallDoc(PointsVsTrieIndex.BenchState state, PointsVsTrieIndex.BenchState.Docs docState) throws Exception {
     UpdateRequest updateRequest = new UpdateRequest();
     updateRequest.setBasePath(state.nodes.get(state.random.nextInt(state.nodeCount)) + "/" + state.collectionName);
-    SolrInputDocument doc = docState.doc;
+    SolrInputDocument doc = docState.getDoc();
 
     updateRequest.add(doc);
 

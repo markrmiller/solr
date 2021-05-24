@@ -25,7 +25,6 @@ import java.util.SimpleTimeZone;
 import java.util.TimeZone;
 
 import com.carrotsearch.randomizedtesting.RandomizedContext;
-import com.carrotsearch.randomizedtesting.generators.RandomPicks;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.PostingsFormat;
@@ -34,7 +33,6 @@ import org.apache.lucene.codecs.asserting.AssertingDocValuesFormat;
 import org.apache.lucene.codecs.asserting.AssertingPostingsFormat;
 import org.apache.lucene.codecs.cheapbastard.CheapBastardCodec;
 import org.apache.lucene.codecs.compressing.CompressingCodec;
-import org.apache.lucene.codecs.lucene90.Lucene90StoredFieldsFormat;
 import org.apache.lucene.codecs.mockrandom.MockRandomPostingsFormat;
 import org.apache.lucene.codecs.simpletext.SimpleTextCodec;
 import org.apache.lucene.index.RandomCodec;

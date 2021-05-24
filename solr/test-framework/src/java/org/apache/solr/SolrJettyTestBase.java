@@ -27,7 +27,6 @@ import java.util.SortedMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
