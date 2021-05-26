@@ -72,11 +72,11 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
     return buffer;
   }
 
-  @Override
-  public long position() throws IOException {
-   // return readBytes + pos;
-    return super.position();
-  }
+//  @Override
+//  public long position() throws IOException {
+//    return readBytes + pos;
+//   // return super.position();
+//  }
 
   /** Current position within the internal buffer */
   public int getPositionInBuffer() {
@@ -202,10 +202,5 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
   @Override
   public String readUTF() throws IOException {
     return new DataInputStream(this).readUTF();
-  }
-
-  @Override
-  public boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len) {
-    return false;
   }
 }

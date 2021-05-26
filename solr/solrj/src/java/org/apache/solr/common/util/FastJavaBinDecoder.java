@@ -28,6 +28,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.util.DataEntry.EntryListener;
@@ -116,12 +118,12 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
       return t;
     }
 
-    public static ByteBuffer readByteBuffer(DataInputInputStream dis, int sz) throws IOException {
-      ByteBuffer result = DataInputInputStream.readDirectByteBuffer(sz);
-      if(result != null) return result;
-      byte[] arr = new byte[readVInt(dis)];
-      dis.readFully(arr);
-      return ByteBuffer.wrap(arr);
+    public static UnsafeBuffer readByteBuffer(DataInputInputStream dis, int sz) throws IOException {
+      MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(-1, false);
+      sz=readVInt(dis);
+      dis.readFully(brr.byteArray(), 0, sz);
+      UnsafeBuffer buffer = new UnsafeBuffer(brr);
+      return buffer;
     }
 
     public CharSequence readObjKey(Tag ktag) throws IOException {
@@ -503,8 +505,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) throws IOException {
-        ByteBuffer buf = StreamCodec.readByteBuffer(codec.dis, entry.size);
-        entry.size = buf.limit() - buf.position();
+        UnsafeBuffer buf = StreamCodec.readByteBuffer(codec.dis, entry.size);
+        entry.size = buf.byteBuffer().limit() - buf.byteBuffer().position();
         return buf;
       }
 

@@ -77,7 +77,7 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
 
     try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), true)) {
       Map<String, Object> map = parser.next();
-      assertEquals("2", map.get("id"));
+      assertEquals(map.toString(), "2", map.get("id"));
       map = parser.next();
       assertEquals("3", map.get("id"));
       //System.out.println();
@@ -159,7 +159,8 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     m = parser.next();
     assertEquals(Boolean.TRUE, m.get("EOF"));
 
-    bytes.reset();
+    bytes.position(0);
+    bytes.limit(bytes.capacity());
     parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), false);
     m = parser.next();
     assertEquals(1, m.get("id"));
@@ -177,8 +178,11 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
   public void testSolrDocumentList() throws IOException {
     SolrQueryResponse response = new SolrQueryResponse();
     SolrDocumentList l = constructSolrDocList(response);
-    try (JavaBinCodec jbc = new JavaBinCodec(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      jbc.marshal(response.getValues(), baos);
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    try (JavaBinCodec jbc = new JavaBinCodec()) {
+      jbc.marshal(response.getValues(), os);
     }
     ByteBuffer bytes = serialize(response.getValues());
     try (JavaBinCodec jbc = new JavaBinCodec()) {
@@ -186,6 +190,8 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     }
     List list = new ArrayList<>();
     Map m = null;
+    bytes.position(0);
+    bytes.limit(bytes.capacity());
     try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), false)) {
       while ((m = parser.next()) != null) {
         list.add(m);
@@ -206,9 +212,7 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     try (JavaBinCodec jbc = new JavaBinCodec()) {
       jbc.marshal(response.getValues(), os);
     }
-    ByteBuffer buffer = expandableBuffer1.byteBuffer().asReadOnlyBuffer();
-    buffer.position(0);
-    buffer.limit(os.position() + expandableBuffer1.wrapAdjustment());
+    ByteBuffer buffer = ByteBuffer.wrap(expandableBuffer1.byteArray(), 0, os.position() + expandableBuffer1.wrapAdjustment());
     return buffer;
   }
 }

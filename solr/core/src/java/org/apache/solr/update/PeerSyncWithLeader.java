@@ -82,7 +82,7 @@ public class PeerSyncWithLeader implements SolrMetricProducer {
 
     this.clientToLeader = new Http2SolrClient.Builder(leaderUrl).withHttpClient(core
         .getCoreContainer().getUpdateShardHandler().
-        getLeaderCheckClient()).markInternalRequest().build();
+        getRecoveryOnlyClient()).markInternalRequest().build();
 
     this.updater = new PeerSync.Updater(msg(), core);
 

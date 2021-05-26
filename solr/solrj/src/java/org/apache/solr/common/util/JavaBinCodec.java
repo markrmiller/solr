@@ -205,8 +205,8 @@ public class JavaBinCodec implements PushWriter {
     assert !alreadyUnmarshalled;
    // FastInputStream dis = new FastInputStream(is);
     if (!(is instanceof FastInputStream)) {
-      is = new SolrInputStream(is);
-      return _init((SolrInputStream) is);
+      is = new FastInputStream(is);
+      return _init((FastInputStream) is);
     }
     return _init((FastInputStream) is);
   }

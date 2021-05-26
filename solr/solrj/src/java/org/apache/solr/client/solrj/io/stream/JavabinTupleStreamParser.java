@@ -100,7 +100,7 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
     int sz = readSize(dis);
     Map m = new LinkedHashMap<>();
     for (int i = 0; i < sz; i++) {
-      String name = (String) readVal(dis);
+      Object name = readVal(dis);
       Object val = readVal(dis);
       m.put(name, val);
     }

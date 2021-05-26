@@ -58,8 +58,6 @@ public class UpdateShardHandler implements SolrInfoBean {
 
   private final Http2SolrClient recoveryOnlyClient;
 
-  private final Http2SolrClient leaderCheckClient;
-
   private ExecutorService recoveryExecutor;
 
  // private final InstrumentedHttpRequestExecutor httpRequestExecutor;
@@ -122,12 +120,6 @@ public class UpdateShardHandler implements SolrInfoBean {
 
     recoveryOnlyClient = recoveryOnlyClientBuilder.name("Recover").markInternalRequest().maxOutstandingAsyncRequests(Integer.getInteger("solr.maxRecoveryHttpRequestsOut", 30)).build();
     recoveryOnlyClient.enableCloseLock();
-
-    Http2SolrClient.Builder leaderCheckClientBuilder = new Http2SolrClient.Builder();
-    leaderCheckClientBuilder = leaderCheckClientBuilder.connectionTimeout(5000).idleTimeout(8000);
-
-    leaderCheckClient = leaderCheckClientBuilder.name("LeaderCheck").markInternalRequest().build();
-    leaderCheckClient.enableCloseLock();
 
     Http2SolrClient.Builder searchOnlyClientBuilder = new Http2SolrClient.Builder();
     searchOnlyClientBuilder.connectionTimeout(5000).maxOutstandingAsyncRequests(-1).idleTimeout(60000);
@@ -216,10 +208,6 @@ public class UpdateShardHandler implements SolrInfoBean {
     return recoveryOnlyClient;
   }
 
-  public Http2SolrClient getLeaderCheckClient() {
-    return leaderCheckClient;
-  }
-
 
   public Http2SolrClient getSearchOnlyClient() {
     return searchOnlyClient;
@@ -238,7 +226,6 @@ public class UpdateShardHandler implements SolrInfoBean {
     if (sharedHttpClient != null) sharedHttpClient.disableCloseLock();
     if (recoveryOnlyClient != null) recoveryOnlyClient.disableCloseLock();
     if (solrCmdDistributorClient != null) solrCmdDistributorClient.disableCloseLock();
-    if (leaderCheckClient != null) leaderCheckClient.disableCloseLock();
     if (searchOnlyClient != null) searchOnlyClient.disableCloseLock();
 
 
@@ -247,7 +234,6 @@ public class UpdateShardHandler implements SolrInfoBean {
       closer.collect(searchOnlyClient);
       closer.collect(sharedHttpClient);
       closer.collect(solrCmdDistributorClient);
-      closer.collect(leaderCheckClient);
     }
     try {
       SolrInfoBean.super.close();
@@ -273,6 +259,5 @@ public class UpdateShardHandler implements SolrInfoBean {
     builder.setup(solrCmdDistributorClient);
     builder.setup(recoveryOnlyClient);
     builder.setup(searchOnlyClient);
-    builder.setup(leaderCheckClient);
   }
 }

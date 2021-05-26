@@ -174,8 +174,10 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 3);
       log.info("wait for active collection before query");
       cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 10, TimeUnit.SECONDS, false, 1, 3, true, true);
-      Thread.sleep(500);
-      cluster.getSolrClient().commit(COLLECTION);
+      Thread.sleep(1000);
+      try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
+        client.commit(COLLECTION, true, true);
+      }
 
       // can be stale (eventually consistent) but should catch up
       for (int i = 0; i < 30; i ++) {
@@ -202,7 +204,6 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
 
       new UpdateRequest().add("id", "1", "num", "30")
           .commit(client1, COLLECTION);
-
 
       for (int i = 0; i < 30; i ++) {
         try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node1.getBaseUrl())) {

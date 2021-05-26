@@ -47,8 +47,8 @@ public class SolrQTP extends QueuedThreadPool {
   }
 
   public static BlockingQueue<Runnable> getSolrQueue() {
-    return new LinkedTransferQueue<>();
-    //return new BlockingArrayQueue<>();
+    //return new LinkedTransferQueue<>();
+    return new BlockingArrayQueue<>(128, BlockingArrayQueue.DEFAULT_GROWTH);
   }
 
   public static class JettyThread extends Thread {

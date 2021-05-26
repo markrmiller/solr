@@ -944,9 +944,9 @@ public class Http2SolrClient extends SolrClient {
           HttpFields.Mutable fields = HttpFields.build();
           fields.add(HttpHeader.CONTENT_TYPE, contentType);
           Long sz = contentStream.getSize();
-//          if (sz != null) {
-//            fields.add(HttpHeader.CONTENT_LENGTH, sz.toString());
-//          }
+          if (sz != null) {
+            fields.add(HttpHeader.CONTENT_LENGTH, sz.toString());
+          }
           content.addFilePart(name, contentStream.getName(), new InputStreamRequestContent(contentType, contentStream.getStream()), fields);
         }
       }

@@ -758,7 +758,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       } else {
         leaderReplica = slice.getLeader(req.getCore().getCoreContainer().getZkController().getZkStateReader().getLiveNodes());
         if (leaderReplica == null) {
-          leaderReplica = zkController.getZkStateReader().getLeaderRetry(req.getCore().getCoreContainer().getUpdateShardHandler().getLeaderCheckClient(),
+          leaderReplica = zkController.getZkStateReader().getLeaderRetry(req.getCore().getCoreContainer().getUpdateShardHandler().getTheSharedHttpClient(),
               collection, shardId, 2000, false);
         }
         if (leaderReplica != null) {

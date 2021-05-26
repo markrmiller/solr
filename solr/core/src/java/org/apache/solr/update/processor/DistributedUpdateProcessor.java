@@ -491,8 +491,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
                 SkyHook.register(cmd.getPrintableId(), "dropping update, inplace update with too low a version");
               }
               return null;
-            } else {
-              assert fetchedFromLeader instanceof AddUpdateCommand;
+            } else if (fetchedFromLeader instanceof AddUpdateCommand) {
               // Newer document was fetched from the leader. Apply that document instead of this current in-place
               // update.
               if (log.isInfoEnabled()) {
@@ -638,7 +637,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
   private long waitForDependentUpdates(AddUpdateCommand cmd, long versionOnUpdate,
                                boolean isReplayOrPeersync, VersionBucket bucket) throws IOException {
     long lastFoundVersion = 0;
-    int wait = Integer.getInteger("solr.dependentupdate.timeout", 2000);
+    int wait = Integer.getInteger("solr.dependentupdate.timeout", 5000);
     TimeOut waitTimeout = new TimeOut(wait, TimeUnit.MILLISECONDS, TimeSource.NANO_TIME);
 
     vinfo.lockForUpdate();
@@ -711,7 +710,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     while (Math.abs(lastFoundVersion) < cmd.prevVersion && !waitTimeout.hasTimedOut()) {
       long timeLeftInNanos = waitTimeout.timeLeft(TimeUnit.NANOSECONDS);
       if (timeLeftInNanos > 0) { // 0 means: wait forever until notified, but we don't want that.
-        bucket.awaitNanos(timeLeftInNanos);
+        bucket.awaitNanos(TimeUnit.NANOSECONDS.convert(250, TimeUnit.MILLISECONDS));
       }
       lookedUpVersion = vinfo.lookupVersion(cmd.getIndexedId());
       lastFoundVersion = lookedUpVersion == null ? 0L : lookedUpVersion;
@@ -743,7 +742,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     NamedList<Object> rsp;
     try {
       ur.setBasePath(leaderUrl);
-      rsp = updateShardHandler.getLeaderCheckClient().request(ur);
+      rsp = updateShardHandler.getTheSharedHttpClient().request(ur);
     } catch (SolrServerException e) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "Error during fetching [" + id +
           "] from leader (" + leaderUrl + "): ", e);
@@ -753,12 +752,13 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     SolrInputDocument leaderDoc = (SolrInputDocument) inputDocObj;
 
     if (leaderDoc == null) {
+      return null;
       // this doc was not found (deleted) on the leader. Lets delete it here as well.
-      DeleteUpdateCommand del = new DeleteUpdateCommand(inplaceAdd.getReq());
-      del.setIndexedId(inplaceAdd.getIndexedId());
-      del.setId(inplaceAdd.getIndexedId().utf8ToString());
-      del.setVersion((version == null || version == 0)? -versionOnUpdate: version);
-      return del;
+//      DeleteUpdateCommand del = new DeleteUpdateCommand(inplaceAdd.getReq());
+//      del.setIndexedId(inplaceAdd.getIndexedId());
+//      del.setId(inplaceAdd.getIndexedId().utf8ToString());
+//      del.setVersion((version == null || version == 0)? -versionOnUpdate: version);
+//      return del;
     }
 
     AddUpdateCommand cmd = new AddUpdateCommand(req);

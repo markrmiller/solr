@@ -16,12 +16,16 @@
  */
 package org.apache.solr;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.GroupParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.util.ExpandableBuffers;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.index.LogDocMergePolicyFactory;
 import org.apache.solr.request.SolrQueryRequest;
@@ -284,7 +288,8 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
         req("q", "*:*","group", "true", "group.field", "nullfirst", "group.main", "true", "wt", "javabin", "start", "4", "rows", "10");
 
     SolrQueryResponse response = new SolrQueryResponse();
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer();
+    ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     try {
       SolrRequestInfo.setRequestInfo(new SolrRequestInfo(request, response));
       String handlerName = request.getParams().get(CommonParams.QT);
@@ -297,8 +302,7 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
     }
 
     assertEquals(6, ((ResultContext) response.getResponse()).getDocList().matches());
-    new BinaryResponseParser().processResponse(new ByteArrayInputStream(out.toByteArray()), "");
-    out.close();
+    new BinaryResponseParser().processResponse(new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()), "");
   }
 
   @Test

@@ -367,9 +367,9 @@ public class JettySolrRunner implements Closeable {
 
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, null, scheduler, null, 1, 1, httpFactory, h2);
+        connector = new ServerConnector(server, null, scheduler, null, 1, 1, h2);
       } else {
-        connector = new ServerConnector(server, null, scheduler, null, 1, 1, ssl, alpn, httpFactory, h2);
+        connector = new ServerConnector(server, null, scheduler, null, 1, 1, ssl, alpn, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());
       }
 

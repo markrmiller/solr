@@ -167,10 +167,13 @@ public class TestFieldCacheSort extends SolrTestCase {
     doc.add(SolrTestUtil.newStringField("value", "foo", Field.Store.YES));
     writer.addDocument(doc);
     Type type = sortType == SortField.Type.STRING ? Type.SORTED : Type.BINARY;
-    IndexReader ir = UninvertingReader.wrap(writer.getReader(), 
-                     Collections.singletonMap("value", type));
-    writer.close();
-    
+
+    writer.commit();
+
+
+    IndexReader ir = UninvertingReader.wrap(writer.getReader(),
+        Collections.singletonMap("value", type));
+
     IndexSearcher searcher = SolrTestUtil.newSearcher(ir);
     Sort sort = new Sort(new SortField("value", sortType, true));
 
@@ -181,6 +184,8 @@ public class TestFieldCacheSort extends SolrTestCase {
     assertEquals("bar", searcher.doc(td.scoreDocs[1].doc).get("value"));
     TestUtil.checkReader(ir);
     ir.close();
+
+    writer.close();
     dir.close();
   }
   

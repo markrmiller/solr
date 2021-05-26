@@ -31,10 +31,6 @@ public class SolrInputStream extends DataInputStream implements DataInputInputSt
     super(in);
   }
 
-  @Override
-  public boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len) {
-    return false;
-  }
 
   public static SolrInputStream wrap(InputStream in) {
     return (in instanceof SolrInputStream) ? (SolrInputStream)in : new SolrInputStream(in);
