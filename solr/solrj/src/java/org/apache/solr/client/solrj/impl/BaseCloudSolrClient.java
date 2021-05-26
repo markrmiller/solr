@@ -909,12 +909,14 @@ public abstract class BaseCloudSolrClient extends SolrClient {
           Map invalidStates = (Map) o;
           for (Object invalidEntries : invalidStates.entrySet()) {
             Map.Entry e = (Map.Entry) invalidEntries;
+         //   if (e.getValue() instanceof String) {
+              String[] versionAndUpdatesHash = ((String) e.getValue()).split(">");
+              int version = Integer.parseInt(versionAndUpdatesHash[0]);
+              int updateHash = Integer.parseInt(versionAndUpdatesHash[1]);
+              log.info("got invalid states", versionAndUpdatesHash);
+              getDocCollection((String) e.getKey(), version, updateHash);
+         //   }
 
-            String[] versionAndUpdatesHash = ((String) e.getValue()).split(">");
-            int version = Integer.parseInt(versionAndUpdatesHash[0]);
-            int updateHash = Integer.parseInt(versionAndUpdatesHash[1]);
-            log.info("got invalid states", versionAndUpdatesHash);
-            getDocCollection((String) e.getKey(), version, updateHash);
           }
         }
       } catch (Exception exc) {

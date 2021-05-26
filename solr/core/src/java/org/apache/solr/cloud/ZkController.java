@@ -1124,7 +1124,7 @@ public class ZkController implements Closeable, Runnable {
           if (coll != null) {
             slice = coll.getSlice(shardId);
           }
-          if ((slice != null && slice.getState() != Slice.State.CONSTRUCTION)) {
+          if ((slice == null || slice.getState() != Slice.State.CONSTRUCTION)) {
             Future<UpdateLog.RecoveryInfo> recoveryFuture = core.getUpdateHandler().getUpdateLog().recoverFromLog();
             if (recoveryFuture != null) {
               // MRM TODO: if we publish active early (like we will) log replay will not be done

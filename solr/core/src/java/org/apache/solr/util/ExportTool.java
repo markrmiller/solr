@@ -371,7 +371,7 @@ public class ExportTool extends SolrCLI.ToolBase {
       public void accept(String s, Object o) {
         try {
           if (s.equals("_version_") || s.equals("_root_")) return;
-          codec.get().writeExternString(s);
+          codec.get().writeStr(s, false);
           codec.get().writeVal(o);
         } catch (IOException e) {
           throw new RuntimeException(e);

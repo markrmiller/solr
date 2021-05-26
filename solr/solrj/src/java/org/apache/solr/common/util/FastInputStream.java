@@ -43,13 +43,13 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   public FastInputStream(InputStream in, int start) {
     super(in);
-    if (start != 0) {
-      try {
-        position(start);
-      } catch (IOException e) {
-        throw new RuntimeIOException(e);
-      }
-    }
+//    if (start != 0) {
+//      try {
+//        position(start);
+//      } catch (IOException e) {
+//        throw new RuntimeIOException(e);
+//      }
+//    }
     //   flush();
   }
 
@@ -64,7 +64,7 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   public int peek() throws IOException {
     if (noMoreCharacters()) return -1;
-    return buffer[pos] & 0xff;
+    return buffer[pos];
   }
 
   /** Returns the internal buffer used for caching */
@@ -112,7 +112,7 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
   @Override
   public void readFully(byte b[], int off, int len) throws IOException {
     while (len>0) {
-      int ret = read(b, off, len);
+      int ret = super.read(b, off, len);
       if (ret==-1) {
         throw new EOFException();
       }

@@ -242,18 +242,20 @@ public class EmbeddedSolrServer extends SolrClient {
 
       // Check if this should stream results
       if (request.getStreamingResponseCallback() != null) {
+
+        final StreamingResponseCallback callback = request.getStreamingResponseCallback();
+        BinaryResponseWriter.Resolver resolver = new MyResolver(req, rsp);
+
+        MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+        ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
         try {
-          final StreamingResponseCallback callback = request.getStreamingResponseCallback();
-          BinaryResponseWriter.Resolver resolver = new MyResolver(req, rsp);
+          createJavaBinCodec(callback, resolver).setWritableDocFields(resolver).marshal(rsp.getValues(), os);
 
-
-          try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            createJavaBinCodec(callback, resolver).setWritableDocFields(resolver).marshal(rsp.getValues(), out);
-
-            try (InputStream in = out.toInputStream()) {
-              return (NamedList<Object>) new JavaBinCodec(resolver).unmarshal(in);
-            }
+          try (InputStream in = new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, os.position() + expandableBuffer1.wrapAdjustment())) {
+            return (NamedList<Object>) new JavaBinCodec(resolver).unmarshal(in);
           }
+
         } catch (Throwable ex) {
           if (ex instanceof Error) {
             throw (Error) ex;

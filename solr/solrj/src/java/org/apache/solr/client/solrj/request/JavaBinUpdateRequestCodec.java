@@ -119,8 +119,8 @@ public class JavaBinUpdateRequestCodec {
    */
   public UpdateRequest unmarshal(InputStream is, final StreamingUpdateHandler handler) throws IOException {
     final UpdateRequest updateRequest = new UpdateRequest();
-    List<List<NamedList>> doclist;
-    List<Entry<SolrInputDocument,Map<Object,Object>>>  docMap;
+  //  List<List<NamedList>> doclist;
+  //  List<Entry<SolrInputDocument,Map<Object,Object>>>  docMap;
     List<String> delById;
     Map<String,Map<String,Object>> delByIdMap;
     List<String> delByQ;
@@ -140,14 +140,14 @@ public class JavaBinUpdateRequestCodec {
     delById = (List<String>) namedList[0].get("delById");
     delByIdMap = (Map<String,Map<String,Object>>) namedList[0].get("delByIdMap");
     delByQ = (List<String>) namedList[0].get("delByQ");
-    doclist = (List) namedList[0].get("docs");
+ //   doclist = (List) namedList[0].get("docs");
     Object docsMapObj = namedList[0].get("docsMap");
-
-    if (docsMapObj instanceof Map) {//SOLR-5762
-      docMap =  new ArrayList(((Map)docsMapObj).entrySet());
-    } else {
-      docMap = (List<Entry<SolrInputDocument, Map<Object, Object>>>) docsMapObj;
-    }
+//
+//    if (docsMapObj instanceof Map) {//SOLR-5762
+//      docMap =  new ArrayList(((Map)docsMapObj).entrySet());
+//    } else {
+//      docMap = (List<Entry<SolrInputDocument, Map<Object, Object>>>) docsMapObj;
+//    }
 
 
     // we don't add any docs, because they were already processed
@@ -235,7 +235,7 @@ public class JavaBinUpdateRequestCodec {
         namedList[0] = nl;
       }
       for (int i = 0; i < sz; i++) {
-        String name = (String) readVal(dis);
+        String name = (String) readStr(dis);
         Object val = readVal(dis);
         nl.add(name, val);
       }
@@ -314,6 +314,11 @@ public class JavaBinUpdateRequestCodec {
             handler.update(null, req, null, null);
           } else if (o instanceof Map.Entry) {
             sdoc = (SolrInputDocument) ((Entry) o).getKey();
+
+            if ( ((Entry) o).getValue() instanceof String) {
+              throw new IllegalStateException(((Entry) o).getValue().toString());
+            }
+
             Map p = (Map) ((Entry) o).getValue();
             if (p != null) {
               commitWithin = (Integer) p.get(UpdateRequest.COMMIT_WITHIN);

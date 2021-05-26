@@ -117,14 +117,14 @@ public class HdfsTransactionLog extends TransactionLog {
     //      fos.setWritten((int) start);    // reflect that we aren't starting at the beginning
           //assert fos.size() == channel.size();
         } else {
-          addGlobalStrings(globalStrings);
+          //addGlobalStrings(globalStrings);
         }
       } else {
         if (start > 0) {
           log.error("New transaction log already exists:{} size={}", tlogFile, tlogOutStream.size());
         }
 
-        addGlobalStrings(globalStrings);
+        //addGlobalStrings(globalStrings);
       }
 
       success = true;
@@ -187,13 +187,13 @@ public class HdfsTransactionLog extends TransactionLog {
     }
     // needed to read other records
 
-    synchronized (this) {
-      globalStringList = (List<String>)header.get("strings");
-      globalStringMap = new Object2IntOpenHashMap(globalStringList.size());
-      for (int i=0; i<globalStringList.size(); i++) {
-        globalStringMap.put( globalStringList.get(i), i+1);
-      }
-    }
+//    synchronized (this) {
+//      globalStringList = (List<String>)header.get("strings");
+//      globalStringMap = new Object2IntOpenHashMap(globalStringList.size());
+//      for (int i=0; i<globalStringList.size(); i++) {
+//        globalStringMap.put( globalStringList.get(i), i+1);
+//      }
+//    }
   }
 
   @Override

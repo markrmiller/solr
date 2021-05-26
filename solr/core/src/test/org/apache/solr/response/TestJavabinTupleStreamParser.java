@@ -21,11 +21,14 @@ package org.apache.solr.response;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.io.Tuple;
@@ -38,9 +41,11 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExplanation;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.Utils;
+import org.apache.zookeeper.server.ByteBufferInputStream;
 
 import static org.apache.solr.response.SmileWriterTest.constructSolrDocList;
 
@@ -68,9 +73,9 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
         "        \"a_f\":3.0}]}}";
     SimpleOrderedMap nl = convert2OrderedMap((Map) Utils.fromJSONString(payload));
 
-    byte[] bytes = serialize(nl);
+    ByteBuffer bytes = serialize(nl);
 
-    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), true)) {
+    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), true)) {
       Map<String, Object> map = parser.next();
       assertEquals("2", map.get("id"));
       map = parser.next();
@@ -140,8 +145,8 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
       }
     };
 
-    byte[] bytes = serialize(tupleStream);
-    JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), true);
+    ByteBuffer bytes = serialize(tupleStream);
+    JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), true);
     Map m = parser.next();
     assertEquals(1L, m.get("id"));
     assertEquals(1.0, (Double) m.get("f"), 0.01);
@@ -154,7 +159,8 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     m = parser.next();
     assertEquals(Boolean.TRUE, m.get("EOF"));
 
-    parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), false);
+    bytes.reset();
+    parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), false);
     m = parser.next();
     assertEquals(1, m.get("id"));
     assertEquals(1.0, (Float) m.get("f"), 0.01);
@@ -174,13 +180,13 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     try (JavaBinCodec jbc = new JavaBinCodec(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
       jbc.marshal(response.getValues(), baos);
     }
-    byte[] bytes = serialize(response.getValues());
+    ByteBuffer bytes = serialize(response.getValues());
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.unmarshal(new ByteArrayInputStream(bytes));
+      jbc.unmarshal(new ByteBufferInputStream(bytes));
     }
     List list = new ArrayList<>();
     Map m = null;
-    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), false)) {
+    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), false)) {
       while ((m = parser.next()) != null) {
         list.add(m);
       }
@@ -191,13 +197,18 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     }
 
   }
-  public static byte[] serialize(Object o) throws IOException {
+  public static ByteBuffer serialize(Object o) throws IOException {
     SolrQueryResponse response = new SolrQueryResponse();
     response.getValues().add("results", o);
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.marshal(response.getValues(), baos);
+      jbc.marshal(response.getValues(), os);
     }
-    return baos.toByteArray();
+    ByteBuffer buffer = expandableBuffer1.byteBuffer().asReadOnlyBuffer();
+    buffer.position(0);
+    buffer.limit(os.position() + expandableBuffer1.wrapAdjustment());
+    return buffer;
   }
 }

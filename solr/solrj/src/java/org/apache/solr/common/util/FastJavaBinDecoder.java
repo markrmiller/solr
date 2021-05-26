@@ -127,7 +127,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     public CharSequence readObjKey(Tag ktag) throws IOException {
       CharSequence key = null;
       if (ktag.type == DataEntry.Type.STR) {
-        if (ktag == _EXTERN_STRING) key = readExternString(dis);
+        if (ktag == _EXTERN_STRING) key = readStr(dis);
         else key = readStr(dis);
       } else if (ktag.type == DataEntry.Type.NULL) {
         //no need to do anything
@@ -680,7 +680,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     _EXTERN_STRING(EXTERN_STRING, UPPER_3_BITS, DataEntry.Type.STR) {
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) throws IOException {
-        return codec.readExternString(codec.dis);
+        return codec.readStr(codec.dis);
       }
     };
 

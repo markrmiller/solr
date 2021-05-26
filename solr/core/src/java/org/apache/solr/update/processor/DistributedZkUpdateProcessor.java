@@ -238,9 +238,9 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       params.set(COMMIT_END_POINT, "terminal");
       params.set(DISTRIB_FROM, Replica.getCoreUrl(zkController.getBaseUrl(), req.getCore().getName()));
       if (log.isDebugEnabled()) log.debug("processCommit - send commit to replicas nodes={} params={}", useNodes, params);
-      future = CompletableFuture.runAsync(() -> {
-        cmdDistrib.distribCommit(cmd, useNodes, new ModifiableSolrParams(params));
-      }, ParWork.getRootSharedIOExecutor());
+        future = CompletableFuture.runAsync(() -> {
+          cmdDistrib.distribCommit(cmd, useNodes, new ModifiableSolrParams(params));
+        }, ParWork.getRootSharedIOExecutor());
 
     }
 
@@ -971,7 +971,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     }
     for (Replica replica : replicas) {
       if (zkController.zkStateReader.isNodeLive(replica.getNodeName()) &&
-          (replica.getState() == Replica.State.ACTIVE || replica.getState() == Replica.State.BUFFERING)) {
+          (replica.getState() == Replica.State.ACTIVE)) {
         nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
       }
     }

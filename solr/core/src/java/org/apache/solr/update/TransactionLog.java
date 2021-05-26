@@ -90,8 +90,8 @@ public class TransactionLog implements Closeable {
   AtomicInteger refcount = new AtomicInteger(1);
 
 
-  Object2IntMap globalStringMap = new Object2IntOpenHashMap();
-  List<String> globalStringList = new ArrayList<>();
+//  Object2IntMap globalStringMap = new Object2IntOpenHashMap();
+//  List<String> globalStringList = new ArrayList<>();
 
   // write a BytesRef as a byte array
   static final JavaBinCodec.ObjectResolver resolver = (o, codec) -> {
@@ -111,35 +111,35 @@ public class TransactionLog implements Closeable {
       super(resolver);
     }
 
-    @Override
-    public void writeExternString(CharSequence s) throws IOException {
-      if (s == null) {
-        writeTag(NULL);
-        return;
-      }
+//    @Override
+//    public void writeExternString(CharSequence s) throws IOException {
+//      if (s == null) {
+//        writeTag(NULL);
+//        return;
+//      }
+//
+//      // no need to synchronize globalStringMap - it's only updated before the first record is written to the log
+//    //  Integer idx = globalStringMap.getInt(s.toString());
+//    //  if (idx == null) {
+//        // write a normal string
+//        writeStr(s, false);
+//    //  } else {
+//        // write the extern string
+//   //     writeTag(EXTERN_STRING, idx);
+//   //   }
+//    }
 
-      // no need to synchronize globalStringMap - it's only updated before the first record is written to the log
-    //  Integer idx = globalStringMap.getInt(s.toString());
-    //  if (idx == null) {
-        // write a normal string
-        writeStr(s, false);
-    //  } else {
-        // write the extern string
-   //     writeTag(EXTERN_STRING, idx);
-   //   }
-    }
-
-    @Override
-    public CharSequence readExternString(DataInputInputStream fis) throws IOException {
-      int idx = readVInt(fis);//readSize(fis);
-   //   if (idx != 0) {// idx != 0 is the index of the extern string
-        // no need to synchronize globalStringList - it's only updated before the first record is written to the log
-    //    return globalStringList.get(idx - 1);
-    //  } else {// idx == 0 means it has a string value
-        // this shouldn't happen with this codec subclass.
-        return readStr(fis, null, false);
-   //   }
-    }
+   // @Override
+//    public CharSequence readExternString(DataInputInputStream fis) throws IOException {
+//    //  int idx = readVInt(fis);//readSize(fis);
+//   //   if (idx != 0) {// idx != 0 is the index of the extern string
+//        // no need to synchronize globalStringList - it's only updated before the first record is written to the log
+//    //    return globalStringList.get(idx - 1);
+//    //  } else {// idx == 0 means it has a string value
+//        // this shouldn't happen with this codec subclass.
+//        return readStr(fis, null, false);
+//   //   }
+//    }
 
 
     @Override
@@ -195,7 +195,7 @@ public class TransactionLog implements Closeable {
           fos.setWritten((int) start);    // reflect that we aren't starting at the beginning
           assert fos.size() == channel.size();
         } else {
-          addGlobalStrings(globalStrings);
+          //addGlobalStrings(globalStrings);
         }
       } else {
         if (start > 0) {
@@ -203,7 +203,7 @@ public class TransactionLog implements Closeable {
           return;
         }
 
-        addGlobalStrings(globalStrings);
+       // addGlobalStrings(globalStrings);
       }
 
       success = true;
@@ -239,7 +239,7 @@ public class TransactionLog implements Closeable {
     long size;
     fosLock.lock();
     try {
-      fos.flush();
+      fos.flushBuffer();
       size = fos.size();
     } finally {
       fosLock.unlock();
@@ -249,7 +249,8 @@ public class TransactionLog implements Closeable {
     byte[] buf = new byte[END_MESSAGE.length()];
     long pos = size - END_MESSAGE.length() - 4;
     if (pos < 0) return false;
-    final FastInputStream is = new ChannelFastInputStream(new GetChannelInputStream(channel, (int) pos), pos);
+    channel.position(pos);
+    final FastInputStream is = new ChannelFastInputStream(new GetChannelInputStream(channel), pos);
     is.read(buf);
     for (int i = 0; i < buf.length; i++) {
       if (buf[i] != END_MESSAGE.charAt(i)) return false;
@@ -260,61 +261,62 @@ public class TransactionLog implements Closeable {
   @SuppressWarnings({"unchecked"})
   private void readHeader(FastInputStream fis) throws IOException {
     // read existing header
-    fis = fis != null ? fis : new ChannelFastInputStream(new GetChannelInputStream(channel, 0), 0);
+    fis = fis != null ? fis : new ChannelFastInputStream(new GetChannelInputStream(channel), 0);
 
     @SuppressWarnings("resource") final LogCodec codec = new LogCodec(resolver);
 
    // fis.position(0);
     //fis.flush();
 
-    @SuppressWarnings({"rawtypes"})
-    Map header = (Map) codec.unmarshal(fis);
 
-
-    fis.readInt(); // skip size
 
     // needed to read other records
 
     fosLock.lock();
     try {
-      globalStringList = (List<String>) header.get("strings");
-      globalStringMap = new Object2IntOpenHashMap(globalStringList.size());
-      for (int i = 0; i < globalStringList.size(); i++) {
-        globalStringMap.put(globalStringList.get(i), i + 1);
-      }
-    } finally {
-      fosLock.unlock();
-    }
-  }
+      @SuppressWarnings({"rawtypes"})
+      Map header = (Map) codec.unmarshal(fis);
 
-  protected void addGlobalStrings(Collection<String> strings) {
-    if (strings == null) return;
-    fosLock.lock();
-    try {
-      int origSize = globalStringMap.size();
-      for (String s : strings) {
-        Integer idx = null;
-        if (origSize > 0) {
-          idx = globalStringMap.getInt(s);
-        }
-        if (idx != null) continue;  // already in list
-        globalStringList.add(s);
-        globalStringMap.put(s, globalStringList.size());
-      }
-      assert globalStringMap.size() == globalStringList.size();
-    } finally {
-      fosLock.unlock();
-    }
-  }
 
-  Collection<String> getGlobalStrings() {
-    fosLock.lock();
-    try {
-      return new ArrayList<>(globalStringList);
+      fis.readInt(); // skip size
+//      globalStringList = (List<String>) header.get("strings");
+//      globalStringMap = new Object2IntOpenHashMap(globalStringList.size());
+//      for (int i = 0; i < globalStringList.size(); i++) {
+//        globalStringMap.put(globalStringList.get(i), i + 1);
+//      }
     } finally {
       fosLock.unlock();
     }
   }
+//
+//  protected void addGlobalStrings(Collection<String> strings) {
+//    if (strings == null) return;
+//    fosLock.lock();
+//    try {
+//      int origSize = globalStringMap.size();
+//      for (String s : strings) {
+//        Integer idx = null;
+//        if (origSize > 0) {
+//          idx = globalStringMap.getInt(s);
+//        }
+//        if (idx != null) continue;  // already in list
+//        globalStringList.add(s);
+//        globalStringMap.put(s, globalStringList.size());
+//      }
+//      assert globalStringMap.size() == globalStringList.size();
+//    } finally {
+//      fosLock.unlock();
+//    }
+//  }
+//
+//  Collection<String> getGlobalStrings() {
+//    fosLock.lock();
+//    try {
+//      return new ArrayList<>(globalStringList);
+//    } finally {
+//      fosLock.unlock();
+//    }
+//  }
 
   @SuppressWarnings({"unchecked"})
   protected void writeLogHeader(LogCodec codec) throws IOException {
@@ -324,7 +326,7 @@ public class TransactionLog implements Closeable {
     @SuppressWarnings({"rawtypes"})
     Map header = new LinkedHashMap<String, Object>(2);
     header.put("SOLR_TLOG", 1); // a magic string + version number
-    header.put("strings", globalStringList);
+  //  header.put("strings", globalStringList);
     codec.marshal(header, fos);
 
     endRecord(pos);
@@ -347,7 +349,7 @@ public class TransactionLog implements Closeable {
     try {
       if (fos.size() != 0) return;  // check again while synchronized
       if (optional != null) {
-        addGlobalStrings(optional.getFieldNames());
+        //addGlobalStrings(optional.getFieldNames());
       }
       writeLogHeader(codec);
     } finally {
@@ -416,7 +418,7 @@ public class TransactionLog implements Closeable {
         fosLock.lock();
         try {
 
-
+          fos.flushBuffer();
           long pos = fos.size();   // if we had flushed, this should be equal to channel.position()
 
           lastAddSize = out.position();
@@ -429,15 +431,17 @@ public class TransactionLog implements Closeable {
          throw new RuntimeException("ERROR" + "###writing at " + pos + " fos.size()=" + fos.size() + " raf.length()=" + raf.length());
          }
          */
-          ByteBuffer buffer = out.buffer().byteBuffer().asReadOnlyBuffer();
-          buffer.position(out.offset() + out.buffer().wrapAdjustment());
-          buffer.limit(out.position() + out.buffer().wrapAdjustment());
-          fos.flushBuffer();
-          channel.write(buffer);
-          // fos.flushBuffer();
+       //   ByteBuffer buffer = out.buffer().byteBuffer().asReadOnlyBuffer();
+       //   codec.writeInt((int) (fos.size() - pos));
+          expandableBuffer1.byteBuffer().position(0);
+          expandableBuffer1.byteBuffer().limit(out.position() + out.buffer().wrapAdjustment());
+          channel.write(expandableBuffer1.byteBuffer());
+          fos.writeInt((int) (fos.size() - pos));
+          numRecords.increment();
+         // fos.flushBuffer();
 
 
-          endRecord(pos);
+          //endRecord(pos);
 
           return pos;
         } finally {
@@ -476,13 +480,13 @@ public class TransactionLog implements Closeable {
 
         fos.flushBuffer();
         long pos = fos.size();
-        assert pos != 0;
+        //assert pos != 0;
 
         channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
          // if we had flushed, this should be equal to channel.position()
 
         endRecord(pos);
-        // fos.flushBuffer();  // flush later
+        fos.flushBuffer();  // flush later
         return pos;
       } finally {
         fosLock.unlock();
@@ -535,12 +539,17 @@ public class TransactionLog implements Closeable {
     fosLock.lock();
     try {
       try {
-        long pos = fos.size();   // if we had flushed, this should be equal to channel.position()
+        fos.flushBuffer(); // flush since this will be the last record in a log fill
 
-        if (pos == 0) {
+
+        long pos;
+        if (fos.size() == 0) {
           writeLogHeader(codec);
-          pos = fos.size();
+
         }
+
+        fos.flush();
+        pos = fos.size();
 
         MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(32); // MRM TODO:
 
@@ -550,13 +559,18 @@ public class TransactionLog implements Closeable {
         codec.writeInt(UpdateLog.COMMIT);  // should just take one byte
         codec.writeLong(cmd.getVersion());
         codec.writeStr(END_MESSAGE, false);  // ensure these bytes are (almost) last in the file
-        codec.writeInt(out.position());
-        fos.flush();  // flush since this will be the last record in a log fill
+
+
         channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
 
+        //fos.setWritten((int) channel.position());
+        fos.writeInt((int) (fos.size() - pos));
         numRecords.increment();
+        fos.flushBuffer();
 
-        assert fos.size() == channel.size() : "fos="+fos.size() + " ch=" + channel.size();
+
+
+       // assert fos.size() == channel.size() : "fos="+fos.size() + " ch=" + channel.size();
 
         return pos;
       } catch (IOException e) {
@@ -590,8 +604,8 @@ public class TransactionLog implements Closeable {
       } finally {
         fosLock.unlock();
       }
-
-      FastInputStream fis = new ChannelFastInputStream(new GetChannelInputStream(channel, (int) pos), pos);
+      channel.position(pos);
+      FastInputStream fis = new ChannelFastInputStream(new GetChannelInputStream(channel), pos);
       try (LogCodec codec = new LogCodec(resolver)) {
         return codec.readVal(fis);
       }
@@ -758,8 +772,17 @@ public class TransactionLog implements Closeable {
 
     public LogReader(long startingPos) {
       incref();
+      fosLock.lock();
+      try {
+        fos.flushBuffer();
+        channel.position(startingPos);
+        fis = new ChannelFastInputStream(new GetChannelInputStream(channel), startingPos);
 
-      fis = new ChannelFastInputStream(new GetChannelInputStream(channel, (int) startingPos), startingPos);
+     } catch (IOException ioException) {
+        throw new RuntimeIOException(ioException);
+      } finally {
+        fosLock.unlock();
+      }
 
     }
 
@@ -776,15 +799,17 @@ public class TransactionLog implements Closeable {
       fosLock.lock();
       try {
         pos = fis.position();
-      //  if (log.isDebugEnabled()) {
-          log.info("Reading log record.  pos={} currentSize={}", pos, fos.size());
-      //  }
+        if (trace) {
+          log.trace("Reading log record.  pos={} currentSize={}", pos, fos.size());
+        }
+
+        fos.flushBuffer();
 
         if (pos >= fos.size()) {
           return null;
         }
 
-        fos.flushBuffer();
+       // fos.flushBuffer();
       } finally {
         fosLock.unlock();
       }
@@ -794,6 +819,7 @@ public class TransactionLog implements Closeable {
         // shouldn't currently happen - header and first record are currently written at the same time
         fosLock.lock();
         try {
+          fos.flushBuffer();
           if (fis.position() >= fos.size()) {
             return null;
           }
@@ -807,7 +833,7 @@ public class TransactionLog implements Closeable {
 
       // skip over record size
       int size = fis.readInt();
-      assert size == fis.position() - pos - 4;
+  //    assert size == fis.position() - pos - 4;
 
       return o;
     }
@@ -838,7 +864,7 @@ public class TransactionLog implements Closeable {
     // returns best effort current size
     // for info purposes
     public long currentSize() throws IOException {
-      return channel.size();
+      return fos.size();
     }
 
   }
@@ -929,12 +955,14 @@ public class TransactionLog implements Closeable {
       try {
         fos.flushBuffer();
         sz = fos.size();
-        assert sz == channel.size() : "sz:" + sz + " ch:" + channel.size();
+        //assert sz == channel.size() : "sz:" + sz + " ch:" + channel.size();
+        channel.position(0);
+        fis = new ChannelFastInputStream(new GetChannelInputStream(channel), 0);
       } finally {
         fosLock.unlock();
       }
 
-        fis = new ChannelFastInputStream(new GetChannelInputStream(channel, 0), 0);
+
         if (sz >= 4) {
           // readHeader(fis);  // should not be needed
           prevPos = sz - 4;
@@ -964,13 +992,13 @@ public class TransactionLog implements Closeable {
       if (prevPos >= bufferPos) {
         // nothing to do... we're within the current buffer
       } else {
-        // Position buffer so that this record is at the end.
-        // For small records, this will cause subsequent calls to next() to be within the buffer.
-        long seekPos = endOfThisRecord - fis.getBufferSize();
-        seekPos = Math.min(seekPos, prevPos); // seek to the start of the record if it's larger then the block size.
-        seekPos = Math.max(seekPos, 0);
-        fis.position(seekPos);
-        fis.peek();  // cause buffer to be filled
+//        // Position buffer so that this record is at the end.
+//        // For small records, this will cause subsequent calls to next() to be within the buffer.
+//        long seekPos = endOfThisRecord - fis.getBufferSize();
+//        seekPos = Math.min(seekPos, prevPos); // seek to the start of the record if it's larger then the block size.
+//        seekPos = Math.max(seekPos, 0);
+//        fis.position(seekPos);
+//        fis.peek();  // cause buffer to be filled
       }
 
       fis.position(prevPos);
@@ -1026,11 +1054,11 @@ public class TransactionLog implements Closeable {
 //      return ch.read(bb, readFromStream);
 //    }
 
-    @Override
-    public void readFully(byte b[], int off, int len) throws IOException {
-      ByteBuffer bb = ByteBuffer.wrap(b, off, len);
-      ((FileChannel)((GetChannelInputStream)is).getChannel()).read(bb, position());
-    }
+//    @Override
+//    public void readFully(byte b[], int off, int len) throws IOException {
+//      ByteBuffer bb = ByteBuffer.wrap(b, off, len);
+//      ((FileChannel)((GetChannelInputStream)is).getChannel()).read(bb, position());
+//    }
 
   /** where is the start of the buffer relative to the whole file */
 //    public long getBufferPos() {

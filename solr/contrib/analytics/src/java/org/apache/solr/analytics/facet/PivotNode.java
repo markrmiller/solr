@@ -151,7 +151,7 @@ public abstract class PivotNode<T> extends SortableFacet implements Consumer<Str
 
     @Override
     public Iterable<Map<String,Object>> getPivotedResponse(Map<String,ReductionDataCollection> pivot) {
-      final List<FacetBucket> facetResults = new ArrayList<>();
+      final List<FacetBucket> facetResults = new ArrayList<>(pivot.size());
       pivot.forEach((facetVal, dataCol) -> {
         collectionManager.setData(dataCol);
         facetResults.add(new FacetBucket(facetVal,expressionCalculator.getResults()));
@@ -161,7 +161,7 @@ public abstract class PivotNode<T> extends SortableFacet implements Consumer<Str
       final LinkedList<Map<String,Object>> results = new LinkedList<>();
       // Export each expression in the bucket.
       for (FacetBucket bucket : facetResultsIter) {
-        Map<String, Object> bucketMap = new HashMap<>();
+        Map<String, Object> bucketMap = new HashMap<>(facetResults.size() * 3);
         bucketMap.put(AnalyticsResponseHeadings.PIVOT_NAME, name);
         bucketMap.put(AnalyticsResponseHeadings.FACET_VALUE, bucket.getFacetValue());
         bucketMap.put(AnalyticsResponseHeadings.RESULTS, bucket.getResults());
@@ -232,7 +232,7 @@ public abstract class PivotNode<T> extends SortableFacet implements Consumer<Str
 
     @Override
     public Iterable<Map<String,Object>> getPivotedResponse(Map<String,PivotDataPair<T>> pivot) {
-      final List<FacetBucket> facetResults = new ArrayList<>();
+      final List<FacetBucket> facetResults = new ArrayList<>(pivot.size());
       pivot.forEach((facetVal, dataPair) -> {
         collectionManager.setData(dataPair.pivotReduction);
         facetResults.add(new FacetBucket(facetVal,expressionCalculator.getResults()));
@@ -242,7 +242,7 @@ public abstract class PivotNode<T> extends SortableFacet implements Consumer<Str
       final LinkedList<Map<String,Object>> results = new LinkedList<>();
       // Export each expression in the bucket.
       for (FacetBucket bucket : facetResultsIter) {
-        Map<String, Object> bucketMap = new HashMap<>();
+        Map<String, Object> bucketMap = new HashMap<>(facetResults.size() * 4);
         bucketMap.put(AnalyticsResponseHeadings.PIVOT_NAME, name);
         bucketMap.put(AnalyticsResponseHeadings.FACET_VALUE, bucket.getFacetValue());
         bucketMap.put(AnalyticsResponseHeadings.RESULTS, bucket.getResults());

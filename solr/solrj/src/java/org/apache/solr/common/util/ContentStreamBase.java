@@ -38,6 +38,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.entity.ContentType;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -323,10 +325,12 @@ public abstract class ContentStreamBase implements ContentStream
     this.sourceInfo = sourceInfo;
   }
   public static ContentStream create(RequestWriter requestWriter, SolrRequest req) throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4092);
+
+    ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     RequestWriter.ContentWriter contentWriter = requestWriter.getContentWriter(req);
-    contentWriter.write(baos);
-    return new ByteArrayStream(baos.toByteArray(), null,contentWriter.getContentType() );
+    contentWriter.write(out);
+    return new ByteArrayStream(expandableBuffer1.byteArray(), null, contentWriter.getContentType(), out.position() + expandableBuffer1.wrapAdjustment() );
   }
   
   /**

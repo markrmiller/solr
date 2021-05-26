@@ -16,6 +16,7 @@
  */
 package org.apache.solr.update;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -45,6 +46,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
@@ -62,6 +65,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.loader.XMLLoader;
@@ -677,14 +681,16 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
       children.put(childKey, child);
     }
 
-    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     try (JavaBinCodec jbc = new JavaBinCodec()) {
       jbc.marshal(topDocument, os);
     }
-    byte[] buffer = os.toByteArray();
+    byte[] buffer = expandableBuffer1.byteArray();
     //now read the Object back
     SolrInputDocument result;
-    try (JavaBinCodec jbc = new JavaBinCodec(); InputStream is = new ByteArrayInputStream(buffer)) {
+    try (JavaBinCodec jbc = new JavaBinCodec(); InputStream is = new ByteArrayInputStream(buffer, 0, os.position() + expandableBuffer1.wrapAdjustment())) {
       result = (SolrInputDocument) jbc.unmarshal(is);
     }
 
@@ -703,14 +709,16 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
       addChildren("child", topDocument, index, false);
     }
 
-    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     try (JavaBinCodec jbc = new JavaBinCodec()) {
       jbc.marshal(topDocument, os);
     }
-    byte[] buffer = os.toByteArray();
+    byte[] buffer = expandableBuffer1.byteArray();
     //now read the Object back
     SolrInputDocument result;
-    try (JavaBinCodec jbc = new JavaBinCodec(); InputStream is = new ByteArrayInputStream(buffer)) {
+    try (JavaBinCodec jbc = new JavaBinCodec(); InputStream is = new ByteArrayInputStream(buffer, 0, os.position() + expandableBuffer1.wrapAdjustment())) {
       result = (SolrInputDocument) jbc.unmarshal(is);
     }
     assertEquals(2, result.size());
@@ -925,6 +933,7 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
   public static String getStringFromDocument(Document doc) {
     try (StringWriter writer = new StringWriter()){
       TransformerFactory tf = TransformerFactory.newInstance();
+      tf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       Transformer transformer = tf.newTransformer();
       transformer.transform(new DOMSource(doc), new StreamResult(writer));
       return writer.toString();

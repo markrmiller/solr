@@ -266,7 +266,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
 
   protected volatile String[] tlogFiles;
   protected volatile File tlogDir;
-  protected volatile Collection<String> globalStrings;
+ // protected volatile Collection<String> globalStrings;
 
   protected volatile String dataDir;
   protected volatile String lastDataDir;
@@ -538,7 +538,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
    * change the implementation of the transaction log.
    */
   public static TransactionLog newTransactionLog(File tlogFile, Collection<String> globalStrings, boolean openExisting) {
-    return new TransactionLog(tlogFile, globalStrings, openExisting);
+    return new TransactionLog(tlogFile, null, openExisting);
   }
 
   public String getLogDir() {
@@ -919,7 +919,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
       newMap();
 
       if (prevTlog != null) {
-        globalStrings = prevTlog.getGlobalStrings();
+    //    globalStrings = prevTlog.getGlobalStrings();
       }
 
       // since document additions can happen concurrently with commit, create
@@ -1467,7 +1467,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
       try {
         if (bufferTlog == null) {
           String newLogName = String.format(Locale.ROOT, LOG_FILENAME_PATTERN, BUFFER_TLOG_NAME, System.nanoTime());
-          bufferTlog = newTransactionLog(new File(tlogDir, newLogName), globalStrings, false);
+          bufferTlog = newTransactionLog(new File(tlogDir, newLogName), null, false);
           bufferTlog.isBuffer = true;
         }
       } finally {
@@ -1493,7 +1493,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
       try {
           if (tlog == null) {
             String newLogName = String.format(Locale.ROOT, LOG_FILENAME_PATTERN, TLOG_NAME, id);
-            tlog = newTransactionLog(new File(tlogDir, newLogName), globalStrings, false);
+            tlog = newTransactionLog(new File(tlogDir, newLogName), null, false);
           }
       } finally {
         tlogLock.unlock();

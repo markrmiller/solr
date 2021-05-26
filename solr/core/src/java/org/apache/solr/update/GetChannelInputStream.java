@@ -1,23 +1,21 @@
 package org.apache.solr.update;
 
 import it.unimi.dsi.fastutil.io.MeasurableStream;
+import it.unimi.dsi.fastutil.io.RepositionableStream;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.Channel;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 
-public class GetChannelInputStream extends InputStream implements MeasurableStream  {
+public class GetChannelInputStream extends InputStream implements MeasurableStream, RepositionableStream {
   private final InputStream inputStream;
-  private final Channel ch;
-  private final int pos;
+  private final FileChannel ch;
 
-  public GetChannelInputStream(Channel ch, int pos) {
+  public GetChannelInputStream(FileChannel ch) {
     this.inputStream = Channels.newInputStream((FileChannel) ch);
     this.ch = ch;
-    this.pos = pos;
   }
   
   public Channel getChannel() {
@@ -35,11 +33,16 @@ public class GetChannelInputStream extends InputStream implements MeasurableStre
 
   @Override
   public long length() throws IOException {
-    return ((FileChannel)ch).size();
+    return ch.size();
+  }
+
+  @Override
+  public void position(long newPosition) throws IOException {
+    ch.position(newPosition);
   }
 
   @Override
   public long position() throws IOException {
-    return pos;
+    return ch.position();
   }
 }

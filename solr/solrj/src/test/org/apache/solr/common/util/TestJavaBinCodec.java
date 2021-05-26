@@ -640,7 +640,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
       if (++bufnum >= buffers.length) bufnum = 0;
       byte[] buf = buffers[bufnum];
       try (JavaBinCodec javabin = new JavaBinCodec(null, stringCache)) {
-        FastInputStream in = new FastInputStream(empty, buf, 0, buf.length);
+        FastInputStream in = new FastInputStream(empty, 0);
         Object o = javabin.unmarshal(in);
         if (o instanceof SolrDocument) {
           ret += ((SolrDocument) o).size();

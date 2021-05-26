@@ -286,7 +286,9 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
     // add the doc, confirm we can query it...
     assertEquals(0, cloudClient.add(SolrTestCaseJ4.sdoc("id", docId, "content_t", "originalcontent")).getStatus());
     assertEquals(0, cloudClient.commit().getStatus());
-    
+
+    cluster.waitForActiveCollection(collection, 2, 4);
+
     assertEquals(1, cloudClient.query(params("q", "id:" + docId)).getResults().getNumFound());
     assertEquals(1, cloudClient.query(params("q", "content_t:originalcontent")).getResults().getNumFound());
     assertEquals(1,
@@ -295,8 +297,8 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
 
 
     // replicas may still be recovering from leaders
-    cluster.waitForActiveCollection(collection, 2, 4);
-    checkShardConsistency(params("q","id:" + docId, "rows", "99","_trace","original_doc"));
+
+    //checkShardConsistency(params("q","id:" + docId, "rows", "99","_trace","original_doc"));
     
     // update doc
     assertEquals(0, cloudClient.add(SolrTestCaseJ4.sdoc("id", docId, "content_t", "updatedcontent")).getStatus());

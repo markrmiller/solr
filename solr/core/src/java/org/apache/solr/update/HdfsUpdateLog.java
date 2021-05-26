@@ -312,7 +312,7 @@ public class HdfsUpdateLog extends UpdateLog {
     if (bufferTlog != null) return;
     String newLogName = String.format(Locale.ROOT, LOG_FILENAME_PATTERN, BUFFER_TLOG_NAME, System.nanoTime());
     bufferTlog = new HdfsTransactionLog(fs, new Path(tlogDir, newLogName),
-        globalStrings, tlogDfsReplication);
+        null, tlogDfsReplication);
     bufferTlog.isBuffer = true;
   }
 
@@ -342,7 +342,7 @@ public class HdfsUpdateLog extends UpdateLog {
       String newLogName = String.format(Locale.ROOT, LOG_FILENAME_PATTERN,
           TLOG_NAME, id);
       HdfsTransactionLog ntlog = new HdfsTransactionLog(fs, new Path(tlogDir, newLogName),
-          globalStrings, tlogDfsReplication);
+          null, tlogDfsReplication);
       tlog = ntlog;
     }
   }

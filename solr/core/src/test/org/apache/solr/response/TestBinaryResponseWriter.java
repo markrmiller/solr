@@ -24,6 +24,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.util.BytesRef;
@@ -32,10 +34,7 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.util.ByteArrayUtf8CharSequence;
-import org.apache.solr.common.util.ByteUtils;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.*;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.response.BinaryResponseWriter.Resolver;
@@ -79,10 +78,12 @@ public class TestBinaryResponseWriter extends SolrTestCaseJ4 {
 
     NamedList nl = new NamedList();
     nl.add("doc1", document);
-    SimplePostTool.BAOS baos = new SimplePostTool.BAOS();
-    new JavaBinCodec(new BinaryResponseWriter.Resolver(null, null)).marshal(nl, baos);
-    ByteBuffer byteBuffer = baos.getByteBuffer();
-    nl = (NamedList) new JavaBinCodec().unmarshal(new ByteArrayInputStream(byteBuffer.array(), 0, byteBuffer.limit()));
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    new JavaBinCodec(new BinaryResponseWriter.Resolver(null, null)).marshal(nl, os);
+
+    nl = (NamedList) new JavaBinCodec().unmarshal(new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, os.position() + expandableBuffer1.wrapAdjustment()));
     assertEquals(text, nl._get("doc1/desc", null));
 
 
