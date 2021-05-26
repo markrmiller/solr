@@ -81,7 +81,6 @@ task jmh(type: JavaExec) {
 
   def resultFile = file("build/reports/jmh/result.${format}")
 
-  args include
 //  if (exclude) {
 //    args '-e', exclude
 //  }

@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.solr.common.util.ByteArrayUtf8CharSequence.convertCharSeq;
 
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -207,12 +208,16 @@ public class JavaBinCodec implements PushWriter {
 
   protected DataInputInputStream initRead(InputStream is) throws IOException {
     assert !alreadyUnmarshalled;
-    SolrInputStream dis = new SolrInputStream(is);
-    return _init(dis);
+   // FastInputStream dis = new FastInputStream(is);
+    if (!(is instanceof FastInputStream)) {
+      is = new SolrInputStream(is);
+      return _init((SolrInputStream) is);
+    }
+    return _init((FastInputStream) is);
   }
   protected FastInputStream initRead(byte[] buf) throws IOException {
     assert !alreadyUnmarshalled;
-    FastInputStream dis = new FastInputStream(null, buf, 0, buf.length);
+    FastInputStream dis = new FastInputStream(new ByteArrayInputStream(buf), 0);
     return _init(dis);
   }
 

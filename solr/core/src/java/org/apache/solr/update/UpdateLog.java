@@ -2036,7 +2036,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
     public void doReplay(TransactionLog translog, SolrQueryRequest req) {
       UpdateRequestProcessor proc = null;
       try {
-        loglog.warn("Starting log replay {}  active={} starting pos={} inSortedOrder={}", translog, activeLog, recoveryInfo.positionOfStart, inSortedOrder);
+        loglog.warn("Starting log replay {}  active={} starting pos={} inSortedOrder={} tlog={}", translog, activeLog, recoveryInfo.positionOfStart, inSortedOrder, translog);
         long lastStatusTime = System.nanoTime();
         if (inSortedOrder) {
           tlogReader = translog.getSortedReader(recoveryInfo.positionOfStart);

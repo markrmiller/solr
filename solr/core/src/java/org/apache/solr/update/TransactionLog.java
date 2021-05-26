@@ -16,12 +16,12 @@
  */
 package org.apache.solr.update;
 
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
-import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.invoke.MethodHandles;
@@ -39,20 +39,23 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.LongAccumulator;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantLock;
 
+import io.netty.channel.Channel;
+import it.unimi.dsi.fastutil.doubles.Double2DoubleMap;
+import it.unimi.dsi.fastutil.io.FastBufferedInputStream;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.apache.solr.common.util.BufferedChannel;
 import org.apache.solr.common.util.FastInputStream;
-import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.DataInputInputStream;
 import org.apache.solr.common.util.ObjectReleaseTracker;
-import org.apache.solr.common.util.TranLogOutputStream;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +89,9 @@ public class TransactionLog implements Closeable {
   FileChannel channel;
   OutputStream os;
   BufferedChannel fos;    // all accesses to this stream should be synchronized on "this" (The TransactionLog)
+
+  //GetChannelInputStream cis;
+
   final ReentrantLock fosLock = new ReentrantLock(true);
   private final LongAdder numRecords = new LongAdder();
   boolean isBuffer;
@@ -93,7 +99,9 @@ public class TransactionLog implements Closeable {
   protected volatile boolean deleteOnClose = true;  // we can delete old tlogs since they are currently only used for real-time-get (and in the future, recovery)
 
   AtomicInteger refcount = new AtomicInteger(1);
-  Map<String,Integer> globalStringMap = new HashMap<>();
+
+
+  Object2IntMap globalStringMap = new Object2IntOpenHashMap();
   List<String> globalStringList = new ArrayList<>();
 
   // write a BytesRef as a byte array
@@ -188,6 +196,7 @@ public class TransactionLog implements Closeable {
       channel = raf.getChannel();
       os = Channels.newOutputStream(channel);
       fos = new BufferedChannel(channel, 8192);
+     // cis = new GetChannelInputStream(channel, Channels.newInputStream(channel));
 
       if (openExisting) {
         if (start > 0) {
@@ -251,7 +260,7 @@ public class TransactionLog implements Closeable {
     byte[] buf = new byte[END_MESSAGE.length()];
     long pos = size - END_MESSAGE.length() - 4;
     if (pos < 0) return false;
-    final ChannelFastInputStream is = new ChannelFastInputStream(channel, pos);
+    final FastInputStream is = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), pos);
     is.read(buf);
     for (int i = 0; i < buf.length; i++) {
       if (buf[i] != END_MESSAGE.charAt(i)) return false;
@@ -262,7 +271,7 @@ public class TransactionLog implements Closeable {
   @SuppressWarnings({"unchecked"})
   private void readHeader(FastInputStream fis) throws IOException {
     // read existing header
-    fis = fis != null ? fis : new ChannelFastInputStream(channel, 0);
+    fis = fis != null ? fis : new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), 0);
     @SuppressWarnings("resource") final LogCodec codec = new LogCodec(resolver);
     @SuppressWarnings({"rawtypes"})
     Map header = (Map) codec.unmarshal(fis);
@@ -274,7 +283,7 @@ public class TransactionLog implements Closeable {
     fosLock.lock();
     try {
       globalStringList = (List<String>) header.get("strings");
-      globalStringMap = new HashMap<>(globalStringList.size());
+      globalStringMap = new Object2IntOpenHashMap(globalStringList.size());
       for (int i = 0; i < globalStringList.size(); i++) {
         globalStringMap.put(globalStringList.get(i), i + 1);
       }
@@ -550,7 +559,7 @@ public class TransactionLog implements Closeable {
         fosLock.unlock();
       }
 
-      ChannelFastInputStream fis = new ChannelFastInputStream(channel, pos);
+      FastInputStream fis = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), pos);
       try (LogCodec codec = new LogCodec(resolver)) {
         return codec.readVal(fis);
       }
@@ -670,7 +679,11 @@ public class TransactionLog implements Closeable {
 
   @Override
   public String toString() {
-    return "tlog{file=" + tlogFile.toString() + " refcount=" + refcount.get() + "}";
+    try {
+      return "tlog{file=" + tlogFile.toString() + " refcount=" + refcount.get() + " size=" + channel.size() + "}";
+    } catch (IOException e) {
+      throw new RuntimeIOException(e);
+    }
   }
 
   public long getLogSize() {
@@ -714,7 +727,9 @@ public class TransactionLog implements Closeable {
 
     public LogReader(long startingPos) {
       incref();
-      fis = new ChannelFastInputStream(channel, startingPos);
+
+      fis = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), startingPos);
+
     }
 
     // for classes that extend
@@ -773,14 +788,22 @@ public class TransactionLog implements Closeable {
     @Override
     public String toString() {
       synchronized (TransactionLog.this) {
-        return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + "}";
+        try {
+          return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + "}";
+        } catch (IOException e) {
+          throw new RuntimeIOException(e);
+        }
       }
     }
 
     // returns best effort current position
     // for info purposes
     public long currentPos() {
-      return fis.position();
+      try {
+        return fis.position();
+      } catch (IOException e) {
+        throw new RuntimeIOException(e);
+      }
     }
 
     // returns best effort current size
@@ -821,7 +844,7 @@ public class TransactionLog implements Closeable {
           if (version < lastVersion) inOrder = false;
           lastVersion = version;
         }
-        fis.seek(startingPos);
+        fis.position(startingPos);
       }
 
       if (inOrder) {
@@ -830,7 +853,7 @@ public class TransactionLog implements Closeable {
         if (iterator == null) iterator = versionToPos.values().iterator();
         if (!iterator.hasNext()) return null;
         long pos = iterator.next();
-        if (pos != currentPos()) fis.seek(pos);
+        if (pos != currentPos()) fis.position(pos);
         return super.next();
       }
     }
@@ -882,11 +905,11 @@ public class TransactionLog implements Closeable {
         fosLock.unlock();
       }
 
-        fis = new ChannelFastInputStream(channel, 0);
+        fis = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), 0);
         if (sz >= 4) {
           // readHeader(fis);  // should not be needed
           prevPos = sz - 4;
-          fis.seek(prevPos);
+          fis.position(prevPos);
           nextLength = fis.readInt();
         }
     }
@@ -908,20 +931,20 @@ public class TransactionLog implements Closeable {
 
       if (prevPos <= 0) return null;  // this record is the header
 
-      long bufferPos = fis.getBufferPos();
-      if (prevPos >= bufferPos) {
-        // nothing to do... we're within the current buffer
-      } else {
-        // Position buffer so that this record is at the end.
-        // For small records, this will cause subsequent calls to next() to be within the buffer.
-        long seekPos = endOfThisRecord - fis.getBufferSize();
-        seekPos = Math.min(seekPos, prevPos); // seek to the start of the record if it's larger then the block size.
-        seekPos = Math.max(seekPos, 0);
-        fis.seek(seekPos);
-        fis.peek();  // cause buffer to be filled
-      }
+//      long bufferPos = fis.getPositionInBuffer();
+//      if (prevPos >= bufferPos) {
+//        // nothing to do... we're within the current buffer
+//      } else {
+//        // Position buffer so that this record is at the end.
+//        // For small records, this will cause subsequent calls to next() to be within the buffer.
+//        long seekPos = endOfThisRecord - fis.getBuffer().length;
+//        seekPos = Math.min(seekPos, prevPos); // seek to the start of the record if it's larger then the block size.
+//        seekPos = Math.max(seekPos, 0);
+//        fis.position(seekPos);
+//        fis.peek();  // cause buffer to be filled
+//      }
 
-      fis.seek(prevPos);
+      fis.position(prevPos);
       nextLength = fis.readInt();     // this is the length of the *next* record (i.e. closer to the beginning)
 
       // TODO: optionally skip document data
@@ -945,6 +968,8 @@ public class TransactionLog implements Closeable {
       fosLock.lock();
       try {
         return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + "}";
+      } catch (IOException e) {
+        throw new RuntimeIOException(e);
       } finally {
         fosLock.unlock();
       }
@@ -956,49 +981,52 @@ public class TransactionLog implements Closeable {
   static class ChannelFastInputStream extends FastInputStream {
     private final FileChannel ch;
 
-    public ChannelFastInputStream(FileChannel ch, long chPosition) {
+    public ChannelFastInputStream(FileChannel ch, InputStream is, long chPosition) {
       // super(null, new byte[10],0,0);    // a small buffer size for testing purposes
-      super(null);
+  //    super(is, (int) chPosition);
+      super(is, (int) 0);
       this.ch = ch;
       super.readFromStream = chPosition;
     }
 
-    @Override
-    public int readWrappedStream(byte[] target, int offset, int len) throws IOException {
-      ByteBuffer bb = ByteBuffer.wrap(target, offset, len);
-      return ch.read(bb, readFromStream);
-    }
+//    public FileChannel getChannel() {
+//      return ch;
+//    }
 
-    public void seek(long position) throws IOException {
-      if (position <= readFromStream && position >= getBufferPos()) {
-        // seek within buffer
-        pos = (int) (position - getBufferPos());
-      } else {
-        // long currSize = ch.size();   // not needed - underlying read should handle (unless read never done)
-        // if (position > currSize) throw new EOFException("Read past EOF: seeking to " + position + " on file of size " + currSize + " file=" + ch);
-        readFromStream = position;
-        end = pos = 0;
-      }
-      assert position() == position;
+//    @Override
+//    public int readWrappedStream(byte[] target, int offset, int len) throws IOException {
+//      ByteBuffer bb = ByteBuffer.wrap(target, offset, len);
+//      return ch.read(bb, readFromStream);
+//    }
+
+    @Override
+    public void readFully(byte b[], int off, int len) throws IOException {
+      ByteBuffer bb = ByteBuffer.wrap(b, off, len);
+      ch.read(bb, readBytes);
     }
 
   /** where is the start of the buffer relative to the whole file */
-    public long getBufferPos() {
-      return readFromStream - end;
-    }
+//    public long getBufferPos() {
+//      return g;
+//    }
 
     public int getBufferSize() {
-      return buf.length;
+      return buffer.length;
     }
 
     @Override
     public void close() throws IOException {
-      ch.close();
+      //ch.close();
+      super.close();
     }
 
     @Override
     public String toString() {
-      return "readFromStream=" + readFromStream + " pos=" + pos + " end=" + end + " bufferPos=" + getBufferPos() + " position=" + position();
+      try {
+        return "readFromStream=" + readBytes + " pos=" + pos + " bufferPos=" + getPositionInBuffer() + " position=" + position() + " size=" + ch.size();
+      } catch (IOException e) {
+        throw new RuntimeIOException(e);
+      }
     }
   }
 }

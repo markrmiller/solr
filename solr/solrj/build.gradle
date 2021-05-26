@@ -60,6 +60,8 @@ dependencies {
 
   implementation 'org.lz4:lz4-java:1.7.1'
 
+  api 'it.unimi.dsi:fastutil:8.2.2'
+
   api('org.apache.httpcomponents:httpmime', {
     exclude group: "commons-codec", module: "commons-codec"
     exclude group: "commons-logging", module: "commons-logging"
