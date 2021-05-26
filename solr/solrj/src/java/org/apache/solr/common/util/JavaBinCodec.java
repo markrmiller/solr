@@ -963,6 +963,7 @@ public class JavaBinCodec implements PushWriter {
           ((BufferedChannel) daos).flushBuffer();
         }
         daos.write(bytes, 0, bytes.length);
+        ((BufferedChannel) daos).flushBuffer();
       } else {
         throw new IllegalStateException(s.getClass().getName() + " " + daos.getClass().getName());
       }

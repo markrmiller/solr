@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.StringTokenizer;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 
 /*
@@ -52,6 +54,7 @@ import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrCore;
@@ -382,12 +385,14 @@ public class TestSubQueryTransformer extends SolrTestCaseJ4 {
         johnTwoFL.getParams().get(CommonParams.QT), johnTwoFL);
 
     BinaryQueryResponseWriter responseWriter = (BinaryQueryResponseWriter) core.getQueryResponseWriter(johnTwoFL);
-    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-    responseWriter.write(bytes, johnTwoFL, response);
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4092);
+
+    ExpandableDirectBufferOutputStream outputStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    responseWriter.write(outputStream, johnTwoFL, response);
 
     try (JavaBinCodec jbc = new JavaBinCodec()) {
       unmarshalled = (NamedList<Object>) jbc.unmarshal(
-          new ByteArrayInputStream(bytes.toByteArray()));
+          new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, outputStream.position() + expandableBuffer1.wrapAdjustment()));
     }
 
     johnTwoFL.close();

@@ -19,15 +19,19 @@ package org.apache.solr.response;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.lucene.util.TestUtil;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.common.util.ContentStreamBase.ByteArrayStream;
 import org.apache.solr.common.util.ContentStreamBase.StringStream;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.SolrQueryRequest;
 import org.junit.BeforeClass;
@@ -175,11 +179,13 @@ public class TestRawResponseWriter extends SolrTestCaseJ4 {
     assertEquals(json, jsonBout.toString(StandardCharsets.UTF_8.toString()));
 
     // javabin
-    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-    write(rsp, bytes, writerBinBase);
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4092);
+
+    ExpandableDirectBufferOutputStream outputStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    write(rsp, outputStream, writerBinBase);
     BinaryResponseParser parser = new BinaryResponseParser();
     NamedList<Object> out = parser.processResponse
-      (new ByteArrayInputStream(bytes.toByteArray()), /* encoding irrelevant */ null);
+      (new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, outputStream.position() + expandableBuffer1.wrapAdjustment()), /* encoding irrelevant */ null);
     assertEquals(RawResponseWriter.CONTENT, out.getName(0));
     assertEquals("test", out.getVal(0));
     assertEquals("foo", out.getName(1));
@@ -187,7 +193,7 @@ public class TestRawResponseWriter extends SolrTestCaseJ4 {
 
   }
 
-  private void write(SolrQueryResponse rsp, ByteArrayOutputStream jsonBout, RawResponseWriter writerJsonBase) throws IOException {
+  private void write(SolrQueryResponse rsp, OutputStream jsonBout, RawResponseWriter writerJsonBase) throws IOException {
     try (SolrQueryRequest req = req()) {
       writerJsonBase.write(jsonBout, req, rsp);
     }

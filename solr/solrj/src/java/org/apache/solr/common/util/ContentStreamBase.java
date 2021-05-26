@@ -65,7 +65,7 @@ public abstract class ContentStreamBase implements ContentStream
   protected String name;
   protected String sourceInfo;
   protected String contentType;
-  protected Long size;
+  protected long size;
   
   //---------------------------------------------------------------------
   //---------------------------------------------------------------------
@@ -336,22 +336,26 @@ public abstract class ContentStreamBase implements ContentStream
   {
     private final byte[] bytes;
     public ByteArrayStream(byte[] bytes, String source ) {
-      this(bytes, source, null);
+      this(bytes, source, null, bytes.length);
+    }
+
+    public ByteArrayStream(byte[] bytes, String source, String contentType ) {
+      this(bytes, source, contentType, bytes.length);
     }
     
-    public ByteArrayStream(byte[] bytes, String source, String contentType ) {
+    public ByteArrayStream(byte[] bytes, String source, String contentType, int limit) {
       this.bytes = bytes;
       
       this.contentType = contentType;
       name = source;
-      size = (long) bytes.length;
+      size = limit;
       sourceInfo = source;
     }
 
 
     @Override
     public InputStream getStream() throws IOException {
-      return new ByteArrayInputStream( bytes );
+      return new ByteArrayInputStream( bytes, 0, (int) size);
     }
   }  
 }

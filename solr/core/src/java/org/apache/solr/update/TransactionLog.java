@@ -249,7 +249,7 @@ public class TransactionLog implements Closeable {
     byte[] buf = new byte[END_MESSAGE.length()];
     long pos = size - END_MESSAGE.length() - 4;
     if (pos < 0) return false;
-    final FastInputStream is = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), pos);
+    final FastInputStream is = new ChannelFastInputStream(new GetChannelInputStream(channel, (int) pos), pos);
     is.read(buf);
     for (int i = 0; i < buf.length; i++) {
       if (buf[i] != END_MESSAGE.charAt(i)) return false;
@@ -260,12 +260,12 @@ public class TransactionLog implements Closeable {
   @SuppressWarnings({"unchecked"})
   private void readHeader(FastInputStream fis) throws IOException {
     // read existing header
-   // fis = fis != null ? fis : new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), 0);
+    fis = fis != null ? fis : new ChannelFastInputStream(new GetChannelInputStream(channel, 0), 0);
 
     @SuppressWarnings("resource") final LogCodec codec = new LogCodec(resolver);
 
-    fis.position(0);
-    fis.flush();
+   // fis.position(0);
+    //fis.flush();
 
     @SuppressWarnings({"rawtypes"})
     Map header = (Map) codec.unmarshal(fis);
@@ -591,7 +591,7 @@ public class TransactionLog implements Closeable {
         fosLock.unlock();
       }
 
-      FastInputStream fis = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), pos);
+      FastInputStream fis = new ChannelFastInputStream(new GetChannelInputStream(channel, (int) pos), pos);
       try (LogCodec codec = new LogCodec(resolver)) {
         return codec.readVal(fis);
       }
@@ -759,7 +759,7 @@ public class TransactionLog implements Closeable {
     public LogReader(long startingPos) {
       incref();
 
-      fis = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), startingPos);
+      fis = new ChannelFastInputStream(new GetChannelInputStream(channel, (int) startingPos), startingPos);
 
     }
 
@@ -776,9 +776,9 @@ public class TransactionLog implements Closeable {
       fosLock.lock();
       try {
         pos = fis.position();
-        if (trace) {
-          log.trace("Reading log record.  pos={} currentSize={}", pos, fos.size());
-        }
+      //  if (log.isDebugEnabled()) {
+          log.info("Reading log record.  pos={} currentSize={}", pos, fos.size());
+      //  }
 
         if (pos >= fos.size()) {
           return null;
@@ -934,7 +934,7 @@ public class TransactionLog implements Closeable {
         fosLock.unlock();
       }
 
-        fis = new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), 0);
+        fis = new ChannelFastInputStream(new GetChannelInputStream(channel, 0), 0);
         if (sz >= 4) {
           // readHeader(fis);  // should not be needed
           prevPos = sz - 4;
@@ -1008,13 +1008,12 @@ public class TransactionLog implements Closeable {
   }
 
   static class ChannelFastInputStream extends FastInputStream {
-    private final FileChannel ch;
 
-    public ChannelFastInputStream(FileChannel ch, InputStream is, long chPosition) {
+    public ChannelFastInputStream(InputStream is, long chPosition) {
       // super(null, new byte[10],0,0);    // a small buffer size for testing purposes
   //    super(is, (int) chPosition);
       super(is, (int) chPosition);
-      this.ch = ch;
+
     }
 
 //    public FileChannel getChannel() {
@@ -1027,11 +1026,11 @@ public class TransactionLog implements Closeable {
 //      return ch.read(bb, readFromStream);
 //    }
 
-//    @Override
-//    public void readFully(byte b[], int off, int len) throws IOException {
-//      ByteBuffer bb = ByteBuffer.wrap(b, off, len);
-//      ch.read(bb, readBytes);
-//    }
+    @Override
+    public void readFully(byte b[], int off, int len) throws IOException {
+      ByteBuffer bb = ByteBuffer.wrap(b, off, len);
+      ((FileChannel)((GetChannelInputStream)is).getChannel()).read(bb, position());
+    }
 
   /** where is the start of the buffer relative to the whole file */
 //    public long getBufferPos() {
@@ -1048,15 +1047,15 @@ public class TransactionLog implements Closeable {
       super.close();
     }
 
-    @Override
-    public void flush() {
-      ((FastBufferedInputStream) is).flush();
-    }
+//    @Override
+//    public void flush() {
+//      ((FastBufferedInputStream) is).flush();
+//    }
 
     @Override
     public String toString() {
       try {
-        return "readFromStream=" + readBytes + " pos=" + pos + " bufferPos=" + getPositionInBuffer() + " position=" + position() + " size=" + ch.size();
+        return "readFromStream=" + readBytes + " pos=" + pos + " bufferPos=" + getPositionInBuffer() + " position=" + position();
       } catch (IOException e) {
         throw new RuntimeIOException(e);
       }

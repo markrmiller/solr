@@ -16,6 +16,8 @@
  */
 package org.apache.solr.search;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
@@ -27,6 +29,7 @@ import org.apache.solr.common.SolrException.ErrorCode;
 import static org.apache.solr.common.params.CursorMarkParams.*;
 
 import org.apache.solr.common.util.Base64;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.FieldType;
@@ -256,11 +259,13 @@ public final class CursorMark {
     // TODO: we could also encode info about the SortSpec for error checking:
     // the type/name/dir from the SortFields (or a hashCode to act as a checksum) 
     // could help provide more validation beyond just the number of clauses.
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(256);
 
-    try (JavaBinCodec jbc = new JavaBinCodec(); ByteArrayOutputStream out = new ByteArrayOutputStream(256)) {
+    ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    try (JavaBinCodec jbc = new JavaBinCodec()) {
       jbc.marshal(marshalledValues, out);
-      byte[] rawData = out.toByteArray();
-      return Base64.byteArrayToBase64(rawData, 0, rawData.length);
+      byte[] rawData = expandableBuffer1.byteArray();
+      return Base64.byteArrayToBase64(rawData, 0, out.position() + out.buffer().wrapAdjustment());
     } catch (Exception ex) {
       throw new SolrException(ErrorCode.SERVER_ERROR,
                               "Unable to format search after totem", ex);
