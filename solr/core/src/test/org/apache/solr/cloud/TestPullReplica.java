@@ -358,7 +358,7 @@ public class TestPullReplica extends SolrCloudTestCase {
         client.add(new SolrInputDocument("id", String.valueOf(id), "foo_s", "bar"));
       }
       SolrDocument docCloudClient = cluster.getSolrClient().getById(collectionName, String.valueOf(id));
-      assertEquals("bar", docCloudClient.getFieldValue("foo_s"));
+      assertEquals(docCloudClient.toString(), "bar", docCloudClient.getFieldValue("foo_s"));
       for (Replica rGet:slice.getReplicas()) {
         try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(rGet.getCoreUrl(), cluster.getSolrClient().getHttpClient())) {
           SolrDocument doc = client.getById(String.valueOf(id));

@@ -42,6 +42,7 @@ import static org.apache.solr.common.params.ShardParams._ROUTE_;
  * Tests the Custom Sharding API.
  */
 @LuceneTestCase.Nightly // MRM TODO: look into this test sometimes being very slow to finish
+@Ignore // nocommit
 public class CustomCollectionTest extends SolrCloudTestCase {
 
   private static final int NODE_COUNT = 3;

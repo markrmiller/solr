@@ -57,7 +57,7 @@ public class AsyncTracker implements Closeable {
   }
 
   public void waitForComplete(long timeout, TimeUnit timeUnit) throws TimeoutException {
-  //  waitForCompleteLock.lock();
+    waitForCompleteLock.lock();
     try {
       final int registeredParties = phaser.getRegisteredParties();
       int phase = phaser.getPhase();
@@ -79,7 +79,7 @@ public class AsyncTracker implements Closeable {
 
       if (log.isTraceEnabled()) log.trace("After wait for outstanding requests {}", phaser);
     } finally {
-  //    waitForCompleteLock.unlock();
+      waitForCompleteLock.unlock();
     }
   }
 

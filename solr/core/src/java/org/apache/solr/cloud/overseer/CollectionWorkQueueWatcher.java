@@ -256,7 +256,7 @@ public class CollectionWorkQueueWatcher extends QueueWatcher {
         }
 
       } catch (Exception e) {
-        log.error("Exception processing entry");
+        log.error("Exception processing entry", e);
       }
 
     } catch (Exception e) {

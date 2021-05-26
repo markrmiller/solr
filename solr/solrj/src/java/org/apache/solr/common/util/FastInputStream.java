@@ -35,7 +35,7 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 //    }
 //  };
 
-  protected long readFromStream; // number of bytes read from the underlying inputstream
+ // protected long readFromStream; // number of bytes read from the underlying inputstream
 
   public FastInputStream(InputStream in) {
     this(in, 0);
@@ -43,13 +43,13 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   public FastInputStream(InputStream in, int start) {
     super(in);
-   // if (start != 0) {
+    if (start != 0) {
       try {
         position(start);
       } catch (IOException e) {
         throw new RuntimeIOException(e);
       }
- //   }
+    }
     //super.readBytes = start;
   }
 
@@ -57,10 +57,10 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
     return (in instanceof FastInputStream) ? (FastInputStream)in : new FastInputStream(in);
   }
 
-  @Override
-  public int read() throws IOException {
-    return super.read() & 0xff;
-  }
+//  @Override
+//  public int read() throws IOException {
+//    return super.read() & 0xff;
+//  }
 
   public int peek() throws IOException {
     if (noMoreCharacters()) return -1;
@@ -72,10 +72,10 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
     return buffer;
   }
 
-//  @Override
-//  public long position() throws IOException {
-//    return pos;
-//  }
+  @Override
+  public long position() throws IOException {
+    return readBytes + pos;
+  }
 
   /** Current position within the internal buffer */
   public int getPositionInBuffer() {
@@ -122,27 +122,37 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   @Override
   public byte readByte() throws IOException {
-    byte b = (byte) super.read();
-//    if (b == -1) {
-//      throw new EOFException();
-//    }
-    return b;
+    int ch = super.read();
+    if (ch < 0)
+      throw new EOFException("" + ch);
+    return (byte)(ch);
   }
 
   @Override
   public int readUnsignedByte() throws IOException {
-    return (byte) read() & 0xff;
+    int ch = super.read();
+    if (ch < 0)
+      throw new EOFException();
+    return ch;
   }
 
 
   @Override
   public short readShort() throws IOException {
-    return (short)((readUnsignedByte() << 8) | readUnsignedByte());
+    int ch1 = super.read();
+    int ch2 = super.read();
+    if ((ch1 | ch2) < 0)
+      throw new EOFException();
+    return (short)((ch1 << 8) + (ch2 << 0));
   }
 
   @Override
   public int readUnsignedShort() throws IOException {
-    return (readUnsignedByte() << 8) | readUnsignedByte();
+    int ch1 = super.read();
+    int ch2 = super.read();
+    if ((ch1 | ch2) < 0)
+      throw new EOFException();
+    return (ch1 << 8) + (ch2 << 0);
   }
 
   @Override
@@ -152,10 +162,13 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   @Override
   public int readInt() throws IOException {
-    return  ((readUnsignedByte() << 24)
-            |(readUnsignedByte() << 16)
-            |(readUnsignedByte() << 8)
-            | readUnsignedByte());
+    int ch1 = super.read();
+    int ch2 = super.read();
+    int ch3 = super.read();
+    int ch4 = super.read();
+    if ((ch1 | ch2 | ch3 | ch4) < 0)
+      throw new EOFException();
+    return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
   }
 
   @Override

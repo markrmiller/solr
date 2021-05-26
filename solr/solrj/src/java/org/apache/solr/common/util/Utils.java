@@ -16,6 +16,8 @@
  */
 package org.apache.solr.common.util;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.http.HttpEntity;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.VersionedData;
@@ -188,9 +190,15 @@ public class Utils {
 
   public static InputStream toJavabin(Object o) throws IOException {
     try (final JavaBinCodec jbc = new JavaBinCodec()) {
-      BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS();
-      jbc.marshal(o, baos);
-      return new ByteBufferInputStream(ByteBuffer.wrap(baos.getbuf(), 0, baos.size()));
+      MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
+
+      ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+      jbc.marshal(o, outStream);
+
+//      ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
+//      buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
+//      buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
+      return new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, outStream.position());
     }
   }
   

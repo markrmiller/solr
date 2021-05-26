@@ -3,6 +3,7 @@ package org.apache.solr.common.util;
 import org.agrona.BitUtil;
 import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.eclipse.jetty.io.RuntimeIOException;
 
 import java.io.Closeable;
 import java.io.FilterOutputStream;
@@ -16,11 +17,10 @@ public class BufferedChannel extends OutputStream implements Closeable {
 
     private final FileChannel ch;
     private final MutableDirectBuffer buff;
-    private int pos;
 
-    protected int count;
-    protected int size;
 
+    protected volatile int count;
+    protected volatile int size;
 
 
     /**
@@ -35,7 +35,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
     public BufferedChannel(FileChannel out, int size) {
         ch = out;
         buff = ExpandableBuffers.getInstance().acquire(-1, true);
-        pos = 0;
+
         buff.byteBuffer().limit(buff.byteBuffer().capacity());
     }
 
@@ -81,8 +81,8 @@ public class BufferedChannel extends OutputStream implements Closeable {
 //        }
         if (len >= buff.byteBuffer().remaining()) {
             flushBuffer();
-//            ch.write(ByteBuffer.wrap(b, off, len));
-//            return;
+            ch.write(ByteBuffer.wrap(b, off, len));
+            return;
         }
 
         buff.putBytes(count, b, off, len);
@@ -96,12 +96,12 @@ public class BufferedChannel extends OutputStream implements Closeable {
     }
 
     public long size() {
-        return size;
-//        try {
-//            return ch.size();
-//        } catch (IOException ioException) {
-//           throw new RuntimeIOException(ioException);
-//        }
+     //   return size;
+        try {
+            return ch.size() + count;
+        } catch (IOException ioException) {
+           throw new RuntimeIOException(ioException);
+        }
     }
 
     public void writeInt(int v) {
@@ -114,13 +114,17 @@ public class BufferedChannel extends OutputStream implements Closeable {
         size+=BitUtil.SIZE_OF_INT;
     }
 
-    public void setWritten(int start) {
-      size = start;
+    public void setWritten(int start) throws IOException {
+      ch.position(start);
     }
 
     public void close() throws IOException {
         flushBuffer();
         ch.close();
         ExpandableBuffers.getInstance().release(buff);
+    }
+
+    public MutableDirectBuffer buffer() {
+        return buff;
     }
 }
