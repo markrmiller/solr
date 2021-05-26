@@ -43,14 +43,14 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   public FastInputStream(InputStream in, int start) {
     super(in);
-    if (start != 0) {
+ //   if (start != 0) {
       try {
         position(start);
       } catch (IOException e) {
         throw new RuntimeIOException(e);
       }
-    }
-    //super.readBytes = start;
+ //   }
+      flush();
   }
 
   public static FastInputStream wrap(InputStream in) {
@@ -75,6 +75,7 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
   @Override
   public long position() throws IOException {
     return readBytes + pos;
+    //return super.position();
   }
 
   /** Current position within the internal buffer */

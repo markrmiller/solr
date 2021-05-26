@@ -86,6 +86,7 @@ import org.apache.solr.util.RTimer;
 import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.TestInjection;
 import org.apache.solr.util.plugin.PluginInfoInitialized;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1900,6 +1901,11 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
               return State.ACTIVE;
             }
             bufferTlog.incref();
+            try {
+              bufferTlog.fos.flushBuffer();
+            } catch (IOException ioException) {
+              throw new RuntimeIOException(ioException);
+            }
           } finally {
             tlogLock.unlock();
           }

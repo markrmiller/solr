@@ -127,6 +127,7 @@ public class FastOutputStream extends FilterOutputStream implements DataOutput {
   public void close() throws IOException {
     dout.flush();
     super.close();
+    dout.close();
   }
 
   /** All writes to the sink will go through this method */

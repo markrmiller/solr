@@ -20,7 +20,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
 
 
     protected volatile int count;
-    protected volatile int size;
+  //  protected volatile int size;
 
 
     /**
@@ -36,7 +36,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
         ch = out;
         buff = ExpandableBuffers.getInstance().acquire(-1, true);
 
-        buff.byteBuffer().limit(buff.byteBuffer().capacity());
+       // buff.byteBuffer().limit(buff.byteBuffer().capacity());
     }
 
     /** Flush the internal buffer */
@@ -66,7 +66,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
             flushBuffer();
         }
         buff.putByte(count++, (byte)b);
-        size++;
+        //size++;
     }
 
     @Override
@@ -87,7 +87,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
 
         buff.putBytes(count, b, off, len);
         count += len;
-        size += len;
+        //size += len;
     }
 
     @Override
@@ -111,7 +111,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
         buff.putByte(count++, (byte) ((v >>>  8) & 0xFF));
         buff.putByte(count++, (byte) ((v >>>  0) & 0xFF));
       //  count+=BitUtil.SIZE_OF_INT;
-        size+=BitUtil.SIZE_OF_INT;
+      //  size+=BitUtil.SIZE_OF_INT;
     }
 
     public void setWritten(int start) throws IOException {

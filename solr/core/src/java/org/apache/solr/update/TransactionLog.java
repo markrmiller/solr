@@ -35,9 +35,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantLock;
 
-import io.netty.channel.Channel;
-import it.unimi.dsi.fastutil.doubles.Double2DoubleMap;
-import it.unimi.dsi.fastutil.io.FastBufferedInputStream;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.agrona.ExpandableArrayBuffer;
@@ -262,10 +259,16 @@ public class TransactionLog implements Closeable {
   @SuppressWarnings({"unchecked"})
   private void readHeader(FastInputStream fis) throws IOException {
     // read existing header
-    fis = fis != null ? fis : new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), 0);
+   // fis = fis != null ? fis : new ChannelFastInputStream(channel,  new GetChannelInputStream(channel, Channels.newInputStream(channel)), 0);
+
     @SuppressWarnings("resource") final LogCodec codec = new LogCodec(resolver);
+
+    fis.position(0);
+    fis.flush();
+
     @SuppressWarnings({"rawtypes"})
     Map header = (Map) codec.unmarshal(fis);
+
 
     fis.readInt(); // skip size
 
@@ -324,6 +327,7 @@ public class TransactionLog implements Closeable {
     codec.marshal(header, fos);
 
     endRecord(pos);
+    fos.flushBuffer();
   }
 
   protected void endRecord(long startRecordPosition) throws IOException {
@@ -531,19 +535,24 @@ public class TransactionLog implements Closeable {
 
         if (pos == 0) {
           writeLogHeader(codec);
-
         }
-        codec.init(fos);
+
+        MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(32); // MRM TODO:
+
+        ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+        codec.init(out);
         codec.writeTag(JavaBinCodec.ARR, 3);
         codec.writeInt(UpdateLog.COMMIT);  // should just take one byte
         codec.writeLong(cmd.getVersion());
         codec.writeStr(END_MESSAGE, false);  // ensure these bytes are (almost) last in the file
-
-        endRecord(pos);
-
+        codec.writeInt(out.position());
         fos.flush();  // flush since this will be the last record in a log fill
+        channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
+
+        numRecords.increment();
+
         assert fos.size() == channel.size() : "fos="+fos.size() + " ch=" + channel.size();
-        pos = fos.size();
+        pos = channel.size();
         return pos;
       } catch (IOException e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
@@ -1031,7 +1040,7 @@ public class TransactionLog implements Closeable {
     @Override
     public void close() throws IOException {
       //ch.close();
-  //    super.close();
+      super.close();
     }
 
 //    @Override

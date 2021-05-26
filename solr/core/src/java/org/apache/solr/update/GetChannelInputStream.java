@@ -22,6 +22,8 @@ public class GetChannelInputStream extends InputStream {
     return inputStream.read();
   }
 
+
+
   public void close() throws IOException {
     inputStream.close();
   }
