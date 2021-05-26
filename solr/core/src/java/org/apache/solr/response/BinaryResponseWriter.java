@@ -16,10 +16,7 @@
  */
 package org.apache.solr.response;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Writer;
+import java.io.*;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,6 +24,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.IndexableField;
@@ -34,6 +33,7 @@ import org.apache.lucene.search.TotalHits;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utf8CharSequence;
@@ -188,12 +188,16 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     try {
       Resolver resolver = new Resolver(req, rsp.getReturnFields());
 
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
+     // ByteArrayOutputStream out = new ByteArrayOutputStream();
+      MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4092);
+
+      ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+
       try (JavaBinCodec jbc = new JavaBinCodec(resolver)) {
         jbc.setWritableDocFields(resolver).marshal(rsp.getValues(), out);
       }
 
-      InputStream in = out.toInputStream();
+      InputStream in = new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, out.position() + out.buffer().wrapAdjustment());
       try (JavaBinCodec jbc = new JavaBinCodec(resolver)) {
         return (NamedList<Object>) jbc.unmarshal(in);
       }
