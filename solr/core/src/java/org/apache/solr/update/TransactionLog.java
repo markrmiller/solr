@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantLock;
 
+import it.unimi.dsi.fastutil.io.FastBufferedInputStream;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.agrona.ExpandableArrayBuffer;
@@ -474,9 +475,12 @@ public class TransactionLog implements Closeable {
       try {
 
         fos.flushBuffer();
-        channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
-        long pos = fos.size();   // if we had flushed, this should be equal to channel.position()
+        long pos = fos.size();
         assert pos != 0;
+
+        channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
+         // if we had flushed, this should be equal to channel.position()
+
         endRecord(pos);
         // fos.flushBuffer();  // flush later
         return pos;
@@ -510,9 +514,9 @@ public class TransactionLog implements Closeable {
 
         fos.flushBuffer();
 
-        channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
-        //out.writeTo(fos);
         long pos = fos.size();   // if we had flushed, this should be equal to channel.position()
+        channel.write(ByteBuffer.wrap(out.buffer().byteArray(), 0, out.position() + expandableBuffer1.wrapAdjustment()));
+
         endRecord(pos);
         // fos.flushBuffer();  // flush later
         return pos;
@@ -535,6 +539,7 @@ public class TransactionLog implements Closeable {
 
         if (pos == 0) {
           writeLogHeader(codec);
+          pos = fos.size();
         }
 
         MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(32); // MRM TODO:
@@ -552,7 +557,7 @@ public class TransactionLog implements Closeable {
         numRecords.increment();
 
         assert fos.size() == channel.size() : "fos="+fos.size() + " ch=" + channel.size();
-        pos = channel.size();
+
         return pos;
       } catch (IOException e) {
         throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
@@ -1043,10 +1048,10 @@ public class TransactionLog implements Closeable {
       super.close();
     }
 
-//    @Override
-//    public void flush() {
-//      ((FastBufferedInputStream) is).flush();
-//    }
+    @Override
+    public void flush() {
+      ((FastBufferedInputStream) is).flush();
+    }
 
     @Override
     public String toString() {

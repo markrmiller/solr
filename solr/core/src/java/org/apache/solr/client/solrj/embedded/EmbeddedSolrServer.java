@@ -27,6 +27,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.Supplier;
 
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.lucene.search.TotalHits.Relation;
 import org.apache.solr.client.solrj.SolrClient;
@@ -44,11 +46,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.ContentStreamBase;
-import org.apache.solr.common.util.IOUtils;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.*;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrCore;
@@ -296,19 +294,21 @@ public class EmbeddedSolrServer extends SolrClient {
     final RequestWriter.ContentWriter contentWriter = request.getContentWriter(null);
 
     String cType;
-    final BAOS baos = new BAOS();
+    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4092);
+
+    ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     if (contentWriter != null) {
-      contentWriter.write(baos);
+      contentWriter.write(out);
       cType = contentWriter.getContentType();
     } else {
       final RequestWriter rw = supplier.newRequestWriter();
       cType = rw.getUpdateContentType();
-      rw.write(request, baos);
+      rw.write(request, out);
     }
 
-    final byte[] buf = baos.toByteArray();
-    if (buf.length > 0) {
-      return Collections.singleton(new MyContentStreamBase(buf, cType));
+    int limit = out.position() + out.buffer().wrapAdjustment();
+    if (limit > 0) {
+      return Collections.singleton(new MyContentStreamBase(expandableBuffer1.byteArray(), cType, limit));
     }
 
     return null;
@@ -369,15 +369,21 @@ public class EmbeddedSolrServer extends SolrClient {
 
     private final byte[] buf;
     private final String cType;
+    private final int limit;
 
     public MyContentStreamBase(byte[] buf, String cType) {
+      this(buf, cType, buf.length);
+    }
+    
+    public MyContentStreamBase(byte[] buf, String cType, int limit) {
       this.buf = buf;
       this.cType = cType;
+      this.limit = limit;
     }
 
     @Override
     public InputStream getStream() throws IOException {
-      return new ByteArrayInputStream(buf);
+      return new ByteArrayInputStream(buf, 0, limit);
     }
 
     @Override
