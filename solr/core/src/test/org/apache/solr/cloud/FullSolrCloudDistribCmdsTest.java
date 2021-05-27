@@ -473,6 +473,7 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
       final Object ignored = result.get();
     }
 
+    cluster.waitForActiveCollection(collectionName, 2, 4);
     cloudClient.commit();
     assertEquals(totalDocsExpected, cloudClient.query(params("q","*:*")).getResults().getNumFound());
     checkShardConsistency(params("q","*:*", "rows", String.valueOf(totalDocsExpected), "_trace","batches_done"));

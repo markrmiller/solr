@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.util.ClientUtils;
@@ -164,7 +165,7 @@ public class JsonQueryRequest extends QueryRequest {
     }
 
     if (! jsonRequestMap.containsKey("facet")) {
-      jsonRequestMap.put("facet", new HashMap<String, Object>());
+      jsonRequestMap.put("facet", new Object2ObjectHashMap<String, Object>());
     }
 
     final Map<String, Object> facetMap = (Map<String, Object>) jsonRequestMap.get("facet");
@@ -204,7 +205,7 @@ public class JsonQueryRequest extends QueryRequest {
     }
 
     if (!jsonRequestMap.containsKey("facet")) {
-      jsonRequestMap.put("facet", new HashMap<String, Object>());
+      jsonRequestMap.put("facet", new Object2ObjectHashMap<String, Object>());
     }
 
     final Map<String, Object> facetMap = (Map<String, Object>) jsonRequestMap.get("facet");
@@ -238,7 +239,7 @@ public class JsonQueryRequest extends QueryRequest {
     }
 
     if (!jsonRequestMap.containsKey("facet")) {
-      jsonRequestMap.put("facet", new HashMap<String, Object>());
+      jsonRequestMap.put("facet", new Object2ObjectHashMap<String, Object>());
     }
 
     final Map<String, Object> facetMap = (Map<String, Object>) jsonRequestMap.get("facet");
@@ -395,7 +396,7 @@ public class JsonQueryRequest extends QueryRequest {
       throw new IllegalArgumentException("'value' parameter must be non-null");
     }
 
-    ((Map<String, Object>)jsonRequestMap.computeIfAbsent("params", s -> new HashMap<String, Object>())).put(name, value);
+    ((Map<String, Object>)jsonRequestMap.computeIfAbsent("params", s -> new Object2ObjectHashMap<String, Object>())).put(name, value);
     return this;
   }
 

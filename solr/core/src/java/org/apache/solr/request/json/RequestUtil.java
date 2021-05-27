@@ -17,6 +17,7 @@
 package org.apache.solr.request.json;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,12 +118,16 @@ public class RequestUtil {
     // first populate defaults, etc..
     if (defaults != null) {
       Map<String, String[]> defaultsMap = MultiMapSolrParams.asMultiMap(defaults);
-      for (Map.Entry<String, String[]> entry : defaultsMap.entrySet()) {
+
+      Iterator<Map.Entry<String, String[]>> it = defaultsMap.entrySet().iterator();
+      while (it.hasNext()) {
+        Map.Entry<String, String[]> entry = it.next();
         String key = entry.getKey();
         if (!newMap.containsKey(key)) {
           newMap.put(key, entry.getValue());
         }
       }
+
     }
 
     if (appends != null) {

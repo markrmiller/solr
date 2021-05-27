@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import org.agrona.collections.Hashing;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.slf4j.Logger;
@@ -97,7 +99,8 @@ public class ShardTerms implements MapWriter {
     boolean changed = false;
     boolean foundReplicasInLowerTerms = false;
 
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     long leaderTerm = newValues.get(leader);
     for (Map.Entry<String, Long> entry : newValues.entrySet()) {
       String key = entry.getKey();
@@ -131,7 +134,8 @@ public class ShardTerms implements MapWriter {
   public ShardTerms ensureHighestTermsAreNotZero() {
     if (maxTerm > 0) return null;
     else {
-      Map<String, Long> newValues = new HashMap<>(values);
+      Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+      newValues.putAll(values);
       for (String replica : values.keySet()) {
         newValues.put(replica, 1L);
       }
@@ -151,7 +155,8 @@ public class ShardTerms implements MapWriter {
       return null;
     }
 
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     newValues.remove(coreNodeName);
     newValues.remove(recoveringTerm(coreNodeName));
 
@@ -166,7 +171,8 @@ public class ShardTerms implements MapWriter {
   public ShardTerms registerTerm(String coreNodeName) {
     if (values.containsKey(coreNodeName)) return null;
 
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     newValues.put(coreNodeName, 0L);
     return new ShardTerms(newValues, version);
   }
@@ -175,7 +181,8 @@ public class ShardTerms implements MapWriter {
     if (values.getOrDefault(coreNodeName, -1L) == 0) {
       return null;
     }
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     newValues.put(coreNodeName, 0L);
     return new ShardTerms(newValues, version);
   }
@@ -194,7 +201,8 @@ public class ShardTerms implements MapWriter {
     }
     if (term == maxTerm) return null;
 
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     newValues.put(coreNodeName, maxTerm);
     newValues.remove(recoveringTerm(coreNodeName));
     return new ShardTerms(newValues, version);
@@ -215,7 +223,8 @@ public class ShardTerms implements MapWriter {
     if (term != null && term == maxTerm)
       return null;
 
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     if (!newValues.containsKey(recoveringTerm(coreNodeName))) {
       long currentTerm = newValues.getOrDefault(coreNodeName, 0L);
       // by keeping old term, we will have more information in leader election
@@ -235,7 +244,8 @@ public class ShardTerms implements MapWriter {
       return null;
     }
 
-    Map<String, Long> newValues = new HashMap<>(values);
+    Map<String, Long> newValues = new Object2LongOpenHashMap<>(values.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newValues.putAll(values);
     newValues.remove(recoveringTerm(coreNodeName));
     return new ShardTerms(newValues, version);
   }

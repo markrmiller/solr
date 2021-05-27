@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.util.PropertiesUtil;
 import org.w3c.dom.NamedNodeMap;
@@ -49,8 +51,9 @@ public class DOMUtil {
     return toMapExcept(node);
   }
   public static Map<String,String> toMapExcept(ConfigNode node, String... exclusions) {
-    Map<String,String> args = new HashMap<>();
-    node.attributes().forEachEntry((k, v) -> {
+    SimpleMap<String> attribs = node.attributes();
+    Map<String,String> args = new Object2ObjectHashMap(attribs.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    attribs.forEachEntry((k, v) -> {
       for (String ex : exclusions) if (ex.equals(k)) return;
         args.put(k,v);
     });
@@ -58,8 +61,9 @@ public class DOMUtil {
   }
 
   public static Map<String,String> toMapExcept(NamedNodeMap attrs, String... exclusions) {
-    Map<String,String> args = new HashMap<>();
-    outer: for (int j=0; j<attrs.getLength(); j++) {
+    int ln = attrs.getLength();
+    Map<String,String> args = new Object2ObjectHashMap<>(ln, Hashing.DEFAULT_LOAD_FACTOR);
+    outer: for (int j=0; j<ln; j++) {
       Node attr = attrs.item(j);
 
       // automatically exclude things in the xml namespace, ie: xml:base

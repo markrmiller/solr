@@ -16,6 +16,12 @@
  */
 package org.apache.solr.common.cloud;
 
+import it.unimi.dsi.fastutil.objects.Object2ByteArrayMap;
+import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2NullableObjectHashMap;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.AlreadyClosedException;
@@ -678,13 +684,13 @@ public class SolrZkClient implements Closeable {
   }
 
   public void mkDirs(String path, byte[] bytes) throws KeeperException {
-    Map<String,byte[]> dataMap = new HashMap<String,byte[]>(1);
+    Map dataMap = new Object2ObjectOpenHashMap(1);
     dataMap.put(path, bytes);
     mkdirs(dataMap);
   }
 
   public void mkdirs(String... paths) throws KeeperException {
-    Map<String,byte[]> dataMap = new HashMap<String,byte[]>(paths.length);
+    Map dataMap = new Object2NullableObjectHashMap(paths.length, Hashing.DEFAULT_LOAD_FACTOR);
     for (String path : paths) {
       dataMap.put(path, null);
     }

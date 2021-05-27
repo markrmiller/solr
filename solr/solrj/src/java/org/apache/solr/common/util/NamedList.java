@@ -31,6 +31,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.MultiMapSolrParams;
@@ -464,8 +466,9 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * Nulls are retained as such in arrays/lists but otherwise will NPE.
    */
   public SolrParams toSolrParams() {
-    HashMap<String,String[]> map = new HashMap<>();
     final int size = this.size();
+    Map<String,String[]> map = new Object2ObjectHashMap(size, Hashing.DEFAULT_LOAD_FACTOR);
+
     for (int i = 0; i< size; i++) {
       String name = this.getName(i);
       Object val = this.getVal(i);

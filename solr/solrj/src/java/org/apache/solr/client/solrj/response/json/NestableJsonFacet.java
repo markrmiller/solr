@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.util.NamedList;
 
 /**
@@ -40,10 +41,10 @@ public class NestableJsonFacet {
   private final Map<String, HeatmapJsonFacet> heatmapFacetsByName;
 
   public NestableJsonFacet(NamedList<Object> facetNL) {
-    queryFacetsByName = new HashMap<>();
-    bucketBasedFacetByName = new HashMap<>();
-    heatmapFacetsByName = new HashMap<>();
-    statsByName = new HashMap<>();
+    queryFacetsByName = new Object2ObjectHashMap<>();
+    bucketBasedFacetByName = new Object2ObjectHashMap<>();
+    heatmapFacetsByName = new Object2ObjectHashMap<>();
+    statsByName = new Object2ObjectHashMap<>();
 
     for (Map.Entry<String, Object> entry : facetNL) {
       final String key = entry.getKey();
