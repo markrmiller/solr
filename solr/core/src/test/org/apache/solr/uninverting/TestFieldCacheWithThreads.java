@@ -234,7 +234,7 @@ public class TestFieldCacheWithThreads extends SolrTestCase {
               }
             }
             while(System.nanoTime() < END_TIME) {
-              for(int iter=0;iter<(TEST_NIGHTLY ? 100 : 10);iter++) {
+              for(int iter=0;iter<(TEST_NIGHTLY ? 59 : 10);iter++) {
                 final int docID = random.nextInt(sr.maxDoc());
                 try {
                   SortedDocValues dvs = sr.getSortedDocValues("stringdv");

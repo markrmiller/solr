@@ -164,14 +164,14 @@ public class CollectionWorkQueueWatcher extends QueueWatcher {
     for (String item : items) {
       fullPaths.add(path + '/' + item);
     }
-    List<Future> futures = new ArrayList<>(fullPaths.size());
+   // List<Future> futures = new ArrayList<>(fullPaths.size());
 
     Map<String,byte[]> data = zkController.getZkClient().getData(fullPaths);
 
     data.forEach((key, value) -> {
       try {
 
-        futures.add(overseer.getTaskExecutor().submit(() -> {
+        overseer.getTaskExecutor().submit(() -> {
           MDCLoggingContext.setNode(zkController.getNodeName());
 
           try {
@@ -179,7 +179,7 @@ public class CollectionWorkQueueWatcher extends QueueWatcher {
           } catch (Exception e) {
             log.error("failed processing collection queue items {}", items, e);
           }
-        }));
+        });
 
       } catch (Exception e) {
         log.error("Exception getting queue data", e);

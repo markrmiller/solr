@@ -180,14 +180,14 @@ public class SimpleFacets {
     if (localParams == null) {
       SolrParams params = global;
       SolrParams required = new RequiredSolrParams(params);
-      return new ParsedParams(localParams, params, required, facetValue, docs, key, tags, threads);
+      return new ParsedParams(null, params, required, facetValue, docs, key, tags, threads);
     }
     
     SolrParams params = SolrParams.wrapDefaults(localParams, global);
     SolrParams required = new RequiredSolrParams(params);
 
     // remove local params unless it's a query
-    if (type != FacetParams.FACET_QUERY) { // TODO Cut over to an Enum here
+    if (!type.equals(FacetParams.FACET_QUERY)) { // TODO Cut over to an Enum here
       facetValue = localParams.get(CommonParams.VALUE);
     }
 
@@ -578,7 +578,7 @@ public class SimpleFacets {
       }
     }
 
-    if (fdebug != null) {
+    if (fdebug != null && timer != null) {
       long timeElapsed = (long) timer.getTime();
       fdebug.setElapse(timeElapsed);
     }

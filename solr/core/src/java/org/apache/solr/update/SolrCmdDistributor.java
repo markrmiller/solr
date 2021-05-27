@@ -478,14 +478,6 @@ public class SolrCmdDistributor implements Closeable {
           return;
         }
 
-        if (e instanceof ClosedChannelException) {
-          // we may get success but be told the peer is shutting down via exception
-          if (log.isTraceEnabled()) {
-            log.trace("Success for distrib update {}", e);
-          }
-          return;
-        }
-
         Error error = new Error(tag);
         error.t = e;
         error.req = req;

@@ -672,7 +672,7 @@ public class SpellCheckComponent extends SearchComponent implements SolrCoreAwar
       if (theSuggestions.size() > 0) {
         hasSuggestions = true;
       }
-      if (theSuggestions != null && (theSuggestions.size() > 0 || shardRequest)) {
+      if (theSuggestions.size() > 0 || shardRequest) {
         SimpleOrderedMap suggestionList = new SimpleOrderedMap();
         suggestionList.add("numFound", theSuggestions.size());
         suggestionList.add("startOffset", inputToken.startOffset());
@@ -779,7 +779,7 @@ public class SpellCheckComponent extends SearchComponent implements SolrCoreAwar
         boolean isDefault = dictionary.equals(SolrSpellChecker.DEFAULT_DICTIONARY_NAME);
         if (isDefault && !hasDefault) {
           hasDefault = true;
-        } else if (isDefault && hasDefault) {
+        } else if (isDefault) {
           throw new RuntimeException("More than one dictionary is missing name.");
         }
         spellCheckers.put(dictionary, checker);

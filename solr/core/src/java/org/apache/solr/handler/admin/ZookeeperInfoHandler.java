@@ -583,11 +583,9 @@ public final class ZookeeperInfoHandler extends RequestHandlerBase {
       // For some reason, without this the Json is badly formed
       writeKeyValue(json, PATH, "Undefined", true);
 
-      if (collectionStates != null) {
-        CharArr collectionOut = new CharArr();
-        new JSONWriter(collectionOut, 2).write(collectionStates);
-        writeKeyValue(json, "data", collectionOut.toString(), false);
-      }
+      CharArr collectionOut = new CharArr();
+      new JSONWriter(collectionOut, 2).write(collectionStates);
+      writeKeyValue(json, "data", collectionOut.toString(), false);
 
       writeKeyValue(json, "paging", page.getPagingHeader(), false);
 

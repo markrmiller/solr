@@ -170,7 +170,7 @@ public class UpdateStream extends TupleStream implements Expressible {
     expression.addParameter(new StreamExpressionNamedParameter("batchSize", Integer.toString(updateBatchSize)));
     
     if(includeStreams){
-      if(tupleSource instanceof Expressible){
+      if(tupleSource != null){
         expression.addParameter(((Expressible)tupleSource).toExpression(factory));
       } else {
         throw new IOException("This ParallelStream contains a non-expressible TupleStream - it cannot be converted to an expression");

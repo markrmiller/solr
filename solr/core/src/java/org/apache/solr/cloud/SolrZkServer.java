@@ -290,10 +290,11 @@ class SolrZkServerProps extends QuorumPeerConfig {
 
     // multiple matches... try to figure out by port.
     for (QuorumPeer.QuorumServer server : slist.values()) {
-      if (server.addr.equals(thisAddr)) {
-        if (clientPortAddress == null || clientPortAddress.getPort() <= 0)
-          setClientPort(server.addr.getOne().getPort() - 1);
-        return server.id;
+      for (InetSocketAddress address : server.addr.getAllAddresses()) {
+        if (address.equals(thisAddr)) {
+          if (clientPortAddress == null || clientPortAddress.getPort() <= 0) setClientPort(server.addr.getOne().getPort() - 1);
+          return server.id;
+        }
       }
     }
 

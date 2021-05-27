@@ -953,7 +953,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
             log.info(formatString("Could not get expectedVersion {0} from {1} for prop {2}   after {3} attempts", expectedZkVersion, coreUrl, prop, attempts));
           }
         } catch (Exception e) {
-          if (e instanceof InterruptedException || e instanceof AlreadyClosedException) {
+          if (e instanceof AlreadyClosedException) {
             ParWork.propagateInterrupt(e);
             break; // stop looping
           } else {

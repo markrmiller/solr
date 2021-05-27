@@ -2233,7 +2233,7 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
 
       DocCollection newDocState = newState.get(false).get();
       if (newDocState == null) {
-        if (log.isDebugEnabled()) log.debug("State is null from a non null collecton ref, collection=", coll);
+        if (log.isDebugEnabled()) log.debug("State is null from a non null collecton ref, collection={}", coll);
         return;
       }
 

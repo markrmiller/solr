@@ -1101,7 +1101,7 @@ public abstract class SolrCall {
   protected static void onProxyResponseSuccess(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Response serverResponse)
   {
     if (log.isDebugEnabled())
-      log.debug("{} proxying successful");
+      log.debug("proxying successful");
 
     AsyncContext asyncContext = clientRequest.getAsyncContext();
     asyncContext.complete();

@@ -293,16 +293,11 @@ public class StatePublisher implements Closeable {
             stateMessage.getProperties().putIfAbsent("id", id);
           }
 
-//          CacheEntry lastState = stateCache.get(id);
-//          if (lastState != null && state.equals(lastState.state)) {
-//            cacheHits.mark();
-//            log.info("Skipping publish state as {} for {}, because it was the last state published", state, core);
-//            return;
-//          }
-
-          if (state == null) {
-            log.error("Null state passed to publish {}", stateMessage);
-            throw new IllegalArgumentException("Null state passed to publish " + stateMessage);
+          CacheEntry lastState = stateCache.get(id);
+          if (lastState != null && state.equals(lastState.state)) {
+            cacheHits.mark();
+            log.info("Skipping publish state as {} for {}, because it was the last state published", state, core);
+            return;
           }
 
           CacheEntry cacheEntry = new CacheEntry();

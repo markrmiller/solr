@@ -646,15 +646,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
           String wt = request.getParameter(CommonParams.WT);
           SolrCore core = null;
-          if (core != null) {
-             core = solrRequest.getCore();
-          }
-          if (core != null) {
-            responseWriter = core.getQueryResponseWriter(wt);
-          } else {
-            responseWriter = SolrCore.DEFAULT_RESPONSE_WRITERS.getOrDefault(wt,
+
+
+          responseWriter = SolrCore.DEFAULT_RESPONSE_WRITERS.getOrDefault(wt,
                 SolrCore.DEFAULT_RESPONSE_WRITERS.get("standard"));
-          }
+
           if (ct == null) {
             ct = responseWriter.getContentType(solrRequest, solrResponse);
           }

@@ -132,7 +132,7 @@ public class SortStream extends TupleStream implements Expressible {
     }
     
     // by
-    if(comparator instanceof Expressible){
+    if(comparator != null){
       expression.addParameter(new StreamExpressionNamedParameter("by", comparator.toExpression(factory)));
     }
     else{

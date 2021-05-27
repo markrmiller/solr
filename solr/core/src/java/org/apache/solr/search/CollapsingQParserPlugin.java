@@ -643,15 +643,11 @@ public class CollapsingQParserPlugin extends QParserPlugin {
         //Handle ordinalMapping case
         if (segmentValues.advanceExact(contextDoc)) {
           ord = (int)segmentOrdinalMap.get(segmentValues.ordValue());
-        } else {
-          ord = -1;
         }
       } else {
         //Handle top Level FieldCache or Single Segment Case
         if (segmentValues.advanceExact(globalDoc)) {
           ord = segmentValues.ordValue();
-        } else {
-          ord = -1;
         }
       }
 

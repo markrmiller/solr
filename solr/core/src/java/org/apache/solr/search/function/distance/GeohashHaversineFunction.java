@@ -107,8 +107,7 @@ public class GeohashHaversineFunction extends ValueSource {
   public boolean equals(Object o) {
     if (this.getClass() != o.getClass()) return false;
     GeohashHaversineFunction other = (GeohashHaversineFunction) o;
-    return GeohashHaversineFunction.name().equals(GeohashHaversineFunction.name())
-            && geoHash1.equals(other.geoHash1) &&
+    return geoHash1.equals(other.geoHash1) &&
             geoHash2.equals(other.geoHash2) &&
             degreesToDist == other.degreesToDist;
   }

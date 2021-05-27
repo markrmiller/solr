@@ -55,7 +55,7 @@ public class StringDistanceFunction extends ValueSource {
         String s2 = str2DV.strVal(doc);
         if (null == s1 || null == s2) {
           // the only thing a missing value scores 1.0 with is another missing value
-          return (s1 == s2) ? 1.0F : 0.0F;
+          return (s1.equals(s2)) ? 1.0F : 0.0F;
         }
         return dist.getDistance(s1, s2);
       }

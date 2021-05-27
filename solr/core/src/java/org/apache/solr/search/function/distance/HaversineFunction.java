@@ -123,8 +123,7 @@ public class HaversineFunction extends ValueSource {
   public boolean equals(Object o) {
     if (this.getClass() != o.getClass()) return false;
     HaversineFunction other = (HaversineFunction) o;
-    return HaversineFunction.name().equals(HaversineFunction.name())
-            && p1.equals(other.p1) &&
+    return p1.equals(other.p1) &&
             p2.equals(other.p2) && radius == other.radius;
   }
 

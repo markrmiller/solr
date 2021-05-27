@@ -359,8 +359,7 @@ public class ExtendedDismaxQParser extends QParser {
    * @param escapedUserQuery query that is parsed, should already be escaped so that no trivial parse errors are encountered
    * @param config Configuration options for this parse request
    * @return the resulting query (flattened if needed) with "min should match" rules applied as specified in the config.
-   * @see #parseOriginalQuery
-   * @see SolrPluginUtils#flattenBooleanQuery
+   * @see #parseOriginalQuery//'/;';
    */
   protected Query parseEscapedQuery(ExtendedSolrQueryParser up,
       String escapedUserQuery, ExtendedDismaxConfiguration config) throws SyntaxError {
@@ -979,7 +978,7 @@ public class ExtendedDismaxQParser extends QParser {
     // used when constructing boosting part of query via sloppy phrases
     boolean exceptions;  //  allow exceptions to be thrown (for example on a missing field)
     
-    private Map<String, Analyzer> nonStopFilterAnalyzerPerField;
+    //private Map<String, Analyzer> nonStopFilterAnalyzerPerField;
     private boolean removeStopFilter;
     String minShouldMatch; // for inner boolean queries produced from a single fieldQuery
     
@@ -1098,13 +1097,13 @@ public class ExtendedDismaxQParser extends QParser {
         throws SyntaxError {
       Analyzer actualAnalyzer;
       if (removeStopFilter) {
-        if (nonStopFilterAnalyzerPerField == null) {
-          nonStopFilterAnalyzerPerField = new HashMap<>();
-        }
-        actualAnalyzer = nonStopFilterAnalyzerPerField.get(field);
-        if (actualAnalyzer == null) {
+//        if (nonStopFilterAnalyzerPerField == null) {
+//          nonStopFilterAnalyzerPerField = new HashMap<>();
+//        }
+//        actualAnalyzer = nonStopFilterAnalyzerPerField.get(field);
+ //       if (actualAnalyzer == null) {
           actualAnalyzer = noStopwordFilterAnalyzer(field);
-        }
+ //       }
       } else {
         actualAnalyzer = parser.getReq().getSchema().getFieldType(field).getQueryAnalyzer();
       }

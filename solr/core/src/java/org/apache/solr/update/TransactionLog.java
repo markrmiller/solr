@@ -105,7 +105,7 @@ public class TransactionLog implements Closeable {
             "TransactionLog doesn't know how to serialize " + o.getClass() + "; try implementing ObjectResolver?");
   };
 
-  public class LogCodec extends JavaBinCodec {
+  public static class LogCodec extends JavaBinCodec {
 
     public LogCodec(JavaBinCodec.ObjectResolver resolver) {
       super(resolver);

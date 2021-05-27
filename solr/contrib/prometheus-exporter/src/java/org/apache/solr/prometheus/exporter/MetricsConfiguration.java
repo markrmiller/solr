@@ -17,10 +17,12 @@
 
 package org.apache.solr.prometheus.exporter;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
+import javax.xml.xpath.XPathFactoryConfigurationException;
 import java.io.File;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
@@ -86,8 +88,14 @@ public class MetricsConfiguration {
 
     // See solr-core XmlConfigFile
     final DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+    dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+    dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    dbf.setXIncludeAware(false);
+    dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    dbf.setExpandEntityReferences(false);
     try {
-      dbf.setXIncludeAware(true);
+     // dbf.setXIncludeAware(true);
       dbf.setNamespaceAware(true);
     } catch (UnsupportedOperationException e) {
       log.warn("{} XML parser doesn't support XInclude option", resource);
@@ -128,7 +136,20 @@ public class MetricsConfiguration {
     );
   }
 
-  static final XPathFactory xpathFactory = XPathFactory.newInstance();
+  static final XPathFactory xpathFactory;
+  static {
+    try {
+      xpathFactory = XPathFactory.newInstance();
+      xpathFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      xpathFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+      xpathFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+      xpathFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+
+    } catch (XPathFactoryConfigurationException e) {
+      throw new RuntimeException(e);
+    }
+
+  }
 
   private static Node getNode(Document doc, String path) {
     // Copied from solr-core XmlConfigFile.getNode with simplifications

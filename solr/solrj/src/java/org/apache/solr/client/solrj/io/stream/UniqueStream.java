@@ -112,7 +112,7 @@ public class UniqueStream extends TupleStream implements Expressible {
     }
     
     // over
-    if(originalEqualitor instanceof Expressible){
+    if(originalEqualitor != null){
       expression.addParameter(new StreamExpressionNamedParameter("over", originalEqualitor.toExpression(factory)));
     }
     else{
