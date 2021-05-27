@@ -320,7 +320,7 @@ public class TestStressThreadBackup extends SolrCloudTestCase {
    */
   private static SolrInputDocument makeDoc(String id, String type) {
     final SolrInputDocument doc = new SolrInputDocument("id", id, "type_s", type);
-    for (int f = 0; f < 100; f++) {
+    for (int f = 0; f < 35; f++) {
       doc.addField(f + "_s", TestUtil.randomUnicodeString(SolrTestCase.random(), 20));
     }
     return doc;

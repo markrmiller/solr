@@ -549,7 +549,7 @@ public class JavaBinCodec implements PushWriter {
 
     @Override
     public MapWriter.EntryWriter put(CharSequence k, double v) throws IOException {
-      codec.writeExternString(k);
+      codec.writeStr(k, false);
       codec.writeDouble(v);
       return this;
     }
@@ -1039,9 +1039,9 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public CharSequence readStr(DataInputInputStream dis, StringCache stringCache, boolean readStringAsCharSeq) throws IOException {
-    if (readStringAsCharSeq) {
-      return readUtf8(dis);
-    }
+//    if (readStringAsCharSeq) {
+//      return readUtf8(dis);
+//    }
     //int sz = readSize(dis);
     return _readStr(dis, stringCache, 0);
   }
@@ -1333,26 +1333,7 @@ public class JavaBinCodec implements PushWriter {
 //  private Map<String, Integer> stringsMap;
 //  private List<CharSequence> stringsList;
 
-  public void writeExternString(CharSequence s) throws IOException {
-    if (s == null) {
-      writeTag(NULL);
-      return;
-    }
-   // Integer idx = stringsMap == null ? null : stringsMap.get(s.toString());
-    //if (idx == null) idx = 0;
-    writeTag(EXTERN_STRING);
-   // if (idx == 0) {
-      if (s instanceof Utf8CharSequence) {
-        throw new IllegalStateException(s.toString());
-      } else {
-        writeStr(s, false);
-     //   new DataOutputStream(daos).writeUTF((String) s);
-      }
-   //   if (stringsMap == null) stringsMap = new HashMap<>();
-   //   stringsMap.put(s.toString(), ++stringsCount);
-   // }
 
-  }
 
 //  public CharSequence readExternString(DataInputInputStream fis) throws IOException {
 //    int idx = readSize(fis);

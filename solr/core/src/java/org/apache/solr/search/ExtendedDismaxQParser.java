@@ -41,6 +41,7 @@ import org.apache.lucene.queries.function.FunctionScoreQuery;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.valuesource.ProductFloatFunction;
 import org.apache.lucene.queries.function.valuesource.QueryValueSource;
+import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BoostQuery;
@@ -49,7 +50,6 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.MultiPhraseQuery;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.spans.SpanQuery;
 import org.apache.solr.analysis.TokenizerChain;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -360,7 +360,6 @@ public class ExtendedDismaxQParser extends QParser {
    * @param config Configuration options for this parse request
    * @return the resulting query (flattened if needed) with "min should match" rules applied as specified in the config.
    * @see #parseOriginalQuery
-   * @see SolrPluginUtils#flattenBooleanQuery
    */
   protected Query parseEscapedQuery(ExtendedSolrQueryParser up,
       String escapedUserQuery, ExtendedDismaxConfiguration config) throws SyntaxError {

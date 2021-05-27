@@ -150,7 +150,7 @@ public class TestFieldCacheWithThreads extends SolrTestCase {
   @LuceneTestCase.Nightly // can generate a lot of garbage
   public void test2() throws Exception {
     Random random = random();
-    final int NUM_DOCS = TEST_NIGHTLY ? SolrTestUtil.atLeast(100) : 20;
+    final int NUM_DOCS = TEST_NIGHTLY ? SolrTestUtil.atLeast(63) : 20;
     final Directory dir = new ByteBuffersDirectory();
     final SolrRandomIndexWriter writer = new SolrRandomIndexWriter(SolrTestCase.random(), dir, SolrTestUtil.newIndexWriterConfig());
     final boolean allowDups = random.nextBoolean();

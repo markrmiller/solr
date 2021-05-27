@@ -57,7 +57,6 @@ import org.apache.solr.search.DocSet;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.search.facet.FacetDebugInfo;
 import org.apache.solr.util.RTimer;
-import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1432,7 +1431,7 @@ public class FacetComponent extends SearchComponent {
     public long[] missingMax;
     // a bitset for each shard, keeping track of which terms seen
     public FixedBitSet[] counted; 
-    public Map<String,ShardFacetCount> counts = new NonBlockingHashMap<>(64);
+    public HashMap<String,ShardFacetCount> counts = new HashMap<>(64);
     public int termNum;
     
     public int initialLimit; // how many terms requested in first phase
@@ -1468,7 +1467,7 @@ public class FacetComponent extends SearchComponent {
       for (int i = 0; i < sz; i++) {
         String name = shardCounts.getName(i);
         long count = ((Number) shardCounts.getVal(i)).longValue();
-        if (name == null) {
+        if (name == null || name.length() == 0) {
           missingCount += count;
           numReceived--;
         } else {
@@ -1483,8 +1482,10 @@ public class FacetComponent extends SearchComponent {
             } else {
               sfc.indexed = new BytesRef(ftype.toInternal(sfc.name));
             }
-            sfc.termNum = termNum++;
-            counts.put(name, sfc);
+            if (sfc.indexed.length > 0) {
+              sfc.termNum = termNum++;
+              counts.put(name, sfc);
+            }
           }
           incCount(sfc, count);
           terms.set(sfc.termNum);

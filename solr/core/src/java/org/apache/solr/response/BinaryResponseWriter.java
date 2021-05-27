@@ -18,10 +18,7 @@ package org.apache.solr.response;
 
 import java.io.*;
 import java.lang.invoke.MethodHandles;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
 import org.agrona.ExpandableArrayBuffer;
@@ -37,9 +34,9 @@ import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utf8CharSequence;
+import org.apache.solr.legacy.LegacyFieldType;
 import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.schema.SchemaField;
+import org.apache.solr.schema.*;
 import org.apache.solr.search.DocList;
 import org.apache.solr.search.ReturnFields;
 import org.slf4j.Logger;
@@ -88,13 +85,15 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
 
     @Override
     public Object resolve(Object o, JavaBinCodec codec) throws IOException {
-//      if (o instanceof StoredField) {
-//        CharSequence val = ((StoredField) o).getCharSequenceValue();
-//        if (val instanceof Utf8CharSequence) {
-//          codec.writeUTF8Str((Utf8CharSequence) val);
-//          return null;
-//        }
-//      }
+      if (o instanceof StoredField) {
+        if (((StoredField) o).fieldType() instanceof LegacyFieldType) {
+          CharSequence val = ((StoredField) o).getCharSequenceValue();
+          if (val instanceof Utf8CharSequence) {
+            codec.writeStr(val.toString(), false);
+            return null;
+          }
+        }
+      }
       if (o instanceof ResultContext) {
         ReturnFields orig = returnFields;
         ResultContext res = (ResultContext)o;
