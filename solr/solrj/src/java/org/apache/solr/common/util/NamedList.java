@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.agrona.collections.Hashing;
 import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.MapWriter;
@@ -467,7 +467,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    */
   public SolrParams toSolrParams() {
     final int size = this.size();
-    Map<String,String[]> map = new Object2ObjectHashMap(size, Hashing.DEFAULT_LOAD_FACTOR);
+    Map<String,String[]> map = new Object2ObjectLinkedOpenHashMap<>(size, 0.5f);
 
     for (int i = 0; i< size; i++) {
       String name = this.getName(i);

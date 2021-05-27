@@ -48,19 +48,6 @@ import java.util.Map;
 public class FieldTypeXmlAdapter {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  protected final static ThreadLocal<DocumentBuilder> THREAD_LOCAL_DB= new ThreadLocal<>() {
-    protected DocumentBuilder initialValue() {
-      DocumentBuilder db;
-      try {
-        db = dbf.newDocumentBuilder();
-      } catch (ParserConfigurationException e) {
-        log.error("Error in parser configuration", e);
-        throw new RuntimeException(e);
-      }
-      return  db;
-    }
-  };
-
 
   public static final javax.xml.parsers.DocumentBuilderFactory dbf;
 
@@ -76,8 +63,8 @@ public class FieldTypeXmlAdapter {
     }
   }
 
-  public static DocumentBuilder getDocumentBuilder() {
-    DocumentBuilder db = THREAD_LOCAL_DB.get();
+  public static DocumentBuilder getDocumentBuilder() throws ParserConfigurationException {
+    DocumentBuilder db = dbf.newDocumentBuilder();
     return db;
   }
 

@@ -19,7 +19,9 @@ package org.apache.solr.client.solrj.response;
 
 
 import java.util.Collections;
+import java.util.Map;
 
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.response.json.NestableJsonFacet;
 import org.apache.solr.common.util.NamedList;
@@ -29,8 +31,8 @@ public class NestableJsonFacetTest extends SolrTestCaseJ4 {
 
   @Test
   public void testParsing() {
-    NamedList<Object> list = new NamedList<>();
-    list.add("count", 12);
+    Map list = new Object2ObjectHashMap<>();
+    list.put("count", 12);
     NamedList<Object> buckets = new NamedList<Object>() {{
       add("val", "Nike");
     }};
@@ -50,14 +52,14 @@ public class NestableJsonFacetTest extends SolrTestCaseJ4 {
       }});
     }};
     vals.add("buckets", Collections.singletonList(buckets));
-    list.add("test", vals);
+    list.put("test", vals);
     NestableJsonFacet facet = new NestableJsonFacet(list);
 
     assertEquals(12L, facet.getCount());
     assertEquals(9L, facet.getBucketBasedFacets("test").getBetween());
     list.clear();
 
-    list.add("count", 12L);
+    list.put("count", 12L);
     buckets = new NamedList<Object>() {{
       add("val", "Nike");
     }};
@@ -77,7 +79,7 @@ public class NestableJsonFacetTest extends SolrTestCaseJ4 {
       }});
     }};
     vals.add("buckets", Collections.singletonList(buckets));
-    list.add("test", vals);
+    list.put("test", vals);
     facet = new NestableJsonFacet(list);
     assertEquals(12L, facet.getCount());
     assertEquals(2L, facet.getBucketBasedFacets("test").getAfter());

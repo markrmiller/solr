@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.util;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.apache.http.HttpEntity;
@@ -341,7 +342,7 @@ public class Utils {
       throw new IllegalArgumentException("arguments should be key,value");
     }
     int sz = keyVals.length;
-    Map<String,Object> propMap = new LinkedHashMap<>(32);
+    Map<String,Object> propMap = new Object2ObjectLinkedOpenHashMap<>(32, 0.5f);
 
     for (int i = 0; i < sz; i += 2) {
       Object keyVal = keyVals[i + 1];

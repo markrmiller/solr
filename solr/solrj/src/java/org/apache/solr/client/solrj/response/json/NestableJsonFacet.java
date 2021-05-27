@@ -18,12 +18,11 @@
 package org.apache.solr.client.solrj.response.json;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.agrona.collections.Object2ObjectHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.solr.common.util.NamedList;
 
 /**
@@ -40,13 +39,13 @@ public class NestableJsonFacet {
   private final Map<String, Object> statsByName;
   private final Map<String, HeatmapJsonFacet> heatmapFacetsByName;
 
-  public NestableJsonFacet(NamedList<Object> facetNL) {
-    queryFacetsByName = new Object2ObjectHashMap<>();
-    bucketBasedFacetByName = new Object2ObjectHashMap<>();
-    heatmapFacetsByName = new Object2ObjectHashMap<>();
-    statsByName = new Object2ObjectHashMap<>();
+  public NestableJsonFacet(Map<String, Object> facetNL) {
+    queryFacetsByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+    bucketBasedFacetByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+    heatmapFacetsByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+    statsByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
 
-    for (Map.Entry<String, Object> entry : facetNL) {
+    for (Map.Entry<String, Object> entry : facetNL.entrySet()) {
       final String key = entry.getKey();
       if (getKeysToSkip().contains(key)) {
         continue;
@@ -57,7 +56,7 @@ public class NestableJsonFacet {
         // Stat/agg facet value
         statsByName.put(key, entry.getValue());
       } else if(entry.getValue() instanceof NamedList) { // Either heatmap/query/range/terms facet
-        final NamedList<Object> facet = (NamedList<Object>) entry.getValue();
+        final Map facet = (Map) entry.getValue();
         final boolean isBucketBased = facet.get("buckets") != null;
         final boolean isHeatmap = HeatmapJsonFacet.isHeatmapFacet(facet);
         if (isBucketBased) {
@@ -65,7 +64,7 @@ public class NestableJsonFacet {
         } else if (isHeatmap) {
           heatmapFacetsByName.put(key, new HeatmapJsonFacet(facet));
         } else { // "query" facet
-          queryFacetsByName.put(key, new NestableJsonFacet(facet));
+          queryFacetsByName.put(key, new NestableJsonFacet((Map<String, Object>) facet));
         }
       }
     }

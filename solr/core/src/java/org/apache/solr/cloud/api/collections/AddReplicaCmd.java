@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
@@ -190,7 +191,7 @@ public class AddReplicaCmd implements OverseerCollectionMessageHandler.Cmd {
     }
 
     for (CreateReplica createReplica : createReplicas) {
-      ZkNodeProps replicaProps = new ZkNodeProps(message.getProperties());
+      ZkNodeProps replicaProps = new ZkNodeProps(new Object2ObjectLinkedOpenHashMap<>(message.getProperties(), 0.5f));
       replicaProps.getProperties().put(ZkStateReader.CORE_NAME_PROP, createReplica.coreName);
       replicaProps.getProperties().put("id", createReplica.id);
       replicaProps.getProperties().put(NODE_NAME_PROP, createReplica.node);

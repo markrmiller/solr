@@ -17,7 +17,8 @@
 
 package org.apache.solr.client.solrj.request.json;
 
-import org.agrona.collections.Object2ObjectHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +45,7 @@ public abstract class JsonFacetMap<B extends JsonFacetMap<B>> extends HashMap<St
 
   public B withSubFacet(String facetName, JsonFacetMap map) {
     if (! containsKey("facet")) {
-      put("facet", new Object2ObjectHashMap<String, Object>());
+      put("facet", new Object2ObjectLinkedOpenHashMap<>());
     }
 
     final Map<String, Object> subFacetMap = (Map<String, Object>) get("facet");
@@ -54,7 +55,7 @@ public abstract class JsonFacetMap<B extends JsonFacetMap<B>> extends HashMap<St
 
   public B withStatSubFacet(String facetName, String statFacet) {
     if (! containsKey("facet")) {
-      put("facet", new Object2ObjectHashMap<String, Object>());
+      put("facet", new Object2ObjectLinkedOpenHashMap<String, Object>());
     }
 
     final Map<String, Object> subFacetMap = (Map<String, Object>) get("facet");

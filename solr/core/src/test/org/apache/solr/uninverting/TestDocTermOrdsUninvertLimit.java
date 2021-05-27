@@ -29,6 +29,7 @@ import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCase;
 import org.apache.lucene.util.TestUtil;
@@ -52,7 +53,7 @@ public class TestDocTermOrdsUninvertLimit extends SolrTestCase {
     final int TERMS = REF_LIMIT/DOCS;            // Each document must have this many references aka terms hit limit
 
     // disk based Directory and IWC settings to reduce risk of OOM
-    Directory dir = LuceneTestCase.newFSDirectory(SolrTestUtil.createTempDir("TestDocTermOrdsUninvertLimit"));
+    Directory dir = SolrTestUtil.newFSDirectory(SolrTestUtil.createTempDir("TestDocTermOrdsUninvertLimit"), FSLockFactory.getDefault());
     final IndexWriter w = new IndexWriter(dir,
                                           new IndexWriterConfig()
                                           .setMaxBufferedDocs(IndexWriterConfig.DISABLE_AUTO_FLUSH)

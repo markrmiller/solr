@@ -21,6 +21,7 @@ import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.search.DocSet;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.function.IntFunction;
 
 // sep class from slotacc to avoid accessing in init and possible deadlocks
@@ -68,7 +69,7 @@ class NullCountSlotAcc extends SlotAcc.CountSlotAcc {
     throw new UnsupportedOperationException("not supported");
   }
 
-  @Override public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
+  @Override public void setValues(Map bucket, int slotNum) throws IOException {
     throw new UnsupportedOperationException("not supported");
   }
 

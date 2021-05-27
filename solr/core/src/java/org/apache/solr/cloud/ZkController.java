@@ -17,6 +17,7 @@
 package org.apache.solr.cloud;
 
 import com.codahale.metrics.Counter;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.LockListener;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -640,7 +641,7 @@ public class ZkController implements Closeable, Runnable {
         log.warn("Leader {} met tragic exception, give up its leadership", key, tragicException);
         try {
           // by using Overseer to remove and add replica back, we can do the task in an async/robust manner
-          Map<String,Object> props = new HashMap<>();
+          Map<String,Object> props = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
           props.put(Overseer.QUEUE_OPERATION, "deletereplica");
           props.put(COLLECTION_PROP, cd.getCollectionName());
           props.put(SHARD_ID_PROP, shard.getName());
@@ -1358,7 +1359,7 @@ public class ZkController implements Closeable, Runnable {
     log.debug("publishing state={}", state);
     String collection = cd.getCloudDescriptor().getCollectionName();
     String shardId = cd.getCloudDescriptor().getShardId();
-    Map<String,Object> props = new HashMap<>();
+    Map<String,Object> props = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     MDCLoggingContext.setCoreName(cd.getName());
     try {
       // System.out.println(Thread.currentThread().getStackTrace()[3]);
@@ -1514,7 +1515,8 @@ public class ZkController implements Closeable, Runnable {
     ZkNodeProps props;
     if (data != null) {
       props = ZkNodeProps.load(data);
-      Map<String, Object> newProps = new HashMap<>(props.getProperties());
+      Map<String, Object> newProps = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+      newProps.putAll(props.getProperties());
       newProps.put(CONFIGNAME_PROP, confSetName);
       props = new ZkNodeProps(newProps);
     } else {

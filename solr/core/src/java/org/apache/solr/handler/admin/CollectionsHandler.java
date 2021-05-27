@@ -18,6 +18,7 @@ package org.apache.solr.handler.admin;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.api.Api;
@@ -1501,7 +1502,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
    * Copy all params to the given map or if the given map is null create a new one
    */
   static Map<String, Object> copy(SolrParams source, Map<String, Object> sink, Collection<String> paramNames) {
-    if (sink == null) sink = new LinkedHashMap<>();
+    if (sink == null) sink =  new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);;
     for (String param : paramNames) {
       String[] v = source.getParams(param);
       if (v != null && v.length > 0) {

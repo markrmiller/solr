@@ -17,12 +17,8 @@
 package org.apache.solr.client.solrj.io.stream;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -758,7 +754,7 @@ public class FacetStream extends TupleStream implements Expressible  {
                                 Metric[] metrics) {
 
     Tuple tuple = new Tuple();
-    NamedList facets = (NamedList)response.get("facets");
+    Map facets = (Map)response.get("facets");
     fillTuples(0,
                tuples,
                tuple,
@@ -768,7 +764,7 @@ public class FacetStream extends TupleStream implements Expressible  {
 
   }
 
-  private static void fillTuples(int level, List<Tuple> tuples, Tuple currentTuple, NamedList facets, Bucket[] _buckets, Metric[] _metrics) {
+  private static void fillTuples(int level, List<Tuple> tuples, Tuple currentTuple, Map facets, Bucket[] _buckets, Metric[] _metrics) {
 
     String bucketName = _buckets[level].toString();
     NamedList nl = (NamedList)facets.get(bucketName);
@@ -777,7 +773,7 @@ public class FacetStream extends TupleStream implements Expressible  {
     }
     List allBuckets = (List)nl.get("buckets");
     for(int b=0; b<allBuckets.size(); b++) {
-      NamedList bucket = (NamedList)allBuckets.get(b);
+      Map bucket = (Map)allBuckets.get(b);
       Object val = bucket.get("val");
       if (val instanceof Integer) {
         val=((Integer)val).longValue();  // calcite currently expects Long values here

@@ -402,7 +402,7 @@ public abstract class FacetRequest {
   }
 
   /** Process the request with the facet context settings, a parameter-object. */
-  final Object process(FacetContext fcontext) throws IOException {
+  final Map process(FacetContext fcontext) throws IOException {
     @SuppressWarnings("rawtypes")
     FacetProcessor facetProcessor = createFacetProcessor(fcontext);
 

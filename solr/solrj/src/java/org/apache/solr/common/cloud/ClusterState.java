@@ -25,13 +25,17 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.Utils;
 import org.apache.zookeeper.KeeperException;
+import org.jctools.maps.NonBlockingHashMap;
 import org.noggit.JSONWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,16 +162,22 @@ public class ClusterState implements JSONWriter.Writable {
    * @return a map of collection name vs DocCollection objectoldDoc.getSlicesMap()
    */
   public Map<String,DocCollection> getCollectionsMap() {
-    Map<String,DocCollection> result = new LinkedHashMap<>(collectionStates.size());
+    Map<String, DocCollection> result = new NonBlockingHashMap(collectionStates.size());
     result.putAll(collectionStates);
-    collectionStateRefs.forEach((s, collectionRef) -> {
-      try {
-        DocCollection docCollection = collectionRef.get().get();
-        result.put(s, docCollection);
-      } catch (Exception e) {
-        throw new SolrException(ErrorCode.SERVER_ERROR, e);
-      }
-    });
+    try (ParWork work = new ParWork(this)) {
+      work.collect("", () -> {
+        collectionStateRefs.forEach((s, collectionRef) -> {
+
+          try {
+            DocCollection docCollection = collectionRef.get().get();
+            result.put(s, docCollection);
+          } catch (Exception e) {
+            throw new SolrException(ErrorCode.SERVER_ERROR, e);
+          }
+        });
+
+      });
+    }
     return result;
   }
 

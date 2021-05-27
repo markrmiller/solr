@@ -17,11 +17,13 @@
 
 package org.apache.solr.search.facet;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
-import org.apache.solr.common.util.SimpleOrderedMap;
 
 public class FacetBucket {
   @SuppressWarnings("rawtypes")
@@ -69,15 +71,15 @@ public class FacetBucket {
     return merger;
   }
 
-  public void mergeBucket(@SuppressWarnings("rawtypes") SimpleOrderedMap bucket, FacetMerger.Context mcontext) {
+  public void mergeBucket(@SuppressWarnings("rawtypes") Map bucket, FacetMerger.Context mcontext) {
     // todo: for refinements, we want to recurse, but not re-do stats for intermediate buckets
 
     mcontext.setShardFlag(bucketNumber);
-
+    Set<Map.Entry<String,Object>> entrySet = bucket.entrySet();
     // drive merging off the received bucket?
-    for (int i=0; i<bucket.size(); i++) {
-      String key = bucket.getName(i);
-      Object val = bucket.getVal(i);
+    for (Map.Entry<String,Object> entry : entrySet) {
+      String key = entry.getKey();
+      Object val = entry.getValue();
       if ("count".equals(key)) {
         count += ((Number)val).longValue();
         continue;
@@ -97,18 +99,18 @@ public class FacetBucket {
 
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  public SimpleOrderedMap getMergedBucket() {
-    SimpleOrderedMap out = new SimpleOrderedMap( (subs == null ? 0 : subs.size()) + 2 );
+  public Map getMergedBucket() {
+    Map out = new Object2ObjectLinkedOpenHashMap( (subs == null ? 0 : subs.size()) + 2 , 0.5f);
     if (bucketValue != null) {
-      out.add("val", bucketValue);
+      out.put("val", bucketValue);
     }
-    out.add("count", count);
+    out.put("count", count);
     if (subs != null) {
       for (Map.Entry<String,FacetMerger> mergerEntry : subs.entrySet()) {
         FacetMerger subMerger = mergerEntry.getValue();
         Object mergedResult = subMerger.getMergedResult();
         if (null != mergedResult) {
-          out.add(mergerEntry.getKey(), mergedResult);
+          out.put(mergerEntry.getKey(), mergedResult);
         }
       }
     }

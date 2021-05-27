@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
@@ -47,7 +48,7 @@ public class VersionBucket {
   private final ReentrantLock lock = new ReentrantLock(true);
   private final Condition lockCondition = lock.newCondition();
 
-  private Map<BytesRef,LongAdder> blockedIds = new NonBlockingHashMap<>();
+  private Map<BytesRef,LongAdder> blockedIds = new Object2ObjectLinkedOpenHashMap<>(16, 0.75f);
 
   public void updateHighest(long val) {
     highest.updateAndGet(operand -> Math.max(operand, Math.abs(val)));

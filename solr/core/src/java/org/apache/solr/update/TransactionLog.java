@@ -16,37 +16,31 @@
  */
 package org.apache.solr.update;
 
+import it.unimi.dsi.fastutil.longs.Long2LongAVLTreeMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.apache.lucene.util.BytesRef;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.util.*;
+import org.eclipse.jetty.io.RuntimeIOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.*;
 import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantLock;
-
-import it.unimi.dsi.fastutil.io.FastBufferedInputStream;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import org.agrona.ExpandableArrayBuffer;
-import org.agrona.MutableDirectBuffer;
-import org.apache.solr.common.util.*;
-import org.apache.lucene.util.BytesRef;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrInputDocument;
-import org.eclipse.jetty.io.RuntimeIOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  *  Log Format: List{Operation, Version, ...}
@@ -324,7 +318,7 @@ public class TransactionLog implements Closeable {
     assert pos == 0;
 
     @SuppressWarnings({"rawtypes"})
-    Map header = new LinkedHashMap<String, Object>(2);
+    Map header = new Object2ObjectLinkedOpenHashMap<String, Object>(2, 0.25f);
     header.put("SOLR_TLOG", 1); // a magic string + version number
   //  header.put("strings", globalStringList);
     codec.marshal(header, fos);
@@ -872,7 +866,7 @@ public class TransactionLog implements Closeable {
   public class SortedLogReader extends LogReader {
     private final long startingPos;
     private boolean inOrder = true;
-    private TreeMap<Long, Long> versionToPos;
+    private Map<Long, Long> versionToPos;
     Iterator<Long> iterator;
 
     public SortedLogReader(long startingPos) {
@@ -883,7 +877,7 @@ public class TransactionLog implements Closeable {
     @Override
     public Object next() throws IOException, InterruptedException {
       if (versionToPos == null) {
-        versionToPos = new TreeMap<>();
+        versionToPos = new Long2LongAVLTreeMap();
         Object o;
         long pos = startingPos;
 

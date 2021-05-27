@@ -269,7 +269,7 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
 
       try {
         SimpleSolrResponse rsp = snitchContext.invokeWithRetry(solrNode, CommonParams.METRICS_PATH, params);
-        NamedList<?> metrics = (NamedList<?>) rsp.nl.get("metrics");
+        NamedList<?> metrics = (NamedList<?>) ((Map)rsp.nl).get("metrics");
 
         if (requestedTags.contains(Variable.FREEDISK.tagName)) {
           Object n = Utils.getObjectByPath(metrics, true, "solr.node/CONTAINER.fs.usableSpace");

@@ -429,7 +429,7 @@ public class TestRangeQuery extends SolrTestCaseJ4 {
     typesMv.put(NumberType.DOUBLE, new String[]{"tds", "tds_dv", "tds_ni_dv", "ds_p", "ds_ni_p", "ds_ndv_p"});
     typesMv.put(NumberType.DATE, new String[]{"tdts", "tdts_dv", "tdts_ni_dv", "dts_p", "dts_ni_p", "dts_ndv_p"});
 
-    final int atLeast = SolrTestUtil.atLeast(TEST_NIGHTLY ? 500 : 50);
+    final int atLeast = SolrTestUtil.atLeast(TEST_NIGHTLY ? 313 : 50);
     SolrInputDocument document = new SolrInputDocument();
     for (int i = 0; i < atLeast; i++) {
       if (random.nextInt(50) == 0) {
@@ -495,7 +495,7 @@ public class TestRangeQuery extends SolrTestCaseJ4 {
     types.values().toArray(possibleTypes);
     String[][] possibleTypesMv = new String[typesMv.size()][];
     typesMv.values().toArray(possibleTypesMv);
-    for (int i = 0; i < SolrTestUtil.atLeast(1000); i++) {
+    for (int i = 0; i < SolrTestUtil.atLeast(513); i++) {
       doTestQuery(cardinality, false, SolrTestCaseUtil.pickRandom(possibleTypes));
       doTestQuery(cardinality, true, SolrTestCaseUtil.pickRandom(possibleTypesMv));
     }

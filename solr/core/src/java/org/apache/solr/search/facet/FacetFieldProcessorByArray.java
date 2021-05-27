@@ -19,12 +19,13 @@ package org.apache.solr.search.facet;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.Map;
 import java.util.function.IntFunction;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.search.Query;
-import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.facet.SlotAcc.SlotContext;
 
@@ -62,8 +63,8 @@ abstract class FacetFieldProcessorByArray extends FacetFieldProcessor {
     response = calcFacets();
   }
 
-  private SimpleOrderedMap<Object> calcFacets() throws IOException {
-    SimpleOrderedMap<Object> refineResult = null;
+  private Map calcFacets() throws IOException {
+    Map refineResult = null;
     boolean skipThisFacet = (fcontext.flags & SKIP_FACET) != 0;
 
     if (fcontext.facetInfo != null) {
@@ -93,10 +94,10 @@ abstract class FacetFieldProcessorByArray extends FacetFieldProcessor {
         allBucketsAcc = new SpecialSlotAcc(fcontext, null, -1, accs, 0);
         collectDocs();
 
-        SimpleOrderedMap<Object> allBuckets = new SimpleOrderedMap<>();
-        allBuckets.add("count", allBucketsAcc.getSpecialCount());
+        Map allBuckets = new Object2ObjectLinkedOpenHashMap(32, .5f);
+        allBuckets.put("count", allBucketsAcc.getSpecialCount());
         allBucketsAcc.setValues(allBuckets, -1); // -1 slotNum is unused for SpecialSlotAcc
-        refineResult.add("allBuckets", allBuckets);
+        refineResult.put("allBuckets", allBuckets);
         return refineResult;
       }
     }

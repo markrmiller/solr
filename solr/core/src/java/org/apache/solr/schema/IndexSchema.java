@@ -16,11 +16,14 @@
  */
 package org.apache.solr.schema;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.sf.saxon.om.AttributeMap;
 import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.tree.tiny.TinyAttributeImpl;
 import net.sf.saxon.tree.tiny.TinyElementImpl;
 import net.sf.saxon.tree.tiny.TinyTextualElement;
+import org.agrona.collections.ObjectHashSet;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.DelegatingAnalyzerWrapper;
 import org.apache.lucene.index.IndexableField;
@@ -148,15 +151,13 @@ public class IndexSchema {
   protected volatile Map<String,FieldType> fieldTypes = new HashMap<>();
 
   protected final List<SchemaField> fieldsWithDefaultValue = new ArrayList<>();
-  protected final Collection<SchemaField> requiredFields = new HashSet<>();
+  protected final Collection<SchemaField> requiredFields = new ObjectOpenHashSet<>(16, 0.5f);
   protected DynamicField[] dynamicFields = EMPTY_DYNAMIC_FIELDS;
   protected volatile boolean isUsableForChildDocs;
 
   public DynamicField[] getDynamicFields() { return dynamicFields; }
 
-  //protected volatile Queue<DynamicField> dynamicFieldsQueue = new ConcurrentLinkedDeque<>();
-
-  protected final Cache<String, SchemaField> dynamicFieldCache = new ConcurrentLRUCache(10000, 8000, 9000,100, false,false, null);
+  protected final Map<String, SchemaField> dynamicFieldCache = new NonBlockingHashMap<>();
 
   private volatile Analyzer indexAnalyzer;
   private volatile Analyzer queryAnalyzer;
@@ -166,13 +167,13 @@ public class IndexSchema {
 
   protected volatile List<SchemaAware> schemaAware = new ArrayList<>();
 
-  protected volatile Map<String, List<CopyField>> copyFieldsMap = new HashMap<>();
+  protected volatile Map<String, List<CopyField>> copyFieldsMap = new Object2ObjectOpenHashMap<>(16, 0.5f);
 
   protected volatile DynamicCopy[] dynamicCopyFields = EMPTY_DYNAMIC_COPY_FIELDS;
 
   public DynamicCopy[] getDynamicCopyFields() { return dynamicCopyFields; }
 
-  private final Map<FieldType, PayloadDecoder> decoders = new HashMap<>();  // cache to avoid scanning token filters repeatedly, unnecessarily
+  private final Map<FieldType, PayloadDecoder> decoders = new Object2ObjectOpenHashMap<>(16, 0.5f);  // cache to avoid scanning token filters repeatedly, unnecessarily
 
   static {
     DynamicReplacement.DynamicPattern.createPattern(""); // early init
@@ -182,7 +183,7 @@ public class IndexSchema {
    * keys are all fields copied to, count is num of copyField
    * directives that target them.
    */
-  protected volatile Map<SchemaField, Integer> copyFieldTargetCounts = new HashMap<>();
+  protected volatile Map<SchemaField, Integer> copyFieldTargetCounts = new Object2ObjectOpenHashMap<>(16, 0.5f);
 
   /**
    * Constructs a schema using the specified resource name and stream.

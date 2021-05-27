@@ -31,11 +31,12 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
+
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.PriorityQueue;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocSet;
@@ -291,7 +292,7 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
   }
 
   /** Processes the collected data to finds the top slots, and composes it in the response NamedList. */
-  SimpleOrderedMap<Object> findTopSlots(final int numSlots, final int slotCardinality,
+  Map findTopSlots(final int numSlots, final int slotCardinality,
                                         @SuppressWarnings("rawtypes") IntFunction<Comparable> bucketValFromSlotNumFunc,
                                         @SuppressWarnings("rawtypes") Function<Comparable, String> fieldQueryValFunc) throws IOException {
     assert this.sortAcc != null;
@@ -374,10 +375,10 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
 
     assert queue.size() <= numBuckets;
 
-    SimpleOrderedMap<Object> res = new SimpleOrderedMap<>();
+    Map res = new Object2ObjectLinkedOpenHashMap(32, .5f);
     if (freq.numBuckets) {
       if (!fcontext.isShard()) {
-        res.add("numBuckets", numBuckets);
+        res.put("numBuckets", numBuckets);
       } else {
         calculateNumBuckets(res);
       }
@@ -387,17 +388,17 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     if (fdebug != null) fdebug.putInfoItem("numBuckets", numBuckets);
 
     if (freq.allBuckets) {
-      SimpleOrderedMap<Object> allBuckets = new SimpleOrderedMap<>();
+      Map allBuckets = new Object2ObjectLinkedOpenHashMap(32, .5f);
       // countAcc.setValues(allBuckets, allBucketsSlot);
-      allBuckets.add("count", allBucketsAcc.getSpecialCount());
+      allBuckets.put("count", allBucketsAcc.getSpecialCount());
       allBucketsAcc.setValues(allBuckets, -1); // -1 slotNum is unused for SpecialSlotAcc
       // allBuckets currently doesn't execute sub-facets (because it doesn't change the domain?)
-      res.add("allBuckets", allBuckets);
+      res.put("allBuckets", allBuckets);
     }
 
-    SimpleOrderedMap<Object> missingBucket = new SimpleOrderedMap<>();
+    Map missingBucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
     if (freq.missing) {
-      res.add("missing", missingBucket);
+      res.put("missing", missingBucket);
       // moved missing fillBucket after we fill facet since it will reset all the accumulators.
     }
 
@@ -435,23 +436,23 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
       }
     }
     @SuppressWarnings({"rawtypes"})
-    List<SimpleOrderedMap> bucketList = new ArrayList<>(sortedSlots.length);
+    List<Map> bucketList = new ArrayList<>(sortedSlots.length);
 
     for (Slot slot : sortedSlots) {
-      SimpleOrderedMap<Object> bucket = new SimpleOrderedMap<>();
-      bucket.add("val", slot.bucketVal);
+      Map bucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
+      bucket.put("val", slot.bucketVal);
 
       fillBucketFromSlot(bucket, slot, resortAccForFill);
 
       bucketList.add(bucket);
     }
 
-    res.add("buckets", bucketList);
+    res.put("buckets", bucketList);
       
     
     if (fcontext.isShard() && shardHasMoreBuckets) {
       // Currently, "more" is an internal implementation detail and only returned for distributed sub-requests
-      res.add("more", true);
+      res.put("more", true);
     }
 
     if (freq.missing) {
@@ -471,7 +472,7 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     return sf.getType().getFieldQuery(null, sf, bucketValue);
   }
 
-  private void calculateNumBuckets(SimpleOrderedMap<Object> target) throws IOException {
+  private void calculateNumBuckets(Map target) throws IOException {
     DocSet domain = fcontext.base;
     if (freq.prefix != null) {
       Query prefixFilter = sf.getType().getPrefixQuery(null, sf, freq.prefix);
@@ -504,10 +505,10 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
   }
 
   /** Helper method used solely when looping over buckets to be returned in findTopSlots */
-  private void fillBucketFromSlot(SimpleOrderedMap<Object> target, Slot slot,
+  private void fillBucketFromSlot(Map target, Slot slot,
                                   SlotAcc resortAcc) throws IOException {
     final long count = countAcc.getCount(slot.slot);
-    target.add("count", count);
+    target.put("count", count);
     if (count <= 0 && !freq.processEmpty) return;
 
     if (collectAcc != null && slot.slot >= 0) {
@@ -620,9 +621,9 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
   }
   
   @Override
-  protected void processStats(SimpleOrderedMap<Object> bucket, Query bucketQ, DocSet docs, long docCount) throws IOException {
+  protected void processStats(Map bucket, Query bucketQ, DocSet docs, long docCount) throws IOException {
     if (docCount == 0 && !freq.processEmpty || freq.getFacetStats().size() == 0) {
-      bucket.add("count", docCount);
+      bucket.put("count", docCount);
       return;
     }
     createAccs(docCount, 1);
@@ -636,8 +637,8 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
   }
 
   // overrides but with different signature!
-  private void addStats(SimpleOrderedMap<Object> target, long count, int slotNum) throws IOException {
-    target.add("count", count);
+  private void addStats(Map target, long count, int slotNum) throws IOException {
+    target.put("count", count);
     if (count > 0 || freq.processEmpty) {
       for (SlotAcc acc : accs) {
         acc.setValues(target, slotNum);
@@ -709,7 +710,7 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     }
 
     @Override
-    public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
+    public void setValues(Map bucket, int slotNum) throws IOException {
       for (SlotAcc acc : subAccs) {
         acc.setValues(bucket, slotNum);
       }
@@ -794,7 +795,7 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     }
 
     @Override
-    public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
+    public void setValues(Map bucket, int slotNum) throws IOException {
       if (collectAcc != null) {
         collectAcc.setValues(bucket, collectAccSlot);
       }
@@ -836,7 +837,7 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  protected SimpleOrderedMap<Object> refineFacets() throws IOException {
+  protected Map refineFacets() throws IOException {
     boolean skipThisFacet = (fcontext.flags & SKIP_FACET) != 0;
 
 
@@ -847,9 +848,9 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     // For leaf refinements, we do full faceting for each leaf bucket.  Any sub-facets of these buckets will be fully evaluated.  Because of this, we should never
     // encounter leaf refinements that have sub-facets that return partial results.
 
-    SimpleOrderedMap<Object> res = new SimpleOrderedMap<>();
-    List<SimpleOrderedMap> bucketList = new ArrayList<>( leaves.size() + skip.size() + partial.size() );
-    res.add("buckets", bucketList);
+    Map res = new Object2ObjectLinkedOpenHashMap(32, .5f);
+    List<Map> bucketList = new ArrayList<>( leaves.size() + skip.size() + partial.size() );
+    res.put("buckets", bucketList);
 
     // TODO: an alternate implementations can fill all accs at once
     createAccs(-1, 1);
@@ -880,9 +881,9 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
       Map<String,Object> bucketFacetInfo = (Map<String,Object>)fcontext.facetInfo.get("missing");
 
       if (bucketFacetInfo != null || !skipThisFacet) {
-        SimpleOrderedMap<Object> missingBucket = new SimpleOrderedMap<>();
+        Map missingBucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
         fillBucket(missingBucket, getFieldMissingQuery(fcontext.searcher, freq.field), null, skipThisFacet, bucketFacetInfo);
-        res.add("missing", missingBucket);
+        res.put("missing", missingBucket);
       }
     }
 
@@ -898,11 +899,11 @@ abstract class FacetFieldProcessor extends FacetProcessor<FacetField> {
     return res;
   }
 
-  private SimpleOrderedMap<Object> refineBucket(Object bucketVal, boolean skip, Map<String,Object> facetInfo) throws IOException {
-    SimpleOrderedMap<Object> bucket = new SimpleOrderedMap<>();
+  private Map refineBucket(Object bucketVal, boolean skip, Map<String,Object> facetInfo) throws IOException {
+    Map bucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
     FieldType ft = sf.getType();
     bucketVal = ft.toNativeType(bucketVal);  // refinement info passed in as JSON will cause int->long and float->double
-    bucket.add("val", bucketVal);
+    bucket.put("val", bucketVal);
 
     // fieldQuery currently relies on a string input of the value...
     String bucketStr = bucketVal instanceof Date ? ((Date)bucketVal).toInstant().toString() : bucketVal.toString();

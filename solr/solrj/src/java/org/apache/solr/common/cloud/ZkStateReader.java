@@ -17,6 +17,8 @@
 package org.apache.solr.common.cloud;
 
 import com.codahale.metrics.Meter;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -730,7 +732,8 @@ public class ZkStateReader implements SolrCloseable, Watcher, Replica.NodeNameTo
   }
 
   private Set<String> getCurrentCollections() {
-    Set<String> collections = new HashSet<>(watchedCollectionStates.size() + lazyCollectionStates.size());
+    Set<String> collections = new ObjectLinkedOpenHashSet<>(watchedCollectionStates.size() + lazyCollectionStates.size(), .5f) {
+    };
     collections.addAll(watchedCollectionStates.keySet());
     collections.addAll(lazyCollectionStates.keySet());
     return collections;

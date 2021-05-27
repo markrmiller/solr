@@ -39,6 +39,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 
 import com.codahale.metrics.Meter;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.solr.cloud.ActionThrottle;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.Stats;
@@ -56,6 +57,7 @@ import org.apache.solr.common.util.metrics.Metrics;
 import org.apache.solr.logging.MDCLoggingContext;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
+import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +85,7 @@ public class ZkStateWriter {
 
 //  Map<Long,List<ZkStateWriter.StateUpdate>> sliceStates = new ConcurrentHashMap<>();
 
-  private final Map<Integer,String> idToCollection = new ConcurrentHashMap<>(64);
+  private final Map<Integer,String> idToCollection = new NonBlockingHashMap<>(64);
 
   private final Map<String,DocAssign> assignMap = new ConcurrentHashMap<>(64);
 
@@ -414,14 +416,14 @@ public class ZkStateWriter {
     Map<String,DocCollection> map;
     if (collection != null) {
 
-      map = new HashMap<>(1);
+      map = new Object2ObjectLinkedOpenHashMap<>(1, 0.25f);
       DocCollection coll = cs.get(collection);
       if (coll != null) {
         map.put(collection, coll.copy());
       }
 
     } else {
-      map = new HashMap<>(cs.keySet().size());
+      map = new Object2ObjectLinkedOpenHashMap<>(cs.keySet().size(), 0.25f);
       cs.forEach((s, docCollection) -> map.put(s, docCollection.copy()));
     }
 

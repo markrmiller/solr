@@ -558,14 +558,14 @@ public class SimpleFacets {
             //Go through the response to build the expected output for SimpleFacets
             counts = new NamedList<>();
             if(resObj != null) {
-              NamedList<Object> res = (NamedList<Object>) resObj;
+              Map res = (Map) resObj;
 
-              List<NamedList<Object>> buckets = (List<NamedList<Object>>)res.get("buckets");
-              for(NamedList<Object> b : buckets) {
+              List<Map> buckets = (List<Map>)res.get("buckets");
+              for(Map b : buckets) {
                 counts.add(b.get("val").toString(), ((Number)b.get("count")).intValue());
               }
               if(missing) {
-                NamedList<Object> missingCounts = (NamedList<Object>) res.get("missing");
+                Map missingCounts = (Map) res.get("missing");
                 counts.add(null, ((Number)missingCounts.get("count")).intValue());
               }
             }

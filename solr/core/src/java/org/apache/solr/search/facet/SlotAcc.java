@@ -19,10 +19,7 @@ package org.apache.solr.search.facet;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.IntFunction;
 
 import org.apache.lucene.index.LeafReaderContext;
@@ -127,11 +124,11 @@ public abstract class SlotAcc implements Closeable {
 
   public abstract Object getValue(int slotNum) throws IOException;
 
-  public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
+  public void setValues(Map bucket, int slotNum) throws IOException {
     if (key == null) return;
     Object val = getValue(slotNum);
     if (val != null) {
-      bucket.add(key, val);
+      bucket.put(key, val);
     }
   }
 

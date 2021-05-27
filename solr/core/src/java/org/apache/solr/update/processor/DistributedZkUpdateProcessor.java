@@ -34,6 +34,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.LeaderElector;
@@ -807,13 +809,13 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
         String[] skipList = req.getParams().getParams(TEST_DISTRIB_SKIP_SERVERS);
         Set<String> skipListSet = null;
         if (skipList != null) {
-          skipListSet = new HashSet<>(skipList.length);
+          skipListSet = new ObjectOpenHashSet<>(skipList.length, 0.5f);
           skipListSet.addAll(Arrays.asList(skipList));
           log.info("test.distrib.skip.servers was found and contains:{}", skipListSet);
         }
 
         List<SolrCmdDistributor.Node> nodes = new ArrayList<>(replicas.size());
-        skippedCoreNodeNames = new HashSet<>();
+        skippedCoreNodeNames = new ObjectOpenHashSet<>(8, 0.5f);
         ZkShardTerms zkShardTerms;
         try {
           zkShardTerms = zkController.getShardTerms(collection, shardId);
@@ -1201,8 +1203,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
 
     // TODO - we may need to tell about more than one error...
 
-    Set<SolrCmdDistributor.Error> errorsForClient = new HashSet<>(errors.size());
-    Set<String> replicasShouldBeInLowerTerms = new HashSet<>();
+    Set<SolrCmdDistributor.Error> errorsForClient = new ObjectOpenHashSet<>(errors.size(), 0.5f);
+    Set<String> replicasShouldBeInLowerTerms = new ObjectOpenHashSet<>(8, 0.5f);
 
     errors.forEach(error -> {
 

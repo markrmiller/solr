@@ -19,6 +19,7 @@ package org.apache.solr.search.facet;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import org.apache.lucene.util.LuceneTestCase;
@@ -120,12 +121,12 @@ public class TestJsonFacetRefinement extends SolrTestCaseHS {
     ObjectBuilder ob = new ObjectBuilder(parser) {
       @Override
       public Object newObject() throws IOException {
-        return new SimpleOrderedMap();
+        return new HashMap();
       }
 
       @Override
       public void addKeyVal(Object map, Object key, Object val) throws IOException {
-        ((SimpleOrderedMap) map).add(key.toString(), val);
+        ((HashMap) map).put(key.toString(), val);
       }
     };
 

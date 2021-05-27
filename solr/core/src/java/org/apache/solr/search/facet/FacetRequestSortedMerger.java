@@ -45,7 +45,7 @@ abstract class FacetRequestSortedMerger<FacetRequestT extends FacetRequestSorted
   public void merge(Object facetResult, Context mcontext) {
     this.mcontext = mcontext;
     @SuppressWarnings({"rawtypes"})
-    SimpleOrderedMap res = (SimpleOrderedMap)facetResult;
+    Map res = (Map)facetResult;
     Boolean more = (Boolean)res.get("more");
     if (more != null && more) {
       if (shardHasMoreBuckets == null) {
@@ -70,8 +70,8 @@ abstract class FacetRequestSortedMerger<FacetRequestT extends FacetRequestSorted
   }
 
   @SuppressWarnings({"rawtypes"})
-  public void mergeBucketList(List<SimpleOrderedMap> bucketList, Context mcontext) {
-    for (SimpleOrderedMap bucketRes : bucketList) {
+  public void mergeBucketList(List<Map> bucketList, Context mcontext) {
+    for (Map bucketRes : bucketList) {
       Comparable bucketVal = (Comparable)bucketRes.get("val");
       FacetBucket bucket = buckets.get(bucketVal);
       if (bucket == null) {

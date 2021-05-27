@@ -40,6 +40,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.Source;
@@ -573,15 +574,12 @@ public class JettySolrRunner implements Closeable {
       rwh.addRule(new RewritePatternRule("/api/*", "/solr/____v2"));
       chain = rwh;
     }
-//    GzipHandler gzipHandler = new GzipHandler();
-//    gzipHandler.setHandler(chain);
-//
-//    gzipHandler.setMinGzipSize(23); // https://github.com/eclipse/jetty.project/issues/4191
-//    gzipHandler.setCheckGzExists(false);
-//    gzipHandler.setCompressionLevel(-1);
-//    gzipHandler.setExcludedAgentPatterns(".*MSIE.6\\.0.*");
-//    gzipHandler.setIncludedMethods("GET");
-//
+    GzipHandler gzipHandler = new GzipHandler();
+    gzipHandler.setHandler(chain);
+
+    gzipHandler.setMinGzipSize(23); // https://github.com/eclipse/jetty.project/issues/4191
+    gzipHandler.setIncludedMethods("GET", "POST");
+
      server.setHandler(chain);
     // ShutdownThread.deregister(server);
   }

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
@@ -197,7 +198,7 @@ public class FileExchangeRateProvider implements ExchangeRateProvider {
         
         addRate(tmpRates, fromCurrency, toCurrency, exchangeRate);
       }
-    } catch (SAXException | IOException | XPathExpressionException e) {
+    } catch (SAXException | IOException | XPathExpressionException | ParserConfigurationException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error while parsing currency configuration file "+currencyConfigFile, e);
     }
     // Atomically swap in the new rates map, if it loaded successfully

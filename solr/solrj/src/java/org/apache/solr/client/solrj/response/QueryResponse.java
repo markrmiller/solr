@@ -50,7 +50,7 @@ public class QueryResponse extends SolrResponseBase
   private NamedList<Object> _highlightingInfo = null;
   private NamedList<Object> _spellInfo = null;
   private List<NamedList<Object>> _clusterInfo = null;
-  private NamedList<Object> _jsonFacetingInfo = null;
+  private Map _jsonFacetingInfo = null;
   private Map<String,NamedList<Object>> _suggestInfo = null;
   private NamedList<Object> _statsInfo = null;
   private NamedList<NamedList<Object>> _termsInfo = null;
@@ -164,7 +164,7 @@ public class QueryResponse extends SolrResponseBase
         extractClusteringInfo(_clusterInfo);
       }
       else if ("facets".equals(n)) {
-        _jsonFacetingInfo = (NamedList<Object>) res.getVal(i);
+        _jsonFacetingInfo = (Map) res.getVal(i);
         // Don't call extractJsonFacetingInfo(_jsonFacetingInfo) here in an effort to do it lazily
       }
       else if ( "suggest".equals( n ) )  {
@@ -197,7 +197,7 @@ public class QueryResponse extends SolrResponseBase
     _clusterResponse = new ClusteringResponse(clusterInfo);
   }
 
-  private void extractJsonFacetingInfo(NamedList<Object> facetInfo) {
+  private void extractJsonFacetingInfo(Map facetInfo) {
     _jsonFacetingResponse = new NestableJsonFacet(facetInfo);
   }
 

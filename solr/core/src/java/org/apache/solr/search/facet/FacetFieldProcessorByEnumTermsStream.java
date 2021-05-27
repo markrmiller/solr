@@ -21,9 +21,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntFunction;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.MultiPostingsEnum;
 import org.apache.lucene.index.PostingsEnum;
@@ -96,8 +98,8 @@ class FacetFieldProcessorByEnumTermsStream extends FacetFieldProcessor implement
     fcontext.qcontext.addCloseHook(this);
 
     setup();
-    response = new SimpleOrderedMap<>();
-    response.add("buckets", new Iterator() {
+    response = new Object2ObjectLinkedOpenHashMap(32, .5f);
+    response.put("buckets", new Iterator() {
       boolean retrieveNext = true;
       Object val;
 
@@ -136,7 +138,7 @@ class FacetFieldProcessorByEnumTermsStream extends FacetFieldProcessor implement
       }
     });
     if (fcontext.isShard()) {
-      response.add("more", shardHasMoreBuckets);  // lazily evaluated
+      response.put("more", shardHasMoreBuckets);  // lazily evaluated
     }
   }
 
@@ -200,7 +202,7 @@ class FacetFieldProcessorByEnumTermsStream extends FacetFieldProcessor implement
     leaves = leafList.toArray(EMPTY_LEAF_READER_CONTEXTS);
   }
 
-  private SimpleOrderedMap<Object> nextBucket() {
+  private Map nextBucket() {
     try {
       return _nextBucket();
     } catch (Exception e) {
@@ -208,7 +210,7 @@ class FacetFieldProcessorByEnumTermsStream extends FacetFieldProcessor implement
     }
   }
 
-  private SimpleOrderedMap<Object> _nextBucket() throws IOException {
+  private Map _nextBucket() throws IOException {
     DocSet termSet = null;
     
     try {
@@ -339,8 +341,8 @@ class FacetFieldProcessorByEnumTermsStream extends FacetFieldProcessor implement
         TermQuery bucketQuery = hasSubFacets ? new TermQuery(new Term(freq.field, term)) : null;
         term = termsEnum.next();
 
-        SimpleOrderedMap<Object> bucket = new SimpleOrderedMap<>();
-        bucket.add("val", bucketVal);
+        Map bucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
+        bucket.put("val", bucketVal);
         addStats(bucket, 0);
         if (hasSubFacets) {
           processSubs(bucket, bucketQuery, termSet, false, null);

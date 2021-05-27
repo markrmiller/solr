@@ -145,11 +145,10 @@ public class FacetModule extends SearchComponent {
     }
     if (rb.isDebug()) {
       FacetDebugInfo fdebug = new FacetDebugInfo();
-      fcontext.setDebugInfo(fdebug);
       rb.req.getContext().put("FacetDebugInfo", fdebug);
     }
 
-    Object results = facetState.facetRequest.process(fcontext);
+    Map results = facetState.facetRequest.process(fcontext);
     // ExitableDirectory timeout causes absent "facets"
     rb.rsp.add("facets", results);
   }
@@ -470,7 +469,7 @@ public class FacetModule extends SearchComponent {
       if (bucket == null) {
         bucket = newBucket(null, mcontext);
       }
-      bucket.mergeBucket((SimpleOrderedMap) facet, mcontext);
+      bucket.mergeBucket((Map) facet, mcontext);
     }
 
     @Override

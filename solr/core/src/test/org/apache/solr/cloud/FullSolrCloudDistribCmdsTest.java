@@ -464,14 +464,17 @@ public class FullSolrCloudDistribCmdsTest extends SolrCloudTestCase {
       futures.add(executor.submit(new BatchIndexer(i)));
     }
     final int totalDocsExpected = numThreads * numBatchesPerThread * numDocsPerBatch;
-    ExecutorUtil.shutdownAndAwaitTermination(executor);
+
+    executor.shutdown();
 
     for (Future result : futures) {
-      assertFalse(result.isCancelled());
-      assertTrue(result.isDone());
+     // assertFalse(result.isCancelled());
+     // assertTrue(result.isDone());
       // all we care about is propogating any possibile execution exception...
       final Object ignored = result.get();
     }
+
+    ExecutorUtil.shutdownAndAwaitTermination(executor);
 
     cluster.waitForActiveCollection(collectionName, 2, 4);
     cloudClient.commit();
