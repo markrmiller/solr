@@ -254,7 +254,7 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
 
     cluster.getSolrClient().getZkStateReader().waitForLiveNodes(5, TimeUnit.SECONDS, (newLiveNodes) -> newLiveNodes.size() == 2);
 
-    cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 5, TimeUnit.SECONDS, false, 1, 2, true, false);
+   // cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 5, TimeUnit.SECONDS, false, 1, 2, true, false);
 
     AtomicReference<Replica> newLeader = new AtomicReference<>(
         cluster.getSolrClient().getZkStateReader().getLeaderRetry(cluster.getSolrClient().getHttpClient(), COLLECTION, "s1", 5000, true));
