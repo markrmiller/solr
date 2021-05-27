@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.beans.DocumentObjectBinder;
 import org.apache.solr.client.solrj.response.json.NestableJsonFacet;
@@ -238,7 +239,7 @@ public class QueryResponse extends SolrResponseBase
     }
 
     // Parse out interesting bits from the debug info
-    _explainMap = new HashMap<>();
+    _explainMap = new Object2ObjectHashMap<>();
     NamedList<Object> explain = (NamedList<Object>)_debugMap.get( "explain" );
     if( explain != null ) {
       for( Map.Entry<String, Object> info : explain ) {
@@ -304,7 +305,7 @@ public class QueryResponse extends SolrResponseBase
 
   private void extractHighlightingInfo( NamedList<Object> info )
   {
-    _highlighting = new HashMap<>();
+    _highlighting = new Object2ObjectHashMap<>();
     for( Map.Entry<String, Object> doc : info ) {
       Map<String,List<String>> fieldMap = new HashMap<>();
       _highlighting.put( doc.getKey(), fieldMap );

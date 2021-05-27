@@ -30,6 +30,8 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import com.google.api.client.util.escape.CharEscapers;
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.ParWork;
@@ -455,7 +457,7 @@ public abstract class SolrParams implements Serializable, MapWriter, Iterable<Ma
   /** Create a Map&lt;String,String&gt; from a NamedList given no keys are repeated */
   @Deprecated // Doesn't belong here (no SolrParams).  Just remove.
   public static Map<String,String> toMap(@SuppressWarnings({"rawtypes"})NamedList params) {
-    HashMap<String,String> map = new HashMap<>();
+    Map<String,String> map = new Object2ObjectHashMap();
     final int size = params.size();
     for (int i = 0; i< size; i++) {
       map.put(params.getName(i), params.getVal(i).toString());
@@ -466,8 +468,9 @@ public abstract class SolrParams implements Serializable, MapWriter, Iterable<Ma
   /** Create a Map&lt;String,String[]&gt; from a NamedList */
   @Deprecated // Doesn't belong here (no SolrParams).  Just remove.
   public static Map<String,String[]> toMultiMap(@SuppressWarnings({"rawtypes"})NamedList params) {
-    HashMap<String,String[]> map = new HashMap<>();
     final int size = params.size();
+    Map<String,String[]> map = new Object2ObjectHashMap(size, Hashing.DEFAULT_LOAD_FACTOR);
+
     for (int i = 0; i< size; i++) {
       String name = params.getName(i);
       Object val = params.getVal(i);

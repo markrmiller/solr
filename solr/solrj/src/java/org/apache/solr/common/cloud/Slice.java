@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.cloud;
 
+import org.agrona.collections.Object2ObjectHashMap;
 import org.noggit.JSONWriter;
 
 import java.util.Collection;
@@ -201,7 +202,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
 
     Map<String,Object> rules = (Map<String,Object>) get("routingRules");
     if (rules != null) {
-      this.routingRules = new HashMap<>();
+      this.routingRules = new Object2ObjectHashMap<>();
       rules.forEach((key, o) -> {
         if (o instanceof Map) {
           Map map = (Map) o;
@@ -220,7 +221,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
 
 
   private Map<String,Replica> makeReplicas(String collection, Integer collectionId, String slice, Map<String,Object> genericReplicas) {
-    if (genericReplicas == null) return new HashMap<>(1);
+    if (genericReplicas == null) return new Object2ObjectHashMap();
     Map<String,Replica> result = new LinkedHashMap<>(genericReplicas.size());
     genericReplicas.forEach((name, val) -> {
       Replica r;

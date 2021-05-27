@@ -17,6 +17,9 @@
 
 package org.apache.solr.common.cloud;
 
+import it.unimi.dsi.fastutil.objects.Object2ByteArrayMap;
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2NullableObjectHashMap;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
@@ -301,7 +304,7 @@ public class ZkMaintenanceUtils {
 
     if (!Files.exists(rootPath))
       throw new IOException("Path " + rootPath + " does not exist");
-    Map<String,byte[]> dataMap = new HashMap(64);
+    Map<String,byte[]> dataMap = new Object2NullableObjectHashMap<String,byte[]>(64, Hashing.DEFAULT_LOAD_FACTOR);
     dataMap.put(zkPath, null);
     Files.walkFileTree(rootPath, new SimpleFileVisitor<Path>() {
       @Override

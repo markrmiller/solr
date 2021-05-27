@@ -421,8 +421,8 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     JavaBinCodec.StringCache stringCache = new JavaBinCodec.StringCache(new MapBackedCache<>(new HashMap<>()));
 
 
-    try (JavaBinCodec c1 = new JavaBinCodec(null, stringCache);
-         JavaBinCodec c2 = new JavaBinCodec(null, stringCache)) {
+    try (JavaBinCodec c1 = new JavaBinCodec(null);
+         JavaBinCodec c2 = new JavaBinCodec(null)) {
 
       m1 = (Map) c1.unmarshal(new ByteArrayInputStream(b1));
       m2 = (Map) c2.unmarshal(new ByteArrayInputStream(b2));
@@ -639,7 +639,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     while (--iter >= 0) {
       if (++bufnum >= buffers.length) bufnum = 0;
       byte[] buf = buffers[bufnum];
-      try (JavaBinCodec javabin = new JavaBinCodec(null, stringCache)) {
+      try (JavaBinCodec javabin = new JavaBinCodec(null)) {
         FastInputStream in = new FastInputStream(empty, 0);
         Object o = javabin.unmarshal(in);
         if (o instanceof SolrDocument) {

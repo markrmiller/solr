@@ -117,7 +117,7 @@ public class SoftAutoCommitTest extends SolrTestCaseJ4 {
     CommitTracker softTracker = updater.softCommitTracker;
     
     // wait out any leaked commits
-    monitor.hard.poll(1000, MILLISECONDS);
+    monitor.hard.poll(400, MILLISECONDS);
     monitor.soft.poll(0, MILLISECONDS);
     monitor.clear();
     

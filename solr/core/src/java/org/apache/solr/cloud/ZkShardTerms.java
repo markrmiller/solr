@@ -27,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import org.apache.solr.client.solrj.cloud.ShardTerms;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
@@ -80,7 +82,6 @@ public class ZkShardTerms extends DoNotWrap implements Closeable {
   private volatile boolean checkAgain = false;
   private volatile boolean running;
 
-  protected final ReentrantLock ourLock = new ReentrantLock(false);
   private volatile boolean closed;
 
   @Override
@@ -411,16 +412,17 @@ public class ZkShardTerms extends DoNotWrap implements Closeable {
       Stat stat = new Stat();
       byte[] data = zkClient.getData(znodePath, null, stat, true);
       if (data == null) {
-        setNewTerms(new ShardTerms(Collections.unmodifiableMap(new HashMap()), -1));
+        setNewTerms(new ShardTerms(Collections.emptyMap(), -1));
         return;
       }
-      Map<String,Long> values = Collections.unmodifiableMap(new HashMap<>((Map<String,Long>) Utils.fromJSON(data)));
+      Map map = new Object2LongOpenHashMap<>((Map<String, Long>) Utils.fromJSON(data));
+      Map<String,Long> values = Collections.unmodifiableMap(map);
       log.debug("refresh shard terms to zk version {} values={}", stat.getVersion(), values);
       newTerms = new ShardTerms(values, stat.getVersion());
     } catch (KeeperException.NoNodeException e) {
       log.info("No node found for shard terms {} znodepath={}", e.getPath(), znodePath);
       // we have likely been deleted
-      setNewTerms(new ShardTerms(Collections.unmodifiableMap(new HashMap()), -1));
+      setNewTerms(new ShardTerms(Collections.emptyMap(), -1));
       return;
     } catch (InterruptedException e) {
       ParWork.propagateInterrupt(e);

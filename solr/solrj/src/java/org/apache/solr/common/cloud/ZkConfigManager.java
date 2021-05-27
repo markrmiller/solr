@@ -16,6 +16,8 @@
  */
 package org.apache.solr.common.cloud;
 
+import it.unimi.dsi.fastutil.objects.Object2ByteArrayMap;
+import org.agrona.collections.Object2NullableObjectHashMap;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,7 +186,7 @@ public class ZkConfigManager {
    * @throws IOException if an I/O error occurs
    */
   public void copyConfigDir(String fromConfig, String toConfig, Set<String> copiedToZkPaths) throws IOException {
-    Map<String,byte[]> dataMap = new HashMap();
+    Map<String,byte[]> dataMap = new Object2NullableObjectHashMap<>();
     copyConfigDirFromZk(CONFIGS_ZKNODE + "/" + fromConfig, CONFIGS_ZKNODE + "/" + toConfig, copiedToZkPaths, dataMap);
     try {
       zkClient.mkdirs(dataMap, 1);

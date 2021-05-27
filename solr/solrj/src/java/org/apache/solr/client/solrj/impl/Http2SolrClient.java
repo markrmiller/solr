@@ -17,6 +17,10 @@
 package org.apache.solr.client.solrj.impl;
 
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2ObjectHashMap;
+import org.agrona.concurrent.UnsafeBuffer;
+import org.agrona.io.DirectBufferInputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
@@ -537,10 +541,12 @@ public class Http2SolrClient extends SolrClient {
     final ResponseParser parser = solrRequest.getResponseParser() == null ? this.parser : solrRequest.getResponseParser();
     boolean tracking = false;
 
-    BufferingResponseListener listener = new BufferingResponseListener(8 * 1024 * 1024) {
+    BufferingResponseListener listener = new BufferingResponseListener(16 * 1024 * 1024) {
       @Override public void onComplete(Result result) {
         httpClient.getExecutor().execute( () -> {
-          InputStream is = getContentAsInputStream();
+
+          UnsafeBuffer buff = new UnsafeBuffer(getContent());
+          InputStream is = new DirectBufferInputStream(buff);
           try {
             Response response = result.getResponse();
             if (result.isSucceeded()) {
@@ -718,7 +724,8 @@ public class Http2SolrClient extends SolrClient {
       }
 
      // if (res  != null && res.getStatus() == 200) {
-         is = listener.getContentAsInputStream();
+      UnsafeBuffer buff = new UnsafeBuffer(listener.getContent());
+      is = new DirectBufferInputStream(buff);
      // }
       return processErrorsAndResponse(req, solrRequest, parser, res, is);
     } finally {
@@ -1309,7 +1316,7 @@ public class Http2SolrClient extends SolrClient {
     private Integer maxConnectionsPerHost = 12;
     private boolean useHttp1_1 = Boolean.getBoolean("solr.http1");
     protected String baseSolrUrl;
-    protected Map<String,String> headers = new HashMap<>();
+    protected Map<String,String> headers = new Object2ObjectHashMap<>(8, Hashing.DEFAULT_LOAD_FACTOR, false);
     protected boolean strictEventOrdering = false;
     private Integer maxOutstandingAsyncRequests;
     private boolean markedInternal;

@@ -78,7 +78,7 @@ public class SearchGroupsResultTransformer implements ShardResultTransformer<Lis
       SortField[] groupSortField, List<Comparable> rawSearchGroupData) {
     SearchGroup<BytesRef> searchGroup = new SearchGroup<>();
     searchGroup.groupValue = null;
-    if (groupValue != null) {
+    if (groupValue != null && groupValue.length() > 0) {
       if (groupField != null) {
         BytesRefBuilder builder = new BytesRefBuilder();
         groupField.getType().readableToIndexed(groupValue, builder);

@@ -106,8 +106,6 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       log.info("wait for active collection before query");
       cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 15, TimeUnit.SECONDS, false, 1, 3, true, true);
 
-
-
       try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
         long numFound = client.query(COLLECTION, new SolrQuery("q","*:*", "distrib", "false")).getResults().getNumFound();
         assertEquals(100, numFound);
@@ -137,6 +135,9 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
       Object v = client1.query(COLLECTION, new SolrQuery("q", "id:1", "distrib", "false")).getResults().get(0).get("num");
       assertEquals("10", v.toString());
 
+      try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
+        client.commit(COLLECTION, true, true);
+      }
 
       // can be stale (eventually consistent) but should catch up
       for (int i = 0; i < 30; i ++) {

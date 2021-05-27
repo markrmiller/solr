@@ -1262,9 +1262,10 @@ public abstract class FieldType extends FieldProperties {
       }
     } else { // analyzer is not instanceof TokenizerChain
       analyzerProps.add(CLASS_NAME, analyzer.getClass().getName());
-      if (analyzer.getVersion() != Version.LATEST) {
-        analyzerProps.add(LUCENE_MATCH_VERSION_PARAM, analyzer.getVersion().toString());
-      }
+      // nocommit
+//      if (analyzer.getVersion() != Version.LATEST) {
+//        analyzerProps.add(LUCENE_MATCH_VERSION_PARAM, analyzer.getVersion().toString());
+//      }
     }
     return analyzerProps;
   }

@@ -32,12 +32,7 @@ import java.io.Reader;
 public class BinaryResponseParser extends ResponseParser {
   public static final String BINARY_CONTENT_TYPE = "application/octet-stream";
 
-  protected JavaBinCodec.StringCache stringCache;
 
-  public BinaryResponseParser setStringCache(JavaBinCodec.StringCache cache) {
-    this.stringCache = cache;
-    return this;
-  }
 
   @Override
   public String getWriterType() {
@@ -54,7 +49,7 @@ public class BinaryResponseParser extends ResponseParser {
   }
 
   protected JavaBinCodec createCodec() {
-    return new JavaBinCodec(null, stringCache);
+    return new JavaBinCodec(null);
   }
 
   @Override

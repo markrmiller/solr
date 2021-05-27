@@ -602,7 +602,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     _SINT(SINT, UPPER_3_BITS, DataEntry.Type.INT) {//unsigned integer
       @Override
       public void lazyRead(EntryImpl entry, StreamCodec codec) throws IOException {
-        entry.numericVal = codec.readSmallInt(codec.dis);
+        entry.numericVal = codec.readVInt(codec.dis);
       }
 
       @Override
@@ -686,8 +686,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
       }
     };
 
-    private static int readObjSz(StreamCodec codec, Tag tag) throws IOException {
-      return tag.isLower5Bits ? readVInt(codec.dis) :
+    int readObjSz(StreamCodec codec, Tag tag) throws IOException {
+      return tag.isLower5Bits ? codec.readVInt(codec.dis) :
           codec.readSize(codec.dis);
     }
 

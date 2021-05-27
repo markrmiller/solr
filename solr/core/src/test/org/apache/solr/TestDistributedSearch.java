@@ -363,7 +363,7 @@ public class TestDistributedSearch extends BaseDistributedSearchTestCase {
     assertEquals("Should be exactly 2 range facets returned after minCounts taken into account ", 3, minResp.getFacetRanges().size());
     assertEquals("Should only be 1 query facets returned after minCounts taken into account ", 1, minResp.getFacetQuery().size());
 
-    checkMinCountsField(minResp.getFacetField(i1).getValues(), new Object[]{null, (TEST_NIGHTLY ? 55L : 5L)}); // Should just be the null entries for field
+    checkMinCountsField(minResp.getFacetField(i1).getValues(), new Object[]{"", (TEST_NIGHTLY ? 55L : 5L)}); // Should just be the null entries for field
 
     checkMinCountsRange(minResp.getFacetRanges().get(0).getCounts(), new Object[]{"0", 5L}); // range on i1
     checkMinCountsRange(minResp.getFacetRanges().get(1).getCounts(), new Object[]{"0", 3L, "100", 3L}); // range on tlong

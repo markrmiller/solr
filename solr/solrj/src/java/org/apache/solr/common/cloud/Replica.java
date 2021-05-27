@@ -23,6 +23,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.agrona.collections.Hashing;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.util.Utils;
 
 public class Replica extends ZkNodeProps {
@@ -369,7 +371,8 @@ public class Replica extends ZkNodeProps {
 
 
   public Replica copyWithProps(Map props) {
-    Map newProps = new HashMap(propMap);
+    Map newProps = new Object2ObjectHashMap(propMap.size() + props.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    newProps.putAll(propMap);
     newProps.putAll(props);
     Replica r = new Replica(name, newProps, collection, collectionId, sliceName, slice);
     return r;
