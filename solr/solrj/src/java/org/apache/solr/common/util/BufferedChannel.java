@@ -1,8 +1,10 @@
 package org.apache.solr.common.util;
 
 import org.agrona.BitUtil;
+import org.agrona.BufferUtil;
 import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.eclipse.jetty.io.RuntimeIOException;
 
 import java.io.Closeable;
@@ -34,7 +36,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
      */
     public BufferedChannel(FileChannel out, int size) {
         ch = out;
-        buff = ExpandableBuffers.getInstance().acquire(-1, true);
+        buff = new UnsafeBuffer(ByteBuffer.allocate(8192));
 
        // buff.byteBuffer().limit(buff.byteBuffer().capacity());
     }
@@ -81,8 +83,11 @@ public class BufferedChannel extends OutputStream implements Closeable {
 //        }
         if (len >= buff.byteBuffer().remaining()) {
             flushBuffer();
-            ch.write(ByteBuffer.wrap(b, off, len));
-            return;
+
+            if (len >= buff.byteBuffer().remaining()) {
+                ch.write(ByteBuffer.wrap(b, off, len));
+                return;
+            }
         }
 
         buff.putBytes(count, b, off, len);
@@ -98,7 +103,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
     public long size() {
      //   return size;
         try {
-            return ch.size() + count;
+            return ch.size() ;//+ count;
         } catch (IOException ioException) {
            throw new RuntimeIOException(ioException);
         }
@@ -121,7 +126,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
     public void close() throws IOException {
         flushBuffer();
         ch.close();
-        ExpandableBuffers.getInstance().release(buff);
+      //  BufferUtil.free(buff);
     }
 
     public MutableDirectBuffer buffer() {

@@ -89,7 +89,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
         if (((StoredField) o).fieldType() instanceof LegacyFieldType) {
           CharSequence val = ((StoredField) o).getCharSequenceValue();
           if (val instanceof Utf8CharSequence) {
-            codec.writeStr(val.toString(), false);
+            codec.writeUTF8Str((Utf8CharSequence) val);
             return null;
           }
         }
@@ -101,7 +101,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
           returnFields = res.getReturnFields();
         }
 //        if (useUtf8CharSeq) {
-//        ResultContext.READASBYTES.set(fieldName -> {
+//        ResultContext.READASBYTES.set(fieldName -> {pkl
 //          SchemaField fld = res.getRequest().getSchema().getFieldOrNull(fieldName);
 //          return fld != null && fld.getType().isUtf8Field();
 //        });

@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
@@ -110,7 +111,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     NONE, TOLEADER, FROMLEADER;
 
     public static DistribPhase parseParam(final String param) {
-      if (param == null || param.trim().isEmpty()) {
+      if (param == null || StringUtils.isBlank(param)) {
         return NONE;
       }
       try {

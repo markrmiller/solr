@@ -50,6 +50,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -393,7 +394,7 @@ public class TestCloudJSONFacetSKG extends SolrCloudTestCase {
                                  e.getMessage(), e);
     }
     try {
-      final Map facetResponse = (Map) topNamedList.get("facets");
+      Map facetResponse = (Map) topNamedList.get("facets");
       assertNotNull("null facet results?", facetResponse);
       assertEquals("numFound mismatch with top count?",
                    rsp.getResults().getNumFound(), ((Number)facetResponse.get("count")).longValue());
@@ -402,6 +403,9 @@ public class TestCloudJSONFacetSKG extends SolrCloudTestCase {
       // still force facet results
       // (even if the background query matches nothing, that just means there will be no
       // buckets in those facets)
+      if (facetResponse == null) {
+        facetResponse = new HashMap();
+      }
       assertFacetSKGsAreCorrect(maxBucketsToCheck, expected, baseParams, facetResponse);
       
     } catch (AssertionError e) {

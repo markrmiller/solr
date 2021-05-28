@@ -20,12 +20,14 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.invoke.MethodHandles;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -182,7 +184,7 @@ class SolrZkServerProps extends QuorumPeerConfig {
       }
 
       Properties cfg = new Properties();
-      FileInputStream in = new FileInputStream(configFile);
+      InputStream in = Files.newInputStream(configFile.toPath());
       try {
         cfg.load(new InputStreamReader(in, StandardCharsets.UTF_8));
       } finally {

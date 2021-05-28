@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud.overseer;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
@@ -182,7 +183,7 @@ public class CollectionMutator {
 
   static boolean checkKeyExistence(ZkNodeProps message, String key) {
     String value = message.getStr(key);
-    if (value == null || value.trim().length() == 0) {
+    if (value == null || StringUtils.isBlank(value)) {
       log.error("Skipping invalid Overseer message because it has no {} specified '{}'", key, message);
       return false;
     }

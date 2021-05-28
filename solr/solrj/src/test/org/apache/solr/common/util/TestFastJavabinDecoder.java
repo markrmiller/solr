@@ -67,7 +67,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
       assertEquals(100, scodec.readSmallInt(scodec.dis));
       tag = scodec.getTag();
       assertEquals(Tag._STR, tag);
-      assertEquals("Hello!", scodec.readStr(fis));
+      assertEquals("Hello!", scodec.readStr(fis, null));
     }
   }
 

@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.cloud.ZkSolrResourceLoader;
 import org.apache.solr.common.SolrException;
@@ -142,7 +143,7 @@ public abstract class ManagedResourceStorage {
     public void configure(SolrResourceLoader loader, NamedList<String> initArgs) throws SolrException {
       String storageDirArg = initArgs.get(STORAGE_DIR_INIT_ARG);
       
-      if (storageDirArg == null || storageDirArg.trim().length() == 0)
+      if (storageDirArg == null || StringUtils.isBlank(storageDirArg))
         throw new IllegalArgumentException("Required configuration parameter '"+
            STORAGE_DIR_INIT_ARG+"' not provided!");
       

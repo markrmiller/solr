@@ -20,6 +20,7 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.Timer;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.MapMaker;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexDeletionPolicy;
@@ -27,6 +28,8 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
@@ -448,9 +451,31 @@ public final class SolrCore implements SolrInfoBean, Closeable {
   // See SOLR-11687
   //
 
+  public static Directory getBaseDir(Directory dir) {
+    Directory baseDir = dir;
+    while (baseDir instanceof FilterDirectory) {
+      baseDir = ((FilterDirectory) baseDir).getDelegate();
+    }
+
+    return baseDir;
+  }
+
   private String getIndexPropertyFromPropFile(Directory dir) throws IOException {
+    InputStream inputStream;
     IndexInput input = null;
-    try {
+    Directory baseDir = getBaseDir(dir);
+
+    if (baseDir instanceof FSDirectory) {
+      try {
+        inputStream = Files.newInputStream(Paths.get(dataDir, IndexFetcher.INDEX_PROPERTIES));
+      } catch (FileNotFoundException | NoSuchFileException e) {
+        // Swallow this error, dataDir/index is the right thing to return
+        // if there is no index.properties file
+        // All other exceptions are will propagate to caller.
+        return dataDir + "index/";
+      }
+    } else {
+
       try {
         input = dir.openInput(IndexFetcher.INDEX_PROPERTIES, IOContext.DEFAULT);
       } catch (FileNotFoundException | NoSuchFileException e) {
@@ -459,22 +484,24 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         // All other exceptions are will propagate to caller.
         return dataDir + "index/";
       }
-      try (InputStream is = new PropertiesInputStream(input)) { // c'tor just assigns a variable here, no exception
-        // thrown.
-        Properties p = new Properties();
-        try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-          p.load(reader);
-        }
-
-        String s = p.getProperty("index");
-        if (s != null && s.trim().length() > 0) {
-          return dataDir + s.trim();
-        }
-
-        // We'll return dataDir/index/ if the properties file has an "index" property with
-        // no associated value or does not have an index property at all.
-        return dataDir + "index/";
+      inputStream = new PropertiesInputStream(input);
+    }
+    try { // c'tor just assigns a variable here, no exception
+      // thrown.
+      Properties p = new Properties();
+      try (InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
+        p.load(reader);
       }
+
+      String s = p.getProperty("index");
+      if (s != null && !StringUtils.isBlank(s)) {
+        return dataDir + s.trim();
+      }
+
+      // We'll return dataDir/index/ if the properties file has an "index" property with
+      // no associated value or does not have an index property at all.
+      return dataDir + "index/";
+
     } finally {
       IOUtils.closeQuietly(input);
     }
@@ -1492,8 +1519,30 @@ public final class SolrCore implements SolrInfoBean, Closeable {
      * Update the index.properties file with the new index sub directory name
      */
     // package private
-    static boolean modifyIndexProps (DirectoryFactory directoryFactory, String dataDir, SolrConfig solrConfig, String tmpIdxDirName){
+    static boolean modifyIndexProps (DirectoryFactory directoryFactory, String dataDir, SolrConfig solrConfig, String tmpIdxDirName) {
       log.info("Updating index properties... index={}", tmpIdxDirName);
+
+      if (directoryFactory instanceof StandardDirectoryFactory) {
+        Properties p = new Properties();
+        Path propFile = Paths.get(dataDir, IndexFetcher.INDEX_PROPERTIES);
+        if (Files.exists(propFile))
+        try (InputStream inputStream = Files.newInputStream(propFile)) {
+
+          try (InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
+            p.load(reader);
+          }
+        } catch (IOException e1) {
+          throw new RuntimeException(e1);
+        }
+        p.put("index", tmpIdxDirName);
+        try (OutputStream out = Files.newOutputStream(propFile)) {
+          p.store(out, IndexFetcher.INDEX_PROPERTIES);
+        } catch (IOException e1) {
+          throw new RuntimeException(e1);
+        }
+        return true;
+      }
+
       Directory dir = null;
       try {
         dir = directoryFactory.get(dataDir, DirContext.META_DATA, solrConfig.indexConfig.lockType);
@@ -1505,11 +1554,11 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         throw new RuntimeException(e1);
       } finally {
         if (dir != null) {
-//          try {
-//            directoryFactory.release(dir);
-//          } catch (IOException e) {
-//            SolrException.log(log, "", e);
-//          }
+          //          try {
+          //            directoryFactory.release(dir);
+          //          } catch (IOException e) {
+          //            SolrException.log(log, "", e);
+          //          }
         }
       }
     }

@@ -70,6 +70,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -789,7 +790,7 @@ public class SimplePostTool {
   public static String appendParam(String url, String param) {
     String[] pa = param.split("&");
     for(String p : pa) {
-      if(p.trim().length() == 0) continue;
+      if(StringUtils.isBlank(p)) continue;
       String[] kv = p.split("=");
       if(kv.length == 2) {
         url = url + (url.indexOf('?')>0 ? "&" : "?") + kv[0] +"="+ kv[1];

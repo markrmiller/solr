@@ -17,6 +17,7 @@
 package org.apache.solr.util;
 
 import org.apache.solr.common.SolrException;
+import org.apache.zookeeper.common.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -150,7 +151,7 @@ public class PropertiesUtil {
    * @return an integer version of the passed in value
    */
   public static Integer toInteger(String value, Integer defValue) {
-    if (value == null || value.trim().length() == 0) {
+    if (value == null || StringUtils.isBlank(value)) {
       return defValue;
     }
     try {

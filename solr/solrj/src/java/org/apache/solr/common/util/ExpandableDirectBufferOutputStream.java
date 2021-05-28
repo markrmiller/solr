@@ -76,10 +76,10 @@ public class ExpandableDirectBufferOutputStream extends OutputStream
     public void wrap(final MutableDirectBuffer buffer, final int offset)
     {
         Objects.requireNonNull(buffer, "Buffer must not be null");
-        if (!buffer.isExpandable())
-        {
-            throw new IllegalStateException("buffer must be expandable.");
-        }
+//        if (!buffer.isExpandable())
+//        {
+//            throw new IllegalStateException("buffer must be expandable.");
+//        }
 
         this.buffer = buffer;
         this.offset = offset;

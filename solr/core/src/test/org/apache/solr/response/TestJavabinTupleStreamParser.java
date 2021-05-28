@@ -73,11 +73,11 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
         "        \"a_f\":3.0}]}}";
     SimpleOrderedMap nl = convert2OrderedMap((Map) Utils.fromJSONString(payload));
 
-    ByteBuffer bytes = serialize(nl);
+    byte[] bytes = serialize(nl);
 
-    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), true)) {
+    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), true)) {
       Map<String, Object> map = parser.next();
-      assertEquals(map.toString(), "2", map.get("id"));
+      assertEquals("2", map.get("id"));
       map = parser.next();
       assertEquals("3", map.get("id"));
       //System.out.println();
@@ -145,8 +145,8 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
       }
     };
 
-    ByteBuffer bytes = serialize(tupleStream);
-    JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), true);
+    byte[] bytes = serialize(tupleStream);
+    JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), true);
     Map m = parser.next();
     assertEquals(1L, m.get("id"));
     assertEquals(1.0, (Double) m.get("f"), 0.01);
@@ -159,9 +159,7 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     m = parser.next();
     assertEquals(Boolean.TRUE, m.get("EOF"));
 
-    bytes.position(0);
-    bytes.limit(bytes.capacity());
-    parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), false);
+    parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), false);
     m = parser.next();
     assertEquals(1, m.get("id"));
     assertEquals(1.0, (Float) m.get("f"), 0.01);
@@ -178,21 +176,16 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
   public void testSolrDocumentList() throws IOException {
     SolrQueryResponse response = new SolrQueryResponse();
     SolrDocumentList l = constructSolrDocList(response);
-    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
-
-    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
-    try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.marshal(response.getValues(), os);
+    try (JavaBinCodec jbc = new JavaBinCodec(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+      jbc.marshal(response.getValues(), baos);
     }
-    ByteBuffer bytes = serialize(response.getValues());
+    byte[] bytes = serialize(response.getValues());
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.unmarshal(new ByteBufferInputStream(bytes));
+      jbc.unmarshal(new ByteArrayInputStream(bytes));
     }
     List list = new ArrayList<>();
     Map m = null;
-    bytes.position(0);
-    bytes.limit(bytes.capacity());
-    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteBufferInputStream(bytes), false)) {
+    try (JavabinTupleStreamParser parser = new JavabinTupleStreamParser(new ByteArrayInputStream(bytes), false)) {
       while ((m = parser.next()) != null) {
         list.add(m);
       }
@@ -203,16 +196,13 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     }
 
   }
-  public static ByteBuffer serialize(Object o) throws IOException {
+  public static byte[] serialize(Object o) throws IOException {
     SolrQueryResponse response = new SolrQueryResponse();
     response.getValues().add("results", o);
-    MutableDirectBuffer expandableBuffer1 = new ExpandableArrayBuffer(4096);
-
-    ExpandableDirectBufferOutputStream os = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.marshal(response.getValues(), os);
+      jbc.marshal(response.getValues(), baos);
     }
-    ByteBuffer buffer = ByteBuffer.wrap(expandableBuffer1.byteArray(), 0, os.position() + expandableBuffer1.wrapAdjustment());
-    return buffer;
+    return baos.toByteArray();
   }
 }

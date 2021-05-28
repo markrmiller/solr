@@ -99,10 +99,12 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileStore;
@@ -1906,7 +1908,7 @@ public class IndexFetcher {
   private static class LocalFsFile implements FileInterface {
 
     FileChannel fileChannel;
-    private final FileOutputStream fileOutputStream;
+    private final OutputStream fileOutputStream;
     File file;
 
     LocalFsFile(File dir, String saveAs) throws IOException {
@@ -1920,9 +1922,8 @@ public class IndexFetcher {
               "Failed to create (sub)directory for file: " + saveAs);
         }
       }
-
-      this.fileOutputStream = new FileOutputStream(file);
-      this.fileChannel = this.fileOutputStream.getChannel();
+      this.fileChannel = FileChannel.open(file.toPath());
+      this.fileOutputStream = Channels.newOutputStream(fileChannel);
     }
 
     public void sync() throws IOException {

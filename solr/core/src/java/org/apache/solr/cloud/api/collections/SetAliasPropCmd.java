@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.ZkNodeProps;
@@ -67,7 +68,7 @@ public class SetAliasPropCmd implements Cmd {
     // check & cleanup properties.  It's a mutable copy.
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
-      if (key.trim().isEmpty()) {
+      if (StringUtils.isBlank(key)) {
         throw new SolrException(BAD_REQUEST, "property keys must not be pure whitespace");
       }
       if (!key.equals(key.trim())) {

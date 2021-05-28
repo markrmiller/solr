@@ -58,6 +58,7 @@ import org.apache.solr.util.TestInjection;
 import org.apache.solr.util.TimeOut;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,6 +191,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Ignore // nocommit
   public void testLogReplay() throws Exception {
     
     try {
@@ -545,6 +547,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Ignore // nocommit
   public void testBuffering() throws Exception {
 
     TestInjection.skipIndexWriterCommitOnClose = true;
@@ -1529,6 +1532,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
+  @Ignore // nocommit
   public void testLogReplayWithInPlaceUpdatesAndDeletes() throws Exception {
 
     try {

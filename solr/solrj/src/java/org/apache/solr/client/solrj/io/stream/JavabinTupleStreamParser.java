@@ -17,9 +17,11 @@
 
 package org.apache.solr.client.solrj.io.stream;
 
+import org.apache.solr.common.util.DataInputInputStream;
+import org.apache.solr.common.util.FastInputStream;
+import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.common.util.JavaBinCodec;
 
-import java.io.Closeable;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -28,12 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.solr.common.util.DataInputInputStream;
-import org.apache.solr.common.util.IOUtils;
-import org.apache.solr.common.util.JavaBinCodec;
-
 public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStreamParser {
-  final DataInputInputStream fis;
+  final FastInputStream fis;
   private int arraySize = Integer.MAX_VALUE;
   private boolean onlyJsonTypes = false;
   int objectSize;
@@ -100,7 +98,8 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
     int sz = readSize(dis);
     Map m = new LinkedHashMap<>();
     for (int i = 0; i < sz; i++) {
-      Object name = readVal(dis);
+      tagByte = dis.readByte();
+      String name = (String) readStr(dis, null);
       Object val = readVal(dis);
       m.put(name, val);
     }
@@ -184,12 +183,6 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
 
   @Override
   public void close() throws IOException {
-    try {
-      while (fis.readInt() != -1) {
-      }
-    } catch (EOFException e) {
-      // okay
-    }
-    IOUtils.closeQuietly((Closeable) fis);
+    IOUtils.closeQuietly(fis);
   }
 }

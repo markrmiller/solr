@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.queries.function.FunctionQuery;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.valuesource.QueryValueSource;
@@ -106,7 +107,7 @@ public class SolrReturnFields extends ReturnFields {
       parseFieldList(null, req);
     }
     else {
-      if( fl.trim().length() == 0 ) {
+      if( StringUtils.isBlank(fl) ) {
         // legacy thing to support fl='  ' => fl=*,score!
         // maybe time to drop support for this?
         // See ConvertedLegacyTest

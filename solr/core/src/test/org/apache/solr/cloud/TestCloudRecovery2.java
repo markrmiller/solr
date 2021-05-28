@@ -239,7 +239,9 @@ public class TestCloudRecovery2 extends SolrCloudTestCase {
 
       cluster.waitForActiveCollection(cluster.getSolrClient().getHttpClient(), COLLECTION, 5, TimeUnit.SECONDS, false, 1, 3, true, false);
 
-      cluster.getSolrClient().commit(COLLECTION);
+      try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
+        client.commit(COLLECTION, true, true);
+      }
 
       try (Http2SolrClient client = SolrTestCaseJ4.getHttpSolrClient(node2.getBaseUrl())) {
         v = client.query(COLLECTION, new SolrQuery("q","id:1", "distrib", "false")).getResults().get(0).get("num");

@@ -81,12 +81,10 @@ public class FieldComparator implements StreamComparator {
     
     sb.append(leftFieldName);
     if(hasDifferentFieldNames()){
-      sb.append("=");
-      sb.append(rightFieldName);
+      sb.append("=").append(rightFieldName);
     }
-    sb.append(" ");
-    sb.append(order);
-    
+    sb.append(" ").append(order);
+
     return new StreamExpressionValue(sb.toString());
   }
 

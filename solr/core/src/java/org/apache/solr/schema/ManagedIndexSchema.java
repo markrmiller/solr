@@ -16,6 +16,7 @@
  */
 package org.apache.solr.schema;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.saxon.om.NodeInfo;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharFilterFactory;
@@ -54,7 +55,6 @@ import org.apache.solr.util.RTimer;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
-import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
@@ -71,7 +71,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -487,7 +486,7 @@ public final class ManagedIndexSchema extends IndexSchema {
         }
         newSchema = shallowCopy(true);
 
-        newSchema.fields = (HashMap<String,SchemaField>) ((HashMap<String,SchemaField>) newSchema.fields).clone();
+        newSchema.fields = (Object2ObjectOpenHashMap) ((Object2ObjectOpenHashMap) newSchema.fields).clone();
 
         for (SchemaField newField : newFields) {
           if (null != newSchema.fields.get(newField.getName())) {
@@ -594,7 +593,7 @@ public final class ManagedIndexSchema extends IndexSchema {
       // clone data structures before modifying them
       newSchema.copyFieldsMap = cloneCopyFieldsMap(copyFieldsMap);
       newSchema.copyFieldTargetCounts
-          = (Map<SchemaField,Integer>)((HashMap<SchemaField,Integer>)copyFieldTargetCounts).clone();
+          = (Map<SchemaField,Integer>)((Object2ObjectOpenHashMap)copyFieldTargetCounts).clone();
       newSchema.dynamicCopyFields = new DynamicCopy[dynamicCopyFields.length];
       System.arraycopy(dynamicCopyFields, 0, newSchema.dynamicCopyFields, 0, dynamicCopyFields.length);
 
@@ -812,7 +811,7 @@ public final class ManagedIndexSchema extends IndexSchema {
 
       // clone data structures before modifying them
       newSchema.copyFieldTargetCounts
-          = (Map<SchemaField,Integer>)((HashMap<SchemaField,Integer>)copyFieldTargetCounts).clone();
+          = (Map<SchemaField,Integer>)((Object2ObjectOpenHashMap)copyFieldTargetCounts).clone();
       newSchema.dynamicCopyFields = new DynamicCopy[dynamicCopyFields.length];
       System.arraycopy(dynamicCopyFields, 0, newSchema.dynamicCopyFields, 0, dynamicCopyFields.length);
 
@@ -915,7 +914,7 @@ public final class ManagedIndexSchema extends IndexSchema {
       // clone data structures before modifying them
       newSchema.copyFieldsMap = cloneCopyFieldsMap(copyFieldsMap);
       newSchema.copyFieldTargetCounts
-          = (Map<SchemaField,Integer>)((HashMap<SchemaField,Integer>)copyFieldTargetCounts).clone();
+          = (Map<SchemaField,Integer>)((Object2ObjectOpenHashMap)copyFieldTargetCounts).clone();
       newSchema.dynamicCopyFields = new DynamicCopy[dynamicCopyFields.length];
       System.arraycopy(dynamicCopyFields, 0, newSchema.dynamicCopyFields, 0, dynamicCopyFields.length);
 
@@ -1058,7 +1057,7 @@ public final class ManagedIndexSchema extends IndexSchema {
       // we shallow copied fieldTypes, but since we're changing them, we need to do a true
       // deep copy before adding the new field types
 
-    newSchema.fieldTypes = (HashMap<String,FieldType>) ((HashMap<String,FieldType>) newSchema.fieldTypes).clone();
+    newSchema.fieldTypes = (Object2ObjectOpenHashMap) ((Object2ObjectOpenHashMap) newSchema.fieldTypes).clone();
 
       // do a first pass to validate the field types don't exist already
       for (FieldType fieldType : fieldTypeList) {
@@ -1131,7 +1130,7 @@ public final class ManagedIndexSchema extends IndexSchema {
   }
   
   private static Map<String,List<CopyField>> cloneCopyFieldsMap(Map<String,List<CopyField>> original) {
-    Map<String,List<CopyField>> clone = new HashMap<>(original.size());
+    Map<String,List<CopyField>> clone = new Object2ObjectOpenHashMap<>(original.size(), 0.5f);
     for (Map.Entry<String,List<CopyField>> entry : original.entrySet()) {
       clone.put(entry.getKey(), new ArrayList<>(entry.getValue()));
     }
@@ -1148,10 +1147,10 @@ public final class ManagedIndexSchema extends IndexSchema {
       }
       newSchema = shallowCopy(true);
       // clone data structures before modifying them
-      newSchema.fieldTypes = (Map<String,FieldType>)((HashMap<String,FieldType>)fieldTypes).clone();
+      newSchema.fieldTypes = (Map<String,FieldType>)((Object2ObjectOpenHashMap)fieldTypes).clone();
       newSchema.copyFieldsMap = cloneCopyFieldsMap(copyFieldsMap);
       newSchema.copyFieldTargetCounts
-          = (Map<SchemaField,Integer>)((HashMap<SchemaField,Integer>)copyFieldTargetCounts).clone();
+          = (Map<SchemaField,Integer>)((Object2ObjectOpenHashMap)copyFieldTargetCounts).clone();
       newSchema.dynamicCopyFields = new DynamicCopy[dynamicCopyFields.length];
       System.arraycopy(dynamicCopyFields, 0, newSchema.dynamicCopyFields, 0, dynamicCopyFields.length);
       newSchema.dynamicFields = new DynamicField[dynamicFields.length];
@@ -1392,7 +1391,7 @@ public final class ManagedIndexSchema extends IndexSchema {
     // build the new FieldType using the existing FieldTypePluginLoader framework
     // which expects XML, so we use a JSON to XML adapter to transform the JSON object
     // provided in the request into the XML format supported by the plugin loader
-    Map<String,FieldType> newFieldTypes = new HashMap<>();
+    Map<String,FieldType> newFieldTypes = new Object2ObjectOpenHashMap(16, 0.5f);
     List<SchemaAware> schemaAwareList = new ArrayList<>();
     FieldTypePluginLoader typeLoader = new FieldTypePluginLoader(this, newFieldTypes, schemaAwareList);
 

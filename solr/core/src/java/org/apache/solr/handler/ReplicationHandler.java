@@ -60,6 +60,7 @@ import java.util.zip.DeflaterOutputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexCommit;
@@ -1135,7 +1136,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
 
   private static Object formatVal(String key, Properties props, @SuppressWarnings({"rawtypes"}) Class clzz) {
     String s = props.getProperty(key);
-    if (s == null || s.trim().length() == 0) return null;
+    if (s == null || StringUtils.isBlank(s)) return null;
     if (clzz == Date.class) {
       try {
         long l = Long.parseLong(s);
@@ -1306,7 +1307,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
 
     if (enableMaster) {
       includeConfFiles = (String) master.get(CONF_FILES);
-      if (includeConfFiles != null && includeConfFiles.trim().length() > 0) {
+      if (includeConfFiles != null && !StringUtils.isBlank(includeConfFiles)) {
         String[] files = includeConfFiles.split(",");
         for (String file : files) {
           if (file.trim().length() == 0) continue;

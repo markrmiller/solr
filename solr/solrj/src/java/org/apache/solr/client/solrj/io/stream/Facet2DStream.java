@@ -346,34 +346,19 @@ public class Facet2DStream extends TupleStream implements Expressible {
 
   private static void appendJson(StringBuilder buf, Bucket x, Bucket y, Metric metric, FieldComparator[] adjustedSorts, int dimensionX, int dimensionY) {
 
-    buf.append('"');
-    buf.append("x");
-    buf.append('"');
-    buf.append(":{");
-    buf.append("\"type\":\"terms\"");
-    buf.append(",\"field\":\"").append(x.toString()).append('"');
-    buf.append(",\"limit\":").append(dimensionX);
-    buf.append(",\"overrequest\":1000");
+    buf.append('"').append("x").append('"').append(":{").append("\"type\":\"terms\"").append(",\"field\":\"").append(x.toString()).append('"').append(",\"limit\":").append(dimensionX)
+        .append(",\"overrequest\":1000");
     String fsort = getFacetSort(adjustedSorts[0].getLeftFieldName(), metric);
-    buf.append(",\"sort\":\"").append(fsort).append(" desc\"");
-    buf.append(",\"facet\":{");
+    buf.append(",\"sort\":\"").append(fsort).append(" desc\"").append(",\"facet\":{");
 
     String identifier = metric.getIdentifier();
     if (!identifier.startsWith("count(")) {
-      buf.append("\"agg\":\"").append(identifier).append('"');
-      buf.append(",");
+      buf.append("\"agg\":\"").append(identifier).append('"').append(",");
     }
-    buf.append('"');
-    buf.append("y");
-    buf.append('"');
-    buf.append(":{");
-    buf.append("\"type\":\"terms\"");
-    buf.append(",\"field\":\"").append(y.toString()).append('"');
-    buf.append(",\"limit\":").append(dimensionY);
-    buf.append(",\"overrequest\":1000");
+    buf.append('"').append("y").append('"').append(":{").append("\"type\":\"terms\"").append(",\"field\":\"").append(y.toString()).append('"').append(",\"limit\":").append(dimensionY)
+        .append(",\"overrequest\":1000");
     String fsortY = getFacetSort(adjustedSorts[1].getLeftFieldName(), metric);
-    buf.append(",\"sort\":\"").append(fsortY).append(" desc\"");
-    buf.append(",\"facet\":{");
+    buf.append(",\"sort\":\"").append(fsortY).append(" desc\"").append(",\"facet\":{");
     if (!identifier.startsWith("count(")) {
       buf.append("\"agg\":\"").append(identifier).append('"');
     }

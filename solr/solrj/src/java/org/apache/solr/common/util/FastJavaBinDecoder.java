@@ -78,13 +78,17 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
 
     public void skip(int sz) throws IOException {
-      dis.skip(sz);
-//      ByteBuffer brr = getByteArr(0);
-//      byte[] bytes = brr.array();
-//      while (sz > 0) {
-//        int read = dis.read(bytes, 0, Math.min(bytes.length, sz));
-//        sz -= read;
-//      }
+      long skipped = dis.skip(sz);
+
+      if (skipped == sz) {
+        return;
+      }
+      
+      byte[] bytes = new byte[64];
+      while (sz > 0) {
+        int read = dis.read(bytes, 0, Math.min(bytes.length, sz));
+        sz -= read;
+      }
 
     }
 
@@ -129,8 +133,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     public CharSequence readObjKey(Tag ktag) throws IOException {
       CharSequence key = null;
       if (ktag.type == DataEntry.Type.STR) {
-        if (ktag == _EXTERN_STRING) key = readStr(dis);
-        else key = readStr(dis);
+        if (ktag == _EXTERN_STRING) key = readExternString(dis);
+        else key = readStr(dis, null);
       } else if (ktag.type == DataEntry.Type.NULL) {
         //no need to do anything
       } else {
@@ -602,7 +606,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     _SINT(SINT, UPPER_3_BITS, DataEntry.Type.INT) {//unsigned integer
       @Override
       public void lazyRead(EntryImpl entry, StreamCodec codec) throws IOException {
-        entry.numericVal = codec.readVInt(codec.dis);
+        entry.numericVal = codec.readSmallInt(codec.dis);
       }
 
       @Override
@@ -682,12 +686,12 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     _EXTERN_STRING(EXTERN_STRING, UPPER_3_BITS, DataEntry.Type.STR) {
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) throws IOException {
-        return codec.readStr(codec.dis);
+        return codec.readExternString(codec.dis);
       }
     };
 
-    int readObjSz(StreamCodec codec, Tag tag) throws IOException {
-      return tag.isLower5Bits ? codec.readVInt(codec.dis) :
+    private static int readObjSz(StreamCodec codec, Tag tag) throws IOException {
+      return tag.isLower5Bits ? readVInt(codec.dis) :
           codec.readSize(codec.dis);
     }
 

@@ -128,7 +128,7 @@ public class ParWorkExecutor extends ThreadPoolExecutor {
       ((SolrThread)Thread.currentThread()).resetName();
       //((SolrThread)Thread.currentThread()).clearExecutor();
     }
-    JavaBinCodec.THREAD_LOCAL_ARR.remove();
+ //   JavaBinCodec.THREAD_LOCAL_ARR.remove();
 
 //    for (ThreadLocal tl : SolrQTP.threadLocals) {
 //      tl.remove();

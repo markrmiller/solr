@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.request.SolrQueryRequest;
@@ -134,7 +135,7 @@ public class RegexpBoostProcessor extends UpdateRequestProcessor {
         line = COMPILE.matcher(line).replaceAll("");
 
         // Skip empty lines or comment lines
-        if (line.trim().length() == 0) {
+        if (StringUtils.isBlank(line)) {
           continue;
         }
 

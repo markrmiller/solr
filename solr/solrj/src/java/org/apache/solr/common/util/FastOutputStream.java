@@ -149,9 +149,9 @@ public class FastOutputStream extends FilterOutputStream implements DataOutput {
 
   /**Copies a {@link Utf8CharSequence} without making extra copies
    */
-  public void writeUtf8CharSeq(Utf8CharSequence utf8) throws IOException {
-    utf8.write(dout);
-  }
+//  public void writeUtf8CharSeq(Utf8CharSequence utf8) throws IOException {
+//    utf8.write(dout);
+//  }
 
   public long size() {
     return dout.size();

@@ -345,17 +345,9 @@ public class TimeSeriesStream extends TupleStream implements Expressible  {
 
 
   private static void appendJson(StringBuilder buf, Metric[] _metrics, String field, String start, String end, String gap) {
-    buf.append('"');
-    buf.append("timeseries");
-    buf.append('"');
-    buf.append(":{");
-    buf.append("\"type\":\"range\"");
-    buf.append(",\"field\":\"").append(field).append('"');
-    buf.append(",\"start\":\"").append(start).append('"');
-    buf.append(",\"end\":\"").append(end).append('"');
-    buf.append(",\"gap\":\"").append(gap).append('"');
+    buf.append('"').append("timeseries").append('"').append(":{").append("\"type\":\"range\"").append(",\"field\":\"").append(field).append('"').append(",\"start\":\"").append(start).append('"')
+        .append(",\"end\":\"").append(end).append('"').append(",\"gap\":\"").append(gap).append('"').append(",\"facet\":{");
 
-    buf.append(",\"facet\":{");
     int metricCount = 0;
     for(Metric metric : _metrics) {
       String identifier = metric.getIdentifier();

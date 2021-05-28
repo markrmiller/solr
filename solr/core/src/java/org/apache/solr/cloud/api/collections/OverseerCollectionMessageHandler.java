@@ -176,6 +176,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   public static final String SHARD_UNIQUE = "shardUnique";
 
   public static final String ONLY_ACTIVE_NODES = "onlyactivenodes";
+  public static final String STATE = "state";
 
   static final String SKIP_CREATE_REPLICA_IN_CLUSTER_STATE = "skipCreateReplicaInClusterState";
 
@@ -187,6 +188,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String FAILURE_FIELD = "failure";
   public static final String SUCCESS_FIELD = "success";
+  public static final String STATUS = "STATUS";
   final LBHttp2SolrClient overseerLbClient;
 
   Overseer overseer;
@@ -469,7 +471,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
 
   private AddReplicaCmd.Response processReplicaAddPropertyCommand(ClusterState clusterState, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results)
           throws Exception {
-    checkRequired(message, COLLECTION_PROP, SHARD_ID_PROP, ZkStateReader.NUM_SHARDS_PROP, "shards", REPLICA_PROP, PROPERTY_PROP, PROPERTY_VALUE_PROP);
+    checkRequired(message, COLLECTION_PROP, SHARD_ID_PROP, ZkStateReader.NUM_SHARDS_PROP, SHARDS_PROP, REPLICA_PROP, PROPERTY_PROP, PROPERTY_VALUE_PROP);
     Map<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>(message.getProperties().size() + 1, 0.5f);
     propMap.put(Overseer.QUEUE_OPERATION, ADDREPLICAPROP.toLower());
     propMap.putAll(message.getProperties());
@@ -866,7 +868,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     success.add(key, value);
   }
 
-  private static Set<CountDownLatch> latches = ConcurrentHashMap.newKeySet();
+  private static final Set<CountDownLatch> latches = ConcurrentHashMap.newKeySet();
 
   private static NamedList<Object> waitForCoreAdminAsyncCallToComplete(String nodeName, String requestId, String adminPath, ZkStateReader zkStateReader, HttpShardHandlerFactory shardHandlerFactory,
                                                                        Overseer overseer) throws KeeperException, InterruptedException {
@@ -890,7 +892,6 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     // mn- from DistributedMap
     final String successPath = "/overseer/collection-map-completed" + "/mn-" + requestId;
     final String failAsyncPathToWaitOn = "/overseer/collection-map-failure" + "/mn-" + requestId;
-    final String runningAsyncPathToWaitOn = "/overseer/collection-map-running" + "/mn-" + requestId;
 
     if (zkController.getOverseerRunningMap().contains(requestId)) {
       WatchForResponseNode waitForResponse = new WatchForResponseNode(latch, zkStateReader.getZkClient(), successPath);
@@ -937,36 +938,37 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
     final NamedList<Object> results = srsp.getValues();
     if (zkController.getOverseerCompletedMap().contains(requestId)) {
       NamedList<String> status = new NamedList<>();
-      status.add("state", COMPLETED.toString());
+      status.add(STATE, COMPLETED.toString());
       status.add("msg", "found [" + requestId + "] in completed tasks");
-      results.add("STATUS", status);
+      results.add(STATUS, status);
     } else if (zkController.getOverseerFailureMap().contains(requestId)) {
+
       NamedList<String> status = new NamedList<>();
-      status.add("state", FAILED.toString());
+      status.add(STATE, FAILED.toString());
       status.add("msg", "found [" + requestId + "] in failed tasks");
-      results.add("STATUS", status);
+      results.add(STATUS, status);
     } else if (zkController.getOverseerRunningMap().contains(requestId)) {
       NamedList<String> status = new NamedList<>();
-      status.add("state", RUNNING.toString());
+      status.add(STATE, RUNNING.toString());
       status.add("msg", "found [" + requestId + "] in running tasks");
-      results.add("STATUS", status);
+      results.add(STATUS, status);
     } else if (zkController.getOverseerCollectionQueue().containsTaskWithRequestId(ASYNC, requestId)) {
       NamedList<String> status = new NamedList<>();
-      status.add("state", SUBMITTED.toString());
+      status.add(STATE, SUBMITTED.toString());
       status.add("msg", "found [" + requestId + "] in submitted tasks");
-      results.add("STATUS", status);
+      results.add(STATUS, status);
     } else {
       NamedList<String> status = new NamedList<>();
-      status.add("state", NOT_FOUND.toString());
+      status.add(STATE, NOT_FOUND.toString());
       status.add("msg", "Did not find [" + requestId + "] in any tasks queue");
-      results.add("STATUS", status);
+      results.add(STATUS, status);
     }
 
-    String r = ((NamedList<String>) srsp.getValues().get("STATUS")).get("state").toLowerCase(Locale.ROOT);
+    String r = ((NamedList<String>) srsp.getValues().get(STATUS)).get(STATE).toLowerCase(Locale.ROOT);
     if (r.equalsIgnoreCase("running")) {
       if (log.isDebugEnabled()) log.debug("The task is still RUNNING, continuing to wait.");
       throw new SolrException(ErrorCode.BAD_REQUEST,
-          "Task is still running even after reporting complete requestId: " + requestId + "" + srsp.getValues().get("STATUS") + "retried " + counter + "times");
+          "Task is still running even after reporting complete requestId: " + requestId + "" + srsp.getValues().get(STATUS) + "retried " + counter + "times");
     } else if (r.equalsIgnoreCase("completed")) {
       // we're done with this entry in the DistributeMap
       overseer.getCoreContainer().getZkController().clearAsyncId(requestId);
@@ -980,7 +982,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       if (log.isDebugEnabled()) log.debug("The task is notfound, retry");
       return srsp.getValues();
     } else {
-      throw new SolrException(ErrorCode.BAD_REQUEST, "Invalid status request " + srsp.getValues().get("STATUS"));
+      throw new SolrException(ErrorCode.BAD_REQUEST, "Invalid status request " + srsp.getValues().get(STATUS));
     }
 
     throw new SolrException(ErrorCode.SERVER_ERROR, "No response on request for async status url=" + replica + " params=" + sreq.params);
@@ -1002,12 +1004,11 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
             message.getStr(COLLECTION_PROP) : message.getStr(NAME);
   }
 
-
-  private long sessionId = -1;
   private LockTree.Session lockSession;
 
   @Override
   public Lock lockTask(ZkNodeProps message, OverseerTaskProcessor.TaskBatch taskBatch) {
+    long sessionId = -1;
     if (lockSession == null || sessionId != taskBatch.getId()) {
       //this is always called in the same thread.
       //Each batch is supposed to have a new taskBatch
@@ -1182,7 +1183,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
         if (INCLUDE_TOP_LEVEL_RESPONSE) {
           results.add(shardAsyncId, reqResult);
         }
-        if ("failed".equalsIgnoreCase(((NamedList<String>)reqResult.get("STATUS")).get("state"))) {
+        if ("failed".equalsIgnoreCase(((NamedList<String>)reqResult.get(STATUS)).get(STATE))) {
           log.error("Error from shard {}: {}", node,  reqResult);
           addFailure(results, node, reqResult);
         } else {
@@ -1227,7 +1228,6 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
       } else if (event.getType().equals(Event.EventType.NodeDataChanged)) {
         if (log.isDebugEnabled()) log.debug("Overseer request response zk node data changed");
         latch.countDown();
-        return;
       }
     }
 

@@ -79,7 +79,7 @@ public class HelloWorldSolrCloudTestCase extends SolrCloudTestCase {
     final SolrQuery solrQuery = new SolrQuery("q", "*:*", "fl", "id,popularity_i", "sort", "popularity_i desc", "rows", "1");
     final CloudHttp2SolrClient cloudSolrClient = cluster.getSolrClient();
     final QueryResponse rsp = cloudSolrClient.query(COLLECTION, solrQuery);
-    assertEquals(1, rsp.getResults().size());
+    assertEquals(rsp.toString(), 1, rsp.getResults().size());
     assertEquals("1", rsp.getResults().get(0).getFieldValue(id));
   }
 

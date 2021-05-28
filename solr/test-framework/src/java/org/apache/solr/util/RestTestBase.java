@@ -16,6 +16,7 @@
  */
 package org.apache.solr.util;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.JSONTestUtil;
 import org.apache.solr.SolrJettyTestBase;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -533,7 +534,7 @@ abstract public class RestTestBase extends SolrJettyTestBase {
     }
     try {
       StringBuilder builder = new StringBuilder();
-      if (null == query || query.trim().isEmpty()) {
+      if (null == query || StringUtils.isBlank(query)) {
         // empty query -> return "paramToSet=valueToSet"
         builder.append(paramToSet);
         builder.append('=');

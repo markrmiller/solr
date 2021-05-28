@@ -23,7 +23,6 @@ import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.tree.tiny.TinyAttributeImpl;
 import net.sf.saxon.tree.tiny.TinyElementImpl;
 import net.sf.saxon.tree.tiny.TinyTextualElement;
-import org.agrona.collections.ObjectHashSet;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.DelegatingAnalyzerWrapper;
 import org.apache.lucene.index.IndexableField;
@@ -39,7 +38,6 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.Cache;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Pair;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -53,7 +51,6 @@ import org.apache.solr.response.SchemaXmlWriter;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.similarities.SchemaSimilarityFactory;
 import org.apache.solr.uninverting.UninvertingReader;
-import org.apache.solr.util.ConcurrentLRUCache;
 import org.apache.solr.util.DOMUtil;
 import org.apache.solr.util.PayloadUtils;
 import org.apache.solr.util.plugin.SolrCoreAware;
@@ -75,8 +72,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -147,8 +142,8 @@ public class IndexSchema {
   protected final SolrResourceLoader loader;
   protected final Properties substitutableProperties;
 
-  protected volatile Map<String,SchemaField> fields = new HashMap<>();
-  protected volatile Map<String,FieldType> fieldTypes = new HashMap<>();
+  protected volatile Map<String,SchemaField> fields = new Object2ObjectOpenHashMap<>(16, 0.5f);
+  protected volatile Map<String,FieldType> fieldTypes = new Object2ObjectOpenHashMap<>(16, 0.5f);
 
   protected final List<SchemaField> fieldsWithDefaultValue = new ArrayList<>();
   protected final Collection<SchemaField> requiredFields = new ObjectOpenHashSet<>(16, 0.5f);
@@ -478,8 +473,8 @@ public class IndexSchema {
       analyzers = analyzerCache(fields);
     }
 
-    protected HashMap<String, Analyzer> analyzerCache(Map<String,SchemaField> fields) {
-      HashMap<String, Analyzer> cache = new HashMap<>();
+    protected Map<String, Analyzer> analyzerCache(Map<String,SchemaField> fields) {
+      Map<String, Analyzer> cache = new Object2ObjectOpenHashMap(16, 0.5f);
       for (SchemaField f : fields.values()) {
         Analyzer analyzer = f.getType().getIndexAnalyzer();
         cache.put(f.getName(), analyzer);
@@ -520,8 +515,8 @@ public class IndexSchema {
     }
 
     @Override
-    protected HashMap<String, Analyzer> analyzerCache(Map<String,SchemaField> fields) {
-      HashMap<String,Analyzer> cache = new HashMap<>();
+    protected Map<String, Analyzer> analyzerCache(Map<String,SchemaField> fields) {
+      Map<String,Analyzer> cache = new Object2ObjectOpenHashMap<>(16, 0.5f);
       fields.forEach((s, f) -> {
         Analyzer analyzer = f.getType().getQueryAnalyzer();
         cache.put(f.getName(), analyzer);
@@ -768,11 +763,11 @@ public class IndexSchema {
    */ 
   protected Map<String,Boolean> loadFields(NodeInfo document) throws XPathExpressionException {
     // Hang on to the fields that say if they are required -- this lets us set a reasonable default for the unique key
-    Map<String,Boolean> explicitRequiredProp = new HashMap<>();
+    Map<String,Boolean> explicitRequiredProp = new Object2ObjectOpenHashMap<>(16, 0.5f);
 
     //                  /schema/field | /schema/dynamicField | /schema/fields/field | /schema/fields/dynamicField
     ArrayList<DynamicField> dFields = new ArrayList<>();
-    Map<String,SchemaField> fields = new HashMap<>();
+    Map<String,SchemaField> fields = new Object2ObjectOpenHashMap<>(16, 0.5f);
     ArrayList<NodeInfo> nodes = (ArrayList) SolrResourceLoader.configXpathExpressions.xpathOrExp.evaluate(document, XPathConstants.NODESET);
 
     for (NodeInfo node : nodes) {

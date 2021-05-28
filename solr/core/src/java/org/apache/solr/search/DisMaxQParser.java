@@ -144,7 +144,7 @@ public class DisMaxQParser extends QParser {
     if (boostParams != null && boostParams.length > 0) {
       boostQueries = new ArrayList<>();
       for (String qs : boostParams) {
-        if (qs.trim().length() == 0) continue;
+        if (StringUtils.isBlank(qs)) continue;
         Query q = subQuery(qs, null).getQuery();
         boostQueries.add(q);
       }

@@ -189,7 +189,7 @@ public class ZkContainer implements Closeable {
   }
   
   private static String stripChroot(String zkRun) {
-    if (zkRun == null || zkRun.trim().length() == 0 || zkRun.lastIndexOf('/') < 0) return zkRun;
+    if (zkRun == null || StringUtils.isBlank(zkRun) || zkRun.lastIndexOf('/') < 0) return zkRun;
     return zkRun.substring(0, zkRun.lastIndexOf('/'));
   }
   

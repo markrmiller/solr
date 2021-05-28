@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud.overseer;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler;
@@ -149,7 +150,7 @@ public class ClusterStateMutator {
     if (shards == null)
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "shards" + " is a required param");
     for (String s : shards.split(",")) {
-      if (s == null || s.trim().isEmpty()) continue;
+      if (s == null || StringUtils.isBlank(s)) continue;
       shardNames.add(s.trim());
     }
     if (shardNames.isEmpty())

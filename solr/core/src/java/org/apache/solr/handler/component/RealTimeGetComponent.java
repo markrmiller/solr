@@ -212,7 +212,7 @@ public class RealTimeGetComponent extends SearchComponent
         // if filters already exists, make a copy instead of modifying the original
         filters = filters == null ? new ArrayList<Query>(fqs.length) : new ArrayList<>(filters);
         for (String fq : fqs) {
-          if (fq != null && fq.trim().length()!=0) {
+          if (fq != null && !org.apache.commons.lang3.StringUtils.isBlank(fq)) {
             QParser fqp = QParser.getParser(fq, req);
             filters.add(fqp.getQuery());
           }

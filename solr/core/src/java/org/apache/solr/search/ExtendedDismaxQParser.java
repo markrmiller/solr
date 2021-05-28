@@ -563,7 +563,7 @@ public class ExtendedDismaxQParser extends QParser {
     List<Query> boostQueries = new LinkedList<>();
     if (config.hasBoostParams()) {
       for (String qs : config.boostParams) {
-        if (qs.trim().length()==0) continue;
+        if (StringUtils.isBlank(qs)) continue;
         Query q = subQuery(qs, null).getQuery();
         boostQueries.add(q);
       }

@@ -367,7 +367,7 @@ public class ZkController implements Closeable, Runnable {
 
       String zkACLProviderClass = cloudConfig.getZkACLProviderClass();
 
-      if (zkACLProviderClass != null && zkACLProviderClass.trim().length() > 0) {
+      if (zkACLProviderClass != null && !StringUtils.isBlank(zkACLProviderClass)) {
         zkACLProvider = cc.getResourceLoader().newInstance(zkACLProviderClass, ZkACLProvider.class);
       } else {
         zkACLProvider = new DefaultZkACLProvider();
@@ -400,7 +400,7 @@ public class ZkController implements Closeable, Runnable {
     }
 
     String zkCredentialsProviderClass = cloudConfig.getZkCredentialsProviderClass();
-    if (zkCredentialsProviderClass != null && zkCredentialsProviderClass.trim().length() > 0) {
+    if (zkCredentialsProviderClass != null && !StringUtils.isBlank(zkCredentialsProviderClass)) {
       zkClient.getConnectionManager().setZkCredentialsToAddAutomatically(cc.getResourceLoader().newInstance(zkCredentialsProviderClass, ZkCredentialsProvider.class));
     } else {
       zkClient.getConnectionManager().setZkCredentialsToAddAutomatically(new DefaultZkCredentialsProvider());

@@ -351,9 +351,9 @@ public class ExportTool extends SolrCLI.ToolBase {
       }
       codec.set(new JavaBinCodec(fos, null));
       codec.get().writeTag(JavaBinCodec.NAMED_LST, 2);
-      codec.get().writeStr("params", false);
+      codec.get().writeStr("params");
       codec.get().writeNamedList(new NamedList<>());
-      codec.get().writeStr("docs", false);
+      codec.get().writeStr("docs");
       codec.get().writeTag(JavaBinCodec.ITERATOR);
 
     }
@@ -371,7 +371,7 @@ public class ExportTool extends SolrCLI.ToolBase {
       public void accept(String s, Object o) {
         try {
           if (s.equals("_version_") || s.equals("_root_")) return;
-          codec.get().writeStr(s, false);
+          codec.get().writeStr(s);
           codec.get().writeVal(o);
         } catch (IOException e) {
           throw new RuntimeException(e);

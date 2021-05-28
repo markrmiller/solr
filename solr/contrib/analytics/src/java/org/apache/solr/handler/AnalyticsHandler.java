@@ -19,6 +19,7 @@ package org.apache.solr.handler;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.ExitableDirectoryReader;
 import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.Query;
@@ -134,7 +135,7 @@ public class AnalyticsHandler extends RequestHandlerBase implements SolrCoreAwar
     String[] fqs = req.getParams().getParams(CommonParams.FQ);
     if (fqs!=null) {
       for (String fq : fqs) {
-        if (fq != null && fq.trim().length()!=0) {
+        if (fq != null && !StringUtils.isBlank(fq)) {
           QParser fqp = QParser.getParser(fq, req);
           queries.add(fqp.getQuery());
         }

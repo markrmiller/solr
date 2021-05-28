@@ -295,7 +295,7 @@ public abstract class SolrCall {
    * {@link #getCollectionsList()}
    */
   protected static List<String> resolveCollectionListOrAlias(CoreContainer cores, String collectionStr) {
-    if (collectionStr == null || collectionStr.trim().isEmpty()) {
+    if (collectionStr == null || StringUtils.isBlank(collectionStr)) {
       return Collections.emptyList();
     }
     List<String> result = Collections.emptyList();

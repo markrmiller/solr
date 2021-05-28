@@ -36,6 +36,7 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
@@ -990,7 +991,7 @@ public class SolrPluginUtils {
     if (null == queries || 0 == queries.length) return null;
     List<Query> out = new ArrayList<>(queries.length);
     for (String q : queries) {
-      if (null != q && 0 != q.trim().length()) {
+      if (null != q && !StringUtils.isBlank(q)) {
         out.add(QParser.getParser(q, req).getQuery());
       }
     }

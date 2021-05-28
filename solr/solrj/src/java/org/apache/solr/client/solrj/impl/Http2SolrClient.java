@@ -87,6 +87,7 @@ import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
 import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.eclipse.jetty.util.Fields;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.SocketAddressResolver;
@@ -951,9 +952,9 @@ public class Http2SolrClient extends SolrClient {
           HttpFields.Mutable fields = HttpFields.build();
           fields.add(HttpHeader.CONTENT_TYPE, contentType);
           Long sz = contentStream.getSize();
-          if (sz != null) {
-            fields.add(HttpHeader.CONTENT_LENGTH, sz.toString());
-          }
+//          if (sz != null) {
+//            fields.add(HttpHeader.CONTENT_LENGTH, sz.toString());
+//          }
           content.addFilePart(name, contentStream.getName(), new InputStreamRequestContent(contentType, contentStream.getStream()), fields);
         }
       }
@@ -1115,7 +1116,7 @@ public class Http2SolrClient extends SolrClient {
         throw new RemoteSolrException(remoteHost, httpStatus, "not found: " + httpStatus + ", message:" + response.getReason(), failure);
       }
 
-      if (is == null) {
+      if (is == null || is.available() == 0) {
         throw new RemoteSolrException(remoteHost, response != null ? response.getStatus() : httpStatus, null, null);
       }
 
@@ -1215,6 +1216,8 @@ public class Http2SolrClient extends SolrClient {
         if (metadata != null) rss.setMetadata(metadata);
         throw rss;
       }
+    } catch (IOException e) {
+      throw new RuntimeIOException(e);
     } finally {
 
     }

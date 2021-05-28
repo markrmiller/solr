@@ -132,7 +132,7 @@ public class MoreLikeThisHandler extends RequestHandlerBase
           if (fqs != null && fqs.length != 0) {
             filters = new ArrayList<>();
             for (String fq : fqs) {
-              if (fq != null && fq.trim().length() != 0) {
+              if (fq != null && !org.apache.commons.lang3.StringUtils.isBlank(fq)) {
                 QParser fqp = QParser.getParser(fq, req);
                 filters.add(fqp.getQuery());
               }

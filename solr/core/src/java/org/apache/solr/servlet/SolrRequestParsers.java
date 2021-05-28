@@ -627,7 +627,7 @@ public class SolrRequestParsers {
 
       String v = req.getHeader("Content-Length");
       if (v != null) {
-        size = Long.valueOf(v);
+        size = Long.parseLong(v);
       }
     }
 

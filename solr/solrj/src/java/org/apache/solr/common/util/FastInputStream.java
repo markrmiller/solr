@@ -201,6 +201,6 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   @Override
   public String readUTF() throws IOException {
-    return new DataInputStream(this).readUTF();
+    throw new UnsupportedOperationException();
   }
 }

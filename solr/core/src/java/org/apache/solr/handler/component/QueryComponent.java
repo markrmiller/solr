@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.ExitableDirectoryReader;
 import org.apache.lucene.index.IndexReaderContext;
 import org.apache.lucene.index.LeafReaderContext;
@@ -205,7 +206,7 @@ public class QueryComponent extends SearchComponent
         // if filters already exists, make a copy instead of modifying the original
         filters = filters == null ? new ArrayList<>(fqs.length) : new ArrayList<>(filters);
         for (String fq : fqs) {
-          if (fq != null && fq.trim().length()!=0) {
+          if (fq != null && !StringUtils.isBlank(fq)) {
             QParser fqp = QParser.getParser(fq, req);
             fqp.setIsFilter(true);
             filters.add(fqp.getQuery());

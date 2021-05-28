@@ -235,7 +235,7 @@ public class JavaBinUpdateRequestCodec {
         namedList[0] = nl;
       }
       for (int i = 0; i < sz; i++) {
-        String name = (String) readStr(dis);
+        String name = (String) readStr(dis, null);
         Object val = readVal(dis);
         nl.add(name, val);
       }
@@ -314,10 +314,6 @@ public class JavaBinUpdateRequestCodec {
             handler.update(null, req, null, null);
           } else if (o instanceof Map.Entry) {
             sdoc = (SolrInputDocument) ((Entry) o).getKey();
-
-            if ( ((Entry) o).getValue() instanceof String) {
-              throw new IllegalStateException(((Entry) o).getValue().toString());
-            }
 
             Map p = (Map) ((Entry) o).getValue();
             if (p != null) {

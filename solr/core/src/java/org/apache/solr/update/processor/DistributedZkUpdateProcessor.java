@@ -973,7 +973,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     }
     for (Replica replica : replicas) {
       if (zkController.zkStateReader.isNodeLive(replica.getNodeName()) &&
-          (replica.getState() == Replica.State.ACTIVE)) {
+          (replica.getState() == Replica.State.ACTIVE || replica.getState() == Replica.State.BUFFERING)) {
         nodes.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collection, shardId));
       }
     }

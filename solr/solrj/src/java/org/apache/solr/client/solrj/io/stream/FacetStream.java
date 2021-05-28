@@ -671,13 +671,8 @@ public class FacetStream extends TupleStream implements Expressible  {
 
   private static void appendJson(StringBuilder buf, Bucket[] _buckets, Metric[] _metrics, FieldComparator[] _sorts, int _limit, String method, boolean refine,
       int level) {
-    buf.append('"');
-    buf.append(_buckets[level].toString());
-    buf.append('"');
-    buf.append(":{");
-    buf.append("\"type\":\"terms\"");
-    buf.append(",\"field\":\"").append(_buckets[level].toString()).append('"');
-    buf.append(",\"limit\":").append(_limit);
+    buf.append('"').append(_buckets[level].toString()).append('"').append(":{").append("\"type\":\"terms\"").append(",\"field\":\"").append(_buckets[level].toString()).append('"')
+        .append(",\"limit\":").append(_limit);
 
     if(refine) {
       buf.append(",\"refine\":true");
@@ -689,9 +684,8 @@ public class FacetStream extends TupleStream implements Expressible  {
 
     String fsort = getFacetSort(_sorts[level].getLeftFieldName(), _metrics);
 
-    buf.append(",\"sort\":{\"").append(fsort).append("\":\"").append(_sorts[level].getOrder()).append("\"}");
+    buf.append(",\"sort\":{\"").append(fsort).append("\":\"").append(_sorts[level].getOrder()).append("\"}").append(",\"facet\":{");
 
-    buf.append(",\"facet\":{");
     int metricCount = 0;
 
 
