@@ -40,6 +40,8 @@ import java.util.regex.Matcher;
 
 import com.codahale.metrics.Meter;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.apache.solr.cloud.ActionThrottle;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.Stats;
@@ -50,6 +52,7 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.Utils;
@@ -705,12 +708,15 @@ public class ZkStateWriter {
 
 
   protected static byte[] toJavabin(Map<Integer,Integer> updates) throws IOException {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    ExpandableDirectBufferOutputStream out = new ExpandableDirectBufferOutputStream(new ExpandableArrayBuffer());
 
     try (JavaBinCodec codec = new JavaBinCodec()) {
       codec.marshal(updates, out);
     }
-    return out.toByteArray();
+
+    byte[] bytes = new byte[out.position()];
+    out.buffer().getBytes(0, bytes);
+    return bytes;
   }
 
   private static class DocAssign {

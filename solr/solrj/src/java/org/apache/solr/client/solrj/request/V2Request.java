@@ -32,6 +32,7 @@ import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.response.V2Response;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.Utils;
 

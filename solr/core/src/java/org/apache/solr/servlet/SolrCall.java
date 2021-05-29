@@ -16,16 +16,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.CommandOperation;
-import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.ExpandableBuffers;
-import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
-import org.apache.solr.common.util.JsonSchemaValidator;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.SimpleOrderedMap;
-import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.common.util.TimeSource;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.*;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.LocalSolrQueryRequest;
@@ -415,6 +406,7 @@ public abstract class SolrCall {
                 ExpandableBuffers.getInstance().release(outStream.buffer());
               } finally {
                 req.getAsyncContext().complete();
+              //  out.softClose();
               }
             }
 
@@ -430,6 +422,7 @@ public abstract class SolrCall {
                 log.warn("Exception sending error", t); // MRM TODO
               } finally {
                 req.getAsyncContext().complete();
+                out.softClose();
               }
             }
           });

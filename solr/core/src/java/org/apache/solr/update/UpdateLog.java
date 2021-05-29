@@ -1304,6 +1304,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
     recoveryInfo = new RecoveryInfo();
     tlog.incref();
 
+
     ExecutorCompletionService<RecoveryInfo> cs = new ExecutorCompletionService<>(ParWork.getExecutorService("LogRecovery", SysStats.PROC_COUNT, true));
     LogReplayer replayer = new LogReplayer(Collections.singletonList(tlog), false, true);
 
@@ -1901,11 +1902,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
               return State.ACTIVE;
             }
             bufferTlog.incref();
-            try {
-              bufferTlog.fos.flushBuffer();
-            } catch (IOException ioException) {
-              throw new RuntimeIOException(ioException);
-            }
+            //  bufferTlog.fos.flushBuffer();
           } finally {
             tlogLock.unlock();
           }
@@ -2005,9 +2002,13 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
             recoveryInfo.errors++;
             SolrException.log(log, e);
           }
-        } catch (Exception e) {
+        } catch (Throwable e) {
           recoveryInfo.errors++;
           SolrException.log(log, e);
+
+          if (e instanceof Error) {
+            throw e;
+          }
         } finally {
           // change the state while updates are still blocked to prevent races
           state.set(State.ACTIVE);
@@ -2040,10 +2041,12 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
     }
 
     public void doReplay(TransactionLog translog, SolrQueryRequest req) {
+
       UpdateRequestProcessor proc = null;
       try {
         loglog.warn("Starting log replay {}  active={} starting pos={} inSortedOrder={} tlog={}", translog, activeLog, recoveryInfo.positionOfStart, inSortedOrder, translog);
         long lastStatusTime = System.nanoTime();
+
         if (inSortedOrder) {
           tlogReader = translog.getSortedReader(recoveryInfo.positionOfStart);
         } else {
@@ -2114,8 +2117,11 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
                 updatesBlocked = false;
               }
             }
-          } catch (Exception e) {
+          } catch (Throwable e) {
             SolrException.log(log, e);
+            if (e instanceof Error) {
+              throw (Error) e;
+            }
            // throw new SolrException(ErrorCode.SERVER_ERROR, e);
           }
 
@@ -2193,12 +2199,13 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
             loglog.warn("REPLAY_ERR: Unexpected log entry or corrupt log.  Entry={}", o, cl);
             // would be caused by a corrupt transaction log
           } catch (Throwable ex) {
-            if (ex instanceof Error) {
-              throw (Error) ex;
-            }
+
             recoveryInfo.errors++;
             loglog.warn("REPLAY_ERR: Exception replaying log", ex);
             // something wrong with the request?
+            if (ex instanceof Error) {
+              throw (Error) ex;
+            }
           }
           assert TestInjection.injectUpdateLogReplayRandomPause();
         }
@@ -2219,17 +2226,22 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
           loglog.error("Replay exception: final commit.", ex);
         }
 
-        if (!activeLog) {
-          // if we are replaying an old tlog file, we need to add a commit to the end
-          // so we don't replay it again if we restart right after.
-          translog.writeCommit(cmd);
-        }
-
         try {
-          proc.finish();
-        } catch (IOException ex) {
-          recoveryInfo.errors++;
-          loglog.error("Replay exception: finish()", ex);
+          if (!activeLog) {
+            // if we are replaying an old tlog file, we need to add a commit to the end
+            // so we don't replay it again if we restart right after.
+            translog.writeCommit(cmd);
+          }
+
+          try {
+            proc.finish();
+          } catch (IOException ex) {
+            recoveryInfo.errors++;
+            loglog.error("Replay exception: finish()", ex);
+          }
+        } catch (Throwable throwable) {
+          loglog.error("REPLAY_ERR: error replaying log", throwable);
+          throw throwable;
         }
 
       } finally {

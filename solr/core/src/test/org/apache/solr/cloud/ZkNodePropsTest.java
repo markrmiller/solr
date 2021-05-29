@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.ZkNodeProps;
+import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.util.SimplePostTool;
@@ -48,7 +49,7 @@ public class ZkNodePropsTest extends SolrTestCaseJ4 {
     props.forEach((s, o) -> assertEquals(o, props2.get(s)));
     SimplePostTool.BAOS baos = new SimplePostTool.BAOS();
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.marshal(zkProps, baos);
+      jbc.marshal(zkProps, new FastOutputStream(baos));
     }
     bytes = baos.toByteArray();
     ZkNodeProps props3 = ZkNodeProps.load(bytes);

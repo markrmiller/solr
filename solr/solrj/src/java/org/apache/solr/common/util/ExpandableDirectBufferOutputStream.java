@@ -151,4 +151,9 @@ public class ExpandableDirectBufferOutputStream extends OutputStream
     public void close()
     {
     }
+
+    public void putInt(int position, int val) {
+        buffer.putInt(position, val);
+        this.position += 4;
+    }
 }

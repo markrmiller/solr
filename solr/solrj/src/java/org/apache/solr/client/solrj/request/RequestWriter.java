@@ -28,6 +28,8 @@ import java.util.Map;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
+import org.apache.solr.common.util.FastOutputStream;
 
 
 /**
@@ -84,7 +86,16 @@ public class RequestWriter {
     return req.getPath();
   }
 
-  public void write(SolrRequest request, OutputStream os) throws IOException {
+  public void write(SolrRequest request, ExpandableDirectBufferOutputStream os) throws IOException {
+    if (request instanceof UpdateRequest) {
+      UpdateRequest updateRequest = (UpdateRequest) request;
+      Writer writer = new OutputStreamWriter(os, StandardCharsets.UTF_8);
+      updateRequest.writeXML(writer);
+      writer.flush();
+    }
+  }
+
+  public void write(SolrRequest request, FastOutputStream os) throws IOException {
     if (request instanceof UpdateRequest) {
       UpdateRequest updateRequest = (UpdateRequest) request;
       Writer writer = new OutputStreamWriter(os, StandardCharsets.UTF_8);

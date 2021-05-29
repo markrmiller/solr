@@ -31,6 +31,7 @@ import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.Utils;
 import org.jctools.maps.NonBlockingHashMap;
 

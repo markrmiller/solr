@@ -110,12 +110,7 @@ public class AsyncTracker implements Closeable {
     if (available != null) {
       if (!wait) {
         boolean success;
-        try {
-          success = available.tryAcquire(0, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-          phaser.arriveAndDeregister();
-          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
-        }
+        success = available.tryAcquire();
         return success;
       } else {
         try {

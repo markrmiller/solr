@@ -66,6 +66,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
+import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.loader.XMLLoader;
@@ -434,7 +435,7 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
 
     RequestWriter requestWriter = new RequestWriter();
     OutputStream os = new ByteArrayOutputStream();
-    requestWriter.write(req, os);
+    requestWriter.write(req, new FastOutputStream(os));
     assertBlockU(os.toString());
     assertU(commit());
 
@@ -508,7 +509,7 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
 
     RequestWriter requestWriter = new RequestWriter();
     OutputStream os = new ByteArrayOutputStream();
-    requestWriter.write(req, os);
+    requestWriter.write(req, new FastOutputStream(os));
     assertBlockU(os.toString());
     assertU(commit());
 
@@ -656,7 +657,7 @@ public class AddBlockUpdateTest extends SolrTestCaseJ4 {
 
     RequestWriter requestWriter = new RequestWriter();
     OutputStream os = new ByteArrayOutputStream();
-    requestWriter.write(req, os);
+    requestWriter.write(req, new FastOutputStream(os));
     assertBlockU(os.toString());
     assertU(commit());
 

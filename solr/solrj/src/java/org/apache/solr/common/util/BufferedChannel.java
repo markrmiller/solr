@@ -22,7 +22,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
 
 
     protected volatile int count;
-  //  protected volatile int size;
+    protected volatile int size;
 
 
     /**
@@ -36,22 +36,24 @@ public class BufferedChannel extends OutputStream implements Closeable {
      */
     public BufferedChannel(FileChannel out, int size) {
         ch = out;
-        buff = new UnsafeBuffer(ByteBuffer.allocate(8192));
+        //buff = ExpandableBuffers.getInstance().acquire(-1, true);
+        buff = new UnsafeBuffer(ByteBuffer.allocate(size));
 
-       // buff.byteBuffer().limit(buff.byteBuffer().capacity());
+        //buff.byteBuffer().limit(buff.byteBuffer().capacity());
     }
 
     /** Flush the internal buffer */
     public void flushBuffer() throws IOException {
         if (count > 0) {
             ByteBuffer bb = buff.byteBuffer();
-            bb.limit(count);
-            bb.position(0);
+         //   bb.flip();
+            bb.limit(count + buff.wrapAdjustment());
+            bb.position(0 + buff.wrapAdjustment());
         //    BufferUtil.flipToFlush(bb, pos);
             ch.write(bb);
        //     pos = BufferUtil.flipToFill(buff.byteBuffer());
-            bb.position(0);
-            bb.limit(bb.capacity());
+            bb.position(0 + buff.wrapAdjustment());
+            bb.limit(bb.capacity() + buff.wrapAdjustment());
             count = 0;
         }
     }
@@ -64,11 +66,11 @@ public class BufferedChannel extends OutputStream implements Closeable {
      */
     @Override
     public void write(int b) throws IOException {
-        if (count >= buff.byteBuffer().remaining()) {
+        if (count + 1 > buff.byteBuffer().remaining()) {
             flushBuffer();
         }
         buff.putByte(count++, (byte)b);
-        //size++;
+        size++;
     }
 
     @Override
@@ -84,7 +86,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
         if (len >= buff.byteBuffer().remaining()) {
             flushBuffer();
 
-            if (len >= buff.byteBuffer().remaining()) {
+            if (len > buff.byteBuffer().remaining()) {
                 ch.write(ByteBuffer.wrap(b, off, len));
                 return;
             }
@@ -92,7 +94,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
 
         buff.putBytes(count, b, off, len);
         count += len;
-        //size += len;
+        size += len;
     }
 
     @Override
@@ -101,12 +103,7 @@ public class BufferedChannel extends OutputStream implements Closeable {
     }
 
     public long size() {
-     //   return size;
-        try {
-            return ch.size() ;//+ count;
-        } catch (IOException ioException) {
-           throw new RuntimeIOException(ioException);
-        }
+        return size;
     }
 
     public void writeInt(int v) {
@@ -116,17 +113,17 @@ public class BufferedChannel extends OutputStream implements Closeable {
         buff.putByte(count++, (byte) ((v >>>  8) & 0xFF));
         buff.putByte(count++, (byte) ((v >>>  0) & 0xFF));
       //  count+=BitUtil.SIZE_OF_INT;
-      //  size+=BitUtil.SIZE_OF_INT;
+        size+=BitUtil.SIZE_OF_INT;
     }
 
-    public void setWritten(int start) throws IOException {
-      ch.position(start);
+    public void setWritten(int start) {
+      size = start;
     }
 
     public void close() throws IOException {
         flushBuffer();
         ch.close();
-      //  BufferUtil.free(buff);
+        BufferUtil.free(buff);
     }
 
     public MutableDirectBuffer buffer() {

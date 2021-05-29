@@ -16,10 +16,7 @@
  */
 package org.apache.solr.common.util;
 
-import java.io.Closeable;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 
 /**

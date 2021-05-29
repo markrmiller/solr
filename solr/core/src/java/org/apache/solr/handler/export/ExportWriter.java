@@ -59,6 +59,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.StreamParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
@@ -300,7 +301,7 @@ public class ExportWriter implements SolrCore.RawWriter, Closeable {
     QueryResponseWriter rw = req.getCore().getResponseWriters().get(wt);
     if (rw instanceof BinaryResponseWriter) {
       //todo add support for other writers after testing
-      writer = new JavaBinCodec(os, null);
+      writer = new JavaBinCodec((ExpandableDirectBufferOutputStream) os, null);
       closeWriter = true;
     } else {
       respWriter = new OutputStreamWriter(os, StandardCharsets.UTF_8);

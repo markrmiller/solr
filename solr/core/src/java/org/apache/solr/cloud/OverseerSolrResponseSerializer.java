@@ -55,7 +55,7 @@ public class OverseerSolrResponseSerializer {
 
     NamedList<Object> response;
     try {
-      response = (NamedList<Object>) Utils.fromJavabin(responseBytes);
+       response = (NamedList<Object>) Utils.fromJavabin(responseBytes);
     } catch (IOException e) {
       throw new SolrException(ErrorCode.SERVER_ERROR, "Exception deserializing response from Javabin", e);
     }

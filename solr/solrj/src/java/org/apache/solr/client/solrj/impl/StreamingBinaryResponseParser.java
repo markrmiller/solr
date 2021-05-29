@@ -126,7 +126,7 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
       private int nestedLevel;
 
       @Override
-      public SolrDocument readSolrDocument(DataInputInputStream dis) throws IOException {
+      public SolrDocument readSolrDocument(InputStream dis) throws IOException {
         nestedLevel++;
         SolrDocument doc = super.readSolrDocument(dis);
         nestedLevel--;
@@ -141,7 +141,7 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
       }
 
       @Override
-      public SolrDocumentList readSolrDocumentList(DataInputInputStream dis) throws IOException {
+      public SolrDocumentList readSolrDocumentList(InputStream dis) throws IOException {
         SolrDocumentList solrDocs = new SolrDocumentList();
         List list = (List) readVal(dis);
         solrDocs.setNumFound((Long) list.get(0));
@@ -154,7 +154,7 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
             solrDocs.getMaxScore());
 
         // Read the Array
-        tagByte = dis.readByte();
+        tagByte = read(dis);
         if ((tagByte >>> 5) != (ARR >>> 5)) {
           throw new RuntimeException("doclist must have an array");
         }

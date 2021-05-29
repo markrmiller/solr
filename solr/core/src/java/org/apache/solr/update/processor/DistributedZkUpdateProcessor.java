@@ -908,7 +908,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
       Slice slice = slices.get(sliceEntry.getKey());
       Replica replica = docCollection.getLeader(slice.getName(), zkController.zkStateReader.getLiveNodes());
       if (replica != null) {
-        if (zkController.getZkStateReader().isNodeLive(replica.getNodeName()) && types.contains(replica.getType()) && replica.getState() == Replica.State.ACTIVE) {
+        if (zkController.getZkStateReader().isNodeLive(replica.getNodeName()) && types.contains(replica.getType()) && replica.getState() == Replica.State.ACTIVE || replica.getState() == Replica.State.BUFFERING) {
           urls.add(new SolrCmdDistributor.StdNode(zkController.getZkStateReader(), replica, collectionName, slice.getName()));
         }
       }

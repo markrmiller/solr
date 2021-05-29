@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 
 /**
  * Basic functionality to upload a File or {@link org.apache.solr.common.util.ContentStream} to a Solr Cell or some

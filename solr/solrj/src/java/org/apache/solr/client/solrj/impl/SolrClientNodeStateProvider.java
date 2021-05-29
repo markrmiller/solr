@@ -49,10 +49,7 @@ import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.Pair;
-import org.apache.solr.common.util.StrUtils;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.*;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -269,7 +266,7 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
 
       try {
         SimpleSolrResponse rsp = snitchContext.invokeWithRetry(solrNode, CommonParams.METRICS_PATH, params);
-        NamedList<?> metrics = (NamedList<?>) ((Map)rsp.nl).get("metrics");
+        NamedList<?> metrics = (NamedList<?>) (rsp.nl).get("metrics");
 
         if (requestedTags.contains(Variable.FREEDISK.tagName)) {
           Object n = Utils.getObjectByPath(metrics, true, "solr.node/CONTAINER.fs.usableSpace");

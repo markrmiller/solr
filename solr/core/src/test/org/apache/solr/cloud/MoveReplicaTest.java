@@ -148,7 +148,7 @@ public class MoveReplicaTest extends SolrCloudTestCase {
       assertNotSame(rsp.getRequestStatus(), RequestStatusState.FAILED);
       Thread.sleep(50);
     }
-   // assertTrue(success);
+    assertTrue(success);
 
     try {
       assertEquals(100, cluster.getSolrClient().query(coll, new SolrQuery("*:*")).getResults().getNumFound());

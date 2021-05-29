@@ -1203,7 +1203,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     if (col != null) {
       if ((expectedVersion <= col.getZNodeVersion() && (updateHash == -1 || updateHash == col.getStateUpdates().hashCode()))
           && !cacheEntry.shouldRetry()) {
-        log.info("Latest cached version looks up to date, returning {}", col);
+        log.debug("Latest cached version looks up to date, returning {}", col);
         return col;
       }
     }

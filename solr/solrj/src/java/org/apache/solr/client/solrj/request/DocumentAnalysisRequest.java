@@ -31,6 +31,7 @@ import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.AnalysisParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

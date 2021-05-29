@@ -44,17 +44,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.util.Base64;
-import org.apache.solr.common.util.CloseTracker;
-import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.ExpandableBuffers;
-import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.ObjectReleaseTracker;
-import org.apache.solr.common.util.SolrInternalHttpClient;
-import org.apache.solr.common.util.SolrQTP;
-import org.apache.solr.common.util.SysStats;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.*;
 import org.eclipse.jetty.client.ConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpClientTransport;
@@ -494,7 +484,7 @@ public class Http2SolrClient extends SolrClient {
 
   public void send(OutStream outStream, SolrRequest req, String collection) throws IOException {
     assert outStream.belongToThisStream(req, collection);
-    this.requestWriter.write(req, outStream.outProvider.getOutputStream());
+    this.requestWriter.write(req, new FastOutputStream(outStream.outProvider.getOutputStream()));
     if (outStream.isXml) {
       // check for commit or optimize
       SolrParams params = req.getParams();

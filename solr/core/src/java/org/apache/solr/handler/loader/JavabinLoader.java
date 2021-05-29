@@ -97,7 +97,7 @@ public class JavabinLoader extends ContentStreamLoader {
     try (JavaBinCodec jbc = new JavaBinCodec() {
       SolrParams params;
       @Override
-      public List<Object> readIterator(DataInputInputStream fis) throws IOException {
+      public List<Object> readIterator(InputStream fis) throws IOException {
         while (true) {
           Object o = readVal(fis);
           if (o == END_OBJ) break;

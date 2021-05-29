@@ -333,7 +333,7 @@ gget   * @throws IOException If there is a low-level I/O error.
       dirFactory.initCoreContainer(cc);
       dirFactory.init(info.initArgs);
     } else {
-     // dirFactory = new StandardDirectoryFactory();
+      //dirFactory = new StandardDirectoryFactory();
       dirFactory = new NRTCachingDirectoryFactory();
       dirFactory.initCoreContainer(cc);
     }

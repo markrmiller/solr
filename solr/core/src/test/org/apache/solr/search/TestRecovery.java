@@ -191,7 +191,6 @@ public class TestRecovery extends SolrTestCaseJ4 {
   }
 
   @Test
-  @Ignore // nocommit
   public void testLogReplay() throws Exception {
     
     try {

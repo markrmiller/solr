@@ -76,8 +76,8 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
     //here after it will be a stream of maps
   }
 
-  private boolean isObjectType(DataInputInputStream dis) throws IOException {
-    tagByte = dis.readByte();
+  private boolean isObjectType(InputStream dis) throws IOException {
+    tagByte = read(dis);
     if (tagByte >>> 5 == ORDERED_MAP >>> 5 ||
         tagByte >>> 5 == NAMED_LST >>> 5) {
       objectSize = readSize(dis);
@@ -94,11 +94,11 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
     return tagByte == SOLRDOCLST;
   }
 
-  private Map readAsMap(DataInputInputStream dis) throws IOException {
+  private Map readAsMap(InputStream dis) throws IOException {
     int sz = readSize(dis);
     Map m = new LinkedHashMap<>();
     for (int i = 0; i < sz; i++) {
-      tagByte = dis.readByte();
+      tagByte = read(dis);
       String name = (String) readStr(dis, null);
       Object val = readVal(dis);
       m.put(name, val);
@@ -106,8 +106,8 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
     return m;
   }
 
-  private Map readSolrDocumentAsMap(DataInputInputStream dis) throws IOException {
-    tagByte = dis.readByte();
+  private Map readSolrDocumentAsMap(InputStream dis) throws IOException {
+    tagByte = read(dis);
     int size = readSize(dis);
     Map doc = new LinkedHashMap<>();
     for (int i = 0; i < size; i++) {
@@ -128,7 +128,7 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
   }
 
   @Override
-  protected Object readObject(DataInputInputStream dis) throws IOException {
+  protected Object readObject(InputStream dis) throws IOException {
     if (tagByte == SOLRDOC) {
       return readSolrDocumentAsMap(dis);
     }
@@ -145,24 +145,24 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
 
       switch (tagByte) {
         case INT: {
-          int i = dis.readInt();
+          int i = readInt(dis);
           return (long) i;
         }
         case FLOAT: {
-          float v = dis.readFloat();
+          float v = readFloat(dis);
           return (double) v;
         }
         case BYTE: {
-          byte b = dis.readByte();
+          byte b = read(dis);
           return (long) b;
         }
         case SHORT: {
-          short s = dis.readShort();
+          short s = readShort(dis);
           return (long) s;
         }
 
         case DATE: {
-          return Instant.ofEpochMilli(dis.readLong()).toString();
+          return Instant.ofEpochMilli(readLong(dis)).toString();
         }
 
         default:

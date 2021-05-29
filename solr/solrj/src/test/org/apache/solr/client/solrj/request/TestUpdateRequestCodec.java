@@ -34,6 +34,8 @@ import org.apache.solr.common.IteratorWriter;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
+import org.apache.solr.common.util.FastInputStream;
+import org.apache.solr.common.util.FastOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.Utils;
 import org.junit.Test;
@@ -87,7 +89,7 @@ public class TestUpdateRequestCodec extends SolrTestCase {
     updateRequest.deleteByQuery("id:3");
     JavaBinUpdateRequestCodec codec = new JavaBinUpdateRequestCodec();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    codec.marshal(updateRequest, baos);
+    codec.marshal(updateRequest, new FastOutputStream(baos));
     final List<SolrInputDocument> docs = new ArrayList<>();
     JavaBinUpdateRequestCodec.StreamingUpdateHandler handler = (document, req, commitWithin, overwrite) -> {
       Assert.assertNotNull(req.getParams());
@@ -133,7 +135,7 @@ public class TestUpdateRequestCodec extends SolrTestCase {
 
     JavaBinUpdateRequestCodec codec = new JavaBinUpdateRequestCodec();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    codec.marshal(updateRequest, baos);
+    codec.marshal(updateRequest, new FastOutputStream(baos));
     final List<SolrInputDocument> docs = new ArrayList<>();
     JavaBinUpdateRequestCodec.StreamingUpdateHandler handler = (document, req, commitWithin, overwrite) -> {
       Assert.assertNotNull(req.getParams());
@@ -179,7 +181,7 @@ public class TestUpdateRequestCodec extends SolrTestCase {
     l.add(m);
     l.add(m2);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    new JavaBinCodec().marshal(l.iterator(), baos);
+    new JavaBinCodec().marshal(l.iterator(), new FastOutputStream(baos));
 
     List<SolrInputDocument>  l2 = new ArrayList();
 

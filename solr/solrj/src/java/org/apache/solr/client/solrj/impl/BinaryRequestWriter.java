@@ -26,6 +26,7 @@ import org.apache.solr.client.solrj.request.JavaBinUpdateRequestCodec;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 
 import static org.apache.solr.common.params.CommonParams.JAVABIN_MIME;
 
@@ -67,7 +68,7 @@ public class BinaryRequestWriter extends RequestWriter {
   }
 
   @Override
-  public void write(SolrRequest request, OutputStream os) throws IOException {
+  public void write(SolrRequest request, ExpandableDirectBufferOutputStream os) throws IOException {
     if (request instanceof UpdateRequest) {
       UpdateRequest updateRequest = (UpdateRequest) request;
       new JavaBinUpdateRequestCodec().marshal(updateRequest, os);

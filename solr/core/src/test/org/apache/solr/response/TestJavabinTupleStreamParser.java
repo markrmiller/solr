@@ -41,10 +41,7 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamExplanation;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
-import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.SimpleOrderedMap;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.*;
 import org.apache.zookeeper.server.ByteBufferInputStream;
 
 import static org.apache.solr.response.SmileWriterTest.constructSolrDocList;
@@ -177,7 +174,7 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     SolrQueryResponse response = new SolrQueryResponse();
     SolrDocumentList l = constructSolrDocList(response);
     try (JavaBinCodec jbc = new JavaBinCodec(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      jbc.marshal(response.getValues(), baos);
+      jbc.marshal(response.getValues(), new FastOutputStream(baos));
     }
     byte[] bytes = serialize(response.getValues());
     try (JavaBinCodec jbc = new JavaBinCodec()) {
@@ -201,7 +198,7 @@ public class TestJavabinTupleStreamParser extends SolrTestCaseJ4 {
     response.getValues().add("results", o);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      jbc.marshal(response.getValues(), baos);
+      jbc.marshal(response.getValues(), new FastOutputStream(baos));
     }
     return baos.toByteArray();
   }

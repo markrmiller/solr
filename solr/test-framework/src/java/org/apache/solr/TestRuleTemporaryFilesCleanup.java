@@ -190,93 +190,93 @@ final class TestRuleTemporaryFilesCleanup extends TestRuleAdapter {
   }
 
 
-  @Override protected void afterAlways(List<Throwable> errors) throws Throwable {
-    // Drain cleanup queue and clear it.
-    final Path[] everything;
-    final String tempDirBasePath;
-
-    tempDirBasePath = (tempDirBase != null ? tempDirBase.toAbsolutePath().toString() : null);
-    tempDirBase = null;
-
-    everything = new Path[cleanupQueue.size()];
-    cleanupQueue.toArray(everything);
-    cleanupQueue.clear();
-
-    // Only check and throw an IOException on un-removable files if the test
-    // was successful. Otherwise just report the path of temporary files
-    // and leave them there.
-    if (failureMarker.wasSuccessful()) {
-      ExecutorService pool = new ThreadPoolExecutor(0, 4, 1, TimeUnit.SECONDS, new LinkedTransferQueue<>(), new ThreadPoolExecutor.CallerRunsPolicy());
-      try {
-
-      List<Future> futures = new ArrayList<>(everything.length);
-      for (Path location : everything) {
-        futures.add(pool.submit(() -> {
-          List<Path> files = new ArrayList<>(32);
-          try {
-
-            Files.walkFileTree(location, new FileVisitor<>() {
-              @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                return FileVisitResult.CONTINUE;
-              }
-
-              @Override public FileVisitResult postVisitDirectory(Path dir, IOException impossible) throws IOException {
-                files.add(dir);
-                return FileVisitResult.CONTINUE;
-              }
-
-              @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                files.add(file);
-                return FileVisitResult.CONTINUE;
-              }
-
-              @Override public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-                files.add(file);
-                return FileVisitResult.CONTINUE;
-              }
-            });
-          } catch (IOException impossible) {
-            throw new AssertionError("visitor threw exception", impossible);
-          }
-          files.sort(Comparator.reverseOrder());
-
-          files.forEach(path -> {
-            try {
-              Files.deleteIfExists(path);
-            } catch (NoSuchFileException e) {
-              // ignore
-            } catch (IOException e2) {
-              System.err.println("WARN: could not delete file:" + path + " " + e2.getClass().getName() + " " + e2.getMessage());
-            }
-          });
-        }));
-      }
+//  @Override protected void afterAlways(List<Throwable> errors) throws Throwable {
+//    // Drain cleanup queue and clear it.
+//    final Path[] everything;
+//    final String tempDirBasePath;
 //
-//      for (Future future : futures) {
-//        future.get();
+//    tempDirBasePath = (tempDirBase != null ? tempDirBase.toAbsolutePath().toString() : null);
+//    tempDirBase = null;
+//
+//    everything = new Path[cleanupQueue.size()];
+//    cleanupQueue.toArray(everything);
+//    cleanupQueue.clear();
+//
+//    // Only check and throw an IOException on un-removable files if the test
+//    // was successful. Otherwise just report the path of temporary files
+//    // and leave them there.
+//    if (failureMarker.wasSuccessful()) {
+//      ExecutorService pool = new ThreadPoolExecutor(0, 4, 1, TimeUnit.SECONDS, new LinkedTransferQueue<>(), new ThreadPoolExecutor.CallerRunsPolicy());
+//      try {
+//
+//      List<Future> futures = new ArrayList<>(everything.length);
+//      for (Path location : everything) {
+//        futures.add(pool.submit(() -> {
+//          List<Path> files = new ArrayList<>(32);
+//          try {
+//
+//            Files.walkFileTree(location, new FileVisitor<>() {
+//              @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+//                return FileVisitResult.CONTINUE;
+//              }
+//
+//              @Override public FileVisitResult postVisitDirectory(Path dir, IOException impossible) throws IOException {
+//                files.add(dir);
+//                return FileVisitResult.CONTINUE;
+//              }
+//
+//              @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+//                files.add(file);
+//                return FileVisitResult.CONTINUE;
+//              }
+//
+//              @Override public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+//                files.add(file);
+//                return FileVisitResult.CONTINUE;
+//              }
+//            });
+//          } catch (IOException impossible) {
+//            throw new AssertionError("visitor threw exception", impossible);
+//          }
+//          files.sort(Comparator.reverseOrder());
+//
+//          files.forEach(path -> {
+//            try {
+//              Files.deleteIfExists(path);
+//            } catch (NoSuchFileException e) {
+//              // ignore
+//            } catch (IOException e2) {
+//              System.err.println("WARN: could not delete file:" + path + " " + e2.getClass().getName() + " " + e2.getMessage());
+//            }
+//          });
+//        }));
 //      }
+////
+////      for (Future future : futures) {
+////        future.get();
+////      }
+////
+////      pool.shutdownNow();
 //
-//      pool.shutdownNow();
-
-    } catch(Exception e){
-      Class<?> suiteClass = RandomizedContext.current().getTargetClass();
-      if (suiteClass.isAnnotationPresent(LuceneTestCase.SuppressTempFileChecks.class)) {
-        System.err.println(
-            "WARNING: Leftover undeleted temporary files (bugUrl: " + suiteClass.getAnnotation(LuceneTestCase.SuppressTempFileChecks.class).bugUrl() + "): " + e
-                .getMessage());
-        return;
-      }
-      throw e;
-    }
-    if (fileSystem != FileSystems.getDefault()) {
-      fileSystem.close();
-    }
-  } else {
-      if (tempDirBasePath != null) {
-        System.err.println("NOTE: leaving temporary files on disk at: " + tempDirBasePath);
-      }
-    }
-  }
+//    } catch(Exception e){
+//      Class<?> suiteClass = RandomizedContext.current().getTargetClass();
+//      if (suiteClass.isAnnotationPresent(LuceneTestCase.SuppressTempFileChecks.class)) {
+//        System.err.println(
+//            "WARNING: Leftover undeleted temporary files (bugUrl: " + suiteClass.getAnnotation(LuceneTestCase.SuppressTempFileChecks.class).bugUrl() + "): " + e
+//                .getMessage());
+//        return;
+//      }
+//      throw e;
+//    }
+//    if (fileSystem != FileSystems.getDefault()) {
+//      fileSystem.close();
+//    }
+//  } else {
+//      if (tempDirBasePath != null) {
+//        System.err.println("NOTE: leaving temporary files on disk at: " + tempDirBasePath);
+//      }
+//    }
+//  }
 
   private static class FileConsumer implements Consumer<Path> {
     public void accept(Path file) {

@@ -18,6 +18,7 @@ package org.apache.solr.update;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.HashMap;
@@ -532,7 +533,7 @@ public class HdfsTransactionLog extends TransactionLog {
     FSDataFastInputStream fis;
     private LogCodec codec = new LogCodec(resolver) {
       @Override
-      public SolrInputDocument readSolrInputDocument(DataInputInputStream dis) {
+      public SolrInputDocument readSolrInputDocument(InputStream dis) {
         // Given that the SolrInputDocument is last in an add record, it's OK to just skip
         // reading it completely.
         return null;

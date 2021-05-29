@@ -30,10 +30,7 @@ import org.apache.lucene.search.TotalHits;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.Utf8CharSequence;
+import org.apache.solr.common.util.*;
 import org.apache.solr.legacy.LegacyFieldType;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.schema.*;
@@ -54,7 +51,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     Resolver resolver = new Resolver(req, response.getReturnFields());
     if (req.getParams().getBool(CommonParams.OMIT_HEADER, false)) response.removeResponseHeader();
     try (JavaBinCodec jbc = new JavaBinCodec(resolver)) {
-      jbc.setWritableDocFields(resolver).marshal(response.getValues(), out);
+      jbc.setWritableDocFields(resolver).marshal(response.getValues(), (ExpandableDirectBufferOutputStream) out);
     }
   }
 
@@ -86,13 +83,13 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public Object resolve(Object o, JavaBinCodec codec) throws IOException {
       if (o instanceof StoredField) {
-        if (((StoredField) o).fieldType() instanceof LegacyFieldType) {
-          CharSequence val = ((StoredField) o).getCharSequenceValue();
-          if (val instanceof Utf8CharSequence) {
-            codec.writeUTF8Str((Utf8CharSequence) val);
-            return null;
-          }
-        }
+
+//          CharSequence val = ((StoredField) o).getCharSequenceValue();
+//          if (val instanceof Utf8CharSequence) {
+//            codec.writeUTF8Str((Utf8CharSequence) val);
+//            return null;
+//          }
+
       }
       if (o instanceof ResultContext) {
         ReturnFields orig = returnFields;
@@ -156,7 +153,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     public void writeResults(ResultContext ctx, JavaBinCodec codec) throws IOException {
       codec.writeTag(JavaBinCodec.SOLRDOCLST);
       List<Object> l = new ArrayList<>(4);
-      l.add(ctx.getDocList().matches());
+      l.add((long) ctx.getDocList().matches());
       l.add((long) ctx.getDocList().offset());
       
       Float maxScore = null;
@@ -277,7 +274,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
 
     @Override
     public Object get(Object key) {
-      return convertCharSeq(_fields.get(key));
+      return _fields.get(key);
     }
 
     public Object getRaw(Object key) {

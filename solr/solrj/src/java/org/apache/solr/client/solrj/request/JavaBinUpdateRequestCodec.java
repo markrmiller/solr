@@ -34,9 +34,7 @@ import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.DataInputInputStream;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +72,39 @@ public class JavaBinUpdateRequestCodec {
    * @throws IOException in case of an exception during marshalling or writing to the stream
    */
   public static void marshal(UpdateRequest updateRequest, OutputStream os) throws IOException {
+    NamedList nl = new NamedList();
+    NamedList params = solrParamsToNamedList(updateRequest.getParams());
+    if (updateRequest.getCommitWithin() != -1) {
+      params.add("commitWithin", updateRequest.getCommitWithin());
+    }
+    Iterator<SolrInputDocument> docIter = null;
+
+    if(updateRequest.getDocIterator() != null){
+      docIter = updateRequest.getDocIterator();
+    }
+
+    Map<SolrInputDocument,Map<String,Object>> docMap = updateRequest.getDocumentsMap();
+
+    nl.add("params", params);// 0: params
+    if (updateRequest.getDeleteByIdMap() != null) {
+      nl.add("delByIdMap", updateRequest.getDeleteByIdMap());
+    }
+    nl.add("delByQ", updateRequest.getDeleteQuery());
+
+    if (docMap != null) {
+      nl.add("docsMap", docMap.entrySet().iterator());
+    } else {
+      if (updateRequest.getDocuments() != null) {
+        docIter = updateRequest.getDocuments().iterator();
+      }
+      nl.add("docs", docIter);
+    }
+    try (JavaBinCodec codec = new JavaBinCodec()) {
+      codec.marshal(nl, os);
+    }
+  }
+
+  public static void marshal(UpdateRequest updateRequest, FastOutputStream os) throws IOException {
     NamedList nl = new NamedList();
     NamedList params = solrParamsToNamedList(updateRequest.getParams());
     if (updateRequest.getCommitWithin() != -1) {
@@ -228,14 +259,14 @@ public class JavaBinUpdateRequestCodec {
     }
 
     @Override
-    public NamedList readNamedList(DataInputInputStream dis) throws IOException {
+    public NamedList readNamedList(InputStream dis) throws IOException {
       int sz = readSize(dis);
       NamedList nl = new NamedList();
       if (namedList[0] == null) {
         namedList[0] = nl;
       }
       for (int i = 0; i < sz; i++) {
-        String name = (String) readStr(dis, null);
+        String name = (String) readVal(dis);
         Object val = readVal(dis);
         nl.add(name, val);
       }
@@ -274,7 +305,7 @@ public class JavaBinUpdateRequestCodec {
     }
 
     @Override
-    public List readIterator(DataInputInputStream fis) throws IOException {
+    public List readIterator(InputStream fis) throws IOException {
       // default behavior for reading any regular Iterator in the stream
       if (seenOuterMostDocIterator.get()) return super.readIterator(fis);
 
@@ -285,7 +316,7 @@ public class JavaBinUpdateRequestCodec {
     }
 
 
-    private List readOuterMostDocIterator(DataInputInputStream fis) throws IOException {
+    private List readOuterMostDocIterator(InputStream fis) throws IOException {
       if(namedList[0] == null) namedList[0] = new NamedList();
       NamedList params = (NamedList) namedList[0].get("params");
       if (params == null) params = new NamedList();

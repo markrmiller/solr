@@ -83,8 +83,8 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
       if (skipped == sz) {
         return;
       }
-      
-      byte[] bytes = new byte[64];
+      sz -= skipped;
+      if (bytes == null) bytes = new byte[64];
       while (sz > 0) {
         int read = dis.read(bytes, 0, Math.min(bytes.length, sz));
         sz -= read;
@@ -122,10 +122,10 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
       return t;
     }
 
-    public static UnsafeBuffer readByteBuffer(DataInputInputStream dis, int sz) throws IOException {
+    public static UnsafeBuffer readByteBuffer(InputStream dis, int sz) throws IOException {
       MutableDirectBuffer brr = ExpandableBuffers.getInstance().acquire(-1, false);
       sz=readVInt(dis);
-      dis.readFully(brr.byteArray(), 0, sz);
+      readFully(dis, brr.byteArray(), 0, sz);
       UnsafeBuffer buffer = new UnsafeBuffer(brr);
       return buffer;
     }
@@ -595,7 +595,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) throws IOException {
-        return codec.readUtf8(codec.dis);
+        return codec.readStr(codec.dis, null);
       }
 
       @Override
@@ -611,7 +611,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) {
-        return Integer.valueOf((int) entry.numericVal);
+        return (int) entry.numericVal;
       }
 
     },
@@ -623,7 +623,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
 
       @Override
       public Object readObject(StreamCodec codec, EntryImpl entry) {
-        return Long.valueOf((int) entry.numericVal);
+        return (long) (int) entry.numericVal;
       }
 
 
@@ -761,7 +761,7 @@ public class FastJavaBinDecoder implements DataEntry.FastDecoder {
     }
 
     /**
-     * Read the entry as an Object. The behavior should be similar to that of {@link JavaBinCodec#readObject(DataInputInputStream)}
+     * Read the entry as an Object. The behavior should be similar to that of
      */
     public Object readObject(StreamCodec codec, EntryImpl entry) throws IOException {
       throw new RuntimeException("Unsupported object : " + this.name());

@@ -74,10 +74,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CursorMarkParams;
 import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.StrUtils;
+import org.apache.solr.common.util.*;
 import org.noggit.CharArr;
 import org.noggit.JSONWriter;
 
@@ -349,7 +346,7 @@ public class ExportTool extends SolrCLI.ToolBase {
       if (info.bufferSize > 0) {
         fos = new BufferedOutputStream(fos, info.bufferSize);
       }
-      codec.set(new JavaBinCodec(fos, null));
+      codec.set(new JavaBinCodec(new FastOutputStream(fos), null));
       codec.get().writeTag(JavaBinCodec.NAMED_LST, 2);
       codec.get().writeStr("params");
       codec.get().writeNamedList(new NamedList<>());
