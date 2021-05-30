@@ -16,10 +16,8 @@
  */
 package org.apache.solr.common.params;
 
-import org.agrona.collections.Hashing;
-import org.agrona.collections.Object2ObjectHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -94,19 +92,19 @@ public class MultiMapSolrParams extends SolrParams {
     if (params instanceof MultiMapSolrParams) {
       Map<String,String[]> map = ((MultiMapSolrParams) params).map;
       if (newCopy) {
-        Object2ObjectHashMap copy = new Object2ObjectHashMap(map.size(), 0.5f, true);
+        Map copy = new Object2ObjectArrayMap(map.size());
         copy.putAll(map);
       }
       return map;
     } else if (params instanceof ModifiableSolrParams) {
       Map<String,String[]> map = ((ModifiableSolrParams)params).getMap();
       if (newCopy) {
-        Object2ObjectHashMap copy = new Object2ObjectHashMap(map.size(), 0.5f, true);
+        Map copy = new Object2ObjectArrayMap(map.size());
         copy.putAll(map);
       }
       return map;
     } else {
-      Object2ObjectHashMap copy = new Object2ObjectHashMap(32, 0.5f, true);
+      Map copy = new Object2ObjectArrayMap(32);
       for (Map.Entry<String, String[]> pair : params) {
         copy.put(pair.getKey(), pair.getValue());
       }

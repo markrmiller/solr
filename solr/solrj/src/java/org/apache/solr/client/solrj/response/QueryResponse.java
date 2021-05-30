@@ -18,13 +18,12 @@ package org.apache.solr.client.solrj.response;
 
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.agrona.collections.Object2ObjectHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.beans.DocumentObjectBinder;
 import org.apache.solr.client.solrj.response.json.NestableJsonFacet;
@@ -239,9 +238,10 @@ public class QueryResponse extends SolrResponseBase
     }
 
     // Parse out interesting bits from the debug info
-    _explainMap = new Object2ObjectHashMap<>();
+
     NamedList<Object> explain = (NamedList<Object>)_debugMap.get( "explain" );
     if( explain != null ) {
+      _explainMap = new Object2ObjectArrayMap<>(explain.size());
       for( Map.Entry<String, Object> info : explain ) {
         String key = info.getKey();
         _explainMap.put( key, info.getValue() );
@@ -305,15 +305,14 @@ public class QueryResponse extends SolrResponseBase
 
   private void extractHighlightingInfo( NamedList<Object> info )
   {
-    _highlighting = new Object2ObjectHashMap<>();
+    _highlighting = new Object2ObjectArrayMap<>(info.size());
     for( Map.Entry<String, Object> doc : info ) {
-      Map<String,List<String>> fieldMap = new HashMap<>();
-      _highlighting.put( doc.getKey(), fieldMap );
-      
       NamedList<List<String>> fnl = (NamedList<List<String>>)doc.getValue();
+      Map<String,List<String>> fieldMap = new Object2ObjectArrayMap<>(fnl.size());
       for( Map.Entry<String, List<String>> field : fnl ) {
         fieldMap.put( field.getKey(), field.getValue() );
       }
+      _highlighting.put( doc.getKey(), fieldMap );
     }
   }
 

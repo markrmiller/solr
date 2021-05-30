@@ -21,6 +21,8 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.cloud.SocketProxy;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.common.ParWork;
+import org.apache.solr.common.util.ByteBufferPool;
+import org.apache.solr.common.util.NonBlockingMappedByteBufferPool;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrQTP;
 import org.apache.solr.core.CoreContainer;
@@ -31,6 +33,7 @@ import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http2.HTTP2Cipher;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.http2.server.HTTP2ServerConnectionFactory;
+import org.eclipse.jetty.io.MappedByteBufferPool;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
 import org.eclipse.jetty.rewrite.handler.RewritePatternRule;
 import org.eclipse.jetty.server.Connector;
@@ -40,14 +43,17 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.server.handler.StatisticsHandler;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.Source;
+import org.eclipse.jetty.util.ProcessorUtils;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
+import org.eclipse.jetty.util.thread.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -301,6 +307,15 @@ public class JettySolrRunner implements Closeable {
     HttpConfiguration httpConfig = new HttpConfiguration();
     httpConfig.setRequestHeaderSize(16 << 10);
     httpConfig.setResponseHeaderSize(16 << 10);
+    httpConfig.setOutputBufferSize(32768);
+
+    httpConfig.setUseOutputDirectByteBuffers(true);
+    httpConfig.setUseOutputDirectByteBuffers(true);
+    httpConfig.setOutputAggregationSize(32768 / 2);
+    httpConfig.setMaxErrorDispatches(2);
+    httpConfig.setSendServerVersion(false);
+    httpConfig.setSendXPoweredBy(false);
+    httpConfig.setSendDateHeader(false);
 
     // https://github.com/jersey/jersey/issues/3691
     // https://github.com/eclipse/jetty.project/issues/1891
@@ -338,7 +353,6 @@ public class JettySolrRunner implements Closeable {
         // HTTP Configuration
       //  httpConfig.setSecureScheme("https");
         //   httpConfig.setSecurePort(port + 1000);
-        httpConfig.setSendServerVersion(false);
 
         // SSL Context Factory for HTTPS and HTTP/2
 
@@ -359,18 +373,20 @@ public class JettySolrRunner implements Closeable {
         httpFactory = new HttpConnectionFactory(httpsConfig);
         h2 = new HTTP2ServerConnectionFactory(httpsConfig);
       }
-      h2.setMaxConcurrentStreams(512);
-      h2.setInputBufferSize(8192);
-      httpFactory.setInputBufferSize(8192);
+
       h2.setStreamIdleTimeout(idleTimeout);
-
+      h2.setMaxConcurrentStreams(1024);
+    //  h2.setInputBufferSize(32768);
     //  NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
-
+      org.eclipse.jetty.io.ByteBufferPool pool = new NonBlockingMappedByteBufferPool(
+          qtp instanceof ThreadPool.SizedThreadPool
+              ? ((ThreadPool.SizedThreadPool)qtp).getMaxThreads() / 2
+              : ProcessorUtils.availableProcessors() << 1);
       // HTTP/2 Connector
       if (ssl == null) {
-        connector = new ServerConnector(server, null, scheduler, null, 1, 1, h2);
+        connector = new ServerConnector(server, null, scheduler, pool, 4, -1, h2);
       } else {
-        connector = new ServerConnector(server, null, scheduler, null, 1, 1, ssl, alpn, h2);
+        connector = new ServerConnector(server, null, scheduler, pool, 4, -1, ssl, alpn, h2);
         alpn.setDefaultProtocol(httpFactory.getProtocol());
       }
 
@@ -388,6 +404,8 @@ public class JettySolrRunner implements Closeable {
 
 
 
+
+
 //    server.setDumpAfterStart(true);
 //    server.setDumpBeforeStop(true);
 
@@ -396,6 +414,10 @@ public class JettySolrRunner implements Closeable {
       // Initialize the servlets
      final ServletContextHandler root = new ServletContextHandler(server, config.context, ServletContextHandler.NO_SESSIONS);
 
+
+//      StatisticsHandler statsHandler = new StatisticsHandler();
+//      statsHandler.setHandler(root);
+//      server.setHandler(statsHandler);
       //root.addServlet(new ServletHolder(new MetricsServlet()), "/metrics");
 
       root.getServletContext().setAttribute(SolrDispatchFilter.PROPERTIES_ATTRIBUTE, nodeProperties);

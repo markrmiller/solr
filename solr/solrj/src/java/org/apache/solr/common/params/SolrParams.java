@@ -21,9 +21,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -31,8 +29,6 @@ import java.util.stream.StreamSupport;
 
 import com.google.api.client.util.escape.CharEscapers;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
-import org.agrona.collections.Hashing;
-import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.ParWork;
@@ -110,7 +106,7 @@ public abstract class SolrParams implements Serializable, MapWriter, Iterable<Ma
           }
 
           @Override public String toString() {
-            return getKey() + "=" + Arrays.toString(getValue());
+            return getKey() + '=' + Arrays.toString(getValue());
           }
         };
       }
@@ -544,7 +540,7 @@ public abstract class SolrParams implements Serializable, MapWriter, Iterable<Ma
   //  And SolrParams now implements MapWriter.toMap(Map) (a default method).  So what do we do?
   @Deprecated
   public Map<String, Object> getAll(Map<String, Object> sink, Collection<String> params) {
-    if (sink == null) sink = new LinkedHashMap<>();
+    if (sink == null) sink = new Object2ObjectLinkedOpenHashMap<>(8, 0.5f);
     for (String param : params) {
       String[] v = getParams(param);
       if (v != null && v.length > 0) {

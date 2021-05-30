@@ -229,7 +229,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       String exclude = config.getInitParameter(EXCLUDE_PATTERNS);
       if (exclude != null) {
         String[] excludeArray = exclude.split(",");
-        ArrayList<Object> excludePatterns = new ArrayList<>();
+        ArrayList<Object> excludePatterns = new ArrayList<>(excludeArray.length);
         for (String element : excludeArray) {
           excludePatterns.add(Pattern.compile(element));
         }
@@ -443,7 +443,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     Boolean passthrough = (Boolean) _request.getAttribute("PASSTHROUGH");
     if (passthrough != null && passthrough) {
-      chain.doFilter(closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
+      chain.doFilter((HttpServletRequest) _request, closeShield((HttpServletResponse) _response));
       return;
     }
 
@@ -458,10 +458,10 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //            asyncContext.dispatch();
 //          } else {
             try {
-              chain.doFilter(closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
+              chain.doFilter(_request, closeShield((HttpServletResponse) _response));
             } catch (Exception e) {
               if (!_response.isCommitted()) {
-                sendException(e, null, closeShield((HttpServletRequest) _request), closeShield((HttpServletResponse) _response));
+                sendException(e, null, (HttpServletRequest) _request, closeShield((HttpServletResponse) _response));
               }
             }
             return;
@@ -478,8 +478,8 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
         ParWork.submitIO("distCall", () -> {
           try {
-            HttpServletRequest req = closeShield((HttpServletRequest) asyncContext.getRequest());
-            HttpServletResponse resp = closeShield((HttpServletResponse) asyncContext.getResponse());
+            HttpServletRequest req = (HttpServletRequest) asyncContext.getRequest();
+            HttpServletResponse resp = (HttpServletResponse) asyncContext.getResponse();
             filter(chain, req, resp, asyncContext);
           } catch (IOException e) {
             log.error("IOException processing request", e);
@@ -488,7 +488,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
       //});
     } else {
-      HttpServletRequest servletRequest = closeShield((HttpServletRequest) _request);
+      HttpServletRequest servletRequest = (HttpServletRequest) _request;
       HttpServletResponse servletResponse = closeShield((HttpServletResponse) _response);
       filter(chain, servletRequest, servletResponse, null);
     }
@@ -508,11 +508,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       Tracer tracer = GlobalTracer.getTracer();
 
       Tracer.SpanBuilder spanBuilder = null;
-      String hostAndPort = servletRequest.getServerName() + "_" + servletRequest.getServerPort();
+      String hostAndPort = servletRequest.getServerName() + '_' + servletRequest.getServerPort();
       if (parentSpan == null) {
-        spanBuilder = tracer.buildSpan(servletRequest.getMethod() + ":" + hostAndPort);
+        spanBuilder = tracer.buildSpan(servletRequest.getMethod() + ':' + hostAndPort);
       } else {
-        spanBuilder = tracer.buildSpan(servletRequest.getMethod() + ":" + hostAndPort)
+        spanBuilder = tracer.buildSpan(servletRequest.getMethod() + ':' + hostAndPort)
             .asChildOf(parentSpan);
       }
 
@@ -577,9 +577,9 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         ExecutorUtil.setServerThreadFlag(null);
       }
     } catch(Exception e) {
-      if (!servletRequest.getInputStream().isFinished()) {
-        consumeInputFully(servletRequest, servletResponse);
-      }
+//      if (!servletRequest.getInputStream().isFinished()) {
+//        consumeInputFully(servletRequest.getInputStream());
+//      }
 
       if (!servletResponse.isCommitted() && !servletRequest.isAsyncStarted()) {
         sendException(e, call, servletRequest, servletResponse);
@@ -643,7 +643,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //            String path = ServletUtils.getPathAfterContext(request);
 //            solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, path, request);
 //          }
-
+// nocommit
           String wt = request.getParameter(CommonParams.WT);
           SolrCore core = null;
 
@@ -709,22 +709,19 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   // we make sure we read the full client request so that the client does
   // not hit a connection reset and we can reuse the 
   // connection - see SOLR-8453 and SOLR-8683
-  public static void consumeInputFully(HttpServletRequest req, HttpServletResponse response) {
+  public static void consumeInputFully(ServletInputStream is) {
     try {
-      ServletInputStream is = req.getInputStream();
 
       while (true) {
         final boolean isFinished = is.isFinished();
         if (isFinished || is.read() == -1) break;
       }
     } catch (IOException e) {
-      if (req.getHeader(HttpHeaders.EXPECT) != null && response.isCommitted()) {
-        log.debug("No input stream to consume from client");
-      } else {
-        log.info("Could not consume full client request", e);
-      }
+
+      log.info("Could not consume full client request", e);
+
     }
-// ;
+    // ;
   }
   
   /**
@@ -858,24 +855,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   private boolean shouldAudit(AuditEvent.EventType eventType) {
     return cores.getAuditLoggerPlugin() != null && cores.getAuditLoggerPlugin().shouldLog(eventType);
   }
-  
-  /**
-   * Wrap the request's input stream with a close shield. If this is a
-   * retry, we will assume that the stream has already been wrapped and do nothing.
-   *
-   * Only the container should ever actually close the servlet output stream.
-   *
-   * @param request The request to wrap.
-   * @return A request object with an {@link InputStream} that will ignore calls to close.
-   */
-  public static HttpServletRequest closeShield(HttpServletRequest request) {
-    if (!(request instanceof CloseShieldHttpServletRequestWrapper)) {
-      return new CloseShieldHttpServletRequestWrapper(request);
-    } else {
-      return request;
-    }
-  }
-  
+
   /**
    * Wrap the response's output stream with a close shield. If this is a
    * retry, we will assume that the stream has already been wrapped and do nothing.
@@ -890,20 +870,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       return new CloseShieldHttpServletResponseWrapper(response);
     } else {
       return response;
-    }
-  }
-
-  private static class CloseShieldServletInputStreamWrapper extends ServletInputStreamWrapper {
-    public CloseShieldServletInputStreamWrapper(ServletInputStream stream) throws IOException {
-      super(stream);
-    }
-
-
-
-    @Override
-    public void close() {
-      // don't allow close
-      log.debug("close called on server inputstream", new UnsupportedOperationException());
     }
   }
 
@@ -948,19 +914,6 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     }
   }
 
-  protected static class CloseShieldHttpServletRequestWrapper extends HttpServletRequestWrapper {
-    final HttpServletRequest request;
-
-    public CloseShieldHttpServletRequestWrapper(HttpServletRequest request) {
-      super(request);
-      this.request = request;
-    }
-
-    @Override
-    public ServletInputStream getInputStream() throws IOException {
-      return new CloseShieldServletInputStreamWrapper(request.getInputStream());
-    }
-  }
 
   private static class CoreContainerIsClosed extends ConnectionManager.IsClosed {
     private final CoreContainer coreContainer;

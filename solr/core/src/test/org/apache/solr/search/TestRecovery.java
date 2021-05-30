@@ -114,7 +114,7 @@ public class TestRecovery extends SolrTestCaseJ4 {
 
   @Test
   public void stressLogReplay() throws Exception {
-    final int NUM_UPDATES = 150;
+    final int NUM_UPDATES = 1;
     try {
       TestInjection.skipIndexWriterCommitOnClose = true;
       final CountDownLatch logReplay = new CountDownLatch(1);

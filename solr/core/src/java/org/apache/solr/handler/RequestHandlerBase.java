@@ -244,7 +244,7 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
         ParWork.propagateInterrupt(e);
         throw new AlreadyClosedException(e);
       } catch (Exception e) {
-        if (log.isDebugEnabled() && !(e instanceof PrepRecoveryOp.NotValidLeader)) {
+        if (!(e instanceof PrepRecoveryOp.NotValidLeader)) {
           log.error("Exception handling request", e);
         }
         if (req.getCore() != null) {

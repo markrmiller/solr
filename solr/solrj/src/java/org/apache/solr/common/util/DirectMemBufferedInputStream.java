@@ -149,11 +149,11 @@ public class DirectMemBufferedInputStream extends InputStream implements DataInp
 
     public int readInt() throws IOException {
 
-        return  ((readUnsignedByte() << 24)
-                |(readUnsignedByte() << 16)
-                |(readUnsignedByte() << 8)
-                | readUnsignedByte());
-     //  return buffer.getInt(position++);
+//        return  ((readUnsignedByte() << 24)
+//                |(readUnsignedByte() << 16)
+//                |(readUnsignedByte() << 8)
+//                | readUnsignedByte());
+       return buffer.getInt(position++);
     }
 
     public int getInt() throws IOException {

@@ -16,12 +16,9 @@
  */
 package org.apache.solr.common.cloud;
 
-import it.unimi.dsi.fastutil.objects.Object2ByteArrayMap;
-import it.unimi.dsi.fastutil.objects.Object2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.agrona.collections.Hashing;
 import org.agrona.collections.Object2NullableObjectHashMap;
-import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.AlreadyClosedException;

@@ -162,6 +162,13 @@ import org.slf4j.LoggerFactory;
     }
   }
 
+  protected void decrementMemory(MutableDirectBuffer buffer)
+  {
+    super.decrementMemory(buffer);
+  //  org.agrona.BufferUtil.free(buffer);
+  }
+
+
   private int bucketFor(int capacity) {
     return (capacity - 1) / getCapacityFactor();
   }

@@ -360,10 +360,7 @@ public abstract class SolrCall {
       QueryResponseWriter responseWriter, Method reqMethod)
       throws IOException {
     try {
-      if (!req.getInputStream().isFinished()) {
 
-        SolrDispatchFilter.consumeInputFully(req, response);
-      }
 
       Map invalidStates = (Map) solrReq.getContext().get(BaseCloudSolrClient.STATE_VERSION);
       //This is the last item added to the response and the client would expect it that way.
@@ -389,43 +386,96 @@ public abstract class SolrCall {
 
 
         ExpandableDirectBufferOutputStream outStream = QueryResponseWriterUtil.writeQueryResponse(responseWriter, solrReq, solrRsp, ct);
-        response.setContentLength(outStream.position() - outStream.offset());
+
+       // response.setContentLength(outStream.position() - outStream.offset());
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
         buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
 
+
+
         if (req.isAsyncStarted() && SolrDispatchFilter.ASYNC_IO) {
 
-          HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
+          HttpOutput out = (HttpOutput) response.getOutputStream();
           //out.setWriteListener(new MyWriteListener(out, buffer, req, response));
-          out.sendContent(buffer, new Callback() {
-            @Override public void succeeded() {
-              Callback.super.succeeded();
+          out.setWriteListener(new WriteListener() {
+            @Override
+            public void onWritePossible() throws IOException {
+//              if (out.isWritten() || out.isClosed() || response.isCommitted()) {
+//                req.getAsyncContext().complete();
+//                return;
+//              }
               try {
-                ExpandableBuffers.getInstance().release(outStream.buffer());
-              } finally {
+                //SolrDispatchFilter.consumeInputFully((ServletInputStream) solrReq.getContentStreams().iterator().next().getStream());
+                while (out.isReady()) {
+                  if (!buffer.hasRemaining()) {
+                    req.getAsyncContext().complete();
+                    ExpandableBuffers.getInstance().release(outStream.buffer());
+                    return;
+                  }
+                  out.write(buffer);
+                }
+
+
+
+
+
                 req.getAsyncContext().complete();
-              //  out.softClose();
+              } catch (Exception e) {
+                log.error("Solr ran into an unexpected problem", e);
+                try {
+                  //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
+                  SolrDispatchFilter.sendException(e, SolrCall.this, req, response);
+                } finally {
+                  req.getAsyncContext().complete();
+                  ExpandableBuffers.getInstance().release(outStream.buffer());
+                }
               }
+
             }
 
-            @Override public void failed(Throwable t) {
-              Callback.super.failed(t);
-
+            @Override
+            public void onError(Throwable t) {
               log.error("Solr ran into an unexpected problem", t);
               try {
                 ExpandableBuffers.getInstance().release(outStream.buffer());
-              //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
+                //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
                 SolrDispatchFilter.sendException(t, SolrCall.this, req, response);
               } catch (IOException ioException) {
                 log.warn("Exception sending error", t); // MRM TODO
               } finally {
                 req.getAsyncContext().complete();
-                out.softClose();
               }
             }
           });
+          //          out.sendContent(buffer, new Callback() {
+          //            @Override public void succeeded() {
+          //              Callback.super.succeeded();
+          //              try {
+          //                ExpandableBuffers.getInstance().release(outStream.buffer());
+          //              } finally {
+          //                req.getAsyncContext().complete();
+          //              //  out.softClose();
+          //              }
+          //            }
+          //
+          //            @Override public void failed(Throwable t) {
+          //              Callback.super.failed(t);
+          //
+          //              log.error("Solr ran into an unexpected problem", t);
+          //              try {
+          //                ExpandableBuffers.getInstance().release(outStream.buffer());
+          //              //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
+          //                SolrDispatchFilter.sendException(t, SolrCall.this, req, response);
+          //              } catch (IOException ioException) {
+          //                log.warn("Exception sending error", t); // MRM TODO
+          //              } finally {
+          //                req.getAsyncContext().complete();
+          //                out.softClose();
+          //              }
+          //            }
+          //          });
         } else {
           HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
           try {

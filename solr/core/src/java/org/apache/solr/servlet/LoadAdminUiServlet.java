@@ -48,7 +48,7 @@ public final class LoadAdminUiServlet extends BaseSolrServlet {
           "ENABLED in bin/solr.in.sh or solr.in.cmd.");
       return;
     }
-    HttpServletRequest request = SolrDispatchFilter.closeShield(_request);
+    HttpServletRequest request = _request;
     HttpServletResponse response = SolrDispatchFilter.closeShield(_response);
 
 

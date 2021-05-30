@@ -66,30 +66,26 @@ public class RequestUtil {
         req.setParams(params);
       }
 
-      String[] jsonFromParams = map.remove(JSON);  // params from the query string should come after (and hence override) JSON content streams
+      String[] jsonFromParams = map.get(JSON);  // params from the query string should come after (and hence override) JSON content streams
 
       for (ContentStream cs : req.getContentStreams()) {
         String contentType = cs.getContentType();
-        if (contentType==null || !contentType.contains("/json")) {
-          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Bad contentType for search handler :" + contentType + " request="+req);
-        }
+//        if (contentType==null || !contentType.contains("/json")) {
+//          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Bad contentType for search handler :" + contentType + " request="+req);
+//        }
 
-        try {
-          String jsonString = IOUtils.toString( cs.getReader() );
-          if (jsonString != null) {
-            MultiMapSolrParams.addParam(JSON, jsonString, map);
-          }
-        } catch (IOException e) {
-          throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Exception reading content stream for request:"+req, e);
-        }
+        //          String jsonString = IOUtils.toString( cs.getReader() );
+        //          if (jsonString != null) {
+        //            MultiMapSolrParams.addParam(JSON, jsonString, map);
+        //          }
       }
 
       // append existing "json" params
-      if (jsonFromParams != null) {
-        for (String json : jsonFromParams) {
-          MultiMapSolrParams.addParam(JSON, json, map);
-        }
-      }
+//      if (jsonFromParams != null) {
+//        for (String json : jsonFromParams) {
+//          MultiMapSolrParams.addParam(JSON, json, map);
+//        }
+//      }
     }
 
     String[] jsonS = params.getParams(JSON);
@@ -103,7 +99,7 @@ public class RequestUtil {
 
     boolean isShard = params.getBool("isShard", false);
 
-    Map<String, String[]> newMap = MultiMapSolrParams.asMultiMap(params, hasAdditions);
+    MultiMapSolrParams newMap = new MultiMapSolrParams(MultiMapSolrParams.asMultiMap(params, hasAdditions));
 
 
     // see if the json has a "params" section
@@ -123,9 +119,9 @@ public class RequestUtil {
       while (it.hasNext()) {
         Map.Entry<String, String[]> entry = it.next();
         String key = entry.getKey();
-        if (!newMap.containsKey(key)) {
-          newMap.put(key, entry.getValue());
-        }
+//        if (!newMap.containsKey(key)) {
+//          newMap.put(key, entry.getValue());
+//        }
       }
 
     }
@@ -135,39 +131,39 @@ public class RequestUtil {
 
       for (Map.Entry<String, String[]> entry : appendsMap.entrySet()) {
         String key = entry.getKey();
-        String[] arr = newMap.get(key);
-        if (arr == null) {
-          newMap.put(key, entry.getValue());
-        } else {
-          String[] appendArr = entry.getValue();
-          String[] newArr = new String[arr.length + appendArr.length];
-          System.arraycopy(arr, 0, newArr, 0, arr.length);
-          System.arraycopy(appendArr, 0, newArr, arr.length, appendArr.length);
-          newMap.put(key, newArr);
-        }
+//        String[] arr = newMap.get(key);
+//        if (arr == null) {
+//          newMap.put(key, entry.getValue());
+//        } else {
+//          String[] appendArr = entry.getValue();
+//          String[] newArr = new String[arr.length + appendArr.length];
+//          System.arraycopy(arr, 0, newArr, 0, arr.length);
+//          System.arraycopy(appendArr, 0, newArr, arr.length, appendArr.length);
+//          newMap.put(key, newArr);
+//        }
       }
     }
 
 
     if (invariants != null) {
-      newMap.putAll( MultiMapSolrParams.asMultiMap(invariants) );
+  //    newMap.putAll( MultiMapSolrParams.asMultiMap(invariants) );
     }
 
     if (!isShard) { // Don't expand macros in shard requests
-      String[] doMacrosStr = newMap.get("expandMacros");
+     // String[] doMacrosStr = newMap.get("expandMacros");
       boolean doMacros = true;
-      if (doMacrosStr != null) {
-        doMacros = "true".equals(doMacrosStr[0]);
-      }
+//      if (doMacrosStr != null) {
+//        doMacros = "true".equals(doMacrosStr[0]);
+//      }
 
       if (doMacros) {
-        newMap = MacroExpander.expand(newMap);
+      //  newMap = MacroExpander.expand(newMap);
       }
     }
     // Set these params as soon as possible so if there is an error processing later, things like
     // "wt=json" will take effect from the defaults.
-    SolrParams newParams = new MultiMapSolrParams(newMap);  // newMap may still change below, but that should be OK
-    req.setParams(newParams);
+   /// SolrParams newParams = new MultiMapSolrParams(newMap);  // newMap may still change below, but that should be OK
+  //  req.setParams(newParams);
 
 
     // Skip the rest of the processing (including json processing for now) if this isn't a search handler.
@@ -177,23 +173,23 @@ public class RequestUtil {
 
     Map<String, Object> json = null;
     // Handle JSON body first, so query params will always overlay on that
-    jsonS = newMap.get(JSON);
-    if (jsonS != null) {
-      if (json == null) {
-        json = new LinkedHashMap<>();
-      }
-      mergeJSON(json, JSON, jsonS, new ObjectUtil.ConflictHandler());
-    }
-    for (Map.Entry<String, String[]> entry : newMap.entrySet()) {
-      String key = entry.getKey();
-      // json.nl, json.wrf are existing query parameters
-      if (key.startsWith("json.") && !("json.nl".equals(key) || "json.wrf".equals(key))) {
-        if (json == null) {
-          json = new LinkedHashMap<>();
-        }
-        mergeJSON(json, key, entry.getValue(), new ObjectUtil.ConflictHandler());
-      }
-    }
+//    jsonS = newMap.get(JSON);
+//    if (jsonS != null) {
+//      if (json == null) {
+//        json = new LinkedHashMap<>();
+//      }
+//      mergeJSON(json, JSON, jsonS, new ObjectUtil.ConflictHandler());
+//    }
+//    for (Map.Entry<String, String[]> entry : newMap.entrySet()) {
+//      String key = entry.getKey();
+//      // json.nl, json.wrf are existing query parameters
+//      if (key.startsWith("json.") && !("json.nl".equals(key) || "json.wrf".equals(key))) {
+//        if (json == null) {
+//          json = new LinkedHashMap<>();
+//        }
+//        mergeJSON(json, key, entry.getValue(), new ObjectUtil.ConflictHandler());
+//      }
+//    }
 
     // implement compat for existing components...
     JsonQueryConverter jsonQueryConverter = new JsonQueryConverter();
@@ -251,11 +247,11 @@ public class RequestUtil {
     }
   }
 
-  private static void convertJsonPropertyToLocalParams(Map<String, String[]> outMap, JsonQueryConverter jsonQueryConverter, Map.Entry<String, Object> jsonProperty, String outKey, boolean isQuery, boolean arr) {
+  private static void convertJsonPropertyToLocalParams(MultiMapSolrParams outMap, JsonQueryConverter jsonQueryConverter, Map.Entry<String, Object> jsonProperty, String outKey, boolean isQuery, boolean arr) {
     Object val = jsonProperty.getValue();
 
     if (arr) {
-      String[] existing = outMap.get(outKey);
+      String[] existing = outMap.getMap().get(outKey);
       List<?> lst = val instanceof List ? (List<?>)val : null;
       int existingSize = existing==null ? 0 : existing.length;
       int jsonSize = lst==null ? 1 : lst.size();
@@ -266,14 +262,14 @@ public class RequestUtil {
       if (lst != null) {
         for (int i = 0; i < jsonSize; i++) {
           Object v = lst.get(i);
-          newval[existingSize + i] = isQuery ? jsonQueryConverter.toLocalParams(v, outMap) : v.toString();
+          newval[existingSize + i] = isQuery ? jsonQueryConverter.toLocalParams(v,  outMap.getMap()) : v.toString();
         }
       } else {
-        newval[newval.length-1] = isQuery ? jsonQueryConverter.toLocalParams(val, outMap) : val.toString();
+        newval[newval.length-1] = isQuery ? jsonQueryConverter.toLocalParams(val,  outMap.getMap()) : val.toString();
       }
-      outMap.put(outKey, newval);
+      outMap.getMap().put(outKey, newval);
     } else {
-      outMap.put(outKey, new String[]{isQuery ? jsonQueryConverter.toLocalParams(val, outMap) : val.toString()});
+      outMap.getMap().put(outKey, new String[]{isQuery ? jsonQueryConverter.toLocalParams(val,  outMap.getMap()) : val.toString()});
     }
   }
 
@@ -298,7 +294,7 @@ public class RequestUtil {
   }
 
 
-  private static void getParamsFromJSON(Map<String, String[]> params, String json) {
+  private static void getParamsFromJSON(MultiMapSolrParams params, String json) {
     if (json.indexOf("params") < 0) {
       return;
     }
@@ -329,16 +325,17 @@ public class RequestUtil {
         }
 
         if (val == null) {
-          params.remove(key);
+          //   params.remove(key);
         } else if (val instanceof List) {
-          List<?> lst = (List<?>) val;
-          String[] vals = new String[lst.size()];
-          for (int i = 0; i < vals.length; i++) {
-            vals[i] = lst.get(i).toString();
-          }
-          params.put(key, vals);
-        } else {
-          params.put(key, new String[]{val.toString()});
+          //          List<?> lst = (List<?>) val;
+          //          String[] vals = new String[lst.size()];
+          //          for (int i = 0; i < vals.length; i++) {
+          //            vals[i] = lst.get(i).toString();
+          //          }
+          //          params.put(key, vals);
+          //        } else {
+          //          params.put(key, new String[]{val.toString()});
+          //        }
         }
       }
 

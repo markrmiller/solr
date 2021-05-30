@@ -83,12 +83,13 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     @Override
     public Object resolve(Object o, JavaBinCodec codec) throws IOException {
       if (o instanceof StoredField) {
-
-//          CharSequence val = ((StoredField) o).getCharSequenceValue();
-//          if (val instanceof Utf8CharSequence) {
-//            codec.writeUTF8Str((Utf8CharSequence) val);
-//            return null;
-//          }
+          if (o instanceof LegacyFieldType) {
+            CharSequence val = ((StoredField) o).getCharSequenceValue();
+            if (val instanceof Utf8CharSequence) {
+              codec.writeUTF8Str((Utf8CharSequence) val);
+              return null;
+            }
+          }
 
       }
       if (o instanceof ResultContext) {

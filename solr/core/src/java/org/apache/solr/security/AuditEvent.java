@@ -138,9 +138,9 @@ public class AuditEvent {
     this.headers = getHeadersFromRequest(httpRequest);
     this.baseUrl = httpRequest.getRequestURL().toString();
     this.nodeName = MDC.get(ZkStateReader.NODE_NAME_PROP);
-    SolrRequestParsers.getInstance().parseQueryString(httpQueryString).forEach(sp -> {
-      this.solrParams.put(sp.getKey(), Arrays.asList(sp.getValue()));
-    });
+//    SolrRequestParsers.getInstance().parseQueryString(httpQueryString).forEach(sp -> {
+//      this.solrParams.put(sp.getKey(), Arrays.asList(sp.getValue()));
+//    });
 
     setResource(ServletUtils.getPathAfterContext(httpRequest));
     setRequestType(findRequestType());

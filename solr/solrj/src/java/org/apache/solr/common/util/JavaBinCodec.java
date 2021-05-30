@@ -300,7 +300,7 @@ public class JavaBinCodec implements PushWriter {
 
 
   public SimpleOrderedMap<Object> readOrderedMap(InputStream dis) throws IOException {
-    log.info("read ordered map");
+    log.trace("read ordered map");
     int sz = readSize(dis);
     SimpleOrderedMap<Object> nl = new SimpleOrderedMap<>(sz);
     for (int i = 0; i < sz; i++) {
@@ -313,7 +313,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public NamedList<Object> readNamedList(InputStream dis) throws IOException {
-    log.info("read namedlist");
+    log.trace("read namedlist");
     int sz = readSize(dis);
     NamedList<Object> nl = new NamedList<>(sz);
     for (int i = 0; i < sz; i++) {
@@ -329,7 +329,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeNamedList(NamedList<?> nl) throws IOException {
-    log.info("write namedlist");
+    log.trace("write namedlist");
     int size = nl.size();
     writeTag(nl instanceof SimpleOrderedMap ? ORDERED_MAP : NAMED_LST, size);
     for (int i = 0; i < size; i++) {
@@ -373,19 +373,19 @@ public class JavaBinCodec implements PushWriter {
   }
 
   protected Object readObject(InputStream dis) throws IOException {
-    log.info("read object tag={}", tagByte);
+    log.trace("read object tag={}", tagByte);
 
      if ((tagByte & 0xe0) == 0) {
        // if top 3 bits are clear, this is a normal tag
-       log.info("norm tag");
+       log.trace("norm tag");
        switch (tagByte) {
          case NULL:
            return null;
          case DATE:
            return new Date(readLong(dis));
          case INT:
-           log.info("read INT TYPE");
-           return readInt(dis);
+           log.trace("read INT TYPE");
+           return readVInt(dis);
          case BOOL_TRUE:
            return Boolean.TRUE;
          case BOOL_FALSE:
@@ -424,7 +424,7 @@ public class JavaBinCodec implements PushWriter {
 
      }
 
-    log.info("tag with size");
+    log.trace("tag with size");
     // OK, try type + size in single byte
     switch (tagByte >>> 5) {
 
@@ -655,7 +655,7 @@ public class JavaBinCodec implements PushWriter {
 
 
   public void writeMap(MapWriter val) throws IOException {
-    log.info("write map");
+    log.trace("write map");
     writeTag(MAP_ENTRY_ITER);
     val.writeMap(ew);
     writeTag(END);
@@ -663,12 +663,12 @@ public class JavaBinCodec implements PushWriter {
 
 
   public void writeTag(byte tag) throws IOException {
-    log.info("write tag {}", tag);
+    log.trace("write tag {}", tag);
     write(tag);
   }
 
   public void writeTag(byte tag, int size) throws IOException {
-    log.info("write tag {} sz={}", tag, size);
+    log.trace("write tag {} sz={}", tag, size);
     if ((tag & 0xe0) != 0) {
       if (size < 0x1f) {
         write((tag | size));
@@ -687,7 +687,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeByteArray(byte[] arr, int offset, int len) throws IOException {
-    log.info("write byte array");
+    log.trace("write byte array");
     writeTag(BYTEARR, len);
     daos.write(arr, offset, len);
   }
@@ -719,7 +719,7 @@ public class JavaBinCodec implements PushWriter {
   private MapWriter.EntryWriter cew;
 
   public void writeSolrDocument(SolrDocument doc) throws IOException {
-    log.info("write solrdoc");
+    log.trace("write solrdoc");
     List<SolrDocument> children = doc.getChildDocuments();
     int fieldsCount = 0;
     if(writableDocFields == null || writableDocFields.wantsAllFields() || ignoreWritable){
@@ -752,7 +752,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public SolrDocument readSolrDocument(InputStream dis) throws IOException {
-    log.info("read solrdoc");
+    log.trace("read solrdoc");
     tagByte = read(dis);
     int size = readSize(dis);
     SolrDocument doc = new SolrDocument(new LinkedHashMap<>(size));
@@ -772,7 +772,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public SolrDocumentList readSolrDocumentList(InputStream dis) throws IOException {
-    log.info("read solrdoc list");
+    log.trace("read solrdoc list");
     SolrDocumentList solrDocs = new SolrDocumentList();
     @SuppressWarnings("unchecked")
     List<Object> list = (List<Object>) readVal(dis);
@@ -791,7 +791,7 @@ public class JavaBinCodec implements PushWriter {
 
   public void writeSolrDocumentList(SolrDocumentList docs)
       throws IOException {
-    log.info("write solrdoclist");
+    log.trace("write solrdoclist");
     writeTag(SOLRDOCLST);
     List<Object> l = new ArrayList<>(4);
     l.add(docs.getNumFound());
@@ -803,7 +803,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public SolrInputDocument readSolrInputDocument(InputStream dis) throws IOException {
-    log.info("read solrdoc in");
+    log.trace("read solrdoc in");
     int sz = readVInt(dis);
 //    float docBoost = (Float)readVal(dis);
 //    if (docBoost != 1f) {
@@ -869,7 +869,7 @@ public class JavaBinCodec implements PushWriter {
 
   public Map<Object,Object> readMap(InputStream dis)
       throws IOException {
-    log.info("read map");
+    log.trace("read map");
     int sz = readVInt(dis);
     return readMap(dis, sz);
   }
@@ -925,13 +925,13 @@ public class JavaBinCodec implements PushWriter {
 
   @Override
   public void writeIterator(IteratorWriter val) throws IOException {
-    log.info("write itr");
+    log.trace("write itr");
     writeTag(ITERATOR);
     val.writeIter(itemWriter);
     writeTag(END);
   }
   public void writeIterator(@SuppressWarnings({"rawtypes"})Iterator iter) throws IOException {
-    log.info("write itr");
+    log.trace("write itr");
     writeTag(ITERATOR);
     while (iter.hasNext()) {
       writeVal(iter.next());
@@ -950,7 +950,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeArray(@SuppressWarnings({"rawtypes"})List l) throws IOException {
-    log.info("write array list");
+    log.trace("write array list");
     final int size = l.size();
     writeTag(ARR, size);
     for (Object o : l) {
@@ -959,7 +959,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeArray(@SuppressWarnings({"rawtypes"})Collection coll) throws IOException {
-    log.info("write array coll");
+    log.trace("write array coll");
     writeTag(ARR, coll.size());
     for (Object o : coll) {
       writeVal(o);
@@ -968,7 +968,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeArray(Object[] arr) throws IOException {
-    log.info("write array obj");
+    log.trace("write array obj");
     int sz = arr.length;
     writeTag(ARR, sz);
     for (Object o : arr) {
@@ -980,18 +980,18 @@ public class JavaBinCodec implements PushWriter {
   public List<Object> readArray(InputStream dis) throws IOException {
 
     int sz = readSize(dis);
-    log.info("read array sz, {}", sz );
+    log.trace("read array sz, {}", sz );
     return readArray(dis, sz);
   }
 
   @SuppressWarnings({"rawtypes"})
   protected List readArray(InputStream dis, int sz) throws IOException {
-    log.info("read array of size {}", sz);
+    log.trace("read array of size {}", sz);
     ArrayList<Object> l = new ArrayList<>(sz);
     for (int i = 0; i < sz; i++) {
       l.add(readVal(dis));
     }
-    log.info("return list {}", l);
+    log.trace("return list {}", l);
     return l;
   }
 
@@ -1000,14 +1000,14 @@ public class JavaBinCodec implements PushWriter {
    * @param enumFieldValue to write
    */
   public void writeEnumFieldValue(EnumFieldValue enumFieldValue) throws IOException {
-    log.info("write enum");
+    log.trace("write enum");
     writeTag(ENUM_FIELD_VALUE);
     writeInt(enumFieldValue.toInt());
     writeStr(enumFieldValue.toString());
   }
 
   public void writeMapEntry(Map.Entry<?,?> val) throws IOException {
-    log.info("write map entry");
+    log.trace("write map entry");
     writeTag(MAP_ENTRY);
     writeVal(val.getKey());
     writeVal(val.getValue());
@@ -1019,7 +1019,7 @@ public class JavaBinCodec implements PushWriter {
    * @return {@link EnumFieldValue}
    */
   public EnumFieldValue readEnumFieldValue(InputStream dis) throws IOException {
-    log.info("read enum");
+    log.trace("read enum");
     Integer intValue = (Integer) readVal(dis);
     String stringValue = (String) readVal(dis);
     return new EnumFieldValue(intValue, stringValue);
@@ -1027,7 +1027,7 @@ public class JavaBinCodec implements PushWriter {
 
 
   public Map.Entry<Object,Object> readMapEntry(InputStream dis) throws IOException {
-    log.info("read mapentry");
+    log.trace("read mapentry");
     final Object key = readVal(dis);
     final Object value = readVal(dis);
     return new MyEntry(key, value);
@@ -1037,7 +1037,7 @@ public class JavaBinCodec implements PushWriter {
    * write the string as tag+length, with length being the number of UTF-8 bytes
    */
   public void writeStr(CharSequence s) throws IOException {
-    log.info("write str");
+    log.trace("write str");
     if (s == null) {
       writeTag(NULL);
       return;
@@ -1197,24 +1197,23 @@ public class JavaBinCodec implements PushWriter {
         b |= 0x10;
         write(b);
         writeVInt(v >>> 4, daos);
-        log.info("writeint var {}", b);
+        log.trace("writeint var {}", b);
       } else {
-        log.info("writeint single byte {}", b);
+        log.trace("writeint single byte {}", b);
         write(b);
       }
 
     } else {
-      log.info("writeint data out");
-      write(INT);
-      daos.write((v >>> 24) & 0xFF);
-      daos.write((v >>> 16) & 0xFF);
-      daos.write((v >>>  8) & 0xFF);
-      daos.write((v >>>  0) & 0xFF);
+      log.trace("writeint data out");
+      int b = SINT | (v & 0x0f);
+      b |= 0x10;
+      write(b);
+      writeVInt(v >>> 4, daos);
     }
   }
 
   public int readSmallInt(InputStream dis) throws IOException {
-    log.info("read small int");
+    log.trace("read small int");
     int v = tagByte & 0x0F;
     if ((tagByte & 0x10) != 0)
       v = (readVInt(dis) << 4) | v;
@@ -1223,7 +1222,7 @@ public class JavaBinCodec implements PushWriter {
 
   public void writeLong(long val) throws IOException {
 
-    log.info("write long");
+    log.trace("write long");
     if ((val & 0xff00000000000000L) == 0) {
       int b = SLONG | ((int) val & 0x0f);
       if (val >= 0x0f) {
@@ -1240,7 +1239,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public long readSmallLong(InputStream dis) throws IOException {
-    log.info("read small long");
+    log.trace("read small long");
     long v = tagByte & 0x0F;
     if ((tagByte & 0x10) != 0)
       v = (readVLong(dis) << 4) | v;
@@ -1248,7 +1247,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeFloat(float val) throws IOException {
-    log.info("write float");
+    log.trace("write float");
     write(FLOAT);
     writeFloatToOut(val);
   }
@@ -1266,7 +1265,7 @@ public class JavaBinCodec implements PushWriter {
     } else if (val instanceof Number) {
 
       if (val instanceof Integer) {
-        log.info("write prim INT TYPE");
+        log.trace("write prim INT TYPE");
         writeInt((Integer) val);
         return true;
       } else if (val instanceof Long) {
@@ -1279,7 +1278,7 @@ public class JavaBinCodec implements PushWriter {
         writeDouble((Double) val);
         return true;
       } else if (val instanceof Byte) {
-        log.info("write BYTE");
+        log.trace("write BYTE");
         write(BYTE);
         write(((Byte) val).intValue());
         return true;
@@ -1312,20 +1311,20 @@ public class JavaBinCodec implements PushWriter {
   }
 
   protected void writeBoolean(boolean val) throws IOException {
-    log.info("write bool");
+    log.trace("write bool");
     if (val) write(BOOL_TRUE);
     else write(BOOL_FALSE);
   }
 
   protected void writeDouble(double val) throws IOException {
-    log.info("write double");
+    log.trace("write double");
     write(DOUBLE);
     writeDoubleToOut(val);
   }
 
 
   public void writeMap(Map<?,?> val) throws IOException {
-    log.info("write map");
+    log.trace("write map");
     writeTag(MAP, val.size());
     if (val instanceof MapWriter) {
       ((MapWriter) val).writeMap(ew);
@@ -1346,7 +1345,7 @@ public class JavaBinCodec implements PushWriter {
   public int readSize(InputStream in) throws IOException {
     int sz = tagByte & 0x1f;
     if (sz == 0x1f) sz += readVInt(in);
-    log.info("read sz {}", sz);
+    log.trace("read sz {}", sz);
     return sz;
   }
 
@@ -1359,12 +1358,31 @@ public class JavaBinCodec implements PushWriter {
    * @throws IOException If there is a low-level I/O error.
    */
   public static void writeVInt(int i, OutputStream out) throws IOException {
-    log.info("write vint");
+    log.trace("write vint");
+    i = encodeZigZag32(i);
     while ((i & ~0x7F) != 0) {
       out.write((byte) ((i & 0x7f) | 0x80));
       i >>>= 7;
     }
     out.write((byte) i);
+  }
+
+  public static int encodeZigZag32(final int n) {
+    // Note:  the right-shift must be arithmetic
+    return (n << 1) ^ (n >> 31);
+  }
+
+  public static int decodeZigZag32(final int n) {
+    return (n >>> 1) ^ -(n & 1);
+  }
+
+  public static long encodeZigZag64(final long n) {
+    // Note:  the right-shift must be arithmetic
+    return (n << 1) ^ (n >> 63);
+  }
+
+  public static long decodeZigZag64(final long n) {
+    return (n >>> 1) ^ -(n & 1);
   }
 
   /**
@@ -1379,20 +1397,22 @@ public class JavaBinCodec implements PushWriter {
       b = read(in);
       i |= (b & 0x7F) << shift;
     }
-    return i;
+    return decodeZigZag32(i);
   }
+
 
   protected static byte read(InputStream in) throws IOException {
     int r = in.read();
-//    if (r == -1) {
-//      throw new EOFException();
-//    }
+    if (r == -1) {
+      throw new EOFException();
+    }
     return (byte) r;
   }
 
 
   public void writeVLong(long i, OutputStream out) throws IOException {
-    log.info("write vlong");
+    log.trace("write vlong");
+    i = encodeZigZag64(i);
     while ((i & ~0x7F) != 0) {
       write((byte) ((i & 0x7f) | 0x80));
       i >>>= 7;
@@ -1406,12 +1426,12 @@ public class JavaBinCodec implements PushWriter {
             |(in.read() << 16)
             |(in.read() << 8)
             | in.read());
-    log.info("read int {}", v);
+    log.trace("read int {}", v);
     return v;
   }
 
   public long readLong(InputStream in) throws IOException {
-    log.info("read long");
+    log.trace("read long");
     return  (((long)readUnsignedByte(in)) << 56)
             | (((long)readUnsignedByte(in)) << 48)
             | (((long)readUnsignedByte(in)) << 40)
@@ -1427,12 +1447,12 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public double readDouble(InputStream is) throws IOException {
-    log.info("read double");
+    log.trace("read double");
     return Double.longBitsToDouble(readLong(is));
   }
 
   public short readShort(InputStream in) throws IOException {
-    log.info("read short");
+    log.trace("read short");
     return (short)((readUnsignedByte(in) << 8) | readUnsignedByte(in));
   }
 
@@ -1445,14 +1465,14 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public static long readVLong(InputStream in) throws IOException {
-    log.info("read vlong");
+    log.trace("read vlong");
     byte b = read(in);
     long i = b & 0x7F;
     for (int shift = 7; (b & 0x80) != 0; shift += 7) {
       b = read(in);
       i |= (long) (b & 0x7F) << shift;
     }
-    return i;
+    return decodeZigZag64(i);
   }
 
   private int stringsCount = 0;
@@ -1465,25 +1485,29 @@ public class JavaBinCodec implements PushWriter {
       writeTag(NULL);
       return;
     }
-    Integer idx = stringsMap == null ? null : stringsMap.get(s.toString());
+    Integer idx = null; //stringsMap == null ? null : stringsMap.get(s.toString());
     if (idx == null) idx = 0;
 
     writeTag(EXTERN_STRING, idx);
 
     if (idx == 0) {
-      s = s.toString();
       writeStr(s);
-      if (s.length() > 5) {
-        if (stringsMap == null) stringsMap = new Object2IntOpenHashMap<>(16, 0.5f);
-        stringsMap.put((String) s, ++stringsCount);
+//      if (s.length() > 20) {
+//        if (stringsMap == null) stringsMap = new Object2IntOpenHashMap<>(16, 0.5f);
+//        stringsMap.compute((String) s,  (s1, integer) -> {
+//          if (integer == null) {
+//            integer = 1;
+//          }
+//          integer++;
+//          return integer;
+//        });
       }
 
-    }
-    log.info("write ext str idx=" + idx + " cnt=" + stringsCount);
+    log.trace("write ext str idx=" + idx + " cnt=" + stringsCount);
   }
 
   public CharSequence readExternString(InputStream fis) throws IOException {
-    log.info("read extern string");
+    log.trace("read extern string");
     int idx = readSize(fis);
     if (idx != 0 && indexMap != null) {// idx != 0 is the index of the extern string
 
@@ -1494,7 +1518,7 @@ public class JavaBinCodec implements PushWriter {
     }
     // idx == 0 means it has a string value
 
-      String s = (String) readVal(fis);
+      String s = readVal(fis).toString();
 
       if (indexMap == null) indexMap = new Int2ObjectOpenHashMap<>(16, 0.5f);
       indexMap.put(idx, s);
@@ -1504,7 +1528,7 @@ public class JavaBinCodec implements PushWriter {
 
 
   public void writeUTF8Str(Utf8CharSequence utf8) throws IOException {
-    log.info("write utf8str");
+    log.trace("write utf8str");
 
 
     byte[] buf = ((ByteArrayUtf8CharSequence) utf8).getBuf();
@@ -1522,7 +1546,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeShortToOut(int v) throws IOException {
-    log.info("write short to out");
+    log.trace("write short to out");
     write((byte)(v >>> 8) & 0xFF);
     write((byte)(v >>> 0) & 0xFF);
   }
@@ -1533,7 +1557,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeLongToOut(long v) throws IOException {
-    log.info("write long to out");
+    log.trace("write long to out");
     write((byte)(v >>> 56));
     write((byte)(v >>> 48));
     write((byte)(v >>> 40));
@@ -1545,7 +1569,7 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeIntToOut(int v) throws IOException {
-    log.info("write int to out");
+    log.trace("write int to out");
     write((byte)(v >>> 24) & 0xFF);
     write((byte)(v >>> 16) & 0xFF);
     write((byte)(v >>>  8) & 0xFF);
@@ -1553,13 +1577,13 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeFloatToOut(float v) throws IOException {
-    log.info("write float to out");
+    log.trace("write float to out");
     writeIntToOut(Float.floatToRawIntBits(v));
   }
 
 
   public void writeDoubleToOut(double v) throws IOException {
-    log.info("write double to out");
+    log.trace("write double to out");
     writeLongToOut(Double.doubleToRawLongBits(v));
   }
 
@@ -1611,6 +1635,9 @@ public class JavaBinCodec implements PushWriter {
   public void close() throws IOException {
     if (daos != null) {
      daos.flush();
+    }
+    if (stringsMap != null) {
+      log.error("Extern String Stats {}", stringsMap);
     }
   }
 

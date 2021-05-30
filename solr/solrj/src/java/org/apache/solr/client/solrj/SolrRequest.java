@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.agrona.collections.Object2ObjectHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
@@ -249,7 +249,7 @@ public abstract class SolrRequest<T extends SolrResponse> implements Serializabl
 
   public void addHeader(String key, String value) {
     if (headers == null) {
-      headers = new Object2ObjectHashMap<>();
+      headers = new Object2ObjectArrayMap<>(8);
     }
     headers.put(key, value);
   }

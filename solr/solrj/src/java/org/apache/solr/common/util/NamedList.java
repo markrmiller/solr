@@ -31,8 +31,6 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
-import org.agrona.collections.Hashing;
-import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.MultiMapSolrParams;

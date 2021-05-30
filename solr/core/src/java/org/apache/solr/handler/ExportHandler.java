@@ -37,6 +37,7 @@ import org.apache.solr.handler.component.SearchHandler;
 import org.apache.solr.handler.export.ExportWriter;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
+import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,7 @@ public class ExportHandler extends SearchHandler {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private ModelCache modelCache = null;
-  private ConcurrentMap objectCache = new ConcurrentHashMap();
+  private ConcurrentMap objectCache = new NonBlockingHashMap();
   private SolrDefaultStreamFactory streamFactory = new ExportHandlerStreamFactory();
   private String coreName;
   private SolrClientCache solrClientCache;

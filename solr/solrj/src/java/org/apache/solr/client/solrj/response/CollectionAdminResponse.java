@@ -21,7 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.agrona.collections.Object2ObjectHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import org.apache.solr.common.cloud.Aliases;
 import org.apache.solr.common.util.NamedList;
 
@@ -54,8 +54,9 @@ public class CollectionAdminResponse extends SolrResponseBase
   @SuppressWarnings("unchecked")
   public Map<String, NamedList<Integer>> getCollectionCoresStatus()
   {
-    Map<String, NamedList<Integer>> res = new Object2ObjectHashMap<>();
+
     NamedList<NamedList<Object>> cols = getCollectionStatus();
+    Map<String, NamedList<Integer>> res = new Object2ObjectArrayMap<>(cols.size());
     if( cols != null ) {
       for (Map.Entry<String, NamedList<Object>> e : cols) {
         NamedList<Object> item = e.getValue();

@@ -26,6 +26,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.params.MultiMapSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.JsonSchemaValidator;
@@ -120,7 +121,7 @@ public class V2HttpCall extends SolrCall {
     SolrQueryRequest solrRequest = null;
     SolrDispatchFilter.Action callAction = null;
     request.setAttribute(HttpSolrCall.class.getName(), this);
-    queryParams = SolrRequestParsers.getDefaultInstance().parseQueryString(request.getQueryString());
+    queryParams = new MultiMapSolrParams(request.getParameterMap());//SolrRequestParsers.getDefaultInstance().parseQueryString(request.getQueryString());
     // set a request timer which can be reused by requests if needed
     request.setAttribute(SolrRequestParsers.REQUEST_TIMER_SERVLET_ATTRIBUTE, new RTimerTree());
     // put the core container in request attribute

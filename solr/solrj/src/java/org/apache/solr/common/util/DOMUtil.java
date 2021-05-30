@@ -17,7 +17,6 @@
 package org.apache.solr.common.util;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,7 @@ public class DOMUtil {
   }
   public static Map<String,String> toMapExcept(ConfigNode node, String... exclusions) {
     SimpleMap<String> attribs = node.attributes();
-    Map<String,String> args = new Object2ObjectHashMap(attribs.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    Map<String,String> args = new Object2ObjectHashMap<>(attribs.size(), Hashing.DEFAULT_LOAD_FACTOR);
     attribs.forEachEntry((k, v) -> {
       for (String ex : exclusions) if (ex.equals(k)) return;
         args.put(k,v);
@@ -426,7 +425,7 @@ public class DOMUtil {
       int prev = 0;
       int pos;
       //search for the next instance of $ from the 'prev' position
-      while ((pos = value.indexOf("$", prev)) >= 0) {
+      while ((pos = value.indexOf('$', prev)) >= 0) {
 
           //if there was any text before this, add it as a fragment
           //TODO, this check could be modified to go if pos>prev;

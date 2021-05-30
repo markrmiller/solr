@@ -283,7 +283,7 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
       invokeAction(req, rsp, cores, action, operation);
 
     } else {
-      throw new SolrException(ErrorCode.BAD_REQUEST, "action is a required param");
+      throw new SolrException(ErrorCode.BAD_REQUEST, "action is a required param, params=" + params);
     }
     rsp.setHttpCaching(false);
   }

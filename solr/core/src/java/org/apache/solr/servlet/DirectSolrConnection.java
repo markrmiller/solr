@@ -74,7 +74,7 @@ public class DirectSolrConnection implements Closeable
     int idx = pathAndParams.indexOf( '?' );
     if( idx > 0 ) {
       path = pathAndParams.substring( 0, idx );
-      params = SolrRequestParsers.getInstance().parseQueryString( pathAndParams.substring(idx+1) );
+     // params = SolrRequestParsers.getInstance().parseQueryString( pathAndParams.substring(idx+1) );
     }
     else {
       path= pathAndParams;

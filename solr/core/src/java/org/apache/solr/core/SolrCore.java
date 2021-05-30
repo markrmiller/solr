@@ -3102,15 +3102,15 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         }
       };
 
-      if (rsp.isAsync()) {
-        rsp.onFinished(finish);
-      }
+//      if (rsp.isAsync()) {
+//        rsp.onFinished(finish);
+//      }
 
       handler.handleRequest(req, rsp);
 
-      if (!rsp.isAsync()) {
+   //   if (!rsp.isAsync()) {
         finish.run();
-      }
+    //  }
 
     }
 
@@ -3189,7 +3189,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         if (echoParams == null) {
           throw new SolrException(ErrorCode.BAD_REQUEST,
               "Invalid value '" + ep + "' for " + CommonParams.HEADER_ECHO_PARAMS + " parameter, use '" + EchoParamStyle.EXPLICIT + "' or '"
-                  + EchoParamStyle.ALL + "'");
+                  + EchoParamStyle.ALL + '\'');
         }
         if (echoParams == EchoParamStyle.EXPLICIT) {
           responseHeader.add("params", req.getOriginalParams().toNamedList());

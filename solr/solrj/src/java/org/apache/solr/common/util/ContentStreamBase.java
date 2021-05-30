@@ -269,7 +269,7 @@ public abstract class ContentStreamBase implements ContentStream
       String charset = getCharsetFromContentType( contentType );
       return charset == null 
         ? new StringReader( str )
-        : new InputStreamReader( getStream(), charset );
+        : new InputStreamReader( new CloseShieldInputStream(getStream()), charset );
     }
   }
 
