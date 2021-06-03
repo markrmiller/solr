@@ -17,6 +17,7 @@
 package org.apache.solr.client.solrj.impl;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
@@ -33,6 +34,8 @@ import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
@@ -72,6 +75,7 @@ import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
  * @since solr 8.0
  */
 public class LBHttp2SolrClient extends LBSolrClient {
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private final Http2SolrClient httpClient;
 
   public LBHttp2SolrClient(Http2SolrClient httpClient, String... baseSolrUrls) {
@@ -188,7 +192,11 @@ public class LBHttp2SolrClient extends LBSolrClient {
         try {
 
           if (code == 200) {
-            listener.onFailure((!isZombie) ? addZombie(baseUrl, new SolrException(SolrException.ErrorCode.SERVER_ERROR,oe)) : new SolrException(SolrException.ErrorCode.SERVER_ERROR,oe), false);
+            log.warn("Request success, but exception", oe);
+            if (isZombie) {
+              zombieServers.remove(baseUrl);
+            }
+            listener.onSuccess(rsp);
             return;
           }
 

@@ -29,7 +29,6 @@ import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.cloud.CloudDescriptor;
 import org.apache.solr.cloud.ZkController;
-import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.annotation.SolrSingleThreaded;
@@ -48,13 +47,10 @@ import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletRequest;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
@@ -81,9 +77,10 @@ public class HttpShardHandler extends ShardHandler {
   private final AtomicInteger pending;
   private final Map<String, List<String>> shardToURLs;
   private final LBHttp2SolrClient lbClient;
-  private volatile Runnable finish;
+ // private volatile Runnable finish;
+ private Runnable finish;
 
-  SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
+  //SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
 
   public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory) {
     this.httpShardHandlerFactory = httpShardHandlerFactory;
