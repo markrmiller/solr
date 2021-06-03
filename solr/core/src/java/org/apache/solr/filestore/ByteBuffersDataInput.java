@@ -303,42 +303,4 @@ public final class ByteBuffersDataInput extends DataInput
     return blockPage;
   }
 
-  private static List<BulkUnsafeBuffer> sliceBufferList(
-      List<BulkUnsafeBuffer> buffers, long offset, long length) {
-    ensureAssumptions(buffers);
-
-    if (buffers.size() == 1) {
-      BulkUnsafeBuffer cloned = BulkUnsafeBuffer.wrapBuffer(buffers.get(0).byteBuffer().asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN));
-
-      cloned.byteBuffer().position(Math.toIntExact(cloned.byteBuffer().position() + offset));
-      cloned.byteBuffer().limit(Math.toIntExact(cloned.byteBuffer().position() + length));
-      return Collections.singletonList(cloned);
-    } else {
-      long absStart = buffers.get(0).byteBuffer().position() + offset;
-      long absEnd = absStart + length;
-
-      int blockBytes = ByteBuffersDataInput.determineBlockPage(buffers);
-      int blockBits = Integer.numberOfTrailingZeros(blockBytes);
-      long blockMask = (1L << blockBits) - 1;
-
-      int endOffset = Math.toIntExact(absEnd & blockMask);
-
-      ArrayList<BulkUnsafeBuffer> cloned =
-          buffers
-              .subList(
-                  Math.toIntExact(absStart / blockBytes),
-                  Math.toIntExact(absEnd / blockBytes + (endOffset == 0 ? 0 : 1)))
-              .stream()
-              .map(buf -> BulkUnsafeBuffer.wrapBuffer(buf.byteBuffer().asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)))
-              .collect(Collectors.toCollection(ArrayList::new));
-
-      if (endOffset == 0) {
-        cloned.add(BulkUnsafeBuffer.wrapBuffer(ByteBuffer.allocate(0).order(ByteOrder.LITTLE_ENDIAN)));
-      }
-
-      cloned.get(0).byteBuffer().position(Math.toIntExact(absStart & blockMask));
-      cloned.get(cloned.size() - 1).byteBuffer().limit(endOffset);
-      return cloned;
-    }
-  }
 }

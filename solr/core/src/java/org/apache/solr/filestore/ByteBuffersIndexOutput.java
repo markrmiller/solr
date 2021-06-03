@@ -92,10 +92,10 @@ public final class ByteBuffersIndexOutput extends IndexOutput {
       lastChecksumPosition = delegate.size();
       checksum.reset();
       ByteBuffer bb = delegate.getBuffer().byteBuffer().asReadOnlyBuffer();
-      long pos = delegate.position();
+      long pos = delegate.position() + delegate.getBuffer().wrapAdjustment();
       if ((pos - lastChecksumPosition) < Integer.MAX_VALUE && pos < Integer.MAX_VALUE ){
         bb.limit((int) pos);
-        bb.position((int) lastChecksumPosition);
+        bb.position((int) lastChecksumPosition + delegate.getBuffer().wrapAdjustment());
 
         checksum.update(bb);
      } else {
@@ -104,7 +104,7 @@ public final class ByteBuffersIndexOutput extends IndexOutput {
         long index = pos;
        while (lastChecksumPosition < pos) {
          ByteBuffer tmpBuff = ByteBuffer.allocate((int) Math.min(Integer.MAX_VALUE, index - lastChecksumPosition));
-         delegate.getBuffer().getBytes(lastChecksumPosition, tmpBuff, 0, tmpBuff.capacity());
+         delegate.getBuffer().getBytes(lastChecksumPosition + delegate.getBuffer().wrapAdjustment(), tmpBuff, 0, tmpBuff.capacity());
          checksum.update(tmpBuff);
 
          lastChecksumPosition += Math.min(Integer.MAX_VALUE, index - lastChecksumPosition);

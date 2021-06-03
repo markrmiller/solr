@@ -374,13 +374,12 @@ public class TransactionLog implements Closeable {
       log.info("headerSize={} fileSize={}", out.position(), raf.length());
 
       //   fos.flushBuffer();
-      expandableBuffer1.byteBuffer().position(0 + expandableBuffer1.wrapAdjustment());
+      expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
       expandableBuffer1.byteBuffer().limit(out.position() + expandableBuffer1.wrapAdjustment());
 
-      int length = expandableBuffer1.byteBuffer().limit() + expandableBuffer1.wrapAdjustment();
-      fos.putBytes(0, expandableBuffer1.byteBuffer(), length);
+      fos.putBytes( expandableBuffer1.byteBuffer().position()+  expandableBuffer1.wrapAdjustment(), expandableBuffer1.byteBuffer(), out.position());
 
-      fos.putInt((length), lastSize);
+      fos.putInt(out.position(), lastSize);
 
       numRecords.increment();
 
@@ -476,8 +475,8 @@ public class TransactionLog implements Closeable {
           codec.writeSolrInputDocument(cmd.getSolrInputDocument());
         }
         int lastAddSize = (int) (out.position());
-        expandableBuffer1.byteBuffer().position(0);
-        expandableBuffer1.byteBuffer().limit(lastAddSize);
+        expandableBuffer1.byteBuffer().position(0 + expandableBuffer1.wrapAdjustment());
+        expandableBuffer1.byteBuffer().limit(lastAddSize + expandableBuffer1.wrapAdjustment());
         long pos;
 
         fosLock.lock();

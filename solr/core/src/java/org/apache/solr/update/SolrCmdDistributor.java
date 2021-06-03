@@ -16,21 +16,6 @@
  */
 package org.apache.solr.update;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
-import java.nio.channels.ClosedChannelException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.AsyncTracker;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
@@ -49,7 +34,6 @@ import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
-import org.apache.solr.common.util.SysStats;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.Diagnostics;
 import org.apache.solr.request.SolrQueryRequest;
@@ -62,6 +46,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.nio.channels.ClosedChannelException;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Used for distributing commands from a shard leader to its replicas.
@@ -393,20 +387,22 @@ public class SolrCmdDistributor implements Closeable {
               // we may get success but be told the peer is shutting down via exception
               log.info("Channel closed code={}", code);
 
-              if (code != 200) {
+
                 allErrors.put(req.cmd, error);
-              }
-              cancelExeption = new AlreadyClosedException();
-              return;
+                cancelExeption = new AlreadyClosedException();
+                return;
+
             }
+
 
             if (t instanceof IOException) {
               if (t.getMessage() != null && t.getMessage().contains("cancel_stream_error")) {
-                if (code != 200) {
+
                   allErrors.put(req.cmd, error);
-                }
-                cancelExeption = new AlreadyClosedException();
-                return;
+                  cancelExeption = new AlreadyClosedException();
+                  return;
+
+
               }
             }
 

@@ -18,7 +18,6 @@ package org.apache.solr.client.solrj.impl;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.io.DirectBufferInputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
@@ -530,7 +529,6 @@ public class Http2SolrClient extends SolrClient {
 
               if (failure instanceof CancelledException) {
                 asyncListener.onFailure(failure, 0, context);
-               // asyncListener.onSuccess(new NamedList<>(), 0);
                 return;
               }
               int status = response.getStatus();
@@ -612,19 +610,26 @@ public class Http2SolrClient extends SolrClient {
     try {
       response = mysl.get(5000, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      ParWork.propagateInterrupt(e);
+            InputStream is = mysl.getInputStream();
+     org.apache.solr.common.util.IOUtils.closeQuietly(is);
       throw new SolrServerException(e);
     } catch (TimeoutException timeoutException) {
+      InputStream is = mysl.getInputStream();
+      org.apache.solr.common.util.IOUtils.closeQuietly(is);
       throw new SolrServerException(timeoutException);
     } catch (ExecutionException e) {
+      InputStream is = mysl.getInputStream();
+      org.apache.solr.common.util.IOUtils.closeQuietly(is);
       throw new SolrServerException(e.getCause());
     }
 
-    if (response.getStatus() != 200) {
-      InputStream is = mysl.getInputStream();
-      org.apache.solr.common.util.IOUtils.closeQuietly(is);
-
-      throw new SolrServerException("Request failed with status " + response.getStatus());
-    }
+//    if (response.getStatus() != 200) {
+//      InputStream is = mysl.getInputStream();
+//      org.apache.solr.common.util.IOUtils.closeQuietly(is);
+//
+//      throw new SolrServerException("Request failed with status " + response.getStatus());
+//    }
 
     return new MyCancellable(req, mysl);
   }

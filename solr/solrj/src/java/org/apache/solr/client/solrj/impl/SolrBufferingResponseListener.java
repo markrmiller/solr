@@ -93,8 +93,8 @@ public abstract class SolrBufferingResponseListener extends Listener.Adapter {
     public MutableDirectBuffer getContent() {
         if (buffer == null)
             return buffer;
-        buffer.byteBuffer().position(0);
-        buffer.byteBuffer().limit(pos.get());
+        buffer.byteBuffer().position(0 + buffer.wrapAdjustment());
+        buffer.byteBuffer().limit(pos.get() + buffer.wrapAdjustment());
         return buffer;
     }
 

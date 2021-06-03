@@ -98,8 +98,8 @@ public interface ByteBufferPool
         public MutableDirectBuffer acquire(int capacity, boolean direct)
         {
             MutableDirectBuffer buffer = byteBufferPool.acquire(capacity, direct);
-            buffer.byteBuffer().position(0);
-            buffer.byteBuffer().limit(buffer.capacity());
+            buffer.byteBuffer().position(buffer.wrapAdjustment());
+            buffer.byteBuffer().limit(buffer.byteBuffer().capacity() + buffer.wrapAdjustment());
 
             return buffer;
         }
@@ -121,15 +121,7 @@ public interface ByteBufferPool
             return buffers;
         }
 
-        public long getTotalLength()
-        {
-            long length = 0;
-            for (MutableDirectBuffer buffer : buffers)
-            {
-                length += buffer.byteBuffer().remaining();
-            }
-            return length;
-        }
+
 
         public int getSize()
         {
@@ -184,8 +176,8 @@ public interface ByteBufferPool
             _lastUpdate.setOpaque(System.nanoTime());
 
             if (buffer.byteBuffer() != null) {
-                buffer.byteBuffer().position(0);
-                buffer.byteBuffer().limit(0);
+                buffer.byteBuffer().position(buffer.wrapAdjustment());
+                buffer.byteBuffer().limit(buffer.byteBuffer().capacity() + buffer.wrapAdjustment());
             }
 
             if (_size == null)
@@ -196,9 +188,15 @@ public interface ByteBufferPool
                 _size.decrementAndGet();
         }
 
+        protected void decrementMemory(MutableDirectBuffer buffer)
+        {
+
+            org.agrona.BufferUtil.free(buffer);
+        }
+
         public void clear()
         {
-            clear(null);
+            clear(this::decrementMemory);
         }
 
         void clear(Consumer<MutableDirectBuffer> memoryFn)

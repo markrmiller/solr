@@ -47,7 +47,7 @@ public final class QueryResponseWriterUtil {
 
 
     MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);//ExpandableBuffers.buffer1.get();
-    expandableBuffer1.byteBuffer().clear();
+
     ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
     if (responseWriter instanceof BinaryQueryResponseWriter) {
       BinaryQueryResponseWriter binWriter = (BinaryQueryResponseWriter) responseWriter;
