@@ -651,8 +651,9 @@ public class TransactionLog implements Closeable {
         raf.setLength(raf.length() + out.position() + 4);
 
         //   fos.flushBuffer();
-
-        fos.putBytes(pos, expandableBuffer1.byteBuffer(), expandableBuffer1.byteBuffer().limit());
+        expandableBuffer1.byteBuffer().position(expandableBuffer1.wrapAdjustment());
+        expandableBuffer1.byteBuffer().limit((int) (out.position() + expandableBuffer1.wrapAdjustment()));
+        fos.putBytes(pos, expandableBuffer1.byteBuffer(), out.position());
 
         fos.putInt((int) (pos + lastSize), lastSize);
 
