@@ -18,6 +18,7 @@ package org.apache.solr.cloud.api.collections;
 
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -472,7 +473,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   private AddReplicaCmd.Response processReplicaAddPropertyCommand(ClusterState clusterState, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results)
           throws Exception {
     checkRequired(message, COLLECTION_PROP, SHARD_ID_PROP, ZkStateReader.NUM_SHARDS_PROP, SHARDS_PROP, REPLICA_PROP, PROPERTY_PROP, PROPERTY_VALUE_PROP);
-    Map<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>(message.getProperties().size() + 1, 0.5f);
+    Object2ObjectLinkedOpenHashMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>(message.getProperties().size() + 1, 0.5f);
     propMap.put(Overseer.QUEUE_OPERATION, ADDREPLICAPROP.toLower());
     propMap.putAll(message.getProperties());
     ZkNodeProps m = new ZkNodeProps(propMap);
@@ -483,7 +484,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
   private AddReplicaCmd.Response processReplicaDeletePropertyCommand(ClusterState clusterState, ZkNodeProps message, @SuppressWarnings({"rawtypes"})NamedList results)
           throws Exception {
     checkRequired(message, COLLECTION_PROP, SHARD_ID_PROP, REPLICA_PROP, PROPERTY_PROP);
-    Map<String, Object> propMap =  new Object2ObjectLinkedOpenHashMap<>(message.getProperties().size() + 1, 0.5f);
+    Object2ObjectLinkedOpenHashMap<String, Object> propMap =  new Object2ObjectLinkedOpenHashMap<>(message.getProperties().size() + 1, 0.5f);
     propMap.put(Overseer.QUEUE_OPERATION, DELETEREPLICAPROP.toLower());
     propMap.putAll(message.getProperties());
     ZkNodeProps m = new ZkNodeProps(propMap);
@@ -681,7 +682,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
 
   AddReplicaCmd.Response cleanupCollection(String collectionName, @SuppressWarnings({"rawtypes"})NamedList results) throws Exception {
     log.error("Cleaning up collection [{}].", collectionName);
-    Map<String, Object> props = makeMap(
+    Object2ObjectMap<String, Object> props = makeMap(
             Overseer.QUEUE_OPERATION, DELETE.toLower(),
             NAME, collectionName);
     AddReplicaCmd.Response response = commandMap.get(DELETE).call(zkStateReader.getClusterState(), new ZkNodeProps(props), results);

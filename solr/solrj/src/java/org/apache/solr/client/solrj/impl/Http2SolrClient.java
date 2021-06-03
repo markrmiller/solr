@@ -17,18 +17,12 @@
 package org.apache.solr.client.solrj.impl;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import org.agrona.BufferUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.io.DirectBufferInputStream;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.http.HttpStatus;
-import org.apache.solr.client.solrj.ResponseParser;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.V2RequestSupport;
+import org.apache.solr.client.solrj.*;
 import org.apache.solr.client.solrj.embedded.SSLConfig;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -39,20 +33,10 @@ import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.StringUtils;
-import org.apache.solr.common.params.CommonParams;
-import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.params.QoSParams;
-import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.params.UpdateParams;
+import org.apache.solr.common.params.*;
+import org.apache.solr.common.util.Base64;
 import org.apache.solr.common.util.*;
-import org.eclipse.jetty.client.ConnectionPool;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.HttpClientTransport;
-import org.eclipse.jetty.client.HttpDestination;
-import org.eclipse.jetty.client.HttpRequest;
-import org.eclipse.jetty.client.MultiplexConnectionPool;
-import org.eclipse.jetty.client.Origin;
-import org.eclipse.jetty.client.ProtocolHandlers;
+import org.eclipse.jetty.client.*;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
@@ -60,19 +44,8 @@ import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.client.dynamic.HttpClientTransportDynamic;
 import org.eclipse.jetty.client.http.HttpClientConnectionFactory;
 import org.eclipse.jetty.client.http.HttpClientTransportOverHTTP;
-import org.eclipse.jetty.client.util.BufferingResponseListener;
-import org.eclipse.jetty.client.util.ByteBufferRequestContent;
-import org.eclipse.jetty.client.util.BytesRequestContent;
-import org.eclipse.jetty.client.util.InputStreamRequestContent;
-import org.eclipse.jetty.client.util.InputStreamResponseListener;
-import org.eclipse.jetty.client.util.MultiPartRequestContent;
-import org.eclipse.jetty.client.util.OutputStreamContentProvider;
-import org.eclipse.jetty.client.util.StringRequestContent;
-import org.eclipse.jetty.http.HttpField;
-import org.eclipse.jetty.http.HttpFields;
-import org.eclipse.jetty.http.HttpHeader;
-import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.http.MimeTypes;
+import org.eclipse.jetty.client.util.*;
+import org.eclipse.jetty.http.*;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
 import org.eclipse.jetty.http2.frames.Frame;
@@ -90,7 +63,6 @@ import org.eclipse.jetty.util.thread.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -104,22 +76,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -541,12 +502,12 @@ public class Http2SolrClient extends SolrClient {
     }
     final ResponseParser parser = solrRequest.getResponseParser() == null ? this.parser : solrRequest.getResponseParser();
     boolean tracking = false;
-
-    BufferingResponseListener listener = new BufferingResponseListener(16 * 1024 * 1024) {
+    MutableDirectBuffer expandableBuffer = ExpandableBuffers.getInstance().acquire(-1, true);
+    SolrBufferingResponseListener listener = new SolrBufferingResponseListener(expandableBuffer) {
       @Override public void onComplete(Result result) {
         httpClient.getExecutor().execute( () -> {
 
-          UnsafeBuffer buff = new UnsafeBuffer(getContent());
+          MutableDirectBuffer buff = getContent();
           InputStream is = new DirectBufferInputStream(buff);
           try {
             Response response = result.getResponse();
@@ -587,7 +548,6 @@ public class Http2SolrClient extends SolrClient {
               asyncListener.onFailure(failure, status, context);
             }
           } catch (Exception e) {
-            BufferUtil.free(buff);
             int status = 0;
             if (e instanceof SolrException) {
               status = ((SolrException) e).code();
@@ -598,6 +558,7 @@ public class Http2SolrClient extends SolrClient {
           } finally {
             try {
               org.apache.solr.common.util.IOUtils.closeQuietly(is);
+              ExpandableBuffers.getInstance().release(expandableBuffer);
             } finally {
               asyncTracker.arrive();
             }
@@ -707,10 +668,13 @@ public class Http2SolrClient extends SolrClient {
 
 
 
-    SolrFutureResponseListener listener = new SolrFutureResponseListener(req, 16 * 1024 * 1024);
+
 
     InputStream is = null;
+    SolrFutureResponseListener listener;
+    MutableDirectBuffer expandableBuffer = ExpandableBuffers.getInstance().acquire(-1, true);
     try {
+      listener = new SolrFutureResponseListener(req, expandableBuffer);
       req.send(listener);
 
       ContentResponse res = null; // Timed block
@@ -724,18 +688,19 @@ public class Http2SolrClient extends SolrClient {
         throw new SolrServerException(e);
       }
 
-     // if (res  != null && res.getStatus() == 200) {
-      UnsafeBuffer buff = new UnsafeBuffer(listener.getContent());
+
+      MutableDirectBuffer buff = listener.getContent();
       try {
         is = new DirectBufferInputStream(buff);
-        // }
-      //  is = new ByteArrayInputStream(listener.getContent());
+
         return processErrorsAndResponse(req, solrRequest, parser, res, is);
       } finally {
-        BufferUtil.free(buff);
+        // BufferUtil.free(buff); not ours
+        //buff.byteBuffer().position(buff.byteBuffer().limit());
       }
     } finally {
       org.apache.solr.common.util.IOUtils.closeQuietly(is);
+      ExpandableBuffers.getInstance().release(expandableBuffer);
 
     }
   }
@@ -980,7 +945,7 @@ public class Http2SolrClient extends SolrClient {
 //          if (sz != null) {
 //            fields.add(HttpHeader.CONTENT_LENGTH, sz.toString());
 //          }
-          content.addFilePart(name, contentStream.getName(), new InputStreamRequestContent(contentType, new CloseShieldInputStream(contentStream.getStream())), fields);
+          content.addFilePart(name, contentStream.getName(), new InputStreamRequestContent(contentType, contentStream.getStream()), fields);
         }
       }
       content.close();

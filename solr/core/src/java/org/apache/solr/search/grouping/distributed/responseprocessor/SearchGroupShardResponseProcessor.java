@@ -30,6 +30,7 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -85,8 +86,13 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
 
         if (srsp.getException() != null) {
           Throwable t = srsp.getException();
+          Integer code = null;
           if (t instanceof SolrServerException) {
             t = t.getCause();
+          }
+          if (t instanceof SolrException) {
+            code = ((SolrException) t).code();
+            srsp.setResponseCode(code);
           }
           nl.add("error", t.toString());
           StringWriter trace = new StringWriter();

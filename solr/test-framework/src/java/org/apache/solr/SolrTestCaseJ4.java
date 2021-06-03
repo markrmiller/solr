@@ -62,6 +62,8 @@ import java.util.stream.Collectors;
 
 import com.carrotsearch.randomizedtesting.RandomizedContext;
 import com.carrotsearch.randomizedtesting.RandomizedTest;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.sf.saxon.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.client.HttpClient;
@@ -1085,8 +1087,8 @@ public abstract class SolrTestCaseJ4 extends SolrTestCase {
     return d;
   }
 
-  public static Map map(Object... params) {
-    LinkedHashMap ret = new LinkedHashMap();
+  public static Object2ObjectMap map(Object... params) {
+    Object2ObjectMap ret = new Object2ObjectLinkedOpenHashMap();
     for (int i=0; i<params.length; i+=2) {
       Object o = ret.put(params[i], params[i+1]);
       // TODO: handle multi-valued map?

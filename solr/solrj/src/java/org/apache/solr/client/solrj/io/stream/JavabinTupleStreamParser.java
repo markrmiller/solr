@@ -17,10 +17,7 @@
 
 package org.apache.solr.client.solrj.io.stream;
 
-import org.apache.solr.common.util.DataInputInputStream;
-import org.apache.solr.common.util.FastInputStream;
-import org.apache.solr.common.util.IOUtils;
-import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStreamParser {
-  final FastInputStream fis;
+  final JavaBinInputStream fis;
   private int arraySize = Integer.MAX_VALUE;
   private boolean onlyJsonTypes = false;
   int objectSize;
@@ -94,19 +91,19 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
     return tagByte == SOLRDOCLST;
   }
 
-  private Map readAsMap(InputStream dis) throws IOException {
+  private Map readAsMap(JavaBinInputStream dis) throws IOException {
     int sz = readSize(dis);
     Map m = new LinkedHashMap<>();
     for (int i = 0; i < sz; i++) {
       tagByte = read(dis);
-      String name = (String) readStr(dis, null);
+      String name = readStr(dis);
       Object val = readVal(dis);
       m.put(name, val);
     }
     return m;
   }
 
-  private Map readSolrDocumentAsMap(InputStream dis) throws IOException {
+  private Map readSolrDocumentAsMap(JavaBinInputStream dis) throws IOException {
     tagByte = read(dis);
     int size = readSize(dis);
     Map doc = new LinkedHashMap<>();
@@ -128,7 +125,7 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
   }
 
   @Override
-  protected Object readObject(InputStream dis) throws IOException {
+  protected Object readObject(JavaBinInputStream dis) throws IOException {
     if (tagByte == SOLRDOC) {
       return readSolrDocumentAsMap(dis);
     }
@@ -145,7 +142,11 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
 
       switch (tagByte) {
         case INT: {
-          int i = readInt(dis);
+          int i = dis.readInt();
+          return (long) i;
+        }
+        case VINT: {
+          int i = readVInt(dis);
           return (long) i;
         }
         case FLOAT: {
@@ -162,7 +163,7 @@ public class JavabinTupleStreamParser extends JavaBinCodec implements TupleStrea
         }
 
         case DATE: {
-          return Instant.ofEpochMilli(readLong(dis)).toString();
+          return Instant.ofEpochMilli(dis.readLong()).toString();
         }
 
         default:

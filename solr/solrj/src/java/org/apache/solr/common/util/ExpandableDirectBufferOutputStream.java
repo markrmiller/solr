@@ -15,9 +15,11 @@
  */
 package org.apache.solr.common.util;
 
+import org.agrona.BitUtil;
 import org.agrona.MutableDirectBuffer;
 
 import java.io.OutputStream;
+import java.nio.ByteOrder;
 import java.util.Objects;
 
 /**
@@ -76,10 +78,10 @@ public class ExpandableDirectBufferOutputStream extends OutputStream
     public void wrap(final MutableDirectBuffer buffer, final int offset)
     {
         Objects.requireNonNull(buffer, "Buffer must not be null");
-//        if (!buffer.isExpandable())
-//        {
-//            throw new IllegalStateException("buffer must be expandable.");
-//        }
+        if (!buffer.isExpandable())
+        {
+            throw new IllegalStateException("buffer must be expandable.");
+        }
 
         this.buffer = buffer;
         this.offset = offset;
@@ -152,8 +154,25 @@ public class ExpandableDirectBufferOutputStream extends OutputStream
     {
     }
 
-    public void putInt(int position, int val) {
-        buffer.putInt(position, val);
-        this.position += 4;
+    public void putInt(int val) {
+        buffer.putInt(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_INT;
+    }
+
+    public void putLong(long val) {
+        buffer.putLong(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_LONG;
+    }
+
+    public void putFloat(float val) {
+
+        buffer.putFloat(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_FLOAT;
+
+    }
+
+    public void putShort(short val) {
+        buffer.putShort(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_SHORT;
     }
 }

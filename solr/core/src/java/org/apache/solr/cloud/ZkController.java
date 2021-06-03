@@ -18,6 +18,7 @@ package org.apache.solr.cloud;
 
 import com.codahale.metrics.Counter;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.LockListener;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -641,7 +642,7 @@ public class ZkController implements Closeable, Runnable {
         log.warn("Leader {} met tragic exception, give up its leadership", key, tragicException);
         try {
           // by using Overseer to remove and add replica back, we can do the task in an async/robust manner
-          Map<String,Object> props = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+          Object2ObjectMap<String,Object> props = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
           props.put(Overseer.QUEUE_OPERATION, "deletereplica");
           props.put(COLLECTION_PROP, cd.getCollectionName());
           props.put(SHARD_ID_PROP, shard.getName());
@@ -1154,7 +1155,7 @@ public class ZkController implements Closeable, Runnable {
       }
 
       log.debug("no leader found, register for notification {}", coreName);
-      AtomicBoolean foundLeader = new AtomicBoolean();
+      var foundLeader = new AtomicBoolean();
       zkStateReader.waitForState(collection, Integer.getInteger("solr.waitForLeaderInZkRegSec", 60), TimeUnit.SECONDS, (n, c) -> {
         if (log.isDebugEnabled()) {
           log.debug("wait for leader notified collection={}", c == null ? "(null)" : c);
@@ -1168,8 +1169,10 @@ public class ZkController implements Closeable, Runnable {
         if (fleader != null && fleader.getState() == Replica.State.ACTIVE) {
           boolean success = foundLeader.compareAndSet(false, true);
           if (success) {
-            log.debug("Found ACTIVE leader for slice={} leader={}", slice.getName(), fleader);
-            zkRegisterExecutor.submit(() -> finishRegistration(afterExpiration, coreName, desc, fleader.getName()));
+            if (log.isDebugEnabled()) {
+              log.debug("Found ACTIVE leader for slice={} leader={}", slice.getName(), fleader);
+            }
+            zkRegisterExecutor.submit(() -> finishRegistration(afterExpiration, coreName, desc, fleader));
           }
           return true;
         }
@@ -1188,24 +1191,24 @@ public class ZkController implements Closeable, Runnable {
     }
   }
 
-  public void finishRegistration(boolean afterExpiration, String coreName, final CoreDescriptor desc, String leaderName) {
+  public void finishRegistration(boolean afterExpiration, String coreName, final CoreDescriptor desc, Replica leader) {
     MDCLoggingContext.setCoreName(desc.getName());
-    log.debug("finishZkRegister replica={} core={}", coreName, leaderName);
+    log.debug("finishZkRegister replica={} core={}", coreName, leader);
 
     if (getCoreContainer().isShutDown() || dcCalled) {
       throw new AlreadyClosedException();
     }
 
     try {
-      boolean isLeader = leaderName.equals(coreName);
+      boolean isLeader = leader.getName().equals(coreName);
 
       final String baseUrl = baseURL;
 
-      final CloudDescriptor cloudDesc = desc.getCloudDescriptor();
+      final var cloudDesc = desc.getCloudDescriptor();
       final String collection = cloudDesc.getCollectionName();
       final String shardId = cloudDesc.getShardId();
 
-      log.debug("We are {} and leader is {} isLeader={}", coreName, leaderName, isLeader);
+      log.debug("We are {} and leader is {} isLeader={}", coreName, leader.getName(), isLeader);
 
       //assert !(isLeader && replica.getType() == Type.PULL) : "Pull replica became leader!";
 
@@ -1236,7 +1239,7 @@ public class ZkController implements Closeable, Runnable {
         }
 
         if (cloudDesc.getReplicaType() != Type.PULL && !isLeader) {
-          checkRecovery(core, cc);
+          checkRecovery(core, cc, leader);
         } else if (isTlogReplicaAndNotLeader) {
           startReplicationFromLeader(coreName, true);
         }
@@ -1295,7 +1298,7 @@ public class ZkController implements Closeable, Runnable {
 
     String shardId = cd.getCloudDescriptor().getShardId();
 
-    Map<String, Object> props = new HashMap<>();
+    Object2ObjectMap<String, Object> props = new Object2ObjectLinkedOpenHashMap<>();
     // we only put a subset of props into the leader node
     props.put(ZkStateReader.NODE_NAME_PROP, nodeName);
     props.put(CORE_NAME_PROP, cd.getName());
@@ -1338,9 +1341,9 @@ public class ZkController implements Closeable, Runnable {
   /**
    * Returns whether or not a recovery was started
    */
-  private static void checkRecovery(SolrCore core, CoreContainer cc) {
+  private static void checkRecovery(SolrCore core, CoreContainer cc, Replica leader) {
     log.debug("Core needs to recover:{}", core.getName());
-    core.getUpdateHandler().getSolrCoreState().doRecovery(cc, core.getCoreDescriptor(), "ZkRegistration");
+    core.getUpdateHandler().getSolrCoreState().doRecovery(cc, core.getCoreDescriptor(), "ZkRegistration", leader);
   }
 
 
@@ -1359,7 +1362,7 @@ public class ZkController implements Closeable, Runnable {
     log.debug("publishing state={}", state);
     String collection = cd.getCloudDescriptor().getCollectionName();
     String shardId = cd.getCloudDescriptor().getShardId();
-    Map<String,Object> props = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+    Object2ObjectMap<String,Object> props = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     MDCLoggingContext.setCoreName(cd.getName());
     try {
       // System.out.println(Thread.currentThread().getStackTrace()[3]);
@@ -1515,7 +1518,7 @@ public class ZkController implements Closeable, Runnable {
     ZkNodeProps props;
     if (data != null) {
       props = ZkNodeProps.load(data);
-      Map<String, Object> newProps = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+      Object2ObjectMap<String, Object> newProps = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
       newProps.putAll(props.getProperties());
       newProps.put(CONFIGNAME_PROP, confSetName);
       props = new ZkNodeProps(newProps);

@@ -15,6 +15,7 @@
  */
 package org.apache.solr.common.util;
 
+import org.agrona.BitUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.MappedResizeableBuffer;
 
@@ -22,6 +23,7 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * {@link OutputStream} that wraps an underlying {@link MutableDirectBuffer}.
@@ -30,7 +32,7 @@ public class DirectMemBufferOutputStream extends OutputStream
 {
     private MappedResizeableBuffer buffer;
 
-    private volatile int position;
+    private volatile long position;
     private int offset;
 
 
@@ -49,7 +51,7 @@ public class DirectMemBufferOutputStream extends OutputStream
      *
      * @return the position in the buffer from the offset up to which has been written.
      */
-    public int position()
+    public long position()
     {
         return position;
     }
@@ -74,7 +76,7 @@ public class DirectMemBufferOutputStream extends OutputStream
      *
      * @return length of the underlying buffer to use
      */
-    public int length()
+    public long length()
     {
         return position;
     }
@@ -152,19 +154,39 @@ public class DirectMemBufferOutputStream extends OutputStream
     }
 
 
-    public void putBytes(long pos, ByteBuffer byteBuffer, int lastAddSize) {
-        buffer.putBytes(pos, byteBuffer, lastAddSize);
-        position += lastAddSize;
+    public void putBytes(long pos, ByteBuffer byteBuffer, int length) {
+        buffer.putBytes(pos, byteBuffer, length);
+      //  position += lastAddSize;
     }
 
     public void putBytes(long pos, byte[] bytes, int lastAddSize) {
         buffer.putBytes(pos, bytes, 0, lastAddSize);
-        position += lastAddSize;
+      //  position += lastAddSize;
     }
 
 
     public void putInt(int position, int val) {
         buffer.putInt(position, val);
-        this.position += 4;
+    }
+
+    public void putInt(int val) {
+        buffer.putInt(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_INT;
+    }
+
+
+    public void putLong(long val) {
+        buffer.putLong(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_LONG;
+    }
+
+    public void putFloat(float val) {
+        buffer.putFloat(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_FLOAT;
+    }
+
+    public void putShort(short val) {
+        buffer.putShort(position, val, ByteOrder.LITTLE_ENDIAN);
+        this.position += BitUtil.SIZE_OF_SHORT;
     }
 }

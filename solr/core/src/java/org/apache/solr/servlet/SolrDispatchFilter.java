@@ -443,7 +443,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     Boolean passthrough = (Boolean) _request.getAttribute("PASSTHROUGH");
     if (passthrough != null && passthrough) {
-      chain.doFilter((HttpServletRequest) _request, closeShield((HttpServletResponse) _response));
+      chain.doFilter((HttpServletRequest) _request, (HttpServletResponse) _response);
       return;
     }
 
@@ -458,10 +458,10 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //            asyncContext.dispatch();
 //          } else {
             try {
-              chain.doFilter(_request, closeShield((HttpServletResponse) _response));
+              chain.doFilter(_request,  _response);
             } catch (Exception e) {
               if (!_response.isCommitted()) {
-                sendException(e, null, (HttpServletRequest) _request, closeShield((HttpServletResponse) _response));
+                sendException(e, null, (HttpServletRequest) _request, (HttpServletResponse) _response);
               }
             }
             return;
@@ -473,7 +473,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     if (ASYNC) {
       AsyncContext asyncContext = _request.startAsync();
       asyncContext.addListener(new SolrAsyncListener());
-      asyncContext.setTimeout(120000);
+      asyncContext.setTimeout(0); // request resumed after timeout and jetty sends a response;
       //asyncContext.start(() -> {
 
         ParWork.submitIO("distCall", () -> {
@@ -489,7 +489,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
       //});
     } else {
       HttpServletRequest servletRequest = (HttpServletRequest) _request;
-      HttpServletResponse servletResponse = closeShield((HttpServletResponse) _response);
+      HttpServletResponse servletResponse = (HttpServletResponse) _response;
       filter(chain, servletRequest, servletResponse, null);
     }
   }
@@ -577,6 +577,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
         ExecutorUtil.setServerThreadFlag(null);
       }
     } catch(Exception e) {
+      log.error("Exception processing request", e);
 //      if (!servletRequest.getInputStream().isFinished()) {
 //        consumeInputFully(servletRequest.getInputStream());
 //      }
@@ -856,22 +857,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     return cores.getAuditLoggerPlugin() != null && cores.getAuditLoggerPlugin().shouldLog(eventType);
   }
 
-  /**
-   * Wrap the response's output stream with a close shield. If this is a
-   * retry, we will assume that the stream has already been wrapped and do nothing.
-   *
-   * Only the container should ever actually close the servlet request stream.
-   *
-   * @param response The response to wrap.
-   * @return A response object with an {@link OutputStream} that will ignore calls to close.
-   */
-  public static HttpServletResponse closeShield(HttpServletResponse response) {
-    if (!(response instanceof CloseShieldHttpServletResponseWrapper)) {
-      return new CloseShieldHttpServletResponseWrapper(response);
-    } else {
-      return response;
-    }
-  }
+
 
   public static class CloseShieldHttpServletResponseWrapper extends HttpServletResponseWrapper {
     final HttpServletResponse response;

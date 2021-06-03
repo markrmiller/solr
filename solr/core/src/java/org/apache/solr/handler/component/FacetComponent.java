@@ -311,7 +311,7 @@ public class FacetComponent extends SearchComponent {
   public static NamedList<Object> getFacetCounts(SimpleFacets simpleFacets, FacetDebugInfo fdebug) {
     // if someone called this method, benefit of the doubt: assume true
     if (!simpleFacets.getGlobalParams().getBool(FacetParams.FACET, true))
-      return null;
+      return NamedList.emptyList();
 
     RangeFacetProcessor rangeFacetProcessor = new RangeFacetProcessor(simpleFacets.getRequest(), simpleFacets.getDocsOrig(), simpleFacets.getGlobalParams(), simpleFacets.getResponseBuilder());
     NamedList<Object> counts = new SimpleOrderedMap<>();
@@ -712,11 +712,11 @@ public class FacetComponent extends SearchComponent {
         facet_counts = (NamedList) srsp.getSolrResponse().getResponse().get("facet_counts");
         if (facet_counts==null) {
           NamedList<?> responseHeader = (NamedList<?>)srsp.getSolrResponse().getResponse().get("responseHeader");
-          if (responseHeader == null) {
-            if (ShardParams.getShardsTolerantAsBool(rb.req.getParams())) {
-              continue; // looks like a shard did not return anything
-            }
-          }
+//          if (responseHeader == null) {
+//            if (ShardParams.getShardsTolerantAsBool(rb.req.getParams())) {
+//              continue; // looks like a shard did not return anything
+//            }
+//          }
           if (Boolean.TRUE.equals(responseHeader.getBooleanArg(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY))) {
             continue;
           } else {
@@ -1129,8 +1129,8 @@ public class FacetComponent extends SearchComponent {
         int lim = dff.limit >= 0 ? dff.limit : Integer.MAX_VALUE;
         
         // index order...
-        for (int i = 0; i < counts.length; i++) {
-          long count = counts[i].count;
+        for (ShardFacetCount shardFacetCount : counts) {
+          long count = shardFacetCount.count;
           if (count < dff.minCount) continue;
           if (off > 0) {
             off--;
@@ -1140,7 +1140,7 @@ public class FacetComponent extends SearchComponent {
             break;
           }
           lim--;
-          fieldCounts.add(counts[i].name, num(count));
+          fieldCounts.add(shardFacetCount.name, num(count));
         }
       }
 

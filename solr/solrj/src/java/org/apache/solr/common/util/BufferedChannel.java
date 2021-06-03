@@ -12,6 +12,7 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 
@@ -106,14 +107,18 @@ public class BufferedChannel extends OutputStream implements Closeable {
         return size;
     }
 
-    public void writeInt(int v) {
-       // buff.putInt(count, i);
-        buff.putByte(count++, (byte) ((v >>> 24) & 0xFF));
-        buff.putByte(count++, (byte) ((v >>> 16) & 0xFF));
-        buff.putByte(count++, (byte) ((v >>>  8) & 0xFF));
-        buff.putByte(count++, (byte) ((v >>>  0) & 0xFF));
-      //  count+=BitUtil.SIZE_OF_INT;
+    public void putInt(int v) {
+        buff.putInt(count, v, ByteOrder.LITTLE_ENDIAN);
+
+        count+=BitUtil.SIZE_OF_INT;
         size+=BitUtil.SIZE_OF_INT;
+    }
+
+    public void putLong(long v) {
+        buff.putLong(count, v, ByteOrder.LITTLE_ENDIAN);
+
+        count+=BitUtil.SIZE_OF_LONG;
+        size+=BitUtil.SIZE_OF_LONG;
     }
 
     public void setWritten(int start) {
@@ -128,5 +133,17 @@ public class BufferedChannel extends OutputStream implements Closeable {
 
     public MutableDirectBuffer buffer() {
         return buff;
+    }
+
+    public void putFloat(float val) {
+        buff.putFloat(count, val, ByteOrder.LITTLE_ENDIAN);
+        count+=BitUtil.SIZE_OF_FLOAT;
+        size+=BitUtil.SIZE_OF_FLOAT;
+    }
+
+    public void putShort(short val) {
+        buff.putShort(count, val, ByteOrder.LITTLE_ENDIAN);
+        count+=BitUtil.SIZE_OF_SHORT;
+        size+=BitUtil.SIZE_OF_SHORT;
     }
 }

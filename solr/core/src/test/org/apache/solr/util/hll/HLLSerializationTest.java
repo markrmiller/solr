@@ -47,7 +47,7 @@ public class HLLSerializationTest extends SolrTestCase {
   @LuceneTestCase.Nightly
   public void serializationSmokeTest() throws Exception {
     final Random random = new Random(randomLong());
-    final int randomCount = 57;
+    final int randomCount = 27;
     final List<Long> randoms = new ArrayList<Long>(randomCount);
     for (int i=0; i<randomCount; i++) {
       randoms.add(random.nextLong());
@@ -56,7 +56,7 @@ public class HLLSerializationTest extends SolrTestCase {
     // NOTE: log2m<=16 was chosen as the max log2m parameter so that the test
     //       completes in a reasonable amount of time. Not much is gained by
     //       testing larger values
-    final int maxLog2m = 16;
+    final int maxLog2m = 12;
     for (HLLType type : EnumSet.allOf(HLLType.class)) {
       assertCardinality(type, maxLog2m, randoms);
     }

@@ -20,6 +20,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.agrona.ExpandableDirectByteBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.eclipse.jetty.client.HttpContentResponse;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
@@ -39,7 +41,7 @@ import org.eclipse.jetty.client.util.BufferingResponseListener;
  * ContentResponse response = listener.get(5, TimeUnit.SECONDS); // Timed block
  * </pre>
  */
-public class SolrFutureResponseListener extends BufferingResponseListener implements Future<ContentResponse>
+public class SolrFutureResponseListener extends SolrBufferingResponseListener implements Future<ContentResponse>
 {
     private final CountDownLatch latch = new CountDownLatch(1);
     private final Request request;
@@ -47,14 +49,11 @@ public class SolrFutureResponseListener extends BufferingResponseListener implem
     private volatile Throwable failure;
     private volatile boolean cancelled;
 
-    public SolrFutureResponseListener(Request request)
-    {
-        this(request, 2 * 1024 * 1024);
-    }
 
-    public SolrFutureResponseListener(Request request, int maxLength)
+
+    public SolrFutureResponseListener(Request request, MutableDirectBuffer buffer)
     {
-        super(maxLength);
+        super(buffer);
         this.request = request;
     }
 
@@ -66,7 +65,7 @@ public class SolrFutureResponseListener extends BufferingResponseListener implem
     @Override
     public void onComplete(Result result)
     {
-        response = new HttpContentResponse(result.getResponse(), getContent(), getMediaType(), getEncoding());
+        response = new HttpContentResponse(result.getResponse(), null, getMediaType(), getEncoding());
         failure = result.getFailure();
         latch.countDown();
     }

@@ -39,12 +39,9 @@ import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.client.util.AsyncRequestContent;
-import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
-import org.eclipse.jetty.http.HttpHeaderValue;
 import org.eclipse.jetty.http.HttpVersion;
-import org.eclipse.jetty.server.HttpInput;
 import org.eclipse.jetty.server.HttpOutput;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.IteratingCallback;
@@ -342,7 +339,7 @@ public abstract class SolrCall {
     }
 
     final DocCollection docCollection = cores.getZkController().getZkStateReader().getCollectionOrNull(collectionName);
-    if (docCollection == null) {
+    if (docCollection == null || docCollection.getSlices()== null) {
       return null;
     }
 
@@ -354,7 +351,7 @@ public abstract class SolrCall {
     return coreUrl;
   }
 
-  public abstract SolrParams getQueryParams();
+  public abstract SolrParams getSolrParams();
 
   protected void writeResponse(SolrQueryRequest solrReq, SolrQueryResponse solrRsp, HttpServletRequest req, HttpServletResponse response,
       QueryResponseWriter responseWriter, Method reqMethod)
@@ -477,7 +474,7 @@ public abstract class SolrCall {
           //            }
           //          });
         } else {
-          HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
+          HttpOutput out = (HttpOutput) response.getOutputStream();
           try {
             out.sendContent(buffer);
           } finally {
@@ -703,7 +700,7 @@ public abstract class SolrCall {
       }
     }
 
-    SolrParams params = getQueryParams();
+    SolrParams params = getSolrParams();
     final ArrayList<AuthorizationContext.CollectionRequest> collectionRequests = new ArrayList<>();
     for (String collection : getCollectionsList()) {
       collectionRequests.add(new AuthorizationContext.CollectionRequest(collection));

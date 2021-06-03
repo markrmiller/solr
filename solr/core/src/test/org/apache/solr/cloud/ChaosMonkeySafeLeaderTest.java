@@ -24,10 +24,7 @@ import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slow
 @LuceneTestCase.Nightly // MRM TODO: look at setErrorHook
+@Ignore // nocommit
 public class ChaosMonkeySafeLeaderTest extends SolrCloudBridgeTestCase {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

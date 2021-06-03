@@ -29,6 +29,7 @@ import org.apache.solr.core.CoreContainer;
 import org.apache.solr.servlet.SolrDispatchFilter;
 import org.apache.solr.servlet.SolrQoSFilter;
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
+import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http2.HTTP2Cipher;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
@@ -317,6 +318,8 @@ public class JettySolrRunner implements Closeable {
     httpConfig.setSendXPoweredBy(false);
     httpConfig.setSendDateHeader(false);
 
+    httpConfig.setFormEncodedMethods(HttpMethod.POST.asString(), HttpMethod.PUT.asString(), HttpMethod.GET.asString());
+
     // https://github.com/jersey/jersey/issues/3691
     // https://github.com/eclipse/jetty.project/issues/1891
     httpConfig.setNotifyRemoteAsyncErrors(true);
@@ -374,7 +377,7 @@ public class JettySolrRunner implements Closeable {
         h2 = new HTTP2ServerConnectionFactory(httpsConfig);
       }
 
-      h2.setStreamIdleTimeout(idleTimeout);
+      //h2.setStreamIdleTimeout(idleTimeout);
       h2.setMaxConcurrentStreams(1024);
     //  h2.setInputBufferSize(32768);
     //  NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
@@ -960,7 +963,7 @@ public class JettySolrRunner implements Closeable {
    * A main class that starts jetty+solr This is useful for debugging
    */
   public static void main(String[] args) throws Exception {
-    JettySolrRunner jetty = new JettySolrRunner(".", "/solr", 8983);
+    var jetty = new JettySolrRunner(".", "/solr", 8983);
     jetty.start();
   }
 

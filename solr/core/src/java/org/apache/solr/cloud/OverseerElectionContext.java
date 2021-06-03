@@ -17,6 +17,8 @@
 
 package org.apache.solr.cloud;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -39,8 +41,8 @@ final class OverseerElectionContext extends ShardLeaderElectionContextBase {
     this.overseer = overseer;
   }
 
-  private static Map<String,Object> getIDMap(Integer zkNodeName, Overseer overseer) {
-    Map<String,Object> idMap = new HashMap<>(2);
+  private static Object2ObjectMap<String,Object> getIDMap(Integer zkNodeName, Overseer overseer) {
+    Object2ObjectMap<String,Object> idMap = new Object2ObjectLinkedOpenHashMap<>(2);
     idMap.put("id", zkNodeName);
     idMap.put(ZkStateReader.NODE_NAME_PROP, overseer.getZkController().getNodeName());
     return idMap;

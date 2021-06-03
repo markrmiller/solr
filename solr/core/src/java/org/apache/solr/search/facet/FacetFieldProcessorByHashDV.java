@@ -18,7 +18,6 @@ package org.apache.solr.search.facet;
 
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.Map;
 import java.util.function.IntFunction;
 
 import org.apache.lucene.index.DocValues;
@@ -35,6 +34,7 @@ import org.apache.lucene.util.BitUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.LongValues;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocSetUtil;
 import org.apache.solr.search.facet.SlotAcc.SlotContext;
@@ -220,7 +220,7 @@ class FacetFieldProcessorByHashDV extends FacetFieldProcessor {
     table = null;//gc
   }
 
-  private Map calcFacets() throws IOException {
+  private SimpleOrderedMap<Object> calcFacets() throws IOException {
 
     if (sf.getType().getNumberType() != null) {
       calc = FacetRangeProcessor.getNumericCalc(sf);

@@ -29,6 +29,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
@@ -159,7 +161,7 @@ public class LeaderElectionTest extends SolrTestCaseJ4 {
       this.nodeName = shard + nodeNumber;
       this.runLeaderDelay = runLeaderDelay;
 
-      Map<String,Object> props = new HashMap<>();
+      Object2ObjectMap<String,Object> props = new Object2ObjectLinkedOpenHashMap<>();
       props.put(ZkStateReader.NODE_NAME_PROP,  Integer.toString(nodeNumber));
       props.put(ZkStateReader.CORE_NAME_PROP, "");
 

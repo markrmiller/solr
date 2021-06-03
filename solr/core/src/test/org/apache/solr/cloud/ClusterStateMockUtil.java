@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.CompositeIdRouter;
 import org.apache.solr.common.cloud.DocCollection;
@@ -158,7 +160,7 @@ public class ClusterStateMockUtil {
           String replicaName = "replica" + replicaCount++;
           String stateCode = m.group(3);
 
-          Map<String, Object> replicaPropMap = makeReplicaProps(sliceName, node, replicaName, stateCode, m.group(1));
+          Object2ObjectMap<String, Object> replicaPropMap = new Object2ObjectLinkedOpenHashMap<>(makeReplicaProps(sliceName, node, replicaName, stateCode, m.group(1)));
           if (collName == null) collName = "collection" + (collectionStates.size() + 1);
           if (sliceName == null) collName = "slice" + (slices.size() + 1);
 

@@ -588,14 +588,12 @@ public class TestConfigSetsAPI extends SolrTestCaseJ4 {
 
         m = (Map) Utils.fromJSONString(resp.asString);
       } catch (JSONParser.ParseException e) {
-        System.err.println("err response: " + resp);
+        System.err.println("err response: " + resp.asString);
         throw new AssertionError(e);
       }
     } catch (InterruptedException e) {
       ParWork.propagateInterrupt(e);
-    } catch (ExecutionException e) {
-      log.error("", e);
-    } catch (TimeoutException e) {
+    } catch (ExecutionException | TimeoutException e) {
       log.error("", e);
     }
     return m;

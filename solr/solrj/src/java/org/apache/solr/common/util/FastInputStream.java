@@ -16,19 +16,20 @@
  */
 package org.apache.solr.common.util;
 
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 import it.unimi.dsi.fastutil.io.FastBufferedInputStream;
 import org.eclipse.jetty.io.RuntimeIOException;
 
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /** Single threaded buffered InputStream
  *  Internal Solr use only, subject to change.
  */
-public class FastInputStream extends FastBufferedInputStream implements DataInputInputStream, DataInput {
+public class FastInputStream extends JavaBinInputStream implements DataInputInputStream, DataInput {
+  private final SolrDataInputStream din;
 //  public final stati ThreadLocal<byte[]> THREAD_LOCAL_BYTEARRAY= new ThreadLocal<>(){
 //    protected byte[] initialValue() {
 //      return new byte[8192];
@@ -42,7 +43,8 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
   }
 
   public FastInputStream(InputStream in, int start) {
-    super(in);
+   // super(new FastInputStream.SolrDataInputStream(in));
+    this.din = new FastInputStream.SolrDataInputStream(in);
 //    if (start != 0) {
 //      try {
 //        position(start);
@@ -59,34 +61,33 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   @Override
   public int read() throws IOException {
-    return super.read() ;// & 0xff;
+    return din.read();
   }
 
-  public int peek() throws IOException {
-    if (noMoreCharacters()) return -1;
-    return buffer[pos];
-  }
+//  public int peek() throws IOException {
+//    return din.p();
+//  }
 
-  /** Returns the internal buffer used for caching */
-  public byte[] getBuffer() {
-    return buffer;
-  }
+//  /** Returns the internal buffer used for caching */
+//  public byte[] getBuffer() {
+//    return buffer;
+//  }
 
-  @Override
-  public long position() throws IOException {
-    return readBytes;
-   // return super.position();
-  }
+//  @Override
+//  public long position() throws IOException {
+//    return readBytes;
+//   // return super.position();
+//  }
 
-  /** Current position within the internal buffer */
-  public int getPositionInBuffer() {
-    return pos;
-  }
-
-  /** Current end-of-data position within the internal buffer.  This is one past the last valid byte. */
-  public int getEndInBuffer() {
-    return pos + avail;
-  }
+//  /** Current position within the internal buffer */
+//  public int getPositionInBuffer() {
+//    return pos;
+//  }
+//
+//  /** Current end-of-data position within the internal buffer.  This is one past the last valid byte. */
+//  public int getEndInBuffer() {
+//    return pos + avail;
+//  }
 
 
 //  @Override
@@ -96,7 +97,7 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   @Override
   public boolean readBoolean() throws IOException {
-    return readByte()==1;
+    return din.readBoolean();
   }
 
   @Override
@@ -111,81 +112,75 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
 
   @Override
   public void readFully(byte b[], int off, int len) throws IOException {
-    while (len>0) {
-      int ret = super.read(b, off, len);
-      if (ret==-1) {
-        throw new EOFException();
-      }
-      off += ret;
-      len -= ret;
-    }
+    din.readFully(b, off, len);
   }
 
   @Override
   public int skipBytes(int n) throws IOException {
-    return (int) super.skip(n);
+    return (int) din.skip(n);
   }
 
   @Override
   public byte readByte() throws IOException {
-    int ch = super.read();
-    if (ch < 0)
-      throw new EOFException("" + ch);
-    return (byte)(ch);
+    return din.readByte();
   }
 
   @Override
   public int readUnsignedByte() throws IOException {
-    int ch = super.read();
-    if (ch < 0)
-      throw new EOFException();
-    return ch;
+    return din.readUnsignedByte();
   }
 
 
   @Override
   public short readShort() throws IOException {
-    return (short)((readUnsignedByte() << 8) | readUnsignedByte());
+    return (short) readUnsignedShort();
   }
 
   @Override
   public int readUnsignedShort() throws IOException {
-    return (readUnsignedByte() << 8) | readUnsignedByte();
+    byte b1 = readAndCheckByte();
+    byte b2 = readAndCheckByte();
+
+    return Ints.fromBytes((byte) 0, (byte) 0, b2, b1);
   }
 
   @Override
   public char readChar() throws IOException {
-    return (char)((readUnsignedByte() << 8) | readUnsignedByte());
+    return din.readChar();
   }
 
   @Override
   public int readInt() throws IOException {
-    return  ((readUnsignedByte() << 24)
-            |(readUnsignedByte() << 16)
-            |(readUnsignedByte() << 8)
-            | readUnsignedByte());
+    byte b1 = readAndCheckByte();
+    byte b2 = readAndCheckByte();
+    byte b3 = readAndCheckByte();
+    byte b4 = readAndCheckByte();
+
+    return Ints.fromBytes(b4, b3, b2, b1);
   }
 
   @Override
   public long readLong() throws IOException {
-    return  (((long)readUnsignedByte()) << 56)
-            | (((long)readUnsignedByte()) << 48)
-            | (((long)readUnsignedByte()) << 40)
-            | (((long)readUnsignedByte()) << 32)
-            | (((long)readUnsignedByte()) << 24)
-            | (readUnsignedByte() << 16)
-            | (readUnsignedByte() << 8)
-            | (readUnsignedByte());
+    byte b1 = readAndCheckByte();
+    byte b2 = readAndCheckByte();
+    byte b3 = readAndCheckByte();
+    byte b4 = readAndCheckByte();
+    byte b5 = readAndCheckByte();
+    byte b6 = readAndCheckByte();
+    byte b7 = readAndCheckByte();
+    byte b8 = readAndCheckByte();
+
+    return Longs.fromBytes(b8, b7, b6, b5, b4, b3, b2, b1);
   }
 
   @Override
   public float readFloat() throws IOException {
-    return Float.intBitsToFloat(readInt());    
+    return Float.intBitsToFloat(readInt());
   }
 
   @Override
   public double readDouble() throws IOException {
-    return Double.longBitsToDouble(readLong());    
+    return Double.longBitsToDouble(readLong());
   }
 
   @Override
@@ -196,5 +191,23 @@ public class FastInputStream extends FastBufferedInputStream implements DataInpu
   @Override
   public String readUTF() throws IOException {
     throw new UnsupportedOperationException();
+  }
+
+  private byte readAndCheckByte() throws IOException, EOFException {
+    int b1 = din.read();
+
+    if (-1 == b1) {
+      throw new EOFException();
+    }
+
+    return (byte) b1;
+  }
+
+  private static class SolrDataInputStream extends DataInputStream {
+
+    public SolrDataInputStream(InputStream in) {
+      super(in);
+    }
+
   }
 }

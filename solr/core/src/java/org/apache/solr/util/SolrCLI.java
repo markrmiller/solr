@@ -688,7 +688,7 @@ public class SolrCLI implements CLIO {
       Map<String, Object> json = (Map<String,Object>) Utils.fromJSON(resp.bytes);
       // check the response JSON from Solr to see if it is an error
       Long statusCode = asLong("/responseHeader/status", json);
-      if (statusCode == -1) {
+      if (statusCode == null || statusCode == -1) {
         throw new SolrServerException("Unable to determine outcome of GET request to: "+
             getUrl+"! Response: "+json);
       } else if (statusCode != 0) {

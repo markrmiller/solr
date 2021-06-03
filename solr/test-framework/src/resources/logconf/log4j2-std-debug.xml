@@ -27,13 +27,13 @@
         =>%ex{short}}}{10240}%n"/>
         </Console>
 
-        <File name="FILE" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
+        <RandomAccessFile name="FILE" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test.log" immediateFlush="false" append="false">
             <PatternLayout pattern="%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%maxLen{%t}{8})}{yellow,bold} [%style{%X{node_name} %X{core}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m %notEmpty{%ex}}\n"/>
-        </File>
+        </RandomAccessFile>
 
-        <File name="FILE2" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test-color.log" immediateFlush="false" append="false">
+        <RandomAccessFile name="FILE2" fileName="${sys:logs.home:-sys:user.home}/solr-test-logs/solr-test-color.log" immediateFlush="false" append="false">
             <PatternLayout pattern="%style{%-4r}{yellow} %highlight{%maxLen{%-5p}{6}} %style{(%t)}{yellow,bold} [%style{%X{core}%X{node_name}}{cyan}] %style{%c{1.}}{cyan} %highlight{%m %notEmpty{%ex}}\n"/>
-        </File>
+        </RandomAccessFile>
 
 
     </Appenders>
@@ -45,7 +45,7 @@
         <AsyncLogger name="org.apache.hadoop" level="WARN"/>
         <AsyncLogger name="org.apache.directory" level="WARN"/>
         <AsyncLogger name="org.apache.solr.hadoop" level="INFO"/>
-        <AsyncLogger name="org.eclipse.jetty" level="DEBUG"/>
+        <AsyncLogger name="org.eclipse.jetty" level="WARN"/>
 
         <AsyncLogger name="org.apache.solr.core.SolrCore" level="DEBUG"/>
         <AsyncLogger name="org.apache.solr.core.DefaultSolrCore" level="INFO"/>

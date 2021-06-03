@@ -17,6 +17,8 @@
 
 package org.apache.solr.cloud.api.collections;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
 import org.apache.solr.client.solrj.cloud.ReplicaInfo;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -197,7 +199,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
             parentShardLeader.getType());
       }
 
-      List<Map<String, Object>> replicas = new ArrayList<>((repFactor - 1) * 2);
+      List<Object2ObjectMap<String, Object>> replicas = new ArrayList<>((repFactor - 1) * 2);
 
       Map<String, Object> replicaToPosition = new HashMap<>(replicas.size());
 
@@ -257,7 +259,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
           } else {
             // delete the shards
             log.info("Sub-shard: {} already exists therefore requesting its deletion", subSlice);
-            Map<String, Object> propMap = new HashMap<>();
+            Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>(6, 0.25f);
             propMap.put(Overseer.QUEUE_OPERATION, "deleteshard");
             propMap.put(COLLECTION_PROP, collectionName);
             propMap.put(SHARD_ID_PROP, subSlice);
@@ -293,7 +295,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
 
         log.info("Creating slice {} of collection {} on {}", subSlice, collectionName, nodeName);
 
-        Map<String, Object> propMap = new HashMap<>();
+        Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>(12, 0.5f);
         propMap.put(Overseer.QUEUE_OPERATION, CREATESHARD.toLower());
         propMap.put(ZkStateReader.SHARD_ID_PROP, subSlice);
         propMap.put(ZkStateReader.COLLECTION_PROP, collectionName);
@@ -309,7 +311,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
 
         log.debug("Adding first replica {} as part of slice {} of collection {} on {}"
             , subShardName, subSlice, collectionName, nodeName);
-        propMap = new HashMap<>();
+        propMap = new Object2ObjectLinkedOpenHashMap<>();
         propMap.put(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower());
         propMap.put(ZkStateReader.CORE_NAME_PROP, subShardName);
         propMap.put(COLLECTION_PROP, collectionName);
@@ -525,7 +527,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         clusterState = resp.clusterState;
 
 
-        HashMap<String, Object> propMap = new HashMap<>();
+        Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
         propMap.put(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower());
         propMap.put(COLLECTION_PROP, collectionName);
         propMap.put(SHARD_ID_PROP, sliceName);
@@ -592,7 +594,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         t.stop();
         // switch sub shard states to 'active'
         log.info("Replication factor is 1 so switching shard states");
-        Map<String, Object> propMap = new HashMap<>();
+        Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
         propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
         propMap.put(slice.get(), Slice.State.INACTIVE.toString());
         for (String subSlice : subSlices) {
@@ -603,7 +605,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         ocmh.overseer.offerStateUpdate(Utils.toJSON(m));
       } else {
         log.info("Requesting shard state be set to 'recovery'");
-        Map<String, Object> propMap = new HashMap<>();
+        Object2ObjectMap<String, Object> propMap =  new Object2ObjectLinkedOpenHashMap<>();
         propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
         for (String subSlice : subSlices) {
           propMap.put(subSlice, Slice.State.RECOVERY.toString());
@@ -617,12 +619,12 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
 
       List<Future> replicaFutures = new ArrayList<>();
       Set<OverseerCollectionMessageHandler.Finalize> replicaRunAfters = ConcurrentHashMap.newKeySet();
-      for (Map<String, Object> replica : replicas) {
+      for (Object2ObjectMap<String, Object> replica : replicas) {
         new AddReplicaCmd(ocmh, true).call(clusterState, new ZkNodeProps(replica), results);
       }
 
       // now actually create replica cores on sub shard nodes
-      for (Map<String, Object> replica : replicas) {
+      for (Object2ObjectMap<String, Object> replica : replicas) {
         ClusterState finalClusterState = clusterState;
         Future<?> future = ocmh.overseer.getTaskExecutor().submit(() -> {
           AddReplicaCmd.Response response = null;
@@ -684,7 +686,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         public AddReplicaCmd.Response call() {
           DocCollection coll = ocmh.overseer.getZkStateReader().getClusterState().getCollection(collectionName);
           ClusterState completeCs = finalClusterState;
-          for (Map<String,Object> replica : replicas) {
+          for (Object2ObjectMap<String,Object> replica : replicas) {
              completeCs = checkAndCompleteShardSplit(completeCs, coll, replica.get("name").toString(), replica.get("shard").toString(),
                 new Replica(replica.get("name").toString(), replica, replica.get("collection").toString(), finalCollection.getId(), null));
           }
@@ -796,7 +798,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
 
     // set already created sub shards states to CONSTRUCTION - this prevents them
     // from entering into RECOVERY or ACTIVE (SOLR-9455)
-    final Map<String, Object> propMap = new HashMap<>();
+    final Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
     boolean sendUpdateState = false;
     propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
     propMap.put("id", coll.getId());
@@ -837,7 +839,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
         continue;
       }
       log.debug("- sub-shard: {} exists therefore requesting its deletion", subSlice);
-      HashMap<String, Object> props = new HashMap<>();
+      Object2ObjectMap<String, Object> props = new Object2ObjectLinkedOpenHashMap<>(6, 0.25f);
       props.put(Overseer.QUEUE_OPERATION, "deleteshard");
       props.put(COLLECTION_PROP, collectionName);
       props.put(SHARD_ID_PROP, subSlice);
@@ -1080,7 +1082,7 @@ public class SplitShardCmd implements OverseerCollectionMessageHandler.Cmd {
                 }
               }
 
-              Map<String,Object> propMap = new HashMap<>();
+              Object2ObjectMap<String,Object> propMap = new Object2ObjectLinkedOpenHashMap<>(12, 0.5f);
               propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
               propMap.put("id", collection.getId());
               if (isLeaderSame) {

@@ -33,11 +33,7 @@ import org.apache.solr.common.cloud.ZooKeeperException;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
-import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.ContentStreamBase;
-import org.apache.solr.common.util.DataInputInputStream;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.*;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.AddUpdateCommand;
@@ -97,7 +93,7 @@ public class JavabinLoader extends ContentStreamLoader {
     try (JavaBinCodec jbc = new JavaBinCodec() {
       SolrParams params;
       @Override
-      public List<Object> readIterator(InputStream fis) throws IOException {
+      public List<Object> readIterator(JavaBinInputStream fis) throws IOException {
         while (true) {
           Object o = readVal(fis);
           if (o == END_OBJ) break;
@@ -124,7 +120,7 @@ public class JavabinLoader extends ContentStreamLoader {
       }
 
     }) {
-      jbc.unmarshal(stream);
+      jbc.unmarshal(FastInputStream.wrap(stream));
     }
   }
 

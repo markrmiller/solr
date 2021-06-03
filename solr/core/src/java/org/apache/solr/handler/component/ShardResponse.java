@@ -76,12 +76,14 @@ public final class ShardResponse {
     this.shard = shard;
   }
 
-  void setException(Throwable exception)
-  {
+  void setException(Throwable exception) {
     this.exception = exception;
+    if (exception instanceof SolrException) {
+      this.rspCode = ((SolrException) exception).code();
+    }
   }
 
-  void setResponseCode(int rspCode)
+  public void setResponseCode(int rspCode)
   {
     this.rspCode = rspCode;
   }

@@ -18,7 +18,6 @@
 package org.apache.solr.search.facet;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntFunction;
 
@@ -152,7 +151,7 @@ class DebugAgg extends AggValueSource {
     }
 
     @Override
-    public void setValues(Map bucket, int slotNum) throws IOException {
+    public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
       sub.key = this.key;  // TODO: Blech... this should be fixed
       sub.setValues(bucket, slotNum);
     }

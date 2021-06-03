@@ -18,6 +18,7 @@
 package org.apache.solr.cloud.api.collections;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -736,7 +737,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
 
     String collectionPath = ZkStateReader.COLLECTIONS_ZKNODE + "/" + collection;
 
-    Map<String,Object> collectionProps = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+    Object2ObjectMap<String,Object> collectionProps = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     try {
       if (log.isDebugEnabled()) log.debug("Creating collection in ZooKeeper:{}", collection);
 

@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.ParWorkRootIOExec;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
@@ -233,18 +234,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     if (!forwardToLeader) {
       CompletableFuture<Object> distFuture = versionAdd(cmd);
       if (distFuture != null) {
-//        try {
-//          distFuture.join();
-//        } catch (CompletionException e) {
-//          Throwable de = e.getCause();
-//          if (de instanceof RuntimeException) {
-//            throw (RuntimeException) de;
-//          } else {
-//            throw new SolrException(ErrorCode.SERVER_ERROR, e);
-//          }
-//        } catch (CancellationException e) {
-//          // okay
-//        }
+
       } else {
         // drop it
         log.debug("drop docid={}", cmd.getPrintableId());
@@ -555,7 +545,7 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     CompletableFuture<Object> distFuture;
 
     AddUpdateCommand finalCloneCmd;
-    if (getNodes() != null && getNodes().size() > 0 && req.getParams().getBool("distrib", true)) {
+    if (getNodes() != null && !getNodes().isEmpty() && req.getParams().getBool("distrib", true)) {
 
 
       cloneCmd = (AddUpdateCommand) cmd.clone();
@@ -564,12 +554,13 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
 
       finalCloneCmd = Objects.requireNonNullElse(cloneCmd, cmd);
 
-      Supplier distCall = new DistAddCallable(finalCloneCmd);
+      Supplier<Object> distCall = new DistAddCallable(finalCloneCmd);
       distCall.get();
-      distFuture = CompletableFuture.completedFuture(null);
+      distFuture = CompletableFuture.supplyAsync(distCall, ParWork.getRootSharedIOExecutor());
     } else {
       distFuture = CompletableFuture.completedFuture(null);
     }
+
 
     // TODO: possibly set checkDeleteByQueries as a flag on the command?
     // if the update updates a doc that is part of a nested structure,

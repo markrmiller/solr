@@ -20,6 +20,7 @@ package org.apache.solr.handler.admin;
 
 import java.util.Map;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.api.Api;
 import org.apache.solr.api.ApiBag;
@@ -42,7 +43,7 @@ public class TestConfigsApi extends SolrTestCaseJ4 {
       @Override
       protected void sendToZk(SolrQueryResponse rsp,
                               ConfigSetOperation operation,
-                              Map<String, Object> result)
+                              Object2ObjectMap<String, Object> result)
           throws KeeperException, InterruptedException {
         result.put(QUEUE_OPERATION, operation.action.toLower());
         rsp.add(ZkNodeProps.class.getName(), new ZkNodeProps(result));

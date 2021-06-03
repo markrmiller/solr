@@ -17,11 +17,8 @@
 package org.apache.solr.search;
 
 import org.agrona.BufferUtil;
-import org.agrona.ExpandableArrayBuffer;
-import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.io.DirectBufferInputStream;
-import org.agrona.io.DirectBufferOutputStream;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
@@ -29,24 +26,17 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
+import org.apache.solr.common.util.Base64;
+import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.SolrDirectBufferOutputStream;
+import org.apache.solr.schema.FieldType;
+import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.schema.SchemaField;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.apache.solr.common.params.CursorMarkParams.*;
-
-import org.apache.solr.common.util.Base64;
-import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.schema.FieldType;
-import org.apache.solr.schema.SchemaField;
-import org.apache.zookeeper.server.ByteBufferInputStream;
-import org.eclipse.jetty.io.ByteBufferOutputStream;
-
-import java.nio.Buffer;
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.ArrayList;
-import java.io.ByteArrayOutputStream;
-import java.io.ByteArrayInputStream;
 
 /**
  * An object that encapsulates the basic information about the current Mark Point of a 
@@ -273,7 +263,7 @@ public final class CursorMark {
     // the type/name/dir from the SortFields (or a hashCode to act as a checksum) 
     // could help provide more validation beyond just the number of clauses.
     UnsafeBuffer buffer = new UnsafeBuffer(new byte[512]);
-    DirectBufferOutputStream out = new DirectBufferOutputStream(buffer);
+    SolrDirectBufferOutputStream out = new SolrDirectBufferOutputStream(buffer);
     try (JavaBinCodec jbc = new JavaBinCodec()) {
       jbc.marshal(marshalledValues, out);
 

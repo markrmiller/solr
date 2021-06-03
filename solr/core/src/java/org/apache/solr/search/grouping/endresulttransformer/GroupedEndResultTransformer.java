@@ -77,7 +77,7 @@ public class GroupedEndResultTransformer implements EndResultTransformer {
         FieldType groupFieldType = groupField.getType();
         for (GroupDocs<BytesRef> group : topGroups.groups) {
           SimpleOrderedMap<Object> groupResult = new SimpleOrderedMap<>();
-          if (group.groupValue != null && group.groupValue.length > 0) {
+          if (group.groupValue != null) {
             // use createFields so that fields having doc values are also supported
             List<IndexableField> fields = groupField.createFields(group.groupValue.utf8ToString());
             if (CollectionUtils.isNotEmpty(fields)) {

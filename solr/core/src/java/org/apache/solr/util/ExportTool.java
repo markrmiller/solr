@@ -346,7 +346,7 @@ public class ExportTool extends SolrCLI.ToolBase {
       if (info.bufferSize > 0) {
         fos = new BufferedOutputStream(fos, info.bufferSize);
       }
-      codec.set(new JavaBinCodec(new FastOutputStream(fos), null));
+      codec.set(new JavaBinCodec(new FastOutputStream(fos)));
       codec.get().writeTag(JavaBinCodec.NAMED_LST, 2);
       codec.get().writeStr("params");
       codec.get().writeNamedList(new NamedList<>());
@@ -384,7 +384,6 @@ public class ExportTool extends SolrCLI.ToolBase {
         if (doc.containsKey("_version_")) sz--;
         if (doc.containsKey("_root_")) sz--;
         codec.get().writeTag(SOLRINPUTDOC, sz);
-        codec.get().writeFloat(1f); // document boost
         doc.forEach(bic);
         super.accept(doc);
       } finally {

@@ -19,6 +19,7 @@ package org.apache.solr.api;
 
 import com.google.common.collect.ImmutableSet;
 import io.opentracing.Span;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
 import org.apache.solr.common.ParWork;
@@ -97,7 +98,7 @@ public class V2HttpCall extends SolrCall {
   private final HttpServletRequest req;
   private final HttpServletResponse response;
 
-  protected final SolrParams queryParams;
+  protected final SolrParams solrParams;
 
   protected final SolrQueryRequest solrReq;
 
@@ -121,7 +122,8 @@ public class V2HttpCall extends SolrCall {
     SolrQueryRequest solrRequest = null;
     SolrDispatchFilter.Action callAction = null;
     request.setAttribute(HttpSolrCall.class.getName(), this);
-    queryParams = new MultiMapSolrParams(request.getParameterMap());//SolrRequestParsers.getDefaultInstance().parseQueryString(request.getQueryString());
+    Map<String, String[]> copy = new Object2ObjectOpenHashMap<>(request.getParameterMap());
+    solrParams = new MultiMapSolrParams(copy);//SolrRequestParsers.getDefaultInstance().parseQueryString(request.getQueryString());
     // set a request timer which can be reused by requests if needed
     request.setAttribute(SolrRequestParsers.REQUEST_TIMER_SERVLET_ATTRIBUTE, new RTimerTree());
     // put the core container in request attribute
@@ -142,7 +144,7 @@ public class V2HttpCall extends SolrCall {
       log.info("request path={} pieces={}", reqPath, pieces);
       if (pieces.size() == 0 || (pieces.size() == 1 && reqPath.endsWith(CommonParams.INTROSPECT))) {
         api = new MyApi();
-        solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, req);
+        solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, req, solrParams);
         solrRequest.getContext().put(CoreContainer.class.getName(), cores);
         solrRequest.getContext().put(CommonParams.PATH, reqPath);
         this.solrReq = solrRequest;
@@ -165,7 +167,7 @@ public class V2HttpCall extends SolrCall {
         if (solrApi != null) {
           isCompositeApi = solrApi instanceof CompositeApi;
           if (!isCompositeApi) {
-            this.solrReq = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, req);
+            this.solrReq = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, req, solrParams);
             solrReq.getContext().put(CoreContainer.class.getName(), cores);
             solrReq.getContext().put(CommonParams.PATH, reqPath);
             this.action = ADMIN;
@@ -186,7 +188,7 @@ public class V2HttpCall extends SolrCall {
 
         origCorename = pieces.get(1);
 
-        DocCollection collection = resolveDocCollection(queryParams.get(COLLECTION_PROP, origCorename));
+        DocCollection collection = resolveDocCollection(solrParams.get(COLLECTION_PROP, origCorename));
 
         if (collection == null) {
           if ( ! reqPath.endsWith(CommonParams.INTROSPECT)) {
@@ -233,7 +235,7 @@ public class V2HttpCall extends SolrCall {
       }
       if (solrCore == null) {
         if (reqPath.endsWith(CommonParams.INTROSPECT)) {
-          this.solrReq = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, req);
+          this.solrReq = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, req, solrParams);
           solrReq.getContext().put(CoreContainer.class.getName(), cores);
           solrReq.getContext().put(CommonParams.PATH, reqPath);
           this.action = ADMIN;
@@ -258,7 +260,7 @@ public class V2HttpCall extends SolrCall {
       }
       this.solrReq = parseRequest(solrCore, reqPath);
 
-      addCollectionParamIfNeeded(cores, solrReq, queryParams, getCollectionsList());
+      addCollectionParamIfNeeded(cores, solrReq, solrParams, getCollectionsList());
 
       api = solrApi;
       this.pieces = pieces;
@@ -271,7 +273,7 @@ public class V2HttpCall extends SolrCall {
       // we are done with a valid handler
     } catch (RuntimeException rte) {
       log.error("Error in init()", rte);
-      throw rte;
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, rte);
     }
   }
 
@@ -281,7 +283,7 @@ public class V2HttpCall extends SolrCall {
 
     // With a valid handler and a valid core...
     log.debug("  reqPath={}", reqPath);
-    SolrQueryRequest solrQueryRequest = parser.parse(core, reqPath, req);
+    SolrQueryRequest solrQueryRequest = parser.parse(core, reqPath, req, solrParams);
     solrQueryRequest.getContext().put(CommonParams.PATH, reqPath);
     return solrQueryRequest;
   }
@@ -303,8 +305,8 @@ public class V2HttpCall extends SolrCall {
     return solrReq;
   }
 
-  public SolrParams getQueryParams() {
-    return queryParams;
+  public SolrParams getSolrParams() {
+    return solrParams;
   }
 
   /** The collection(s) referenced in this request. */

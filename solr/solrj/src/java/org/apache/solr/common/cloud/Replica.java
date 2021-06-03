@@ -23,6 +23,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.agrona.collections.Hashing;
 import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.solr.common.util.Utils;
@@ -193,12 +196,12 @@ public class Replica extends ZkNodeProps {
   public final String collection;
   private final String sliceName;
 
-  public Replica(String name, Map newProps, String collection, Integer collectionId, String sliceName) {
+  public Replica(String name, Object2ObjectMap<String,Object> newProps, String collection, Integer collectionId, String sliceName) {
     this(name, newProps , collection, collectionId, sliceName,null);
   }
 
 
-  public Replica(String name, Map<String,Object> propMap, String collection, Integer collectionId, String sliceName, Slice slice) {
+  public Replica(String name, Object2ObjectMap<String,Object> propMap, String collection, Integer collectionId, String sliceName, Slice slice) {
     super(propMap);
     this.collection = collection;
     this.slice = slice;
@@ -371,7 +374,7 @@ public class Replica extends ZkNodeProps {
 
 
   public Replica copyWithProps(Map props) {
-    Map newProps = new Object2ObjectHashMap(propMap.size() + props.size(), Hashing.DEFAULT_LOAD_FACTOR);
+    Object2ObjectLinkedOpenHashMap newProps = new Object2ObjectLinkedOpenHashMap(propMap.size() + props.size(), 0.5f);
     newProps.putAll(propMap);
     newProps.putAll(props);
     Replica r = new Replica(name, newProps, collection, collectionId, sliceName, slice);
@@ -379,7 +382,7 @@ public class Replica extends ZkNodeProps {
   }
 
   public Replica copyWithProps(Slice slice, Map props) {
-    Map newProps = new HashMap(propMap);
+    Object2ObjectLinkedOpenHashMap newProps = new Object2ObjectLinkedOpenHashMap(propMap, 0.5f);
     newProps.putAll(props);
     Replica r = new Replica(name, newProps, collection, collectionId, sliceName, slice);
     return r;

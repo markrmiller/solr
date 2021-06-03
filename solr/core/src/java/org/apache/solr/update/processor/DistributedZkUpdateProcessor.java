@@ -329,7 +329,7 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
             cmd.isIndexChanged = isIndexChanged;
             cmdDistrib.distribAdd(cmd, nodesByRoutingRules, params, true);
           } catch (IOException e) {
-            log.error("", e);
+            log.error("IOException doing dist add by routing rules", e);
             throw new SolrException(ErrorCode.SERVER_ERROR, e);
           }
           return;

@@ -20,8 +20,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.apache.lucene.search.Query;
+import org.apache.solr.common.util.SimpleOrderedMap;
 
 public class FacetQuery extends FacetRequest {
   // query string or query?
@@ -40,8 +41,10 @@ public class FacetQuery extends FacetRequest {
   
   @Override
   public Map<String, Object> getFacetDescription() {
-    Map<String, Object> descr = new HashMap<String, Object>();
-    descr.put("query", q);
+    Map<String, Object> descr = new Object2ObjectHashMap<>();
+    if (q != null) {
+      descr.put("query", q);
+    }
     return descr;
   }
 }
@@ -61,7 +64,7 @@ class FacetQueryProcessor extends FacetProcessor<FacetQuery> {
     if (fcontext.facetInfo != null) {
       // FIXME - what needs to be done here?
     }
-    response = new Object2ObjectLinkedOpenHashMap(32, .5f);
+    response = new SimpleOrderedMap<>();
     fillBucket(response, freq.q, null, (fcontext.flags & FacetContext.SKIP_FACET)!=0, fcontext.facetInfo);
   }
 

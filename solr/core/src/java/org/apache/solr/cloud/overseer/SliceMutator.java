@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.cloud.Overseer;
@@ -113,7 +115,7 @@ public class SliceMutator {
       if (replica != null) {
         Map<String, Replica> newReplicas = slice.getReplicasCopy();
         newReplicas.remove(coreName);
-        Map<String,Object> props = replica.shallowCopy();
+        Object2ObjectMap<String,Object> props = replica.shallowCopy();
         props.put("remove", true);
         Replica removeReplica = new Replica(coreName, props, collection, coll.getId(), slice.getName(), slice);
         newReplicas.put(coreName, removeReplica);
@@ -241,7 +243,7 @@ public class SliceMutator {
       routingRules = new HashMap<>();
     RoutingRule r = routingRules.get(routeKey);
     if (r == null) {
-      Map<String, Object> map = new HashMap<>();
+      Object2ObjectMap<String, Object> map = new Object2ObjectLinkedOpenHashMap<>();
       map.put("routeRanges", range);
       map.put("targetCollection", targetCollection);
       map.put("expireAt", expireAt);
@@ -249,7 +251,7 @@ public class SliceMutator {
       routingRules.put(routeKey, rule);
     } else {
       // add this range
-      Map<String, Object> map = r.shallowCopy();
+      Object2ObjectMap<String, Object> map = r.shallowCopy();
       map.put("routeRanges", map.get("routeRanges") + "," + range);
       map.put("expireAt", expireAt);
       routingRules.put(routeKey, new RoutingRule(routeKey, map));

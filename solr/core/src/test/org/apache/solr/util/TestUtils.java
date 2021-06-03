@@ -198,7 +198,7 @@ public class TestUtils extends SolrTestCaseJ4 {
     ContentStream stream = new ContentStreamBase.ByteArrayStream(outStream.buffer().byteArray(), null, "application/javabin");
     List<CommandOperation> commands = CommandOperation.readCommands(Collections.singletonList(stream), new NamedList(), Collections.singleton("single"));
 
-    assertEquals(5, commands.size());
+    assertEquals(commands.toString(), 5, commands.size());
   }
 
   private void assertNoggitJsonValues(Map m) {

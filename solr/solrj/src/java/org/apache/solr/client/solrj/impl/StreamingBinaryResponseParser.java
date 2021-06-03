@@ -25,14 +25,10 @@ import org.apache.solr.client.solrj.StreamingResponseCallback;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.util.DataEntry;
+import org.apache.solr.common.util.*;
 import org.apache.solr.common.util.DataEntry.EntryListener;
-import org.apache.solr.common.util.DataInputInputStream;
-import org.apache.solr.common.util.FastJavaBinDecoder;
 import org.apache.solr.common.util.FastJavaBinDecoder.EntryImpl;
 import org.apache.solr.common.util.FastJavaBinDecoder.Tag;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.NamedList;
 
 /**
  * A BinaryResponseParser that sends callback events rather then build
@@ -59,7 +55,7 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
   @Override
   public NamedList<Object> processResponse(InputStream body, String encoding) {
     if (callback != null) {
-      return streamDocs(body);
+      return streamDocs(FastInputStream.wrap(body));
     } else {
       try {
         return fastStreamDocs(body, fastCallback);
@@ -120,13 +116,13 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
   private EntryListener docListener;
 
 
-  private NamedList<Object> streamDocs(InputStream body) {
+  private NamedList<Object> streamDocs(JavaBinInputStream body) {
     try (JavaBinCodec codec = new JavaBinCodec() {
 
       private int nestedLevel;
 
       @Override
-      public SolrDocument readSolrDocument(InputStream dis) throws IOException {
+      public SolrDocument readSolrDocument(JavaBinInputStream dis) throws IOException {
         nestedLevel++;
         SolrDocument doc = super.readSolrDocument(dis);
         nestedLevel--;
@@ -141,7 +137,7 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
       }
 
       @Override
-      public SolrDocumentList readSolrDocumentList(InputStream dis) throws IOException {
+      public SolrDocumentList readSolrDocumentList(JavaBinInputStream dis) throws IOException {
         SolrDocumentList solrDocs = new SolrDocumentList();
         List list = (List) readVal(dis);
         solrDocs.setNumFound((Long) list.get(0));

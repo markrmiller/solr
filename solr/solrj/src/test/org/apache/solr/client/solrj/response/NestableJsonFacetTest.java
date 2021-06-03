@@ -31,8 +31,8 @@ public class NestableJsonFacetTest extends SolrTestCaseJ4 {
 
   @Test
   public void testParsing() {
-    Map list = new Object2ObjectHashMap<>();
-    list.put("count", 12);
+    NamedList<Object> list = new NamedList<>();
+    list.add("count", 12);
     NamedList<Object> buckets = new NamedList<Object>() {{
       add("val", "Nike");
     }};
@@ -52,14 +52,14 @@ public class NestableJsonFacetTest extends SolrTestCaseJ4 {
       }});
     }};
     vals.add("buckets", Collections.singletonList(buckets));
-    list.put("test", vals);
+    list.add("test", vals);
     NestableJsonFacet facet = new NestableJsonFacet(list);
 
     assertEquals(12L, facet.getCount());
     assertEquals(9L, facet.getBucketBasedFacets("test").getBetween());
     list.clear();
 
-    list.put("count", 12L);
+    list.add("count", 12L);
     buckets = new NamedList<Object>() {{
       add("val", "Nike");
     }};
@@ -79,7 +79,7 @@ public class NestableJsonFacetTest extends SolrTestCaseJ4 {
       }});
     }};
     vals.add("buckets", Collections.singletonList(buckets));
-    list.put("test", vals);
+    list.add("test", vals);
     facet = new NestableJsonFacet(list);
     assertEquals(12L, facet.getCount());
     assertEquals(2L, facet.getBucketBasedFacets("test").getAfter());

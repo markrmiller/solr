@@ -16,6 +16,8 @@
  */
 package org.apache.solr.common.util;
 
+import com.google.common.primitives.Longs;
+
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.FilterOutputStream;
@@ -26,13 +28,12 @@ import java.io.UnsupportedEncodingException;
 /** Single threaded buffered OutputStream
  *  Internal Solr use only, subject to change.
  */
-public class FastOutputStream extends FilterOutputStream implements DataOutput {
+public class FastOutputStream extends JavaBinOutputStream implements DataOutput {
   protected final SolrDataOutputStream dout;
   //protected final ExpandableDirectBufferOutputStream byteArrayOut;
 
   public FastOutputStream(OutputStream out) {
-    super(new SolrDataOutputStream(out));
-    this.dout = (SolrDataOutputStream) this.out;
+    this.dout = new SolrDataOutputStream(out);
    // byteArrayOut = null;
   }
 
@@ -49,7 +50,7 @@ public class FastOutputStream extends FilterOutputStream implements DataOutput {
 
   @Override
   public void write(int b) throws IOException {
-    dout.write((byte)b);
+    dout.writeByte(b);
   }
 
   @Override
@@ -70,7 +71,7 @@ public class FastOutputStream extends FilterOutputStream implements DataOutput {
   }
 
   @Override public void writeShort(int v) throws IOException {
-    dout.writeShort(v);
+    writeShort((short) v);
   }
 
   @Override public void writeChar(int v) throws IOException {
@@ -78,19 +79,29 @@ public class FastOutputStream extends FilterOutputStream implements DataOutput {
   }
 
   @Override public void writeInt(int v) throws IOException {
-    dout.writeInt(v);
+    dout.write(0xFF & v);
+    dout.write(0xFF & (v >> 8));
+    dout.write(0xFF & (v >> 16));
+    dout.write(0xFF & (v >> 24));
   }
 
   @Override public void writeLong(long v) throws IOException {
-    dout.writeLong(v);
+    byte[] bytes = Longs.toByteArray(Long.reverseBytes(v));
+    write(bytes, 0, bytes.length);
   }
 
   @Override public void writeFloat(float v) throws IOException {
-    dout.writeFloat(v);
+    writeInt(Float.floatToIntBits(v));
+  }
+
+  @Override
+  public void writeShort(short v) throws IOException {
+    dout.write(0xFF & v);
+    dout.write(0xFF & (v >> 8));
   }
 
   @Override public void writeDouble(double v) throws IOException {
-    dout.writeDouble(v);
+    writeLong(Double.doubleToLongBits(v));
   }
 
   @Override public void writeBytes(String s) throws IOException {
@@ -125,7 +136,6 @@ public class FastOutputStream extends FilterOutputStream implements DataOutput {
 
   @Override
   public void close() throws IOException {
-    dout.flush();
     super.close();
     dout.close();
   }

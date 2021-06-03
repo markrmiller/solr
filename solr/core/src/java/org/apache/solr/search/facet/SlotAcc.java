@@ -19,9 +19,13 @@ package org.apache.solr.search.facet;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.IntFunction;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.function.FunctionValues;
 import org.apache.lucene.queries.function.ValueSource;
@@ -124,11 +128,11 @@ public abstract class SlotAcc implements Closeable {
 
   public abstract Object getValue(int slotNum) throws IOException;
 
-  public void setValues(Map bucket, int slotNum) throws IOException {
+  public void setValues(SimpleOrderedMap<Object> bucket, int slotNum) throws IOException {
     if (key == null) return;
     Object val = getValue(slotNum);
     if (val != null) {
-      bucket.put(key, val);
+      bucket.add(key, val);
     }
   }
 
@@ -534,7 +538,7 @@ public abstract class SlotAcc implements Closeable {
 
     @Override public Object getValue(int slot) {
       if (fcontext.isShard()) {
-        ArrayList<Object> lst = new ArrayList<>(3);
+        ObjectArrayList<Object> lst = new ObjectArrayList<>(3);
         lst.add(counts[slot]);
         lst.add(result[slot]);
         lst.add(sum[slot]);
@@ -647,5 +651,4 @@ public abstract class SlotAcc implements Closeable {
       throw new UnsupportedOperationException();
     }
   }
-
 }

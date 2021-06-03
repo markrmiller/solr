@@ -16,7 +16,6 @@
  */
 package org.apache.solr.servlet;
 
-import javax.servlet.MultipartConfigElement;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.Part;
 import java.io.ByteArrayOutputStream;
@@ -26,27 +25,11 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.*;
 import java.security.Principal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import org.agrona.MutableDirectBuffer;
-import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.solr.api.V2HttpCall;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -56,9 +39,6 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
-import org.apache.solr.common.util.ExpandableBuffers;
-import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
-import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.core.RequestHandlers;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
@@ -67,8 +47,6 @@ import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.util.RTimerTree;
 import org.apache.solr.util.tracing.GlobalTracer;
 import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.server.MultiPartFormInputStream;
-import org.eclipse.jetty.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,11 +93,11 @@ public class SolrRequestParsers {
 
   public static final String INPUT_ENCODING_KEY = "ie";
   private final static byte[] INPUT_ENCODING_BYTES = INPUT_ENCODING_KEY.getBytes(CHARSET_US_ASCII);
-  private final ByteBuffer INPUT_ENCODING_BUFFER =  ByteBuffer.wrap(INPUT_ENCODING_BYTES);
+ // private final ByteBuffer INPUT_ENCODING_BUFFER =  ByteBuffer.wrap(INPUT_ENCODING_BYTES);
 
   public final static String REQUEST_TIMER_SERVLET_ATTRIBUTE = "org.apache.solr.RequestTimer";
 
-  private final HashMap<String,SolrRequestParser> parsers = new HashMap<>();
+  //private final HashMap<String,SolrRequestParser> parsers = new HashMap<>();
   private final boolean enableRemoteStreams;
   private final boolean enableStreamBody;
  // private StandardRequestParser standard;
@@ -187,7 +165,7 @@ public class SolrRequestParsers {
     return new RTimerTree();
   }
 
-  public SolrQueryRequest parse(SolrCore core, String path, HttpServletRequest req) throws Exception {
+  public SolrQueryRequest parse(SolrCore core, String path, HttpServletRequest req, SolrParams solrParams) throws Exception {
  //   SolrRequestParser parser = standard;
 
     // TODO -- in the future, we could pick a different parser based on the request
@@ -199,12 +177,20 @@ public class SolrRequestParsers {
  //     GlobalTracer.get().getTracer().activeSpan().setTag("params", params.toString());
     }
 
-    HttpRequestContentStream servletStream = new HttpRequestContentStream(req);
+    String contentType = req.getContentType();
+    if (MimeTypes.Type.MULTIPART_FORM_DATA.is(contentType)) {
+      Collection<Part> parts = req.getParts();
+
+
+      log.info("parts={} {}", parts.size(), parts);
+    }
+
+    var servletStream = new HttpRequestContentStream(req, contentType);
     streams.add(servletStream);
-    SolrQueryRequest sreq = buildRequestFrom(core, new MultiMapSolrParams(req.getParameterMap()), streams, getRequestTimer(req), req);
+    SolrQueryRequest sreq = buildRequestFrom(core, solrParams, streams, getRequestTimer(req), req);
 
     String wt = sreq.getParams().get("wt");
-    if (wt.equals("javabin")) {
+    if (wt != null && wt.equals("javabin")) {
       servletStream.setContentType("application/javabin");
     }
 
@@ -280,7 +266,7 @@ public class SolrRequestParsers {
 //      q.setContentStreams(streams);
 //    }
 
-    SolrQueryRequestBase q = new MySolrQueryRequestBase(core, params);
+    SolrQueryRequestBase q = new MySolrQueryRequestBase(req, httpSolrCall, core, params);
     q.setContentStreams(streams);
 
     return q;
@@ -293,11 +279,11 @@ public class SolrRequestParsers {
   /**
    * Given a url-encoded query string (UTF-8), map it into solr params
    */
-//  public static MultiMapSolrParams parseQueryString(String queryString) {
-//    Map<String,String[]> map = new Object2ObjectArrayMap<>(8);
-//    parseQueryString(queryString, map);
-//    return new MultiMapSolrParams(map);
-//  }
+  public static MultiMapSolrParams parseQueryString(String queryString) {
+    Map<String,String[]> map = new Object2ObjectArrayMap<>(8);
+    parseQueryString(queryString, map);
+    return new MultiMapSolrParams(map);
+  }
 
   public static boolean isFormData(HttpServletRequest req) {
     String contentType = req.getContentType();
@@ -319,18 +305,18 @@ public class SolrRequestParsers {
    * @param queryString as given from URL
    * @param map         place all parameters in this map
    */
-//  static void parseQueryString(final String queryString, final Map<String,String[]> map) {
-//    if (queryString != null && queryString.length() > 0) {
-//      try {
-//        final int len = queryString.length();
-//        // this input stream emulates to get the raw bytes from the URL as passed to servlet container, it disallows any byte > 127 and enforces to %-escape them:
-//        final InputStream in = new MyInputStream(len, queryString);
-//        parseFormDataContent(in, Long.MAX_VALUE, StandardCharsets.UTF_8, map, true);
-//      } catch (IOException ioe) {
-//        throw new SolrException(ErrorCode.BAD_REQUEST, ioe);
-//      }
-//    }
-  //}
+  static void parseQueryString(final String queryString, final Map<String,String[]> map) {
+    if (queryString != null && queryString.length() > 0) {
+      try {
+        final int len = queryString.length();
+        // this input stream emulates to get the raw bytes from the URL as passed to servlet container, it disallows any byte > 127 and enforces to %-escape them:
+        final InputStream in = new MyInputStream(len, queryString);
+        parseFormDataContent(in, Long.MAX_VALUE, StandardCharsets.UTF_8, map, true);
+      } catch (IOException ioe) {
+        throw new SolrException(ErrorCode.BAD_REQUEST, ioe);
+      }
+    }
+  }
 
   /**
    * Given a url-encoded form from POST content (as InputStream), map it into the given map.
@@ -586,8 +572,35 @@ public class SolrRequestParsers {
   }
 
   private static class MySolrQueryRequestBase extends SolrQueryRequestBase {
-    public MySolrQueryRequestBase(SolrCore core, SolrParams params) {
+    private final HttpServletRequest req;
+    private final SolrCall solrCall;
+
+    public MySolrQueryRequestBase(HttpServletRequest req, SolrCall httpSolrCall, SolrCore core, SolrParams params) {
       super(core, params);
+      this.req = req;
+      this.solrCall = httpSolrCall;
+    }
+
+    @Override public Principal getUserPrincipal() {
+      return req == null ? null : req.getUserPrincipal();
+    }
+
+    @Override public List<CommandOperation> getCommands(boolean validateInput) {
+      if (solrCall != null) {
+        return solrCall.getCommands(solrCall.getSolrReq(), validateInput);
+      }
+      return super.getCommands(validateInput);
+    }
+
+    @Override public Map<String,String> getPathTemplateValues() {
+      if (solrCall instanceof V2HttpCall) {
+        return ((V2HttpCall) solrCall).getUrlParts();
+      }
+      return super.getPathTemplateValues();
+    }
+
+    @Override public SolrCall getHttpSolrCall() {
+      return solrCall;
     }
   }
 
@@ -596,18 +609,18 @@ public class SolrRequestParsers {
    */
   static class RawRequestParser implements SolrRequestParser {
     @Override public SolrParams parseParamsAndFillStreams(final HttpServletRequest req, ArrayList<ContentStream> streams) {
-      streams.add(new SolrRequestParsers.HttpRequestContentStream(req));
-      return  new MultiMapSolrParams(req.getParameterMap());
+      streams.add(new SolrRequestParsers.HttpRequestContentStream(req, null));
+      return new MultiMapSolrParams(req.getParameterMap());
     }
   }
 
   static class HttpRequestContentStream extends ContentStreamBase {
     private final HttpServletRequest req;
 
-    public HttpRequestContentStream(HttpServletRequest req) {
+    public HttpRequestContentStream(HttpServletRequest req, String contentType) {
       this.req = req;
 
-      //String ct = req.getContentType();
+      this.contentType = contentType;
 
 
       // name = ???
@@ -624,30 +637,30 @@ public class SolrRequestParsers {
     }
   }
   //
-//  private static class MyInputStream extends InputStream {
-//    private final int len;
-//    private final String queryString;
-//    int pos;
-//
-//    public MyInputStream(int len, String queryString) {
-//      this.len = len;
-//      this.queryString = queryString;
-//      pos = 0;
-//    }
-//
-//    @Override public int read() {
-//      if (pos < len) {
-//        final char ch = queryString.charAt(pos);
-//        if (ch > 127) {
-//          throw new SolrException(ErrorCode.BAD_REQUEST, "URLDecoder: The query string contains a not-%-escaped byte > 127 at position " + pos);
-//        }
-//        pos++;
-//        return ch;
-//      } else {
-//        return -1;
-//      }
-//    }
-//  }
+  private static class MyInputStream extends InputStream {
+    private final int len;
+    private final String queryString;
+    int pos;
+
+    public MyInputStream(int len, String queryString) {
+      this.len = len;
+      this.queryString = queryString;
+      pos = 0;
+    }
+
+    @Override public int read() {
+      if (pos < len) {
+        final char ch = queryString.charAt(pos);
+        if (ch > 127) {
+          throw new SolrException(ErrorCode.BAD_REQUEST, "URLDecoder: The query string contains a not-%-escaped byte > 127 at position " + pos);
+        }
+        pos++;
+        return ch;
+      } else {
+        return -1;
+      }
+    }
+  }
 
   //-----------------------------------------------------------------
   //-----------------------------------------------------------------

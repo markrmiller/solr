@@ -405,7 +405,7 @@ public class SchemaRequest extends AbstractSchemaRequest<SchemaResponse> {
 
     private static NamedList<Object> createRequestParameters(Map<String, Object> fieldAttributes) {
       final NamedList<Object> replaceFieldParameters = createAddFieldNamedList(fieldAttributes);
-      final NamedList<Object> requestParameters = new NamedList<>();
+      final NamedList<Object> requestParameters = new NamedList<>(1);
       requestParameters.add("replace-field", replaceFieldParameters);
       return requestParameters;
     }
@@ -770,7 +770,7 @@ public class SchemaRequest extends AbstractSchemaRequest<SchemaResponse> {
 
     @Override
     protected NamedList<Object> getRequestParameters() {
-      NamedList<Object> multipleRequestsParameters = new NamedList<>();
+      NamedList<Object> multipleRequestsParameters = new NamedList<>(updateSchemaRequests.size());
       for (Update updateSchemaRequest : updateSchemaRequests) {
         multipleRequestsParameters.addAll(updateSchemaRequest.getRequestParameters());
       }

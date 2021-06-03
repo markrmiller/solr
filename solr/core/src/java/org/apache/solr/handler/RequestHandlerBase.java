@@ -214,9 +214,9 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
       //  @SuppressWarnings("resource")
     //  Timer.Context dTimer = distrib ? distribRequestTimes.time() : localRequestTimes.time();
       try {
-        if (pluginInfo != null && pluginInfo.attributes.containsKey(USEPARAM)) req.getContext().put(USEPARAM, pluginInfo.attributes.get(USEPARAM));
-        SolrPluginUtils.setDefaults(this, req, defaults, appends, invariants);
-        req.getContext().remove(USEPARAM);
+        String useParams = null;
+        if (pluginInfo != null ) useParams = pluginInfo.attributes.get(USEPARAM);
+        SolrPluginUtils.setDefaults(this, req, defaults, appends, invariants, useParams);
         rsp.setHttpCaching(httpCaching);
 
         Runnable finish = () -> {

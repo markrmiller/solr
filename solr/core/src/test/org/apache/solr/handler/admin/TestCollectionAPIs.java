@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseUtil;
 import org.apache.solr.api.Api;
@@ -281,15 +283,15 @@ public class TestCollectionAPIs extends SolrTestCaseJ4 {
                       CoreContainer cores,
                       CollectionParams.CollectionAction action,
                       CollectionOperation op) throws Exception {
-      Map<String, Object> result = null;
+      Object2ObjectMap<String, Object> result = null;
       if (action == CollectionParams.CollectionAction.COLLECTIONPROP) {
         //Fake this action, since we don't want to write to ZooKeeper in this test
-        result = new HashMap<>();
+        result = new Object2ObjectLinkedOpenHashMap<>();
         result.put(NAME, req.getParams().required().get(NAME));
         result.put(PROPERTY_NAME, req.getParams().required().get(PROPERTY_NAME));
         result.put(PROPERTY_VALUE, req.getParams().required().get(PROPERTY_VALUE));
       } else {
-        result = op.execute(req, rsp, this);
+        result = new Object2ObjectLinkedOpenHashMap<>(op.execute(req, rsp, this));
       }
       if (result != null) {
         result.put(QUEUE_OPERATION, op.action.toLower());

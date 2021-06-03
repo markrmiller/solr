@@ -201,7 +201,7 @@ public class AddUpdateCommand extends UpdateCommand {
           if (overwrite) {
             throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
                 "Document is missing mandatory uniqueKey field: "
-                    + sf.getName());
+                    + sf.getName() + " doc=" + solrDoc);
           }
         } else if (count > 1) {
           throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,

@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.cloud.LeaderElector;
 import org.apache.solr.cloud.OverseerTaskProcessor;
@@ -398,7 +400,7 @@ class RebalanceLeaders {
   private void rejoinElectionQueue(Slice slice, String electionNode, String core, boolean rejoinAtHead)
       throws KeeperException, InterruptedException {
     Replica replica = slice.getReplica(LeaderElector.getNodeName(electionNode));
-    Map<String, Object> propMap = new HashMap<>();
+    Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
     propMap.put(COLLECTION_PROP, collectionName);
     propMap.put(SHARD_ID_PROP, slice.getName());
     propMap.put(QUEUE_OPERATION, REBALANCELEADERS.toLower());

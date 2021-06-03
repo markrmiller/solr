@@ -806,7 +806,7 @@ public class SolrMetricManager {
     if (name.startsWith(REGISTRY_NAME_PREFIX)) {
       return name;
     } else {
-      return new StringBuilder(REGISTRY_NAME_PREFIX).append(name).toString();
+      return REGISTRY_NAME_PREFIX + name;
     }
   }
 

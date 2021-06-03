@@ -59,7 +59,7 @@ public class UninvertingReader extends FilterLeafReader {
   /**
    * Specifies the type of uninversion to apply for the field. 
    */
-  public static enum Type {
+  public enum Type {
     /** 
      * Single-valued Integer, (e.g. indexed with {@link org.apache.lucene.document.IntPoint})
      * <p>

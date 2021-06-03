@@ -157,7 +157,7 @@ public class JavaBinUpdateRequestCodec {
     List<String> delByQ;
     final NamedList[] namedList = new NamedList[1];
     try (JavaBinCodec codec = new StreamingCodec(namedList, updateRequest, handler, seenOuterMostDocIterator, readStringAsCharSeq)) {
-      codec.unmarshal(is);
+      codec.unmarshal(FastInputStream.wrap(is));
     }
 
     // NOTE: if the update request contains only delete commands the params
@@ -259,7 +259,7 @@ public class JavaBinUpdateRequestCodec {
     }
 
     @Override
-    public NamedList readNamedList(InputStream dis) throws IOException {
+    public NamedList readNamedList(JavaBinInputStream dis) throws IOException {
       int sz = readSize(dis);
       NamedList nl = new NamedList();
       if (namedList[0] == null) {
@@ -305,7 +305,7 @@ public class JavaBinUpdateRequestCodec {
     }
 
     @Override
-    public List readIterator(InputStream fis) throws IOException {
+    public List readIterator(JavaBinInputStream fis) throws IOException {
       // default behavior for reading any regular Iterator in the stream
       if (seenOuterMostDocIterator.get()) return super.readIterator(fis);
 
@@ -316,7 +316,7 @@ public class JavaBinUpdateRequestCodec {
     }
 
 
-    private List readOuterMostDocIterator(InputStream fis) throws IOException {
+    private List readOuterMostDocIterator(JavaBinInputStream fis) throws IOException {
       if(namedList[0] == null) namedList[0] = new NamedList();
       NamedList params = (NamedList) namedList[0].get("params");
       if (params == null) params = new NamedList();

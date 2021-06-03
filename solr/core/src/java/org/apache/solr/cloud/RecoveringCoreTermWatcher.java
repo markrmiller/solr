@@ -64,7 +64,7 @@ public class RecoveringCoreTermWatcher extends ZkShardTerms.CoreTermWatcher impl
         leaderElector.retryElection(false);
       }
       try (SolrCore solrCore = coreContainer.getCore(coreDescriptor.getName())) {
-        solrCore.getUpdateHandler().getSolrCoreState().doRecovery(solrCore.getCoreContainer(), solrCore.getCoreDescriptor(), "CoreTerm");
+        solrCore.getUpdateHandler().getSolrCoreState().doRecovery(solrCore.getCoreContainer(), solrCore.getCoreDescriptor(), "CoreTerm", null);
       }
       terms.setTermEqualsToLeader(coreName);
 

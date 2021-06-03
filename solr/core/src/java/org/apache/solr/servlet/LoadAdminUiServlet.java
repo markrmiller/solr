@@ -49,7 +49,7 @@ public final class LoadAdminUiServlet extends BaseSolrServlet {
       return;
     }
     HttpServletRequest request = _request;
-    HttpServletResponse response = SolrDispatchFilter.closeShield(_response);
+    HttpServletResponse response = _response;
 
 
     response.addHeader("X-Frame-Options", "DENY"); // security: SOLR-7966 - avoid clickjacking for admin interface

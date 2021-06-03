@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud.overseer;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
@@ -61,7 +62,7 @@ public class NodeMutator {
           }
           if (rNodeName.equals(nodeName)) {
             log.debug("Update replica state for {} to {}", replica, Replica.State.RECOVERING);
-            Map<String, Object> props = replica.shallowCopy();
+            Object2ObjectMap<String, Object> props = replica.shallowCopy();
             props.put(ZkStateReader.STATE_PROP, Replica.State.RECOVERING.toString());
             Replica newReplica = new Replica(replica.getName(), props, collection, replica.getCollectionId(), slice.getCollection(), slice);
             newReplicas.put(replica.getName(), newReplica);

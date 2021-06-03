@@ -25,7 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.apache.solr.common.util.SimpleOrderedMap;
 
 
 // TODO: refactor more out to base class
@@ -51,17 +52,17 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
     if (numReturnedPerShard == null) {
       numReturnedPerShard = new int[mcontext.numShards];
     }
-    merge((Map)facetResult, mcontext);
+    merge((SimpleOrderedMap)facetResult, mcontext);
   }
 
-  protected void merge(@SuppressWarnings("rawtypes") Map facetResult, Context mcontext) {
+  protected void merge(@SuppressWarnings("rawtypes") SimpleOrderedMap facetResult, Context mcontext) {
     if (freq.missing) {
       Object o = facetResult.get("missing");
       if (o != null) {
         if (missingBucket == null) {
           missingBucket = newBucket(null, mcontext);
         }
-        missingBucket.mergeBucket((Map)o , mcontext);
+        missingBucket.mergeBucket((SimpleOrderedMap)o , mcontext);
       }
     }
 
@@ -71,13 +72,13 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
         if (allBuckets == null) {
           allBuckets = newBucket(null, mcontext);
         }
-        allBuckets.mergeBucket((Map)o , mcontext);
+        allBuckets.mergeBucket((SimpleOrderedMap)o , mcontext);
       }
     }
 
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    List<Map> bucketList = (List<Map>) facetResult.get("buckets");
+    List<SimpleOrderedMap> bucketList = (List<SimpleOrderedMap>) facetResult.get("buckets");
     numReturnedPerShard[mcontext.shardNum] = bucketList.size();
     numReturnedBuckets += bucketList.size();
     mergeBucketList(bucketList , mcontext);
@@ -100,10 +101,10 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
   @Override
   @SuppressWarnings({"unchecked", "rawtypes"})
   public Object getMergedResult() {
-    Map result = new Object2ObjectLinkedOpenHashMap(32, .5f);
+    var result = new SimpleOrderedMap(4);
 
     if (numBuckets != null) {
-      result.put("numBuckets", ((Number)numBuckets.getMergedResult()).longValue());
+      result.add("numBuckets", ((Number)numBuckets.getMergedResult()).longValue());
     }
 
     sortBuckets(freq.sort);
@@ -112,7 +113,7 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
     long end = freq.limit >=0 ? first + (int) freq.limit : Integer.MAX_VALUE;
     long last = Math.min(sortedBuckets.size(), end);
 
-    List<Map> resultBuckets = new ArrayList<>(Math.max(0, (int)(last - first)));
+    List<SimpleOrderedMap> resultBuckets = new ObjectArrayList<>(Math.max(0, (int)(last - first)));
 
     /** this only works if there are no filters (like mincount)
     for (int i=first; i<last; i++) {
@@ -125,13 +126,13 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
 
     boolean refine = freq.refine != null && freq.refine != FacetRequest.RefineMethod.NONE;
 
-    int off = (int)freq.offset;
-    int lim = freq.limit >= 0 ? (int)freq.limit : Integer.MAX_VALUE;
+    int off = (int) freq.offset;
+    int lim = freq.limit >= 0 ? (int) freq.limit : Integer.MAX_VALUE;
     for (FacetBucket bucket : sortedBuckets) {
       if (bucket.getCount() < freq.mincount) {
         continue;
       }
-      if (refine && !isBucketComplete(bucket,mcontext)) {
+      if (refine && !isBucketComplete(bucket, mcontext)) {
         continue;
       }
 
@@ -144,16 +145,16 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
         break;
       }
 
-      resultBuckets.add( bucket.getMergedBucket() );
+      resultBuckets.add(bucket.getMergedBucket());
     }
 
 
-    result.put("buckets", resultBuckets);
+    result.add("buckets", resultBuckets);
     if (missingBucket != null) {
-      result.put("missing", missingBucket.getMergedBucket());
+      result.add("missing", missingBucket.getMergedBucket());
     }
     if (allBuckets != null) {
-      result.put("allBuckets", allBuckets.getMergedBucket());
+      result.add("allBuckets", allBuckets.getMergedBucket());
     }
 
     return result;
@@ -206,7 +207,7 @@ public class FacetFieldMerger extends FacetRequestSortedMerger<FacetField> {
     @Override
     @SuppressWarnings({"rawtypes"})
     public void merge(Object facetResult, Context mcontext) {
-      Map map = (Map)facetResult;
+      SimpleOrderedMap map = (SimpleOrderedMap)facetResult;
       long numBuckets = ((Number)map.get("numBuckets")).longValue();
       sumBuckets += numBuckets;
 

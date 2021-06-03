@@ -253,7 +253,7 @@ public class EmbeddedSolrServer extends SolrClient {
           createJavaBinCodec(callback, resolver).setWritableDocFields(resolver).marshal(rsp.getValues(), os);
 
           try (InputStream in = new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, os.position() + expandableBuffer1.wrapAdjustment())) {
-            return (NamedList<Object>) new JavaBinCodec(resolver).unmarshal(in);
+            return (NamedList<Object>) new JavaBinCodec(resolver).unmarshal(FastInputStream.wrap(in));
           }
 
         } catch (Throwable ex) {

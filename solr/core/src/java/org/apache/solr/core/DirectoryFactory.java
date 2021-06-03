@@ -36,6 +36,7 @@ import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.Utils;
 import org.apache.solr.core.CachingDirectoryFactory.CloseListener;
+import org.apache.solr.filestore.UnsafeMMapDirectory;
 import org.apache.solr.util.plugin.NamedListInitializedPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -333,8 +334,9 @@ gget   * @throws IOException If there is a low-level I/O error.
       dirFactory.initCoreContainer(cc);
       dirFactory.init(info.initArgs);
     } else {
-      //dirFactory = new StandardDirectoryFactory();
-      dirFactory = new NRTCachingDirectoryFactory();
+      dirFactory = new StandardDirectoryFactory();
+      //dirFactory = new NRTCachingDirectoryFactory();
+      //dirFactory = new MMapDirectoryFactory();
       dirFactory.initCoreContainer(cc);
     }
     return dirFactory;

@@ -31,6 +31,7 @@ import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestInfo;
@@ -45,7 +46,7 @@ import org.apache.solr.search.facet.SlotAcc.SlotContext;
 
 /** Base abstraction for a class that computes facets. This is fairly internal to the module. */
 public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
-  Map response;
+  SimpleOrderedMap<Object> response;
   FacetContext fcontext;
   FacetRequestT freq;
 
@@ -60,7 +61,7 @@ public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
     fcontext.processor = this;
   }
 
-  public Map getResponse() {
+  public org.apache.solr.common.MapWriter getResponse() {
     return response;
   }
 
@@ -291,9 +292,9 @@ public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
     return appliedFilters;
   }
 
-  protected void processStats(Map bucket, Query bucketQ, DocSet docs, long docCount) throws IOException {
+  protected void processStats(SimpleOrderedMap<Object> bucket, Query bucketQ, DocSet docs, long docCount) throws IOException {
     if (docCount == 0 && !freq.processEmpty || freq.getFacetStats().size() == 0) {
-      bucket.put("count", docCount);
+      bucket.add("count", docCount);
       return;
     }
     createAccs(docCount, 1);
@@ -392,9 +393,9 @@ public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
     }
   }
 
-  void addStats(Map target, int slotNum) throws IOException {
+  void addStats(SimpleOrderedMap<Object> target, int slotNum) throws IOException {
     long count = countAcc.getCount(slotNum);
-    target.put("count", count);
+    target.add("count", count);
     if (count > 0 || freq.processEmpty) {
       for (SlotAcc acc : accs) {
         acc.setValues(target, slotNum);
@@ -402,7 +403,7 @@ public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
     }
   }
 
-  void fillBucket(Map bucket, Query q, DocSet result, boolean skip, Map<String,Object> facetInfo) throws IOException {
+  void fillBucket(SimpleOrderedMap<Object> bucket, Query q, DocSet result, boolean skip, Map<String,Object> facetInfo) throws IOException {
 
     boolean needDocSet = (skip==false && freq.getFacetStats().size() > 0) || freq.getSubFacets().size() > 0;
 
@@ -440,7 +441,7 @@ public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
   }
 
   @SuppressWarnings({"unchecked"})
-  void processSubs(Map response, Query filter, DocSet domain, boolean skip, Map<String,Object> facetInfo) throws IOException {
+  void processSubs(SimpleOrderedMap<Object> response, Query filter, DocSet domain, boolean skip, Map<String,Object> facetInfo) throws IOException {
 
     boolean emptyDomain = domain == null || domain.size() == 0;
 
@@ -476,7 +477,7 @@ public abstract class FacetProcessor<FacetRequestT extends FacetRequest>  {
 
       Object result = subRequest.process(subContext);
 
-      response.put( sub.getKey(), result);
+      response.add( sub.getKey(), result);
     }
   }
 

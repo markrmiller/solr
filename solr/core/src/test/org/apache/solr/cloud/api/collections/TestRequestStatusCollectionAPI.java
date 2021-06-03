@@ -208,6 +208,7 @@ public class TestRequestStatusCollectionAPI extends SolrCloudBridgeTestCase {
       r = sendRequest(params);
       @SuppressWarnings("unchecked")
       final NamedList<Object> status = (NamedList<Object>) r.get("status");
+      log.info("Result={}", r);
       final RequestStatusState state = RequestStatusState.fromKey((String) status.get("state"));
 
       if (state == RequestStatusState.COMPLETED || state == RequestStatusState.FAILED) {

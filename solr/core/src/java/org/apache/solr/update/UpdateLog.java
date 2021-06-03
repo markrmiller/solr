@@ -443,7 +443,7 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
             oldLog = newTransactionLog(f, null, true);
             addOldLog(oldLog, false);  // don't remove old logs on startup since more than one may be uncapped.
           } catch (Exception e) {
-            SolrException.log(log, "Failure to open existing log file (non fatal) " + f, e);
+            SolrException.log(log, "Failure to open existing log file (non fatal) size=" + f.length() + " " + f, e);
             deleteFile(f);
           }
         }
@@ -2196,7 +2196,8 @@ public class UpdateLog implements PluginInfoInitialized, SolrMetricProducer {
             }
           } catch (ClassCastException cl) {
             recoveryInfo.errors++;
-            loglog.warn("REPLAY_ERR: Unexpected log entry or corrupt log.  Entry={}", o, cl);
+           // loglog.warn("REPLAY_ERR: Unexpected log entry or corrupt log.  Entry={}", o, cl);
+            loglog.warn("REPLAY_ERR: Unexpected log entry or corrupt log.", cl);
             // would be caused by a corrupt transaction log
           } catch (Throwable ex) {
 

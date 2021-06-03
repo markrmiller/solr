@@ -33,6 +33,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
@@ -294,7 +296,7 @@ public class ReindexCollectionCmd implements OverseerCollectionMessageHandler.Cm
         return null;
       }
 
-      Map<String, Object> propMap = new HashMap<>();
+      Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
       propMap.put(Overseer.QUEUE_OPERATION, CollectionParams.CollectionAction.CREATE.toLower());
       propMap.put(CommonParams.NAME, targetCollection);
       propMap.put(ZkStateReader.NUM_SHARDS_PROP, numShards);

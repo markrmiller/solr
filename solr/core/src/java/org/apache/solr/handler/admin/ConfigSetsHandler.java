@@ -27,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.lang3.StringUtils;
@@ -127,10 +129,10 @@ public class ConfigSetsHandler extends RequestHandlerBase implements PermissionN
       log.info("Invoked ConfigSet Action :{} with params {} ", action.toLower(), req.getParamString());
     }
     Map<String, Object> result = operation.call(req, rsp, this);
-    sendToZk(rsp, operation, result);
+    sendToZk(rsp, operation, new Object2ObjectLinkedOpenHashMap<>(result, 0.25f));
   }
 
-  protected void sendToZk(SolrQueryResponse rsp, ConfigSetOperation operation, Map<String, Object> result)
+  protected void sendToZk(SolrQueryResponse rsp, ConfigSetOperation operation, Object2ObjectMap<String, Object> result)
       throws KeeperException, InterruptedException {
     if (result != null) {
       // We need to differentiate between collection and configsets actions since they currently

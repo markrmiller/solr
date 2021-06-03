@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.util.SimpleOrderedMap;
 
@@ -40,13 +41,13 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
   @Override
   public void merge(Object facetResult, Context mcontext) {
     super.merge(facetResult, mcontext);
-    mergeBucket((Map) facetResult , mcontext);
+    merge((SimpleOrderedMap) facetResult , mcontext);
   }
 
   @Override
   public void sortBuckets(final FacetRequest.FacetSort sort) {
     // regardless of sort or mincount, every shard returns a consistent set of buckets which are already in the correct order
-    sortedBuckets = new ArrayList<>( buckets.values() );
+    sortedBuckets = new ObjectArrayList<>( buckets.values() );
   }
 
   @Override
@@ -90,7 +91,7 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
     return refinement;
   }
   
-  public void mergeBucket(@SuppressWarnings("rawtypes") Map facetResult, Context mcontext) {
+  public void merge(@SuppressWarnings("rawtypes") SimpleOrderedMap facetResult, Context mcontext) {
     boolean all = freq.others.contains(FacetParams.FacetRangeOther.ALL);
 
     if (all || freq.others.contains(FacetParams.FacetRangeOther.BEFORE)) {
@@ -99,7 +100,7 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
         if (beforeBucket == null) {
           beforeBucket = newBucket(null, mcontext);
         }
-        beforeBucket.mergeBucket((Map)o, mcontext);
+        beforeBucket.mergeBucket((SimpleOrderedMap)o, mcontext);
       }
     }
 
@@ -109,7 +110,7 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
         if (afterBucket == null) {
           afterBucket = newBucket(null, mcontext);
         }
-        afterBucket.mergeBucket((Map)o , mcontext);
+        afterBucket.mergeBucket((SimpleOrderedMap)o , mcontext);
       }
     }
 
@@ -119,7 +120,7 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
         if (betweenBucket == null) {
           betweenBucket = newBucket(null, mcontext);
         }
-        betweenBucket.mergeBucket((Map)o , mcontext);
+        betweenBucket.mergeBucket((SimpleOrderedMap)o , mcontext);
       }
     }
 
@@ -133,7 +134,7 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    List<Map> bucketList = (List<Map>) facetResult.get("buckets");
+    List<SimpleOrderedMap> bucketList = (List<SimpleOrderedMap>) facetResult.get("buckets");
     mergeBucketList(bucketList , mcontext);
   }
 
@@ -144,7 +145,7 @@ public class FacetRangeMerger extends FacetRequestSortedMerger<FacetRange> {
     // TODO: use sortedBuckets
     SimpleOrderedMap result = new SimpleOrderedMap(4);
 
-    List<Map> resultBuckets = new ArrayList<>(buckets.size());
+    List<SimpleOrderedMap> resultBuckets = new ArrayList<>(buckets.size());
 
     for (FacetBucket bucket : buckets.values()) {
        if (bucket.getCount() < freq.mincount) {

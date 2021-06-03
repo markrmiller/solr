@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.lucene.spatial.prefix.HeatmapFacetCounter;
 import org.apache.lucene.spatial.prefix.PrefixTreeStrategy;
 import org.apache.lucene.spatial.query.SpatialArgs;
@@ -41,6 +40,7 @@ import org.apache.lucene.spatial.query.SpatialOperation;
 import org.apache.lucene.util.Bits;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.schema.AbstractSpatialPrefixTreeFieldType;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.RptWithGeometrySpatialField;
@@ -263,19 +263,19 @@ public class FacetHeatmap extends FacetRequest {
       }
 
       //Populate response
-      response = new Object2ObjectLinkedOpenHashMap(32, .5f);
-      response.put("gridLevel", gridLevel);
-      response.put("columns", heatmap.columns);
-      response.put("rows", heatmap.rows);
-      response.put("minX", heatmap.region.getMinX());
-      response.put("maxX", heatmap.region.getMaxX());
-      response.put("minY", heatmap.region.getMinY());
-      response.put("maxY", heatmap.region.getMaxY());
+      response = new SimpleOrderedMap<>();
+      response.add("gridLevel", gridLevel);
+      response.add("columns", heatmap.columns);
+      response.add("rows", heatmap.rows);
+      response.add("minX", heatmap.region.getMinX());
+      response.add("maxX", heatmap.region.getMaxX());
+      response.add("minY", heatmap.region.getMinY());
+      response.add("maxY", heatmap.region.getMaxY());
 
       //A shard request will always be a PNG
       String format = fcontext.isShard() ? FORMAT_PNG : FacetHeatmap.this.format;
 
-      response.put("counts_" + format, formatCountsVal(format, heatmap.columns, heatmap.rows, heatmap.counts, fcontext.getDebugInfo()));
+      response.add("counts_" + format, formatCountsVal(format, heatmap.columns, heatmap.rows, heatmap.counts, fcontext.getDebugInfo()));
 
       // note: we do not call processStats or processSubs as it's not supported yet
     }
@@ -327,7 +327,7 @@ public class FacetHeatmap extends FacetRequest {
   @Override
   public FacetMerger createFacetMerger(Object prototype) {
     return new FacetMerger() {
-      Map mergedResult; // except counts, which we add in when done
+      NamedList<Object> mergedResult; // except counts, which we add in when done
       int[] counts;
 
       // note: there appears to be no mechanism to modify the shard requests in this API.  If we could, we'd
@@ -337,7 +337,7 @@ public class FacetHeatmap extends FacetRequest {
       @SuppressWarnings("unchecked")
       @Override
       public void merge(Object facetResult, Context mcontext) {
-        Map facetResultNL = (Map) facetResult;
+        NamedList<Object> facetResultNL = (NamedList<Object>) facetResult;
         counts = addPngToIntArray((byte[]) facetResultNL.remove("counts_" + FORMAT_PNG), counts);
         if (mergedResult == null) {
           mergedResult = facetResultNL;
@@ -351,8 +351,8 @@ public class FacetHeatmap extends FacetRequest {
 
       @Override
       public Object getMergedResult() {
-        mergedResult.put("counts_" + format, formatCountsVal(
-            format, (Integer) mergedResult.get("columns"), (Integer) mergedResult.get("rows"), counts, null));//TODO where debugInfo?
+        mergedResult.add("counts_" + format, formatCountsVal(
+            format, (Integer) mergedResult.get("columns"), (int) mergedResult.get("rows"), counts, null));//TODO where debugInfo?
         return mergedResult;
       }
     };

@@ -183,7 +183,7 @@ public class FieldCacheImpl implements FieldCache {
         innerCache = readerCache.get(readerKey);
         if (innerCache == null) {
           // First time this reader is using FieldCache
-          innerCache = new NonBlockingHashMap<>();
+          innerCache = new HashMap<>();
           readerCache.put(readerKey, innerCache);
           wrapper.initReader(reader);
           value = null;
@@ -200,7 +200,9 @@ public class FieldCacheImpl implements FieldCache {
           CreationPlaceholder progress = (CreationPlaceholder) value;
           if (progress.value == null) {
             progress.value = createValue(reader, key);
-            innerCache.put(key, progress.value);
+            synchronized (readerCache) {
+              innerCache.put(key, progress.value);
+            }
           }
           return progress.value;
         }

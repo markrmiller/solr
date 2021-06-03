@@ -17,11 +17,12 @@
 
 package org.apache.solr.search.facet;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.NumericUtils;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.FacetParams;
+import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.schema.*;
 import org.apache.solr.search.DocSet;
 import org.apache.solr.search.SyntaxError;
@@ -478,7 +479,7 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private Map getRangeCountsIndexed() throws IOException {
+  private  SimpleOrderedMap getRangeCountsIndexed() throws IOException {
 
     int slotCount = rangeList.size() + otherList.size();
     intersections = new DocSet[slotCount];
@@ -496,16 +497,16 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
     }
 
 
-    final Map res = new Object2ObjectLinkedOpenHashMap(32, .5f);
-    List<Map> buckets = new ArrayList<>();
-    res.put("buckets", buckets);
+    final SimpleOrderedMap res = new SimpleOrderedMap<>();
+    List<SimpleOrderedMap> buckets = new ArrayList<>();
+    res.add("buckets", buckets);
 
     for (int idx = 0; idx<rangeList.size(); idx++) {
       if (effectiveMincount > 0 && countAcc.getCount(idx) < effectiveMincount) continue;
       Range range = rangeList.get(idx);
-      Map bucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
+      SimpleOrderedMap bucket = new SimpleOrderedMap();
       buckets.add(bucket);
-      bucket.put("val", range.label);
+      bucket.add("val", range.label);
       addStats(bucket, idx);
       doSubs(bucket, idx);
     }
@@ -513,14 +514,14 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
     for (int idx = 0; idx<otherList.size(); idx++) {
       // we don't skip these buckets based on mincount
       Range range = otherList.get(idx);
-      Map bucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
-      res.put(range.label.toString(), bucket);
+      SimpleOrderedMap bucket = new SimpleOrderedMap();
+      res.add(range.label.toString(), bucket);
       addStats(bucket, rangeList.size() + idx);
       doSubs(bucket, rangeList.size() + idx);
     }
 
     if (null != actual_end) {
-      res.put(FacetRange.ACTUAL_END_JSON_KEY, calc.formatValue(actual_end));
+      res.add(FacetRange.ACTUAL_END_JSON_KEY, calc.formatValue(actual_end));
     }
 
     return res;
@@ -539,7 +540,7 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private void doSubs(Map bucket, int slot) throws IOException {
+  private void doSubs(SimpleOrderedMap bucket, int slot) throws IOException {
     // handle sub-facets for this bucket
     if (freq.getSubFacets().size() > 0) {
       DocSet subBase = intersections[slot];
@@ -883,7 +884,7 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  protected Map refineFacets() throws IOException {
+  protected SimpleOrderedMap<Object> refineFacets() throws IOException {
     // this refineFacets method is patterned after FacetFieldProcessor.refineFacets such that
     // the same "_s" skip bucket syntax is used and FacetRangeMerger can subclass FacetRequestSortedMerger
     // for dealing with them & the refinement requests.
@@ -901,9 +902,9 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
     assert 0 == FacetFieldProcessor.asList(fcontext.facetInfo.get("_l")).size();
     assert 0 == FacetFieldProcessor.asList(fcontext.facetInfo.get("_p")).size();
 
-    Map res = new Object2ObjectLinkedOpenHashMap(32, .5f);
-    List<Map> bucketList = new ArrayList<>( skip.size() );
-    res.put("buckets", bucketList);
+    SimpleOrderedMap<Object> res = new SimpleOrderedMap<>();
+    List<SimpleOrderedMap> bucketList = new ArrayList<>( skip.size() );
+    res.add("buckets", bucketList);
 
     // TODO: an alternate implementations can fill all accs at once
     createAccs(-1, 1);
@@ -923,19 +924,19 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
 
       specialFacetInfo = (Map<String, Object>) fcontext.facetInfo.get(FacetParams.FacetRangeOther.BEFORE.toString());
       if (null != specialFacetInfo) {
-        res.put(FacetParams.FacetRangeOther.BEFORE.toString(),
+        res.add(FacetParams.FacetRangeOther.BEFORE.toString(),
             refineRange(buildBeforeRange(), skipThisFacet, specialFacetInfo));
       }
 
       specialFacetInfo = (Map<String, Object>) fcontext.facetInfo.get(FacetParams.FacetRangeOther.AFTER.toString());
       if (null != specialFacetInfo) {
-        res.put(FacetParams.FacetRangeOther.AFTER.toString(),
+        res.add(FacetParams.FacetRangeOther.AFTER.toString(),
             refineRange(buildAfterRange(), skipThisFacet, specialFacetInfo));
       }
 
       specialFacetInfo = (Map<String, Object>) fcontext.facetInfo.get(FacetParams.FacetRangeOther.BETWEEN.toString());
       if (null != specialFacetInfo) {
-        res.put(FacetParams.FacetRangeOther.BETWEEN.toString(),
+        res.add(FacetParams.FacetRangeOther.BETWEEN.toString(),
             refineRange(buildBetweenRange(), skipThisFacet, specialFacetInfo));
       }
     }
@@ -980,14 +981,14 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private Map refineBucket(Object bucketVal, boolean skip, Map<String,Object> facetInfo) throws IOException {
+  private SimpleOrderedMap<Object> refineBucket(Object bucketVal, boolean skip, Map<String,Object> facetInfo) throws IOException {
 
     String val = bucketVal.toString();
     if (ranges != null) {
       try {
         Range range = parseRangeFromString(val, val);
-        final Map bucket = refineRange(range, skip, facetInfo);
-        bucket.put("val", range.label);
+        final SimpleOrderedMap<Object> bucket = refineRange(range, skip, facetInfo);
+        bucket.add("val", range.label);
         return bucket;
       } catch (SyntaxError e) {
         // execution won't reach here as ranges are already validated
@@ -1025,8 +1026,8 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
 
     // now refine this range
 
-    final Map bucket = refineRange(range, skip, facetInfo);
-    bucket.put("val", range.label);
+    final SimpleOrderedMap<Object> bucket = refineRange(range, skip, facetInfo);
+    bucket.add("val", range.label);
 
     return bucket;
   }
@@ -1034,8 +1035,8 @@ class FacetRangeProcessor extends FacetProcessor<FacetRange> {
   /** Helper method for refining a Range
    * @see #fillBucket
    */
-  private Map refineRange(Range range, boolean skip, Map<String,Object> facetInfo) throws IOException {
-    final Map bucket = new Object2ObjectLinkedOpenHashMap(32, .5f);
+  private SimpleOrderedMap<Object> refineRange(Range range, boolean skip, Map<String,Object> facetInfo) throws IOException {
+    final SimpleOrderedMap<Object> bucket = new SimpleOrderedMap<>();
     final Query domainQ = sf.getType().getRangeQuery(null, sf, range.low == null ? null : calc.formatValue(range.low), range.high==null ? null : calc.formatValue(range.high), range.includeLower, range.includeUpper);
     fillBucket(bucket, domainQ, null, skip, facetInfo);
     return bucket;

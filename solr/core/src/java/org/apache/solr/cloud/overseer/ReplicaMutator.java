@@ -16,6 +16,8 @@
  */
 package org.apache.solr.cloud.overseer;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -194,7 +196,7 @@ public class ReplicaMutator {
     Slice slice = collection != null ? collection.getSlice(sliceName) : null;
     Integer id = -1;
 
-    Map<String,Object> replicaProps = new LinkedHashMap<>();
+    Object2ObjectMap<String,Object> replicaProps = new Object2ObjectLinkedOpenHashMap<>();
     if (slice != null) {
       Replica oldReplica = slice.getReplica(coreName);
 

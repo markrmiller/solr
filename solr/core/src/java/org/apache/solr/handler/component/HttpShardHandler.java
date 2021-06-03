@@ -307,16 +307,16 @@ public class HttpShardHandler extends ShardHandler {
         //log.info("loop ing in httpshardhandler pending {}", pending.get());
 
 
-        ShardResponse rsp = responses.poll(5, TimeUnit.SECONDS);
-//
-        if (rsp == null) {
-          if (pending.get() > 0 && httpShardHandlerFactory.isClosed()) {
-            cancelAll();
-            throw new AlreadyClosedException();
-          }
-          continue;
-        }
-      //  ShardResponse rsp = responses.take();
+//        ShardResponse rsp = responses.poll(5, TimeUnit.SECONDS);
+////
+//        if (rsp == null) {
+//          if (pending.get() > 0 && httpShardHandlerFactory.isClosed()) {
+//            cancelAll();
+//            throw new AlreadyClosedException();
+//          }
+//          continue;
+//        }
+        ShardResponse rsp = responses.take();
         responseCancellableMap.remove(rsp);
 
         if (finish == null) {
@@ -338,6 +338,7 @@ public class HttpShardHandler extends ShardHandler {
         }
       }
     } catch (InterruptedException e) {
+      ParWork.propagateInterrupt(e);
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     }
     return null;

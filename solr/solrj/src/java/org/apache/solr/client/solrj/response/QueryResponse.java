@@ -49,7 +49,7 @@ public class QueryResponse extends SolrResponseBase
   private NamedList<Object> _highlightingInfo = null;
   private NamedList<Object> _spellInfo = null;
   private List<NamedList<Object>> _clusterInfo = null;
-  private Map _jsonFacetingInfo = null;
+  private NamedList<Object> _jsonFacetingInfo = null;
   private Map<String,NamedList<Object>> _suggestInfo = null;
   private NamedList<Object> _statsInfo = null;
   private NamedList<NamedList<Object>> _termsInfo = null;
@@ -163,7 +163,7 @@ public class QueryResponse extends SolrResponseBase
         extractClusteringInfo(_clusterInfo);
       }
       else if ("facets".equals(n)) {
-        _jsonFacetingInfo = (Map) res.getVal(i);
+        _jsonFacetingInfo = (NamedList<Object>) res.getVal(i);
         // Don't call extractJsonFacetingInfo(_jsonFacetingInfo) here in an effort to do it lazily
       }
       else if ( "suggest".equals( n ) )  {
@@ -196,7 +196,7 @@ public class QueryResponse extends SolrResponseBase
     _clusterResponse = new ClusteringResponse(clusterInfo);
   }
 
-  private void extractJsonFacetingInfo(Map facetInfo) {
+  private void extractJsonFacetingInfo(NamedList<Object> facetInfo) {
     _jsonFacetingResponse = new NestableJsonFacet(facetInfo);
   }
 
@@ -238,7 +238,6 @@ public class QueryResponse extends SolrResponseBase
     }
 
     // Parse out interesting bits from the debug info
-
     NamedList<Object> explain = (NamedList<Object>)_debugMap.get( "explain" );
     if( explain != null ) {
       _explainMap = new Object2ObjectArrayMap<>(explain.size());
@@ -319,8 +318,8 @@ public class QueryResponse extends SolrResponseBase
   private void extractFacetInfo( NamedList<Object> info )
   {
     // Parse the queries
-    _facetQuery = new LinkedHashMap<>();
     NamedList<Integer> fq = (NamedList<Integer>) info.get( "facet_queries" );
+    _facetQuery =  new Object2ObjectArrayMap<>(fq.size());
     if (fq != null) {
       for( Map.Entry<String, Integer> entry : fq ) {
         _facetQuery.put( entry.getKey(), entry.getValue() );
@@ -335,7 +334,7 @@ public class QueryResponse extends SolrResponseBase
       _limitingFacets = new ArrayList<>( ff.size() );
       
       long minsize = _results == null ? Long.MAX_VALUE :_results.getNumFound();
-      for( Map.Entry<String,NamedList<Number>> facet : ff ) {
+      for(Map.Entry<String,NamedList<Number>> facet : ff ) {
         FacetField f = new FacetField( facet.getKey() );
         for( Map.Entry<String, Number> entry : facet.getValue() ) {
           f.add( entry.getKey(), entry.getValue().longValue() );

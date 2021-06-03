@@ -19,11 +19,13 @@ package org.apache.solr.request;
 import java.io.Closeable;
 import java.security.Principal;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.CommandOperation;
 import org.apache.solr.common.util.ContentStream;
@@ -53,11 +55,11 @@ import org.jctools.maps.NonBlockingHashMap;
 public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeable {
   protected final SolrCore core;
   protected final SolrParams origParams;
-  protected volatile IndexSchema schema;
-  protected volatile SolrParams params;
-  protected volatile Map<Object,Object> context;
-  protected volatile Iterable<ContentStream> streams;
-  protected volatile Map<String,Object> json;
+  protected IndexSchema schema;
+  protected SolrParams params;
+  protected Map<Object,Object> context;
+  protected Iterable<ContentStream> streams;
+  protected Map<String,Object> json;
 
   private final RTimerTree requestTimer;
   protected final long startTime;
@@ -66,7 +68,7 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
   public SolrQueryRequestBase(SolrCore core, SolrParams params, RTimerTree requestTimer) {
     this.core = core;
     this.schema = null == core ? null : core.getLatestSchema();
-    this.params = this.origParams = params;
+    this.params = this.origParams = (params == null ? new ModifiableSolrParams() : params);
     this.requestTimer = requestTimer;
     this.startTime = System.currentTimeMillis();
   }
@@ -77,7 +79,8 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
 
   @Override
   public Map<Object,Object> getContext() {
-    if (context==null) context = new NonBlockingHashMap<>();
+    //if (context==null) context = new NonBlockingHashMap<>();
+    if (context==null) context = new HashMap<>();
     return context;
   }
 
@@ -210,6 +213,6 @@ public abstract class SolrQueryRequestBase implements SolrQueryRequest, Closeabl
   }
 
   protected Map<Object, JsonSchemaValidator> getValidators(){
-    return Collections.EMPTY_MAP;
+    return Collections.emptyMap();
   }
 }

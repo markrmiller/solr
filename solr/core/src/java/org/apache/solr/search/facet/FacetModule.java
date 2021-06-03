@@ -19,12 +19,9 @@ package org.apache.solr.search.facet;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Deque;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
 
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.common.SolrException;
@@ -145,10 +142,11 @@ public class FacetModule extends SearchComponent {
     }
     if (rb.isDebug()) {
       FacetDebugInfo fdebug = new FacetDebugInfo();
+      fcontext.setDebugInfo(fdebug);
       rb.req.getContext().put("FacetDebugInfo", fdebug);
     }
 
-    Map results = facetState.facetRequest.process(fcontext);
+    Object results = facetState.facetRequest.process(fcontext);
     // ExitableDirectory timeout causes absent "facets"
     rb.rsp.add("facets", results);
   }
@@ -469,7 +467,7 @@ public class FacetModule extends SearchComponent {
       if (bucket == null) {
         bucket = newBucket(null, mcontext);
       }
-      bucket.mergeBucket((Map) facet, mcontext);
+      bucket.mergeBucket((SimpleOrderedMap) facet, mcontext);
     }
 
     @Override

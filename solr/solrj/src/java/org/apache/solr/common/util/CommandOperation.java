@@ -254,10 +254,10 @@ public class CommandOperation {
           return level == 1 ? map : super.newMap(size);
         }
       }) {
-        jbc.unmarshal(in);
+        jbc.unmarshal(FastInputStream.wrap(in));
       }
     } finally {
-      Utils.readFully(in);
+      //Utils.readFully(in);
     }
     return operations;
   }

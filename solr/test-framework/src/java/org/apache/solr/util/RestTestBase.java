@@ -541,7 +541,7 @@ abstract public class RestTestBase extends SolrJettyTestBase {
         StrUtils.partialURLEncodeVal(builder, valueToSet);
         return builder.toString();
       }
-      MultiMapSolrParams requestParams = null;//SolrRequestParsers.getInstance().parseQueryString(query);
+      MultiMapSolrParams requestParams = SolrRequestParsers.getInstance().parseQueryString(query);
       String[] values = requestParams.getParams(paramToSet);
       if (null == values) {
         // paramToSet isn't present in the request -> append "&paramToSet=valueToSet"

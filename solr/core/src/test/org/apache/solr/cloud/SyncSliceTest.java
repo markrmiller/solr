@@ -25,6 +25,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
+import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.cloud.Replica;
@@ -123,8 +124,9 @@ public class SyncSliceTest extends SolrCloudBridgeTestCase {
 
     //  checkShardConsistency(false, true);
 
-    long cloudClientDocs = cloudClient.query(new SolrQuery("*:*")).getResults().getNumFound();
-    assertEquals(4, cloudClientDocs);
+    SolrDocumentList results = cloudClient.query(new SolrQuery("*:*")).getResults();
+    long cloudClientDocs = results.getNumFound();
+    assertEquals(results.toString(), 4, cloudClientDocs);
 
     // kill the leader - new leader could have all the docs or be missing one
     JettySolrRunner leaderJetty = getJettyOnPort(getReplicaPort(getShardLeader(COLLECTION, "s1", 10000)));

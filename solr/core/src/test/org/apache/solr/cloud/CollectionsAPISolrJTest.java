@@ -163,6 +163,7 @@ public class CollectionsAPISolrJTest extends SolrCloudTestCase {
 
   @Test
   @LuceneTestCase.Nightly
+  @Ignore // nocommit
   public void testCreateCollWithDefaultClusterPropertiesNewFormat() throws Exception {
     String COLL_NAME = "CollWithDefaultClusterProperties";
       V2Response rsp = new V2Request.Builder("/cluster")

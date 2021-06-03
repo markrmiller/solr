@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.common.ParWork;
@@ -60,7 +62,7 @@ public class MaintainRoutedAliasCmd extends AliasCmd {
   static void remoteInvoke(CollectionsHandler collHandler, String aliasName, String targetCol)
       throws Exception {
     final String operation = CollectionParams.CollectionAction.MAINTAINROUTEDALIAS.toLower();
-    Map<String, Object> msg = new HashMap<>();
+    Object2ObjectMap<String, Object> msg = new Object2ObjectLinkedOpenHashMap<String, Object>(6, 0.25f);
     msg.put(Overseer.QUEUE_OPERATION, operation);
     msg.put(CollectionParams.NAME, aliasName);
     msg.put(MaintainRoutedAliasCmd.ROUTED_ALIAS_TARGET_COL, targetCol);
@@ -182,7 +184,7 @@ public class MaintainRoutedAliasCmd extends AliasCmd {
   }
 
   public void deleteTargetCollection(ClusterState clusterState, @SuppressWarnings({"rawtypes"})NamedList results, String aliasName, ZkStateReader.AliasesManager aliasesManager, RoutedAlias.Action action) throws Exception {
-    Map<String, Object> delProps = new HashMap<>();
+    Object2ObjectMap<String, Object> delProps =  new Object2ObjectLinkedOpenHashMap<>();
     delProps.put(INVOKED_BY_ROUTED_ALIAS,
         (Runnable) () -> removeCollectionFromAlias(aliasName, aliasesManager, action.targetCollection));
     delProps.put(NAME, action.targetCollection);

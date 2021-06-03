@@ -17,6 +17,7 @@
 package org.apache.solr.common.util;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.apache.http.HttpEntity;
@@ -329,20 +330,20 @@ public class Utils {
         }
       }
 
-      public static Map<String, Object> makeMap (Object...keyVals){
+      public static Object2ObjectMap<String, Object> makeMap (Object...keyVals){
         return makeMap(false, keyVals);
       }
 
-  public static Map<String, Object> makeNonNullMap(Object...keyVals){
+  public static Object2ObjectMap<String, Object> makeNonNullMap(Object...keyVals){
     return makeMap(true, keyVals);
   }
 
-  public static Map<String,Object> makeMap(boolean skipNulls, Object... keyVals) {
+  public static Object2ObjectMap<String,Object> makeMap(boolean skipNulls, Object... keyVals) {
     if ((keyVals.length & 0x01) != 0) {
       throw new IllegalArgumentException("arguments should be key,value");
     }
     int sz = keyVals.length;
-    Map<String,Object> propMap = new Object2ObjectLinkedOpenHashMap<>(32, 0.5f);
+    Object2ObjectMap<String,Object> propMap = new Object2ObjectLinkedOpenHashMap<>(keyVals.length, 0.5f);
 
     for (int i = 0; i < sz; i += 2) {
       Object keyVal = keyVals[i + 1];
@@ -371,6 +372,8 @@ public class Utils {
           throw new RuntimeException(e);
         }
       };
+
+  // nocommit MRM TODO Object2ObjectMap
       public static final Function<JSONParser, ObjectBuilder> MAPWRITEROBJBUILDER = jsonParser -> {
         try {
           return new ObjectBuilder(jsonParser) {
@@ -808,7 +811,7 @@ public class Utils {
 
   public interface InputStreamConsumer<T> {
 
-        T accept(InputStream is) throws IOException;
+        T accept(JavaBinInputStream is) throws IOException;
 
       }
       public static final InputStreamConsumer<?> JAVABINCONSUMER = is -> {
@@ -865,13 +868,13 @@ public class Utils {
           is = new ByteArrayInputStream(resp.bytes);
           if (consumer != null) {
 
-            result = consumer.accept(is);
+            result = consumer.accept(FastInputStream.wrap(is));
           }
         } catch (IOException e) {
           throw new SolrException(SolrException.ErrorCode.UNKNOWN, e);
         } finally {
           IOUtils.closeQuietly(is);
-          Utils.readFully(is);
+         // Utils.readFully(is);
         }
         return result;
       }

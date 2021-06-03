@@ -20,6 +20,8 @@ package org.apache.solr.search.join;
 import java.util.HashSet;
 import java.util.List;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.apache.solr.common.StringUtils;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
@@ -36,8 +38,8 @@ public class XCJFQParserPlugin extends QParserPlugin {
 
   public static final String NAME = "xcjf";
 
-  private volatile String routerField;
-  private final HashSet<String> solrUrlWhitelist = new HashSet<>();
+  private String routerField;
+  private ObjectSet<String> solrUrlWhitelist;
 
   @Override
   public QParser createParser(String qstr, SolrParams localParams, SolrParams params, SolrQueryRequest req) {
@@ -48,13 +50,14 @@ public class XCJFQParserPlugin extends QParserPlugin {
   @SuppressWarnings({"unchecked"})
   public void init(@SuppressWarnings({"rawtypes"})NamedList args) {
     routerField = (String) args.get("routerField");
+    solrUrlWhitelist = new ObjectOpenHashSet<>();
     if (args.get("solrUrl") != null) {
       for (String s : (List<String>) args.get("solrUrl")) {
         if (!StringUtils.isEmpty(s))
           solrUrlWhitelist.add(s);
       }
     } else {
-      solrUrlWhitelist.clear();
+      solrUrlWhitelist = null;
     }
   }
 

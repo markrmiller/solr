@@ -17,6 +17,8 @@
 
 package org.apache.solr.cloud.api.collections;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.OverseerSolrResponse;
 import org.apache.solr.common.SolrException;
@@ -68,10 +70,10 @@ abstract class AliasCmd implements OverseerCollectionMessageHandler.Cmd {
     createReqParams.set(NAME, createCollName);
     // a CollectionOperation reads params and produces a message (Map) that is supposed to be sent to the Overseer.
     //   Although we could create the Map without it, there are a fair amount of rules we don't want to reproduce.
-    final Map<String, Object> createMsgMap = CollectionsHandler.CollectionOperation.CREATE_OP.execute(
+    final Object2ObjectMap<String, Object> createMsgMap = new Object2ObjectLinkedOpenHashMap<>(CollectionsHandler.CollectionOperation.CREATE_OP.execute(
         new LocalSolrQueryRequest(null, createReqParams),
         null,
-        ocmh.overseer.getCoreContainer().getCollectionsHandler());
+        ocmh.overseer.getCoreContainer().getCollectionsHandler()));
     createMsgMap.put(Overseer.QUEUE_OPERATION, "create");
 
     NamedList results = new NamedList();

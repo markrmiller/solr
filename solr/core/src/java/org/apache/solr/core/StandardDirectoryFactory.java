@@ -26,6 +26,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Collection;
 import java.util.Locale;
 
+import org.apache.lucene.misc.store.RAFDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FilterDirectory;
@@ -52,16 +53,18 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  // nocommit TODO: DirectIODirectory
   @Override public Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
     // we pass NoLockFactory, because the real lock factory is set later by injectLockFactory:
-    return new FilterDirectory(FSDirectory.open(new File(path).toPath(), lockFactory)) {
-      @Override
-      public void sync(Collection<String> names) throws IOException {
-        if (!Boolean.getBoolean("solr.skipNrtDirSync")) {
-          super.sync(names);
-        }
-      }
-    };
+//    return new FilterDirectory(FSDirectory.open(new File(path).toPath(), lockFactory)) {
+//      @Override
+//      public void sync(Collection<String> names) throws IOException {
+//        if (!Boolean.getBoolean("solr.skipNrtDirSync")) {
+//          super.sync(names);
+//        }
+//      }
+//    };
+    return new RAFDirectory(new File(path).toPath(), lockFactory);
   }
   
   @Override public LockFactory createLockFactory(String rawLockType) throws IOException {

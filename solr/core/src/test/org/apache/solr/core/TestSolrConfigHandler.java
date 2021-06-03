@@ -157,7 +157,7 @@ public class TestSolrConfigHandler extends RestTestBase {
   public void testProperty() throws Exception {
     RestTestHarness harness = restTestHarness;
     MapWriter confMap = getRespMap("/config", harness);
-    assertNotNull(confMap._get(asList("config", "requestHandler", "/admin/luke"), null));
+    assertNotNull(confMap.toString(), confMap._get(asList("config", "requestHandler", "/admin/luke"), null));
     assertNotNull(confMap._get(asList("config", "requestHandler", "/admin/system"), null));
     assertNotNull(confMap._get(asList("config", "requestHandler", "/admin/mbeans"), null));
     assertNotNull(confMap._get(asList("config", "requestHandler", "/admin/plugins"), null));

@@ -17,6 +17,7 @@
 package org.apache.solr.servlet;
 
 import io.opentracing.Span;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.apache.solr.client.solrj.impl.BaseCloudSolrClient;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
@@ -61,7 +62,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
 
 import static org.apache.solr.common.cloud.ZkStateReader.COLLECTION_PROP;
 import static org.apache.solr.common.params.CollectionAdminParams.SYSTEM_COLL;
@@ -85,7 +85,7 @@ public class HttpSolrCall extends SolrCall {
   private volatile SolrCore solrCore;
   protected SolrQueryRequest solrReq;
   protected final SolrRequestHandler handler;
-  protected final SolrParams queryParams;
+  protected final SolrParams solrParams;
   protected final String path;
   protected final Action action;
   private final String coreUrl;
@@ -111,7 +111,8 @@ public class HttpSolrCall extends SolrCall {
     SolrQueryRequest solrRequest = null;
     Action callAction = null;
     request.setAttribute(HttpSolrCall.class.getName(), this);
-    queryParams = new MultiMapSolrParams(request.getParameterMap()); //SolrRequestParsers.getInstance().parseQueryString(request.getQueryString());
+    Map<String, String[]> copy = new Object2ObjectOpenHashMap<>(request.getParameterMap());
+    solrParams = new MultiMapSolrParams(copy); //SolrRequestParsers.getInstance().parseQueryString(request.getQueryString());
     // set a request timer which can be reused by requests if needed
     request.setAttribute(SolrRequestParsers.REQUEST_TIMER_SERVLET_ATTRIBUTE, new RTimerTree());
     // put the core container in request attribute
@@ -133,7 +134,7 @@ public class HttpSolrCall extends SolrCall {
     SolrRequestHandler reqHandler = cores.getRequestHandler(reqPath);
     if (log.isDebugEnabled()) log.debug("Check for handler {} returned {} handlers={}", reqPath, reqHandler, cores.getRequestHandlers().keySet());
     if (reqHandler != null) {
-      solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, request);
+      solrRequest = SolrRequestParsers.getDefaultInstance().parse(null, reqPath, request, solrParams);
       solrRequest.getContext().put(CoreContainer.class.getName(), cores);
       this.requestType = RequestType.ADMIN;
       this.handler = reqHandler;
@@ -200,7 +201,7 @@ public class HttpSolrCall extends SolrCall {
     if (solrCore == null && cores.isZooKeeperAware()) {
       // init collectionList (usually one name but not when there are aliases)
       String def = origCorename;
-      collectionsList = resolveCollectionListOrAlias(cores, queryParams.get(COLLECTION_PROP, def)); // &collection= takes precedence
+      collectionsList = resolveCollectionListOrAlias(cores, solrParams.get(COLLECTION_PROP, def)); // &collection= takes precedence
 
       // lookup core from collection, or route away if need to
       String collectionName = collectionsList.isEmpty() ? null : collectionsList.get(0); // route to 1st
@@ -224,12 +225,12 @@ public class HttpSolrCall extends SolrCall {
         if (log.isDebugEnabled()) log.debug("check remote path extraction {} {}", collectionName, origCorename);
 
         // don't proxy for internal update requests
-        invalidStates = checkStateVersionsAreValid(cores, getCollectionsList(), queryParams.get(BaseCloudSolrClient.STATE_VERSION));
+        invalidStates = checkStateVersionsAreValid(cores, getCollectionsList(), solrParams.get(BaseCloudSolrClient.STATE_VERSION));
 
         String coreUrl = null;
 
         if (origCorename != null) {
-          coreUrl = extractRemotePath(cores, origCorename, queryParams, request);
+          coreUrl = extractRemotePath(cores, origCorename, solrParams, request);
         }
 
         if (coreUrl != null) {
@@ -245,7 +246,7 @@ public class HttpSolrCall extends SolrCall {
           this.coreUrl = coreUrl;
           return;
         } else if (collectionName != null){
-          coreUrl = extractRemotePath(cores, collectionName, queryParams, request);
+          coreUrl = extractRemotePath(cores, collectionName, solrParams, request);
           if (coreUrl != null) {
             if (idx2 > 0) {
               reqPath = reqPath.substring(idx2);
@@ -285,7 +286,7 @@ public class HttpSolrCall extends SolrCall {
         // no handler yet but <requestDispatcher> allows us to handle /select with a 'qt' param
         if (reqHandler == null && parser.isHandleSelect()) {
           if ("/select".equals(reqPath) || "/select/".equals(reqPath)) {
-            this.solrReq = parser.parse(solrCore, reqPath, request);
+            this.solrReq = parser.parse(solrCore, reqPath, request, solrParams);
             SolrParams params = this.solrReq.getParams();
             String qt = params.get(CommonParams.QT);
             reqHandler = solrCore.getRequestHandler(qt);
@@ -305,13 +306,13 @@ public class HttpSolrCall extends SolrCall {
       if (this.solrReq == null) {
         // if not a /select, create the request
         log.debug("build solrequest from handler={}", reqPath);
-        this.solrReq = parser.parse(solrCore, reqPath, request);
+        this.solrReq = parser.parse(solrCore, reqPath, request, solrParams);
 
         log.debug("handler={} result solrReq={}", reqHandler, solrReq);
 
-        invalidStates = checkStateVersionsAreValid(cores, getCollectionsList(), queryParams.get(BaseCloudSolrClient.STATE_VERSION));
+        invalidStates = checkStateVersionsAreValid(cores, getCollectionsList(), solrParams.get(BaseCloudSolrClient.STATE_VERSION));
 
-        addCollectionParamIfNeeded(cores, solrReq, queryParams, getCollectionsList());
+        addCollectionParamIfNeeded(cores, solrReq, solrParams, getCollectionsList());
         this.handler = reqHandler;
         coreUrl = null;
         this.action = PROCESS;
@@ -354,8 +355,8 @@ public class HttpSolrCall extends SolrCall {
     return solrReq;
   }
 
-  public SolrParams getQueryParams() {
-    return queryParams;
+  public SolrParams getSolrParams() {
+    return solrParams;
   }
 
   /** The collection(s) referenced in this request. */

@@ -25,6 +25,8 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.lucene.util.LuceneTestCase.Slow;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestUtil;
@@ -183,8 +185,8 @@ public class ZkControllerTest extends SolrTestCaseJ4 {
 
       zkClient.makePath(ZkConfigManager.CONFIGS_ZKNODE, false, false);
       zkClient.makePath(ZkConfigManager.CONFIGS_ZKNODE + "/" + actualConfigName, false, false);
-      
-      Map<String,Object> props = new HashMap<>();
+
+      Object2ObjectMap<String,Object> props = new Object2ObjectLinkedOpenHashMap<>();
       props.put("configName", actualConfigName);
       ZkNodeProps zkProps = new ZkNodeProps(props);
       zkClient.makePath(ZkStateReader.COLLECTIONS_ZKNODE + "/"

@@ -186,6 +186,12 @@ public class LBHttp2SolrClient extends LBSolrClient {
 
       @Override public void onFailure(Throwable oe, int code, Object context) {
         try {
+
+          if (code == 200) {
+            listener.onFailure((!isZombie) ? addZombie(baseUrl, new SolrException(SolrException.ErrorCode.SERVER_ERROR,oe)) : new SolrException(SolrException.ErrorCode.SERVER_ERROR,oe), false);
+            return;
+          }
+
           throw (Exception) oe;
         } catch (BaseHttpSolrClient.RemoteExecutionException e) {
           req.retryCount.incrementAndGet();

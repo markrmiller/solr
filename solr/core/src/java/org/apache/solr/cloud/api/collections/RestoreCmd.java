@@ -35,6 +35,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.cloud.Overseer;
 import org.apache.solr.cloud.api.collections.OverseerCollectionMessageHandler.ShardRequestTracker;
 import org.apache.solr.cloud.overseer.OverseerAction;
@@ -154,7 +156,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
 
     //Create core-less collection
     {
-      Map<String, Object> propMap = new HashMap<>();
+      Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
       propMap.put(Overseer.QUEUE_OPERATION, CREATE.toString());
       propMap.put("fromApi", "true"); // mostly true.  Prevents autoCreated=true in the collection state.
       propMap.put(REPLICATION_FACTOR, numNrtReplicas);
@@ -208,7 +210,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
     //Mark all shards in CONSTRUCTION STATE while we restore the data
     {
       //TODO might instead createCollection accept an initial state?  Is there a race?
-      Map<String, Object> propMap = new HashMap<>();
+      Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
       propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
       for (Slice shard : restoreCollection.getSlices()) {
         propMap.put(shard.getName(), Slice.State.CONSTRUCTION.toString());
@@ -243,7 +245,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
       if (log.isInfoEnabled()) {
         log.info("Adding replica for shard={} collection={} ", slice.getName(), restoreCollection);
       }
-      HashMap<String, Object> propMap = new HashMap<>();
+      Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
       propMap.put(Overseer.QUEUE_OPERATION, CREATESHARD);
       propMap.put(COLLECTION_PROP, restoreCollectionName);
       propMap.put(SHARD_ID_PROP, slice.getName());
@@ -333,7 +335,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
 
     //Mark all shards in ACTIVE STATE
     {
-      HashMap<String, Object> propMap = new HashMap<>();
+      Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
       propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
       propMap.put("id", restoreCollection.getId());
       for (Slice shard : restoreCollection.getSlices()) {
@@ -375,7 +377,7 @@ public class RestoreCmd implements OverseerCollectionMessageHandler.Cmd {
           if (log.isDebugEnabled()) {
             log.debug("Adding replica for shard={} collection={} of type {} ", slice.getName(), restoreCollection, typeToCreate);
           }
-          HashMap<String, Object> propMap = new HashMap<>();
+          Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
           propMap.put(COLLECTION_PROP, restoreCollectionName);
           propMap.put(SHARD_ID_PROP, slice.getName());
           propMap.put(REPLICA_TYPE, typeToCreate.name());

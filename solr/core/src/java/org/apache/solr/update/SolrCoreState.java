@@ -27,6 +27,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.Sort;
 import org.apache.solr.cloud.RecoveryStrategy;
 import org.apache.solr.common.AlreadyClosedException;
+import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.core.CoreContainer;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.DirectoryFactory;
@@ -165,9 +166,9 @@ public abstract class SolrCoreState {
     void closeWriter(IndexWriter writer) throws IOException;
   }
 
-  public abstract void doRecovery(SolrCore core, String source);
+  public abstract void doRecovery(SolrCore core, String source, Replica leader);
 
-  public abstract void doRecovery(CoreContainer cc, CoreDescriptor cd, String source);
+  public abstract void doRecovery(CoreContainer cc, CoreDescriptor cd, String source, Replica leader);
   
   public abstract void cancelRecovery();
 

@@ -16,6 +16,8 @@
  */
 package org.apache.solr.common.cloud;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.agrona.collections.Object2ObjectHashMap;
 import org.noggit.JSONWriter;
 
@@ -62,7 +64,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
   /** Loads multiple slices into a Map from a generic Map that probably came from deserialized JSON. */
   public static Map<String,Slice> loadAllFromMap(String collection, Integer id, Map<String, Object> genericSlices) {
     if (genericSlices == null) return Collections.emptyMap();
-    Map<String, Slice> result = new LinkedHashMap<>(genericSlices.size());
+    Map<String, Slice> result =  new Object2ObjectLinkedOpenHashMap<>(genericSlices.size(), 0.5f);
     genericSlices.forEach((name, val) -> {
       if (val instanceof Slice) {
         result.put(name, (Slice) val);
@@ -160,7 +162,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
    * @param props  The properties of the slice - a shallow copy will always be made.
    */
   public Slice(String name, Map<String,Replica> replicas, Map<String,Object> props, String collection, Integer collectionId) {
-    super(props == null ? new LinkedHashMap(32) : new LinkedHashMap<>(props));
+    super(props == null ? new Object2ObjectLinkedOpenHashMap<>(32, 0.5f) : new Object2ObjectLinkedOpenHashMap<>(props, 0.5f));
     this.name = name;
     this.collection = collection;
     this.collectionId = collectionId;
@@ -205,7 +207,7 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
       this.routingRules = new Object2ObjectHashMap<>();
       rules.forEach((key, o) -> {
         if (o instanceof Map) {
-          Map map = (Map) o;
+          Object2ObjectLinkedOpenHashMap map = (Object2ObjectLinkedOpenHashMap) o;
           RoutingRule rule = new RoutingRule(key, map);
           routingRules.put(key, rule);
         } else {
@@ -222,14 +224,14 @@ public class Slice extends ZkNodeProps implements Iterable<Replica> {
 
   private Map<String,Replica> makeReplicas(String collection, Integer collectionId, String slice, Map<String,Object> genericReplicas) {
     if (genericReplicas == null) return new Object2ObjectHashMap();
-    Map<String,Replica> result = new LinkedHashMap<>(genericReplicas.size());
+    Object2ObjectMap<String,Replica> result = new Object2ObjectLinkedOpenHashMap<String,Replica>(genericReplicas.size(), 0.5f);
     genericReplicas.forEach((name, val) -> {
       Replica r;
       if (val instanceof Replica) {
         r = (Replica) val;
 
       } else {
-        r = new Replica(name, (Map<String,Object>) val, collection, collectionId, this.name, this);
+        r = new Replica(name, new Object2ObjectLinkedOpenHashMap((Map)val, 0.25f), collection, collectionId, this.name, this);
 
       }
       result.put(name, r);

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
@@ -265,7 +266,7 @@ abstract class FacetParser<FacetRequestT extends FacetRequest> {
     } else if (raw instanceof List) {
       result = (List<Object>) raw;
     } else {
-      result = new ArrayList<>(1);
+      result = new ObjectArrayList<>(1);
       result.add(raw);
     }
     return result;

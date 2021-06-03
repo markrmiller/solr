@@ -114,12 +114,6 @@ public class SolrCmdDistributor implements Closeable {
   public void finish() {
     assert !finished : "lifecycle sanity check";
 
-//    if (cancelExeption != null) {
-//      Throwable exp = cancelExeption;
-//      cancelExeption = null;
-//      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
-//    }
-
     if (isClosed == null || !isClosed.isClosed()) {
       try {
         asyncTracker.waitForComplete(10, TimeUnit.MINUTES);
@@ -204,7 +198,14 @@ public class SolrCmdDistributor implements Closeable {
 
   public void distribDelete(DeleteUpdateCommand cmd, List<Node> nodes, ModifiableSolrParams params, boolean sync,
                             RollupRequestReplicationTracker rollupTracker,
-                            LeaderRequestReplicationTracker leaderTracker) throws IOException {
+                            LeaderRequestReplicationTracker leaderTracker) {
+
+    if (cancelExeption != null) {
+      Throwable exp = cancelExeption;
+      cancelExeption = null;
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
+    }
+
     if (nodes == null) return;
 
     for (Node node : nodes) {
@@ -234,6 +235,11 @@ public class SolrCmdDistributor implements Closeable {
   public void distribAdd(AddUpdateCommand cmd, List<Node> nodes, ModifiableSolrParams params, boolean synchronous,
                          RollupRequestReplicationTracker rollupTracker,
                          LeaderRequestReplicationTracker leaderTracker) throws IOException {
+    if (cancelExeption != null) {
+      Throwable exp = cancelExeption;
+      cancelExeption = null;
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
+    }
     if (nodes == null) return;
     for (Node node : nodes) {
       if (node == null) continue;
@@ -252,7 +258,11 @@ public class SolrCmdDistributor implements Closeable {
 
   public void distribCommit(CommitUpdateCommand cmd, List<Node> nodes,
       ModifiableSolrParams params) {
-
+    if (cancelExeption != null) {
+      Throwable exp = cancelExeption;
+      cancelExeption = null;
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
+    }
     if (log.isDebugEnabled()) {
       log.debug("Distrib commit to: {} params: {}", nodes, params);
     }
@@ -271,7 +281,11 @@ public class SolrCmdDistributor implements Closeable {
 
   public void blockAndDoRetries() {
     try {
-
+      if (cancelExeption != null) {
+        Throwable exp = cancelExeption;
+        cancelExeption = null;
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
+      }
       asyncTracker.waitForComplete(TIMEOUT, TimeUnit.MINUTES);
 
       //replicaSolrClient.waitForOutstandingRequests(TIMEOUT, TimeUnit.MINUTES);
@@ -290,11 +304,11 @@ public class SolrCmdDistributor implements Closeable {
   // section submit
   private void submit(final Req req, String tag) {
 
-    //    if (cancelExeption != null) {
-    //      Throwable exp = cancelExeption;
-    //      cancelExeption = null;
-    //      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
-    //    }
+        if (cancelExeption != null) {
+          Throwable exp = cancelExeption;
+          cancelExeption = null;
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, exp);
+        }
 
     //    if (log.isDebugEnabled()) {
     //      log.debug("sending update to " + req.node.getUrl() + " retry:" + req.retries + " " + req.cmd + " params:" + req.uReq.getParams());
@@ -367,18 +381,40 @@ public class SolrCmdDistributor implements Closeable {
             if (asyncReq.get() != null) {
               asyncRequests.remove(asyncReq.get());
             }
-            if (t instanceof ClosedChannelException) {
-              // we may get success but be told the peer is shutting down via exception
-              if (log.isTraceEnabled()) {
-                log.trace("Success for distrib update {}", code);
-              }
-              return;
-            }
+
+            Error error = new Error(tag);
+            error.t = t;
+            error.req = req;
+            error.statusCode = code;
 
             log.error("Exception sending dist update code={}", code, t);
 
+            if (t instanceof ClosedChannelException) {
+              // we may get success but be told the peer is shutting down via exception
+              log.info("Channel closed code={}", code);
+
+              if (code != 200) {
+                allErrors.put(req.cmd, error);
+              }
+              cancelExeption = new AlreadyClosedException();
+              return;
+            }
+
+            if (t instanceof IOException) {
+              if (t.getMessage() != null && t.getMessage().contains("cancel_stream_error")) {
+                if (code != 200) {
+                  allErrors.put(req.cmd, error);
+                }
+                cancelExeption = new AlreadyClosedException();
+                return;
+              }
+            }
+
             if (t instanceof Http2SolrClient.CancelledException) {
               log.info("Stream cancelled code={}", code);
+              if (code != 200) {
+                allErrors.put(req.cmd, error);
+              }
               return;
             }
 
@@ -389,10 +425,7 @@ public class SolrCmdDistributor implements Closeable {
               return;
             }
 
-            Error error = new Error(tag);
-            error.t = t;
-            error.req = req;
-            error.statusCode = code;
+
 
             boolean retry = checkRetry(error);
 

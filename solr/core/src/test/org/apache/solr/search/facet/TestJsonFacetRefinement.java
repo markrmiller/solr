@@ -121,12 +121,12 @@ public class TestJsonFacetRefinement extends SolrTestCaseHS {
     ObjectBuilder ob = new ObjectBuilder(parser) {
       @Override
       public Object newObject() throws IOException {
-        return new HashMap();
+        return new SimpleOrderedMap();
       }
 
       @Override
       public void addKeyVal(Object map, Object key, Object val) throws IOException {
-        ((HashMap) map).put(key.toString(), val);
+        ((SimpleOrderedMap) map).add(key.toString(), val);
       }
     };
 

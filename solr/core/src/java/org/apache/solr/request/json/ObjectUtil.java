@@ -91,13 +91,13 @@ public class ObjectUtil {
     for (int i=0; i<path.size()-1; i++) {
       Map<String,Object> sub = (Map<String,Object>)outer.get(path.get(i));
       if (sub == null) {
-        sub = new LinkedHashMap<String,Object>();
+        sub = new LinkedHashMap<>();
         outer.put(path.get(i), sub);
       }
       outer = sub;
     }
 
-    String key = path.size() > 0 ? path.get(path.size()-1) : null;
+    String key = !path.isEmpty() ? path.get(path.size()-1) : null;
 
     if (key != null) {
       Object existingVal = outer.put(key, val);

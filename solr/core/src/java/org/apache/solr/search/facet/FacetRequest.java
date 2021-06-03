@@ -17,12 +17,11 @@
 package org.apache.solr.search.facet;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.lucene.search.Query;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
@@ -51,8 +50,8 @@ public abstract class FacetRequest {
     final String sortVariable;
     final SortDirection sortDirection;
     public FacetSort(final String sortVariable, final SortDirection sortDirection) {
-      assert null != sortVariable;
-      assert null != sortDirection;
+      Objects.requireNonNull(sortVariable);
+      Objects.requireNonNull(sortDirection);
       
       this.sortVariable = sortVariable;
       this.sortDirection = sortDirection;
@@ -127,8 +126,8 @@ public abstract class FacetRequest {
   }
 
 
-  protected volatile Map<String,AggValueSource> facetStats;  // per-bucket statistics
-  protected volatile Map<String,FacetRequest> subFacets;     // per-bucket sub-facets
+  protected Map<String,AggValueSource> facetStats;  // per-bucket statistics
+  protected Map<String,FacetRequest> subFacets;     // per-bucket sub-facets
   protected boolean processEmpty;
   protected Domain domain;
 
@@ -327,8 +326,8 @@ public abstract class FacetRequest {
   }
 
   public FacetRequest() {
-    facetStats = new LinkedHashMap<>();
-    subFacets = new LinkedHashMap<>();
+    facetStats = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
+    subFacets = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
   }
 
   public Map<String, AggValueSource> getFacetStats() {
@@ -402,7 +401,7 @@ public abstract class FacetRequest {
   }
 
   /** Process the request with the facet context settings, a parameter-object. */
-  final Map process(FacetContext fcontext) throws IOException {
+  final Object process(FacetContext fcontext) throws IOException {
     @SuppressWarnings("rawtypes")
     FacetProcessor facetProcessor = createFacetProcessor(fcontext);
 

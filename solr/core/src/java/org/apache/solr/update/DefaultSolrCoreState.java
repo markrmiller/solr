@@ -19,23 +19,20 @@ package org.apache.solr.update;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.index.IndexDeletionPolicy;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.store.Directory;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.client.solrj.util.Cancellable;
-import org.apache.solr.cloud.ActionThrottle;
-import org.apache.solr.cloud.LeaderElector;
-import org.apache.solr.cloud.RecoveryStrategy;
-import org.apache.solr.cloud.StatePublisher;
+import org.apache.solr.cloud.*;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.ParWork;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.Replica;
+import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.util.IOUtils;
@@ -56,20 +53,20 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public final class DefaultSolrCoreState extends SolrCoreState implements RecoveryStrategy.RecoveryListener {
+  public static final String SKIPPING_RECOVERY_BECAUSE_SOLR_IS_SHUTDOWN = "Skipping recovery because Solr is shutdown";
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  public static final String RESTART_OF_PREP_RECOVERY_FAILED = "Restart of Prep recovery failed";
 
   private final AtomicReference<Boolean> needsRecovery = new AtomicReference<>();
 
@@ -79,8 +76,6 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
 
   private final ActionThrottle recoveryThrottle = new ActionThrottle("recovery", Integer.getInteger("solr.recoveryThrottle", 0));
-
-  private final AtomicInteger recoveryWaiting = new AtomicInteger();
 
   // Use the readLock to retrieve the current IndexWriter (may be lazily opened)
   // Use the writeLock for changing index writers
@@ -372,7 +367,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     lock(iwLock.readLock());
     try {
       if (indexWriter != null) {
-        final MergePolicy mergePolicy = indexWriter.getConfig().getMergePolicy();
+        final var mergePolicy = indexWriter.getConfig().getMergePolicy();
         if (mergePolicy instanceof SortingMergePolicy) {
           return ((SortingMergePolicy)mergePolicy).getSort();
         }
@@ -394,20 +389,21 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
   }
 
   @Override
-  public void doRecovery(CoreContainer cc, CoreDescriptor cd, String source) {
+  public void doRecovery(CoreContainer cc, CoreDescriptor cd, String source, Replica leader) {
     try (SolrCore core = cc.getCore(cd.getName())) {
-      doRecovery(core, source);
+      doRecovery(core, source, leader);
     }
   }
 
   @Override
-  public void doRecovery(SolrCore core, String source) {
+  public void doRecovery(SolrCore core, String source, Replica leader) {
 
     log.info("Do recovery for core {} source={}", core.getName(), source);
-    CoreContainer corecontainer = core.getCoreContainer();
-    if (prepForClose || closed || corecontainer.isShutDown()) {
-      log.warn("Skipping recovery because Solr is shutdown");
+    var coreContainer = core.getCoreContainer();
+    if (prepForClose || closed || coreContainer.isShutDown()) {
+      log.warn(SKIPPING_RECOVERY_BECAUSE_SOLR_IS_SHUTDOWN);
       return;
+
     }
 
     try {
@@ -418,7 +414,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
       //
       if (log.isDebugEnabled()) log.debug("Submit recovery for {}", core.getName());
 
-      Boolean newVal = needsRecovery.getAndUpdate(aBoolean -> {
+      needsRecovery.getAndUpdate(aBoolean -> {
         if (recoveryRunning) {
           log.info("Recovery already running core {}", core.getName());
           cancelRecovery();
@@ -426,12 +422,16 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
         }
         recoveryRunning = true;
         log.info("Running recovery for core {}", core.getName());
-        RecoveryTask recoveryTask = new RecoveryTask(core, corecontainer, needsRecovery);
+        var recoveryTask = new RecoveryTask(core, coreContainer, needsRecovery);
 
         try {
-          sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask);
+          sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, leader);
+        } catch (AlreadyClosedException e) {
+          log.info("Already closed while starting recovery");
+          return true;
         } catch (Exception e) {
           log.error("Exception starting recovery", e);
+          return true; // nocommit - we should wait ane retry ...
         }
         return false;
       });
@@ -442,99 +442,142 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     }
   }
 
-  final private void sendPrepRecoveryCmd(SolrCore core, CoreDescriptor coreDescriptor, RecoveryTask recoveryTask) throws Exception {
+  final private void sendPrepRecoveryCmd(SolrCore core, CoreDescriptor coreDescriptor, RecoveryTask recoveryTask, Replica leaderReplica) {
+
+    if (core.getCoreContainer().isShutDown()) {
+      throw new AlreadyClosedException();
+    }
+
     CompletableFuture.runAsync(() -> {
 
       if (core.getCoreContainer().isShutDown()) {
         throw new AlreadyClosedException();
       }
-      while (true) {
+
+      try {
+        LeaderElector leaderElector = core.getCoreContainer().getZkController().getLeaderElector(core.getName());
+
+        if (leaderElector != null && leaderElector.isLeader()) {
+          log.warn("We are the leader, STOP recovery", new SolrException(ErrorCode.INVALID_STATE, "Leader in recovery"));
+          var zkNodes = ZkNodeProps
+                  .fromKeyVals(StatePublisher.OPERATION, OverseerAction.STATE.toLower(), ZkStateReader.CORE_NAME_PROP, core.getName(), "id",
+                          core.getCoreDescriptor().getCoreProperty("collId", null) + "-" + core.getCoreDescriptor().getCoreProperty("id", null), ZkStateReader.COLLECTION_PROP, core.getCoreDescriptor().getCollectionName(), ZkStateReader.STATE_PROP, Replica.State.LEADER);
+          core.getCoreContainer().getZkController().publish(zkNodes);
+          return;
+        }
+
+        if (leaderReplica == null) {
+          var foundLeader = new AtomicBoolean();
+          String shardId = coreDescriptor.getCloudDescriptor().getShardId();
+          core.getCoreContainer().getZkController().zkStateReader.waitForState(coreDescriptor.getCollectionName(), Integer.getInteger("solr.waitForLeaderInZkRegSec", 60), TimeUnit.SECONDS, (n, c) -> {
+            if (log.isDebugEnabled()) {
+              log.debug("wait for leader notified collection={}", c == null ? "(null)" : c);
+            }
+
+            if (c == null) return false;
+            Slice slice = c.getSlice(shardId);
+            if (slice == null) return false;
+            Replica fleader = slice.getLeader(n);
+
+            if (fleader != null && fleader.getState() == Replica.State.ACTIVE) {
+              boolean success = foundLeader.compareAndSet(false, true);
+              if (success) {
+                if (log.isDebugEnabled()) {
+                  log.debug("Found ACTIVE leader for slice={} leader={}", slice.getName(), fleader);
+                }
+                core.getCoreContainer().getUpdateShardHandler().getRecoveryExecutor().submit(() -> sendCmd(core, fleader, recoveryTask));
+              }
+              return true;
+            }
+
+            return false;
+          });
+        } else {
+          core.getCoreContainer().getUpdateShardHandler().getRecoveryExecutor().submit(() -> sendCmd(core, leaderReplica, recoveryTask));
+        }
+      } catch (Exception e) {
+        ParWork.propagateInterrupt(e);
+
         try {
-          LeaderElector leaderElector = core.getCoreContainer().getZkController().getLeaderElector(core.getName());
-
-          if (leaderElector != null && leaderElector.isLeader()) {
-            log.warn("We are the leader, STOP recovery", new SolrException(ErrorCode.INVALID_STATE, "Leader in recovery"));
-            ZkNodeProps zkNodes = ZkNodeProps
-                .fromKeyVals(StatePublisher.OPERATION, OverseerAction.STATE.toLower(), ZkStateReader.CORE_NAME_PROP, core.getName(), "id",
-                    core.getCoreDescriptor().getCoreProperty("collId", null) + "-" + core.getCoreDescriptor().getCoreProperty("id", null), ZkStateReader.COLLECTION_PROP, core.getCoreDescriptor().getCollectionName(), ZkStateReader.STATE_PROP, Replica.State.LEADER);
-            core.getCoreContainer().getZkController().publish(zkNodes);
-            break;
-          }
-
-          log.debug("Publishing state of core [{}] as buffering {}", core.getName(), "doSyncOrReplicateRecovery");
-
-          core.getCoreContainer().getZkController().publish(core.getCoreDescriptor(), Replica.State.BUFFERING);
-
-          Replica leader = null;
-          try {
-            leader = core.getCoreContainer().getZkController().getZkStateReader()
-                .getLeaderRetry(core.getCoreContainer().getUpdateShardHandler().getRecoveryOnlyClient(), core.getCoreDescriptor().getCollectionName(),
-                    core.getCoreDescriptor().getCloudDescriptor().getShardId(), Integer.getInteger("solr.getleader.looptimeout", 8000), false);
-          } catch (InterruptedException e) {
-            log.info("Interrupted, bailing on recovery");
-          } catch (TimeoutException timeoutException) {
-            log.info("Timeout looking for leader");
-          }
-
-          recoveryTask.setFistLeader(leader);
-
-          String leaderCoreName = leader.getName();
-
-          if (leader.getNodeName().equals(core.getCoreContainer().getZkController().getNodeName())) {
-            if (!core.getCoreContainer().getZkController().zkStateReader.isLocalLeader.isLocalLeader(leaderCoreName)) {
-              break;
-            }
-          }
-          String leaderBaseUrl = leader.getBaseUrl();
-          CoreAdminRequest.WaitForState prepCmd = new CoreAdminRequest.WaitForState();
-          prepCmd.setCoreName(core.getName());
-          prepCmd.setLeaderName(leaderCoreName);
-          prepCmd.setState(Replica.State.BUFFERING);
-          prepCmd.setCoresCollection(coreDescriptor.getCollectionName());
-          prepCmd.setCheckIsLeader(true);
-
-          if (prepForClose || closed || core.getCoreContainer().isShutDown()) {
-            log.warn("Skipping recovery because Solr is shutdown");
-             break;
-          }
-          log.info("Sending prep recovery command to {} for leader={} params={}", leaderBaseUrl, leaderCoreName, prepCmd.getParams());
-
-          try (Http2SolrClient client = new Http2SolrClient.Builder(leaderBaseUrl).withHttpClient(core.getCoreContainer().getUpdateShardHandler().getRecoveryOnlyClient()).markInternalRequest().build()) {
-
-            prepCmd.setBasePath(leaderBaseUrl);
-            CountDownLatch latch = new CountDownLatch(1);
-            AtomicReference<NamedList> results = new AtomicReference<>();
-            AtomicReference<Throwable> exp = new AtomicReference<>();
-            prevSendPreRecoveryRequest = client.asyncRequest(prepCmd, null, new PrepRecoveryAsyncListener(results, exp, recoveryTask, core));
-            break;
-          } catch (SolrException e) {
-            Throwable cause = e.getRootCause();
-            if (cause instanceof AlreadyClosedException) {
-              break;
-            }
-            log.info("failed in prep recovery", e);
-          } catch (Exception e) {
-            log.info("failed in prep recovery", e);
-          }
-        } catch (Exception e) {
-          log.info("failed in prep recovery", e);
+          sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, null);
+        } catch (Exception e2) {
+          log.error(RESTART_OF_PREP_RECOVERY_FAILED, e2);
         }
       }
+
     }, core.getCoreContainer().getUpdateShardHandler().getRecoveryExecutor());
 
   }
 
-  private class PrepRecoveryAsyncListener implements AsyncListener<NamedList<Object>> {
-    private final AtomicReference<NamedList> results;
+  private void sendCmd(SolrCore core, Replica leader, RecoveryTask recoveryTask) {
+    try {
+    log.debug("Publishing state of core [{}] as buffering {}", core.getName(), "doSyncOrReplicateRecovery");
 
-    private final AtomicReference<Throwable> exp;
+    core.getCoreContainer().getZkController().publish(core.getCoreDescriptor(), Replica.State.BUFFERING);
+
+    recoveryTask.setFistLeader(leader);
+
+    String leaderCoreName = leader.getName();
+
+    if (leader.getNodeName().equals(core.getCoreContainer().getZkController().getNodeName()) &&
+            !core.getCoreContainer().getZkController().zkStateReader.isLocalLeader.isLocalLeader(leaderCoreName)) {
+      try {
+        sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, null);
+      } catch (Exception e) {
+        log.error(RESTART_OF_PREP_RECOVERY_FAILED, e);
+      }
+      return;
+    }
+    String leaderBaseUrl = leader.getBaseUrl();
+    var prepCmd = new CoreAdminRequest.WaitForState();
+    prepCmd.setCoreName(core.getName());
+    prepCmd.setLeaderName(leaderCoreName);
+    prepCmd.setState(Replica.State.BUFFERING);
+    prepCmd.setCoresCollection(core.getCoreDescriptor().getCollectionName());
+    prepCmd.setCheckIsLeader(true);
+
+    if (prepForClose || closed || core.getCoreContainer().isShutDown()) {
+      log.warn(SKIPPING_RECOVERY_BECAUSE_SOLR_IS_SHUTDOWN);
+      return;
+    }
+    log.info("Sending prep recovery command to {} for leader={} params={}", leaderBaseUrl, leaderCoreName, prepCmd.getParams());
+
+    try {
+      Http2SolrClient client = core.getCoreContainer().getUpdateShardHandler().getRecoveryOnlyClient();
+      prepCmd.setBasePath(leaderBaseUrl);
+      AtomicReference<NamedList<Object>> results = new AtomicReference<>();
+      AtomicReference<Throwable> exp = new AtomicReference<>();
+      prevSendPreRecoveryRequest = client.asyncRequest(prepCmd, null, new PrepRecoveryAsyncListener(results, exp, recoveryTask, core));
+    } catch (SolrException e) {
+      Throwable cause = e.getRootCause();
+      if (cause instanceof AlreadyClosedException) {
+        return;
+      }
+      log.info("failed in prep recovery", e);
+    } catch (Exception e) {
+      log.info("failed in prep recovery", e);
+    }
+  } catch (Exception e) {
+      ParWork.propagateInterrupt(e);
+
+      try {
+        sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, null);
+      } catch (Exception e2) {
+        log.error(RESTART_OF_PREP_RECOVERY_FAILED, e2);
+      }
+    }
+
+}
+
+  private class PrepRecoveryAsyncListener implements AsyncListener<NamedList<Object>> {
+    private final AtomicReference<NamedList<Object>> results;
+
     private final RecoveryTask recoveryTask;
     private final SolrCore core;
 
-    public PrepRecoveryAsyncListener(AtomicReference<NamedList> results, AtomicReference<Throwable> exp, RecoveryTask recoveryTask, SolrCore core) {
+    public PrepRecoveryAsyncListener(AtomicReference<NamedList<Object>> results, AtomicReference<Throwable> exp, RecoveryTask recoveryTask, SolrCore core) {
       this.results = results;
 
-      this.exp = exp;
       this.recoveryTask = recoveryTask;
       this.core = core;
     }
@@ -556,9 +599,9 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     @Override public void onFailure(Throwable throwable, int code, Object context) {
       log.info("Prep recovery failed", throwable);
       try {
-        sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask);
+        sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, null);
       } catch (Exception e) {
-        log.error("Restart of Prep recovery failed", e);
+        log.error(RESTART_OF_PREP_RECOVERY_FAILED, e);
       }
     }
   }
@@ -617,7 +660,9 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     cancelRecovery(false, true);
 
     try {
-      prevSendPreRecoveryRequest.cancel();
+      if (prevSendPreRecoveryRequest != null) {
+        prevSendPreRecoveryRequest.cancel();
+      }
     } catch (NullPointerException e) {
 
     }
@@ -652,7 +697,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     private final SolrCore core;
     private final CoreContainer corecontainer;
     private final AtomicReference<Boolean> needsRecovery;
-    private volatile Replica firstLeader;
+    private Replica firstLeader;
 
     public RecoveryTask(SolrCore core, CoreContainer corecontainer, AtomicReference<Boolean> needsRecoveryRef) {
       this.core = core;
@@ -661,7 +706,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     }
 
     @Override public void run() {
-      CoreDescriptor coreDescriptor = core.getCoreDescriptor();
+      var coreDescriptor = core.getCoreDescriptor();
       MDCLoggingContext.setCoreName(core.getName());
       MDCLoggingContext.setNode(corecontainer.getZkController().getNodeName());
       try {
@@ -674,7 +719,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
 
         // check before we grab the lock
         if (prepForClose || closed || corecontainer.isShutDown()) {
-          log.warn("Skipping recovery because Solr is shutdown");
+          log.warn(SKIPPING_RECOVERY_BECAUSE_SOLR_IS_SHUTDOWN);
           return;
         }
 
@@ -697,7 +742,7 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
       } finally {
 
         needsRecovery.getAndUpdate(aBoolean -> {
-          if (!aBoolean) {
+          if (!Boolean.TRUE.equals(aBoolean)) {
             return false;
           }
           recoveryRunning = true;

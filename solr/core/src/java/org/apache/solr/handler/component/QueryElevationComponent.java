@@ -16,7 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import com.carrotsearch.hppc.IntIntHashMap;
 import com.carrotsearch.hppc.cursors.IntIntCursor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Collections2;
@@ -26,6 +25,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.ObjectArrays;
 import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMapIndex;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import net.sf.saxon.om.NodeInfo;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
@@ -538,7 +540,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
     }
     boolean forceElevation = rb.req.getParams().getBool(QueryElevationParams.FORCE_ELEVATION, this.forceElevation);
     boolean useConfigured = rb.req.getParams().getBool(QueryElevationParams.USE_CONFIGURED_ELEVATED_ORDER, this.useConfiguredElevatedOrder);
-    final IntIntHashMap elevatedWithPriority = getBoostDocs(rb.req.getSearcher(), elevation.elevatedIds, rb.req.getContext());
+    final Int2IntOpenHashMapIndex elevatedWithPriority = getBoostDocs(rb.req.getSearcher(), elevation.elevatedIds, rb.req.getContext());
     ElevationComparatorSource comparator = new ElevationComparatorSource(elevatedWithPriority, useConfigured);
     setSortSpec(rb, forceElevation, comparator);
     setGroupingSpec(rb, forceElevation, comparator);
@@ -640,23 +642,23 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
    */
   //TODO consider simplifying to remove "boosted" arg which can be looked up in context via BOOSTED key?
   @SuppressWarnings({"unchecked"})
-  public static IntIntHashMap getBoostDocs(SolrIndexSearcher indexSearcher, Set<BytesRef> boosted,
-                                           @SuppressWarnings({"rawtypes"})Map context) throws IOException {
+  public static Int2IntOpenHashMapIndex getBoostDocs(SolrIndexSearcher indexSearcher, Set<BytesRef> boosted,
+                                                     @SuppressWarnings({"rawtypes"})Map context) throws IOException {
 
-    IntIntHashMap boostDocs = null;
+    Int2IntOpenHashMapIndex boostDocs = null;
 
     if (boosted != null) {
 
       //First see if it's already in the request context. Could have been put there by another caller.
       if (context != null) {
-        boostDocs = (IntIntHashMap) context.get(BOOSTED_DOCIDS);
+        boostDocs = (Int2IntOpenHashMapIndex) context.get(BOOSTED_DOCIDS);
         if (boostDocs != null) {
           return boostDocs;
         }
       }
 
       //Not in the context yet so load it.
-      boostDocs = new IntIntHashMap(boosted.size()); // docId to boost
+      boostDocs = new Int2IntOpenHashMapIndex(boosted.size()); // docId to boost
       int priority = boosted.size() + 1; // the corresponding priority for each boosted key (starts at this; decrements down)
       for (BytesRef uniqueKey : boosted) {
         priority--; // therefore first == bosted.size(); last will be 1
@@ -1136,20 +1138,20 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
   /** Elevates certain docs to the top. */
   private static class ElevationComparatorSource extends FieldComparatorSource {
 
-    private final IntIntHashMap elevatedWithPriority;
+    private final Int2IntOpenHashMapIndex elevatedWithPriority;
     private final boolean useConfiguredElevatedOrder;
     private final int[] sortedElevatedDocIds;
 
-    private ElevationComparatorSource(IntIntHashMap elevatedWithPriority, boolean useConfiguredElevatedOrder) {
+    private ElevationComparatorSource(Int2IntOpenHashMapIndex elevatedWithPriority, boolean useConfiguredElevatedOrder) {
       this.elevatedWithPriority = elevatedWithPriority;
       this.useConfiguredElevatedOrder = useConfiguredElevatedOrder;
 
       // copy elevatedWithPriority keys (doc IDs) into sortedElevatedDocIds, sorted
       sortedElevatedDocIds = new int[elevatedWithPriority.size()];
-      final Iterator<IntIntCursor> iterator = elevatedWithPriority.iterator();
+      ObjectIterator<Int2IntMap.Entry> iterator = elevatedWithPriority.int2IntEntrySet().fastIterator();
       for (int i = 0; i < sortedElevatedDocIds.length; i++) {
-        IntIntCursor next = iterator.next();
-        sortedElevatedDocIds[i] = next.key;
+        Int2IntMap.Entry next = iterator.next();
+        sortedElevatedDocIds[i] = next.getIntKey();
       }
       assert iterator.hasNext() == false;
       Arrays.sort(sortedElevatedDocIds);

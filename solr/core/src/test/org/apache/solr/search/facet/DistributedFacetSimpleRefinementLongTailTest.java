@@ -16,9 +16,9 @@
  */
 package org.apache.solr.search.facet;
 
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.util.LuceneTestCase;
@@ -27,6 +27,8 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A test the demonstrates some of the expected behavior fo "long tail" terms when using <code>refine:simple</code>
@@ -44,7 +46,7 @@ import org.junit.Test;
  */
 @LuceneTestCase.Nightly // can be slow
 public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistributedSearchTestCase {
-
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static List<String> ALL_STATS;
                                                         
   private final String STAT_FIELD;
@@ -146,17 +148,17 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     SolrParams req = params( "q", "*:*", "distrib", "false", "json.facet",
                              " { foo:{ type:terms, limit:10, field:foo_s, facet:{ bar:{ type:terms, limit:10, field:bar_s }}}}");
 
-    List<Map>[] shardFooBuckets = new List[clients.size()];
+    List<NamedList>[] shardFooBuckets = new List[clients.size()];
     for (int i = 0; i < clients.size(); i++) {
-      shardFooBuckets[i] = (List<Map>)
-        ((Map<String,Map>)clients.get(i).query( req ).getResponse().get("facets")).get("foo").get("buckets");
+      shardFooBuckets[i] = (List<NamedList>)
+        ((NamedList<NamedList>)clients.get(i).query( req ).getResponse().get("facets")).get("foo").get("buckets");
     }
 
     // top 5 same on all shards
     for (int i = 0; i < 3; i++) {
       assertEquals(10, shardFooBuckets[i].size());
       for (int j = 0; j < 5; j++) {
-        Map bucket = shardFooBuckets[i].get(j);
+        NamedList bucket = shardFooBuckets[i].get(j);
         assertEquals(bucket.toString(), "aaa"+j, bucket.get("val"));
         assertEquals(bucket.toString(), 100L, bucket.get("count"));
       }
@@ -164,7 +166,7 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     // top 6-10 same on shard0 & shard1
     for (int i = 0; i < 2; i++) {
       for (int j = 5; j < 10; j++) {
-        Map bucket = shardFooBuckets[i].get(j);
+        NamedList bucket = shardFooBuckets[i].get(j);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("bbb"));
         assertEquals(bucket.toString(), 50L, bucket.get("count"));
       }
@@ -176,20 +178,20 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     assertEquals("tail", shardFooBuckets[2].get(6).get("val"));
     assertEquals(45L, shardFooBuckets[2].get(6).get("count"));
     for (int j = 7; j < 10; j++) {
-      Map bucket = shardFooBuckets[2].get(j);
+      NamedList bucket = shardFooBuckets[2].get(j);
       assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("ZZZ"));
       assertEquals(bucket.toString(), 1L, bucket.get("count"));
     }
     
     // check 'bar' sub buckets on "tail" from shard2
-    { List<Map> bar_buckets = (List<Map>)  ((Map<String,Map>) shardFooBuckets[2].get(6).get("bar")).get("buckets");
+    { List<NamedList> bar_buckets = (List<NamedList>)  ((NamedList<NamedList>) shardFooBuckets[2].get(6).get("bar")).get("buckets");
       assertEquals(6, bar_buckets.size());
       for (int j = 0; j < 5; j++) {
-        Map bucket = bar_buckets.get(j);
+        NamedList bucket = bar_buckets.get(j);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("junkB"));
         assertEquals(bucket.toString(), 8L, bucket.get("count"));
       }
-      Map bucket = bar_buckets.get(5);
+      NamedList bucket = bar_buckets.get(5);
       assertEquals("tailB", bucket.get("val"));
       assertEquals(5L, bucket.get("count"));
     }
@@ -199,20 +201,20 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     // // distributed queries // //
 
     { // w/o refinement, the default overrequest isn't enough to find the long 'tail' *OR* the correct count for 'bbb0'...
-      List<Map> foo_buckets = (List<Map>)
-        ((Map<String,Map>)
+      List<NamedList> foo_buckets = (List<NamedList>)
+        ((NamedList<NamedList>)
          queryServer( params( "q", "*:*", "shards", shardsWithDead, "json.facet",
                               "{ foo: { type:terms, refine:none, limit:6, field:foo_s } }"
                               ) ).getResponse().get("facets")).get("foo").get("buckets");
       assertEquals(6, foo_buckets.size());
       for (int i = 0; i < 5; i++) {
-        Map bucket = foo_buckets.get(i);
+        NamedList bucket = foo_buckets.get(i);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("aaa"));
         assertEquals(bucket.toString(), 300L, bucket.get("count"));
       }
 
       // this will be short the "+1" fo the doc added to shard2...
-      Map bucket = foo_buckets.get(5);
+      NamedList bucket = foo_buckets.get(5);
       assertTrue(bucket.toString(), bucket.get("val").equals("bbb0")); // 'tail' is missed
       assertEquals(bucket.toString(), 100L, bucket.get("count")); // will not include the "+1" for the doc added to shard2
     }
@@ -220,20 +222,20 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     // even if we enable refinement, we still won't find the long 'tail' ...
     // regardless of wether we use either the default overrequest, or disable overrequesting...
     for (String over : Arrays.asList( "", "overrequest:0,")) { 
-      List<Map> foo_buckets = (List<Map>)
-        ((Map<String, Map>)
+      List<NamedList> foo_buckets = (List<NamedList>)
+        ((NamedList<NamedList>)
          queryServer( params( "q", "*:*", "shards", shardsWithDead, "json.facet",
                               "{ foo: { type:terms, refine:simple, limit:6, "+ over +" field:foo_s, facet:{ " + ALL_STATS_JSON + 
                               "  bar: { type:terms, refine:simple, limit:6, "+ over +" field:bar_s, facet:{"+ALL_STATS_JSON+"}}}}}"
                               ) ).getResponse().get("facets")).get("foo").get("buckets");
       assertEquals(6, foo_buckets.size());
       for (int i = 0; i < 5; i++) {
-        Map bucket = foo_buckets.get(i);
+        NamedList bucket = foo_buckets.get(i);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("aaa"));
         assertEquals(bucket.toString(), 300L, bucket.get("count"));
       }
       // ...but it should have correctly asked shard2 to refine bbb0
-      Map bucket = foo_buckets.get(5);
+      NamedList bucket = foo_buckets.get(5);
       assertTrue(bucket.toString(), bucket.get("val").equals("bbb0"));
       assertEquals(bucket.toString(), 101L, bucket.get("count"));
       // ...and the status under bbb0 should be correct to include the refinement
@@ -268,8 +270,8 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
                                           "refine:simple, overrequest:0," )) {
 
 
-      List<Map> buckets = (List<Map>)
-        ((Map<String,Map>)
+      List<NamedList> buckets = (List<NamedList>)
+        ((NamedList<NamedList>)
          queryServer( params( "q", "*:*", "shards", shardsWithDead, "json.facet",
                               "{ foo: { type:terms, limit:6, overrequest:20, refine:simple, field:foo_s, facet:{ " +
                               "  bar: { type:terms, limit:6, " + bar_opts + " field:bar_s }}}}"
@@ -277,16 +279,16 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
 
       assertEquals(6, buckets.size());
       for (int i = 0; i < 5; i++) {
-        Map bucket = buckets.get(i);
+        NamedList bucket = buckets.get(i);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("aaa"));
         assertEquals(bucket.toString(), 300L, bucket.get("count"));
       }
 
-      Map bucket = buckets.get(5);
+      NamedList bucket = buckets.get(5);
       assertEquals(bucket.toString(), "tail", bucket.get("val"));
       assertEquals(bucket.toString(), 135L, bucket.get("count"));
       // check the sub buckets
-      buckets = ((Map<String,Map<String,List<Map>>>) bucket).get("bar").get("buckets");
+      buckets = ((NamedList<NamedList<List<NamedList>>>) bucket).get("bar").get("buckets");
       assertEquals(6, buckets.size());
       bucket = buckets.get(0);
       assertEquals(bucket.toString(), "tailB", bucket.get("val"));
@@ -305,8 +307,8 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
                                           "refine:none,   overrequest:1,",
                                           "refine:simple, overrequest:1," )) {
       
-      List<Map> buckets = (List<Map>)
-        ((Map<String,Map>)
+      List<NamedList> buckets = (List<NamedList>)
+        ((NamedList<NamedList>)
          queryServer( params( "q", "*:*", "shards", shardsWithDead, "json.facet",
                               "{ foo: { type:terms, limit:6, overrequest:20, refine:simple, field:foo_s, facet:{ " +
                               "  bar: { type:terms, limit:5, " + bar_opts + " field:bar_s }}}}"
@@ -314,15 +316,15 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
       
       assertEquals(6, buckets.size());
       for (int i = 0; i < 5; i++) {
-        Map bucket = buckets.get(i);
+        NamedList bucket = buckets.get(i);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("aaa"));
         assertEquals(bucket.toString(), 300L, bucket.get("count"));
       }
-      Map bucket = buckets.get(5);
+      NamedList bucket = buckets.get(5);
       assertEquals(bucket.toString(), "tail", bucket.get("val"));
       assertEquals(bucket.toString(), 135L, bucket.get("count"));
       // check the sub buckets
-      buckets = ((Map<String,Map<String,List<Map>>>) bucket).get("bar").get("buckets");
+      buckets = ((NamedList<NamedList<List<NamedList>>>) bucket).get("bar").get("buckets");
       assertEquals(5, buckets.size());
       bucket = buckets.get(0);
       assertEquals(bucket.toString(), "tailB", bucket.get("val"));
@@ -339,8 +341,8 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     for (String bar_opts : Arrays.asList( "refine:none,   overrequest:0,",
                                           "refine:simple, overrequest:0," )) {
       
-      List<Map> buckets = (List<Map>)
-        ((Map<String,Map>)
+      List<NamedList> buckets = (List<NamedList>)
+        ((NamedList<NamedList>)
          queryServer( params( "q", "*:*", "shards", shardsWithDead, "json.facet",
                               "{ foo: { type:terms, limit:6, overrequest:20, refine:simple, field:foo_s, facet:{ " +
                               "  bar: { type:terms, limit:5, " + bar_opts + " field:bar_s }}}}"
@@ -348,15 +350,15 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
 
       assertEquals(6, buckets.size());
       for (int i = 0; i < 5; i++) {
-        Map bucket = buckets.get(i);
+        NamedList bucket = buckets.get(i);
         assertTrue(bucket.toString(), bucket.get("val").toString().startsWith("aaa"));
         assertEquals(bucket.toString(), 300L, bucket.get("count"));
       }
-      Map bucket = buckets.get(5);
+      NamedList bucket = buckets.get(5);
       assertEquals(bucket.toString(), "tail", bucket.get("val"));
       assertEquals(bucket.toString(), 135L, bucket.get("count"));
       // check the sub buckets
-      buckets = ((Map<String,Map<String,List<Map>>>) bucket).get("bar").get("buckets");
+      buckets = ((NamedList<NamedList<List<NamedList>>>) bucket).get("bar").get("buckets");
       assertEquals(5, buckets.size());
       for (int i = 0; i < 5; i++) { // ccc(0-4)
         bucket = buckets.get(i);
@@ -383,7 +385,7 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
   
   private void checkSubFacetStats(String extraJson) throws Exception {
     String commonJson = "type: terms, " + extraJson;
-    Map all_facets = (Map) queryServer
+    NamedList<NamedList> all_facets = (NamedList) queryServer
       ( params( "q", "*:*", "shards", shardsWithDead, "rows" , "0", "json.facet",
                 "{ foo : { " + commonJson + " field: foo_s, facet: { " +
                 ALL_STATS_JSON + " bar: { " + commonJson + " field: bar_s, facet: { " + ALL_STATS_JSON +
@@ -394,9 +396,9 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     
     assertNotNull(all_facets);
 
-    List<Map> foo_buckets = (List) ((Map)all_facets.get("foo")).get("buckets");
+    List<NamedList> foo_buckets = (List) ((NamedList)all_facets.get("foo")).get("buckets");
 
-    Map aaa0_Bucket = foo_buckets.get(0);
+    NamedList aaa0_Bucket = foo_buckets.get(0);
     assertEquals(ALL_STATS.size() + 3, aaa0_Bucket.size()); // val,count,facet
     assertEquals("aaa0", aaa0_Bucket.get("val"));
     assertEquals(300L, aaa0_Bucket.get("count"));
@@ -413,7 +415,7 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     assertEquals(284L, aaa0_Bucket.get("unique"));
     assertEquals(284L, aaa0_Bucket.get("hll"));
 
-    Map tail_Bucket = foo_buckets.get(5);
+    NamedList tail_Bucket = foo_buckets.get(5);
     assertEquals(ALL_STATS.size() + 3, tail_Bucket.size()); // val,count,facet
     assertEquals("tail", tail_Bucket.get("val"));
     assertEquals(135L, tail_Bucket.get("count"));
@@ -430,9 +432,9 @@ public class DistributedFacetSimpleRefinementLongTailTest extends BaseDistribute
     assertEquals(45L, tail_Bucket.get("unique"));
     assertEquals(45L, tail_Bucket.get("hll"));
 
-    List<Map> tail_bar_buckets = (List) ((Map)tail_Bucket.get("bar")).get("buckets");
+    List<NamedList> tail_bar_buckets = (List) ((NamedList)tail_Bucket.get("bar")).get("buckets");
 
-    Map tailB_Bucket = tail_bar_buckets.get(0);
+    NamedList tailB_Bucket = tail_bar_buckets.get(0);
     assertEquals(ALL_STATS.size() + 3, tailB_Bucket.size()); // val,count,skg ... NO SUB FACETS
     assertEquals("tailB", tailB_Bucket.get("val"));
     assertEquals(17L, tailB_Bucket.get("count"));

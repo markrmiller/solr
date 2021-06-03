@@ -18,6 +18,7 @@ package org.apache.solr.client.solrj.impl;
 
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.FastInputStream;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.JavaBinCodec;
 
@@ -42,14 +43,14 @@ public class BinaryResponseParser extends ResponseParser {
   @Override
   public NamedList<Object> processResponse(InputStream body, String encoding) {
     try (JavaBinCodec codec = createCodec()) {
-      return (NamedList<Object>) codec.unmarshal(body);
+      return (NamedList<Object>) codec.unmarshal(FastInputStream.wrap(body));
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "parsing error", e);
     }
   }
 
   protected JavaBinCodec createCodec() {
-    return new JavaBinCodec(null);
+    return new JavaBinCodec();
   }
 
   @Override

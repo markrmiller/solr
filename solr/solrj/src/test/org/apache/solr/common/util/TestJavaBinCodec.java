@@ -112,6 +112,69 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     return parentDocument;
   }
 
+  private List<Object> generateFewDataTypes0() {
+    List<Object> types = new ArrayList<>();
+    types.add(-4);
+    types.add((long)5000000L);
+    return types;
+  }
+
+  private List<Object> generateFewDataTypes() {
+    List<Object> types = new ArrayList<>();
+
+    types.add(null); //NULL
+    types.add(true);
+    types.add(false);
+    types.add((byte) 1);
+    types.add((short) 2);
+    types.add((double) 3);
+    return types;
+  }
+
+  private List<Object> generateFewDataTypes2() {
+    List<Object> types = new ArrayList<>();
+
+
+    types.add(-4);
+    types.add(4);
+    types.add(42);
+
+    types.add((long) -5);
+    types.add((long) 5);
+    types.add((long) 50);
+
+    types.add((float) 6);
+    types.add(new Date(0));
+
+    return types;
+  }
+
+  private List<Object> generateFewDataTypes3() {
+    List<Object> types = new ArrayList<>();
+
+
+    Map<Integer, Integer> map = new HashMap<>();
+    map.put(1, 2);
+    types.add(map);
+
+    SolrDocument doc = new SolrDocument();
+    doc.addField("foo", "bar");
+    types.add(doc);
+//
+    SolrDocumentList solrDocs = new SolrDocumentList();
+    solrDocs.setMaxScore(1.0f);
+    solrDocs.setNumFound(1);
+    solrDocs.setNumFoundExact(Boolean.TRUE);
+    solrDocs.setStart(0);
+    solrDocs.add(0, doc);
+    types.add(solrDocs);
+
+    types.add(new byte[] {1,2,3,4,5});
+
+    return types;
+  }
+
+
   private List<Object> generateAllDataTypes() {
     List<Object> types = new ArrayList<>();
 
@@ -194,12 +257,12 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
   public void testBackCompat() throws IOException {
     try (InputStream is = getClass().getResourceAsStream(SOLRJ_JAVABIN_BACKCOMPAT_BIN); JavaBinCodec javabin = new JavaBinCodec(){
       @Override
-      public List<Object> readIterator(InputStream fis) throws IOException {
-        return super.readIterator(fis);
+      public List<Object> readIterator(JavaBinInputStream fis) throws IOException {
+        return super.readIterator(FastInputStream.wrap(fis));
       }
     };)
     {
-      List<Object> unmarshaledObj = (List<Object>) javabin.unmarshal(is);
+      List<Object> unmarshaledObj = (List<Object>) javabin.unmarshal(FastInputStream.wrap(is));
       List<Object> matchObj = generateAllDataTypes();
       compareObjects(unmarshaledObj, matchObj);
     } catch (IOException e) {
@@ -219,13 +282,13 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
       } else if (unmarshaledObj.get(i) instanceof SolrDocument && matchObj.get(i) instanceof SolrDocument) {
         assertTrue(SolrTestUtil.compareSolrDocument(unmarshaledObj.get(i), matchObj.get(i)));
       } else if (unmarshaledObj.get(i) instanceof SolrDocumentList && matchObj.get(i) instanceof SolrDocumentList) {
-        assertTrue(SolrTestUtil.compareSolrDocumentList(unmarshaledObj.get(i), matchObj.get(i)));
+        assertTrue(unmarshaledObj.get(i) + " vs " + matchObj.get(i), SolrTestUtil.compareSolrDocumentList(unmarshaledObj.get(i), matchObj.get(i)));
       } else if (unmarshaledObj.get(i) instanceof SolrInputDocument && matchObj.get(i) instanceof SolrInputDocument) {
-        assertTrue(compareSolrInputDocument(unmarshaledObj.get(i), matchObj.get(i)));
+        assertTrue("unmarshalled:\n" + unmarshaledObj.get(i) + "]\nobj:\n" + matchObj.get(i) , compareSolrInputDocument(unmarshaledObj.get(i), matchObj.get(i)));
       } else if (unmarshaledObj.get(i) instanceof SolrInputField && matchObj.get(i) instanceof SolrInputField) {
         assertTrue(assertSolrInputFieldEquals(unmarshaledObj.get(i), matchObj.get(i)));
       } else {
-        assertEquals(unmarshaledObj.get(i), matchObj.get(i));
+        assertEquals( matchObj.get(i), unmarshaledObj.get(i));
       }
 
     }
@@ -290,6 +353,83 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
   }
 
   @Test
+  public void testFewTypes0() throws IOException {
+    List<Object> obj = generateFewDataTypes0();
+    compareObjects(
+            (List) getObject(getBytes(obj)),
+            (List) obj
+    );
+  }
+
+  @Test
+  public void testFewTypes() throws IOException {
+    List<Object> obj = generateFewDataTypes();
+    compareObjects(
+            (List) getObject(getBytes(obj)),
+            (List) obj
+    );
+  }
+
+  @Test
+  public void testFewTypes2() throws IOException {
+    List<Object> obj = generateFewDataTypes2();
+    compareObjects(
+            (List) getObject(getBytes(obj)),
+            (List) obj
+    );
+  }
+
+  @Test
+  public void testFewTypes3() throws IOException {
+    List<Object> obj = generateFewDataTypes3();
+    compareObjects(
+            (List) getObject(getBytes(obj)),
+            (List) obj
+    );
+  }
+
+  @Test
+  public void testFewTypes4() throws IOException {
+    List<Object> obj = generateFewDataTypes4();
+    compareObjects(
+            (List) getObject(getBytes(obj)),
+            (List) obj
+    );
+  }
+
+  private List<Object> generateFewDataTypes4() {
+    List<Object> types = new ArrayList<>();
+
+    types.add("bam");
+    types.add("QTime");
+    types.add("indexversion");
+
+    Map map = new HashMap();;
+    map.put("fsv", "fingerprint");
+    map.put("score", "distrib");
+    map.put("shards.purpose", "wt");
+
+    NamedList nl = new NamedList();;
+    map.put("highlight", "expand");
+    map.put("start", "trace");
+    map.put("STATUS", 3333L);
+
+
+    SolrInputDocument idoc = new SolrInputDocument();
+    idoc.addField("response", "q");
+    types.add(idoc);
+
+    SolrInputDocument parentDoc = new SolrInputDocument();
+    parentDoc.addField("responseHeader", "bar");
+    SolrInputDocument childDoc = new SolrInputDocument();
+    childDoc.addField("id", "bar");
+    parentDoc.addChildDocument(childDoc);
+    types.add(parentDoc);
+
+    return types;
+  }
+
+  @Test
   public void testAllTypes() throws IOException {
     List<Object> obj = generateAllDataTypes();
     compareObjects(
@@ -339,7 +479,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     try (InputStream is = getClass().getResourceAsStream(fileName)) {
       try (DataInputInputStream dis = new FastInputStream(is)) {
         try (JavaBinCodec javabin = new JavaBinCodec()) {
-          return javabin.readMapEntry((InputStream) dis);
+          return javabin.readMapEntry(FastInputStream.wrap(is));
         }
       }
     }
@@ -418,11 +558,10 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     assertTrue(l1.get(1).equals(l2.get(1)));
     assertFalse(l1.get(1) == l2.get(1));
 
-    JavaBinCodec.StringCache stringCache = new JavaBinCodec.StringCache(new MapBackedCache<>(new HashMap<>()));
 
 
-    try (JavaBinCodec c1 = new JavaBinCodec(null);
-         JavaBinCodec c2 = new JavaBinCodec(null)) {
+    try (JavaBinCodec c1 = new JavaBinCodec();
+         JavaBinCodec c2 = new JavaBinCodec()) {
 
       m1 = (Map) c1.unmarshal(new ByteArrayInputStream(b1));
       m2 = (Map) c2.unmarshal(new ByteArrayInputStream(b2));
@@ -470,7 +609,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     printMem("before cache init");
 
     Cache<StringBytes, String> cache1 = new MapBackedCache<>(new HashMap<>()) ;
-    final JavaBinCodec.StringCache STRING_CACHE = new JavaBinCodec.StringCache(cache1);
+
 
 //    STRING_CACHE = new JavaBinCodec.StringCache(cache);
     byte[] bytes = new byte[0];
@@ -482,7 +621,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
       int maxSize = end * 4;
       if (bytes == null || bytes.length < maxSize) bytes = new byte[maxSize];
       int sz = ByteUtils.UTF16toUTF8(s, 0, end, bytes, 0);
-      STRING_CACHE.get(stringBytes.reset(bytes, 0, sz));
+      //STRING_CACHE.get(stringBytes.reset(bytes, 0, sz));
     }
     printMem("after cache init");
 
@@ -495,7 +634,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
       for (int i = 0; i < ITERS; i++) {
         StringBytes b = l.get(i % l.size());
         stringBytes1.reset(b.bytes, 0, b.bytes.length);
-        if (STRING_CACHE.get(stringBytes1) == null) throw new RuntimeException("error");
+      //  if (STRING_CACHE.get(stringBytes1) == null) throw new RuntimeException("error");
       }
 
     });
@@ -607,13 +746,13 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     int ret = 0;
     final RTimer timer = new RTimer();
     ConcurrentLRUCache underlyingCache = cacheSz > 0 ? new ConcurrentLRUCache<>(cacheSz,cacheSz-cacheSz/10,cacheSz,cacheSz/10,false,true,null) : null;  // the cache in the first version of the patch was 10000,9000,10000,1000,false,true,null
-    final JavaBinCodec.StringCache stringCache = underlyingCache==null ? null : new JavaBinCodec.StringCache(underlyingCache);
+
     if (nThreads <= 0) {
-      ret += doDecode(buffers, iter, stringCache);
+      ret += doDecode(buffers, iter);
     } else {
       runInThreads(nThreads, () -> {
         try {
-          doDecode(buffers, iter, stringCache);
+          doDecode(buffers, iter);
         } catch (IOException e) {
           log.error("", e);
         }
@@ -625,7 +764,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     if (underlyingCache != null) System.out.println("cache: hits=" + underlyingCache.getStats().getCumulativeHits() + " lookups=" + underlyingCache.getStats().getCumulativeLookups() + " size=" + underlyingCache.getStats().getCurrentSize());
   }
 
-  public static int doDecode(byte[][] buffers, long iter, JavaBinCodec.StringCache stringCache) throws IOException {
+  public static int doDecode(byte[][] buffers, long iter) throws IOException {
     int ret = 0;
     int bufnum = -1;
 
@@ -639,7 +778,7 @@ public class TestJavaBinCodec extends SolrTestCaseJ4 {
     while (--iter >= 0) {
       if (++bufnum >= buffers.length) bufnum = 0;
       byte[] buf = buffers[bufnum];
-      try (JavaBinCodec javabin = new JavaBinCodec(null)) {
+      try (JavaBinCodec javabin = new JavaBinCodec()) {
         FastInputStream in = new FastInputStream(empty, 0);
         Object o = javabin.unmarshal(in);
         if (o instanceof SolrDocument) {

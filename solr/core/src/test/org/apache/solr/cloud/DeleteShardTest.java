@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestUtil;
 import org.apache.solr.client.solrj.cloud.DistributedQueue;
@@ -112,7 +114,7 @@ public class DeleteShardTest extends SolrCloudTestCase {
 
     // TODO can this be encapsulated better somewhere?
     DistributedQueue inQueue =  cluster.getJettySolrRunner(0).getCoreContainer().getZkController().getOverseer().getStateUpdateQueue();
-    Map<String, Object> propMap = new HashMap<>();
+    Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
     propMap.put(Overseer.QUEUE_OPERATION, OverseerAction.UPDATESHARDSTATE.toLower());
     propMap.put(slice, state.toString());
     propMap.put("id", id);

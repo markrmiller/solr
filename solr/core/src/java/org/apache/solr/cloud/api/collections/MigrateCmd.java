@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.cloud.Overseer;
@@ -146,7 +148,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
     ZkStateReader zkStateReader = ocmh.zkStateReader;
     if (clusterState.hasCollection(tempSourceCollectionName)) {
       log.info("Deleting temporary collection: {}", tempSourceCollectionName);
-      Map<String, Object> props = makeMap(
+      Object2ObjectMap<String, Object> props = makeMap(
           Overseer.QUEUE_OPERATION, DELETE.toLower(),
           NAME, tempSourceCollectionName);
 
@@ -234,7 +236,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
 
     // create a temporary collection with just one node on the shard leader
     String configName = zkStateReader.readConfigName(sourceCollection.getName());
-    Map<String, Object> props = makeMap(
+    Object2ObjectMap<String, Object> props = makeMap(
         Overseer.QUEUE_OPERATION, CREATE.toLower(),
         NAME, tempSourceCollectionName,
         NRT_REPLICAS, 1,
@@ -300,7 +302,7 @@ public class MigrateCmd implements OverseerCollectionMessageHandler.Cmd {
     DocCollection docCollection = clusterState.getCollection(tempSourceCollectionName);
 
     String tempCollectionReplica2 = Assign.buildSolrCoreName(docCollection, tempSourceSlice.getName(), Replica.Type.NRT, ocmh.overseer).coreName;
-    props = new HashMap<>();
+    props = new Object2ObjectLinkedOpenHashMap<>();
     props.put(Overseer.QUEUE_OPERATION, ADDREPLICA.toLower());
     props.put(COLLECTION_PROP, tempSourceCollectionName);
     props.put(SHARD_ID_PROP, tempSourceSlice.getName());

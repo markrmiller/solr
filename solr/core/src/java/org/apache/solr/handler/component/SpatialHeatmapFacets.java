@@ -46,9 +46,9 @@ public class SpatialHeatmapFacets {
 
   /** Called by {@link org.apache.solr.request.SimpleFacets} to compute heatmap facets. */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public static Map getHeatmapForField(String fieldKey, String fieldName, ResponseBuilder rb, SolrParams params, DocSet docSet) throws IOException {
+  public static NamedList<Object> getHeatmapForField(String fieldKey, String fieldName, ResponseBuilder rb, SolrParams params, DocSet docSet) throws IOException {
     final FacetRequest facetRequest = createHeatmapRequest(fieldKey, fieldName, rb, params);
-    return (Map) facetRequest.process(rb.req, docSet);
+    return (NamedList) facetRequest.process(rb.req, docSet);
   }
 
   private static FacetRequest createHeatmapRequest(String fieldKey, String fieldName, ResponseBuilder rb, SolrParams params) {
@@ -108,14 +108,14 @@ public class SpatialHeatmapFacets {
    * {@link org.apache.solr.handler.component.SearchComponent#handleResponses(ResponseBuilder, ShardRequest)}. */
   @SuppressWarnings("unchecked")
   public static void distribHandleResponse(LinkedHashMap<String, HeatmapFacet> heatmapFacets, @SuppressWarnings({"rawtypes"})NamedList srsp_facet_counts) {
-    NamedList<Map> facet_heatmaps = (NamedList<Map>) srsp_facet_counts.get(RESPONSE_KEY);
+    NamedList<NamedList<Object>> facet_heatmaps = (NamedList<NamedList<Object>>) srsp_facet_counts.get(RESPONSE_KEY);
     if (facet_heatmaps == null) {
       return;
     }
     // (should the caller handle the above logic?  Arguably yes.)
-    for (Map.Entry<String, Map> entry : facet_heatmaps) {
+    for (Map.Entry<String, NamedList<Object>> entry : facet_heatmaps) {
       String fieldKey = entry.getKey();
-      Map shardNamedList = entry.getValue();
+      NamedList<Object> shardNamedList = entry.getValue();
       final HeatmapFacet facet = heatmapFacets.get(fieldKey);
       if (facet == null) {
         log.error("received heatmap for field/key {} that we weren't expecting", fieldKey);

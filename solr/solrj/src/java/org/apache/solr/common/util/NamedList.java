@@ -66,7 +66,39 @@ import org.apache.solr.common.params.SolrParams;
 public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry<String,T>> , MapWriter {
 
   private static final long serialVersionUID = 1957981902839867821L;
+  private static final NamedList EMPTY_NAMED_LIST = new NamedList<>(0) {
+    public void add(String name, Object val) {
+     throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Modifies the name of the pair at the specified index.
+     */
+    public void setName(int idx, String name) {
+      throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Modifies the value of the pair at the specified index.
+     *
+     * @return the value that used to be at index
+     */
+    public Object setVal(int idx, Object val) {
+      throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Removes the name/value pair at the specified index.
+     *
+     * @return the value at the index removed
+     */
+    public Object remove(int idx) {
+      throw new UnsupportedOperationException();
+    }
+  };
+
   protected final List<Object> nvPairs;
+  private Entry mapEntry;
 
   /** Creates an empty instance */
   public NamedList() {
@@ -76,6 +108,10 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
   public NamedList(int sz) {
     nvPairs = new ArrayList<>(sz<<1);
+  }
+
+  public static <T> NamedList<T>  emptyList() {
+    return EMPTY_NAMED_LIST;
   }
 
   @Override
@@ -530,7 +566,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * Iterates over the Map and sequentially adds its key/value pairs
    */
   public boolean addAll(Map<String,T> args) {
-    args.forEach((key, value) -> add(key, value));
+    args.forEach(this::add);
     return args.size()>0;
   }
 
@@ -562,7 +598,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
     final NamedList<T> list = this;
 
-    Iterator<Map.Entry<String,T>> iter = new Iterator<Map.Entry<String,T>>() {
+    Iterator<Map.Entry<String,T>> iter = new Iterator<>() {
 
       int idx = 0;
 
@@ -572,30 +608,14 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
       }
 
       @Override
-      public Map.Entry<String,T> next() {
+      public Map.Entry<String, T> next() {
         final int index = idx++;
-        Map.Entry<String,T> nv = new Map.Entry<String,T>() {
-          @Override
-          public String getKey() {
-            return list.getName( index );
-          }
-
-          @Override
-          public T getValue() {
-            return list.getVal( index );
-          }
-
-          @Override
-          public String toString() {
-            return getKey()+"="+getValue();
-          }
-
-          @Override
-          public T setValue(T value) {
-            return list.setVal(index, value);
-          }
-        };
-        return nv;
+        if (mapEntry == null) {
+          mapEntry = new Entry();
+        }
+        mapEntry.index = index;
+        mapEntry.list = list;
+        return mapEntry;
       }
 
       @Override
@@ -877,6 +897,44 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
     @Override
     public void forEach(BiConsumer action) {
       namedList.forEach(action);
+    }
+  }
+
+  private class Entry implements Map.Entry<String, T> {
+
+    private NamedList<T> list;
+    private int index;
+
+    public Entry() {
+
+    }
+
+    @Override
+    public String getKey() {
+      return list.getName(index);
+    }
+
+    @Override
+    public T getValue() {
+      return list.getVal(index);
+    }
+
+    @Override
+    public String toString() {
+      return getKey() + "=" + getValue();
+    }
+
+    @Override
+    public T setValue(T value) {
+      return list.setVal(index, value);
+    }
+
+    public void setList(NamedList<T> list) {
+      this.list = list;
+    }
+
+    public void setIndex(int index) {
+      this.index = index;
     }
   }
 }

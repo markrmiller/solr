@@ -137,13 +137,13 @@ public class SolrPluginUtils {
    * @param invariants values which will be used instead of any request, or default values, regardless of context.
    */
   public static void setDefaults(SolrQueryRequest req, SolrParams defaults, SolrParams appends, SolrParams invariants) {
-    setDefaults(null, req, defaults, appends, invariants);
+    setDefaults(null, req, defaults, appends, invariants, null);
   }
 
   public static void setDefaults(SolrRequestHandler handler, SolrQueryRequest req, SolrParams defaults,
-                                 SolrParams appends, SolrParams invariants) {
-    String useParams = (String) req.getContext().get(USEPARAM);
-    if(useParams != null) {
+                                 SolrParams appends, SolrParams invariants, String useParamsParam) {
+    String useParams = useParamsParam != null ? useParamsParam : (String) req.getContext().get(USEPARAM);
+    if (useParams != null) {
       RequestParams rp = req.getCore().getSolrConfig().getRequestParams();
       defaults = applyParamSet(rp, defaults, useParams, DEFAULTS);
       appends = applyParamSet(rp, appends, useParams, APPENDS);

@@ -196,7 +196,7 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
 
       InputStream in = new ByteArrayInputStream(expandableBuffer1.byteArray(), 0, out.position() + out.buffer().wrapAdjustment());
       try (JavaBinCodec jbc = new JavaBinCodec(resolver)) {
-        return (NamedList<Object>) jbc.unmarshal(in);
+        return (NamedList<Object>) jbc.unmarshal(FastInputStream.wrap(in));
       }
     }
     catch (Exception ex) {

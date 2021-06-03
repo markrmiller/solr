@@ -459,7 +459,7 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
                                  e.getMessage(), e);
     }
     try {
-      final Map facetResponse = (Map) topNamedList.get("facets");
+      final NamedList facetResponse = (NamedList) topNamedList.get("facets");
       assertNotNull("null facet results?", facetResponse);
       assertEquals("numFound mismatch with top count?",
                    rsp.getResults().getNumFound(), ((Number)facetResponse.get("count")).longValue());
@@ -482,14 +482,14 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
   private void assertFacetCountsAreCorrect(final AtomicInteger maxBucketsToCheck,
                                            final Map<String,TermFacet> expected,
                                            final SolrParams baseParams,
-                                           final Map actualFacetResponse) throws SolrServerException, IOException {
+                                           final NamedList actualFacetResponse) throws SolrServerException, IOException {
 
     for (Map.Entry<String,TermFacet> entry : expected.entrySet()) {
       final String facetKey = entry.getKey();
       final TermFacet facet = entry.getValue();
-      final Map results = (Map) actualFacetResponse.get(facetKey);
+      final NamedList results = (NamedList) actualFacetResponse.get(facetKey);
       assertNotNull(facetKey + " key missing from: " + actualFacetResponse, results);
-      final List<Map> buckets = (List<Map>) results.get("buckets");
+      final List<NamedList> buckets = (List<NamedList>) results.get("buckets");
       assertNotNull(facetKey + " has null buckets: " + actualFacetResponse, buckets);
 
       if (buckets.isEmpty()) {
@@ -500,7 +500,7 @@ public class TestCloudJSONFacetJoinDomain extends SolrCloudTestCase {
                      0, docsWithField);
       }
       
-      for (Map bucket : buckets) {
+      for (NamedList bucket : buckets) {
         final long count = ((Number) bucket.get("count")).longValue();
         final String fieldVal = bucket.get("val").toString(); // int or stringified int
 

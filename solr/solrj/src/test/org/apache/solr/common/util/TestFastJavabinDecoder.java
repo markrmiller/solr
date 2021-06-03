@@ -46,7 +46,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
 
     FastOutputStream faos = new FastOutputStream(baos);
 
-    try (JavaBinCodec codec = new JavaBinCodec(faos, null)) {
+    try (JavaBinCodec codec = new JavaBinCodec(faos)) {
       codec.writeVal(10);
       codec.writeVal(100);
       codec.writeVal("Hello!");
@@ -67,7 +67,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
       assertEquals(100, scodec.readSmallInt(scodec.dis));
       tag = scodec.getTag();
       assertEquals(Tag._STR, tag);
-      assertEquals("Hello!", scodec.readStr(fis, null));
+      assertEquals("Hello!", scodec.readStr(fis));
     }
   }
 

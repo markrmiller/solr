@@ -54,6 +54,9 @@
         <AsyncLogger name="org.apache.solr.core.SolrCoreState" level="INFO"/>
         <AsyncLogger name="org.apache.solr.update.LoggingInfoStream" level="OFF"/>
 
+
+        <AsyncLogger name="org.apache.solr.common.util.JavaBinCodec" level="INFO"/>
+
         <AsyncLogger name="org.apache.solr.core.CoreContainer.Deprecation" additivity="false" level="OFF">
             <AppenderRef ref="null"/>
         </AsyncLogger>
@@ -61,7 +64,7 @@
 
         <AsyncRoot level="INFO">
             <AppenderRef ref="FILE"/>
-            <!--   <AppenderRef ref="STDERR"/> -->
+            <AppenderRef ref="STDERR"/>
            </AsyncRoot>
        </Loggers>
    </Configuration>

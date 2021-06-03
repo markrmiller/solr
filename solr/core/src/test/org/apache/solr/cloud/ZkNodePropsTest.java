@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.common.cloud.ZkNodeProps;
 import org.apache.solr.common.util.FastOutputStream;
@@ -33,8 +35,8 @@ import org.junit.Test;
 public class ZkNodePropsTest extends SolrTestCaseJ4 {
   @Test
   public void testBasic() throws IOException {
-    
-    Map<String,Object> props = new HashMap<>();
+
+    Object2ObjectMap<String,Object> props = new Object2ObjectLinkedOpenHashMap<>();
     props.put("prop1", "value1");
     props.put("prop2", "value2");
     props.put("prop3", "value3");

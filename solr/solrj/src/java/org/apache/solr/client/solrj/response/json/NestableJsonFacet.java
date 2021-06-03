@@ -39,13 +39,13 @@ public class NestableJsonFacet {
   private final Map<String, Object> statsByName;
   private final Map<String, HeatmapJsonFacet> heatmapFacetsByName;
 
-  public NestableJsonFacet(Map<String, Object> facetNL) {
+  public NestableJsonFacet(NamedList<Object> facetNL) {
     queryFacetsByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     bucketBasedFacetByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     heatmapFacetsByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     statsByName = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
 
-    for (Map.Entry<String, Object> entry : facetNL.entrySet()) {
+    for (Map.Entry<String, Object> entry : facetNL) {
       final String key = entry.getKey();
       if (getKeysToSkip().contains(key)) {
         continue;
@@ -56,7 +56,7 @@ public class NestableJsonFacet {
         // Stat/agg facet value
         statsByName.put(key, entry.getValue());
       } else if(entry.getValue() instanceof NamedList) { // Either heatmap/query/range/terms facet
-        final Map facet = (Map) entry.getValue();
+        final NamedList<Object> facet = (NamedList<Object>) entry.getValue();
         final boolean isBucketBased = facet.get("buckets") != null;
         final boolean isHeatmap = HeatmapJsonFacet.isHeatmapFacet(facet);
         if (isBucketBased) {
@@ -64,7 +64,7 @@ public class NestableJsonFacet {
         } else if (isHeatmap) {
           heatmapFacetsByName.put(key, new HeatmapJsonFacet(facet));
         } else { // "query" facet
-          queryFacetsByName.put(key, new NestableJsonFacet((Map<String, Object>) facet));
+          queryFacetsByName.put(key, new NestableJsonFacet(facet));
         }
       }
     }

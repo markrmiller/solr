@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import org.apache.solr.SolrTestCase;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.ZkStateReader;
@@ -152,7 +154,7 @@ public class ReplicaListTransformerTest extends SolrTestCase {
 
         final String name = "coll1_s1_r_n" + (ii + 1);
         final String url = urls.get(ii);
-        final Map<String, Object> propMap = new HashMap<String, Object>();
+        final Object2ObjectMap<String, Object> propMap = new Object2ObjectLinkedOpenHashMap<>();
         propMap.put(ZkStateReader.NODE_NAME_PROP, url);
         propMap.put("type", "NRT");
         propMap.put("id", ii);
