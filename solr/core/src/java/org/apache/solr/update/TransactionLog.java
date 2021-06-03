@@ -117,7 +117,7 @@ public class TransactionLog implements Closeable {
 
     @Override
     public void writeExternString(CharSequence s) throws IOException {
-      log.info("tlog writeExternString s={}", s);
+      log.trace("tlog writeExternString s={}", s);
       if (s == null) {
         writeTag(NULL);
         return;
@@ -377,7 +377,7 @@ public class TransactionLog implements Closeable {
       expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
       expandableBuffer1.byteBuffer().limit(out.position() + expandableBuffer1.wrapAdjustment());
 
-      fos.putBytes( expandableBuffer1.byteBuffer().position()+  expandableBuffer1.wrapAdjustment(), expandableBuffer1.byteBuffer(), out.position());
+      fos.putBytes( pos, expandableBuffer1.byteBuffer(), out.position());
 
       fos.putInt(out.position(), lastSize);
 
@@ -475,8 +475,7 @@ public class TransactionLog implements Closeable {
           codec.writeSolrInputDocument(cmd.getSolrInputDocument());
         }
         int lastAddSize = (int) (out.position());
-        expandableBuffer1.byteBuffer().position(0 + expandableBuffer1.wrapAdjustment());
-        expandableBuffer1.byteBuffer().limit(lastAddSize + expandableBuffer1.wrapAdjustment());
+
         long pos;
 
         fosLock.lock();
@@ -487,14 +486,17 @@ public class TransactionLog implements Closeable {
 
 
 
-          raf.setLength(raf.length() + out.position() + 4);
+          raf.setLength(raf.length() + lastAddSize+ 4);
 
         } finally {
           fosLock.unlock();
         }
         //   fos.flushBuffer();
 
-        fos.putBytes(pos, expandableBuffer1.byteBuffer(), expandableBuffer1.byteBuffer().limit());
+        expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
+        expandableBuffer1.byteBuffer().limit(lastAddSize + expandableBuffer1.wrapAdjustment());
+
+        fos.putBytes( pos, expandableBuffer1.byteBuffer(), lastAddSize);
 
         fos.putInt((int) (pos + lastAddSize), lastAddSize);
 
@@ -556,7 +558,10 @@ public class TransactionLog implements Closeable {
 
         //   fos.flushBuffer();
 
-        fos.putBytes(pos, expandableBuffer1.byteBuffer(), expandableBuffer1.byteBuffer().limit());
+        expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
+        expandableBuffer1.byteBuffer().limit(lastSize + expandableBuffer1.wrapAdjustment());
+
+        fos.putBytes(pos, expandableBuffer1.byteBuffer(), lastSize);
 
         fos.putInt((int) (pos + lastSize), lastSize);
 
@@ -594,11 +599,14 @@ public class TransactionLog implements Closeable {
 
         int lastSize = (int) (out.position());
         checkWriteHeader(codec, null, pos);
-        raf.setLength(raf.length() + out.position() + 4);
+        raf.setLength(raf.length() +  lastSize + 4);
 
         //   fos.flushBuffer();
 
-        fos.putBytes(pos, expandableBuffer1.byteBuffer(), expandableBuffer1.byteBuffer().limit());
+        expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
+        expandableBuffer1.byteBuffer().limit(out.position() + expandableBuffer1.wrapAdjustment());
+
+        fos.putBytes( pos, expandableBuffer1.byteBuffer(), lastSize);
 
         fos.putInt((int) (pos + lastSize), lastSize);
 
@@ -651,9 +659,10 @@ public class TransactionLog implements Closeable {
         raf.setLength(raf.length() + out.position() + 4);
 
         //   fos.flushBuffer();
-        expandableBuffer1.byteBuffer().position(expandableBuffer1.wrapAdjustment());
-        expandableBuffer1.byteBuffer().limit((int) (out.position() + expandableBuffer1.wrapAdjustment()));
-        fos.putBytes(pos, expandableBuffer1.byteBuffer(), out.position());
+        expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
+        expandableBuffer1.byteBuffer().limit(out.position() + expandableBuffer1.wrapAdjustment());
+
+        fos.putBytes(pos, expandableBuffer1.byteBuffer(), lastSize);
 
         fos.putInt((int) (pos + lastSize), lastSize);
 
