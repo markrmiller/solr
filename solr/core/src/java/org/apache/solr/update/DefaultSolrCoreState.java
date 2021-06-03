@@ -597,11 +597,17 @@ public final class DefaultSolrCoreState extends SolrCoreState implements Recover
     }
 
     @Override public void onFailure(Throwable throwable, int code, Object context) {
-      log.info("Prep recovery failed", throwable);
-      try {
-        sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, null);
-      } catch (Exception e) {
-        log.error(RESTART_OF_PREP_RECOVERY_FAILED, e);
+      log.info("Prep recovery exception", throwable);
+
+      if (code == 200) {
+        CompletableFuture.runAsync(recoveryTask, core.getCoreContainer().getUpdateShardHandler().getRecoveryExecutor());
+      } else {
+        try {
+          Thread.sleep(250);
+          sendPrepRecoveryCmd(core, core.getCoreDescriptor(), recoveryTask, null);
+        } catch (Exception e) {
+          log.error(RESTART_OF_PREP_RECOVERY_FAILED, e);
+        }
       }
     }
   }
