@@ -546,7 +546,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       return null;
     }
     this.name = v;
-    this.logid = (v == null) ? "" : ("[" + v + "] ");
+    this.logid = (v == null) ? "" : ('[' + v + "] ");
     if (coreMetricManager != null) {
       return coreContainer.coreContainerExecutor.submit(() -> {
         coreMetricManager.afterCoreSetName();
@@ -601,7 +601,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
 
   private SolrSnapshotMetaDataManager initSnapshotMetaDataManager() {
     try {
-      String dir = dataDir + SolrSnapshotMetaDataManager.SNAPSHOT_METADATA_DIR + "/";
+      String dir = dataDir + SolrSnapshotMetaDataManager.SNAPSHOT_METADATA_DIR + '/';
       return new SolrSnapshotMetaDataManager(this, dir);
     } catch (Throwable e) {
       ParWork.propagateInterrupt(e);
@@ -1546,7 +1546,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       Directory dir = null;
       try {
         dir = directoryFactory.get(dataDir, DirContext.META_DATA, solrConfig.indexConfig.lockType);
-        String tmpIdxPropName = IndexFetcher.INDEX_PROPERTIES + "." + System.nanoTime();
+        String tmpIdxPropName = IndexFetcher.INDEX_PROPERTIES + '.' + System.nanoTime();
         writeNewIndexProps(dir, tmpIdxPropName, tmpIdxDirName);
         directoryFactory.renameWithOverwrite(dir, tmpIdxPropName, IndexFetcher.INDEX_PROPERTIES);
         return true;
@@ -1737,7 +1737,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       log.trace("Open SolrCore called, refCount={}", count);
 
       if (count <= 0) {
-        throw new AlreadyClosedException("open refcount " + this + " " + refCount.get());
+        throw new AlreadyClosedException("open refcount " + this + ' ' + refCount.get());
       }
 
 //          if (log.isInfoEnabled()) {
@@ -3130,7 +3130,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         final SolrParams params = req.getParams();
         final String lpList = params.get(CommonParams.LOG_PARAMS_LIST);
         if (lpList == null) {
-          toLog.add("params", "{" + req.getParamString() + "}");
+          toLog.add("params", '{' + req.getParamString() + '}');
         } else if (lpList.length() > 0) {
 
           // Filter params by those in LOG_PARAMS_LIST so that we can then call toString
@@ -3151,7 +3151,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
             } // assume in lpSet
           };
 
-          toLog.add("params", "{" + filteredParams + "}");
+          toLog.add("params", "{" + filteredParams + '}');
         }
       }
     }
@@ -3355,7 +3355,7 @@ public final class SolrCore implements SolrInfoBean, Closeable {
         T o = createInitInstance(info, type, type.getSimpleName(), defClassName, subpackages);
         registry.put(info.name, o);
         if (o instanceof SolrMetricProducer) {
-          coreMetricManager.registerMetricProducer(type.getSimpleName() + "." + info.name, (SolrMetricProducer) o);
+          coreMetricManager.registerMetricProducer(type.getSimpleName() + '.' + info.name, (SolrMetricProducer) o);
         }
         if (info.isDefault()) {
           def = o;
@@ -3524,14 +3524,14 @@ public final class SolrCore implements SolrInfoBean, Closeable {
     public static Runnable getConfListener(SolrCore core, ZkSolrResourceLoader zkSolrResourceLoader){
       final String coreName = core.name;
       final CoreContainer cc = core.coreContainer;
-      final String overlayPath = zkSolrResourceLoader.getConfigSetZkPath() + "/" + ConfigOverlay.RESOURCE_NAME;
-      final String solrConfigPath = zkSolrResourceLoader.getConfigSetZkPath() + "/" + core.solrConfig.getName();
+      final String overlayPath = zkSolrResourceLoader.getConfigSetZkPath() + '/' + ConfigOverlay.RESOURCE_NAME;
+      final String solrConfigPath = zkSolrResourceLoader.getConfigSetZkPath() + '/' + core.solrConfig.getName();
       String schemaRes = null;
       if (core.schema.isMutable() && core.schema instanceof ManagedIndexSchema) {
         ManagedIndexSchema mis = (ManagedIndexSchema) core.schema;
         schemaRes = mis.getResourceName();
       }
-      final String managedSchmaResourcePath = schemaRes == null ? null : zkSolrResourceLoader.getConfigSetZkPath() + "/" + schemaRes;
+      final String managedSchmaResourcePath = schemaRes == null ? null : zkSolrResourceLoader.getConfigSetZkPath() + '/' + schemaRes;
       return () -> {
 
         if (core.isClosed) { // if we start new searchers after close we won't close them

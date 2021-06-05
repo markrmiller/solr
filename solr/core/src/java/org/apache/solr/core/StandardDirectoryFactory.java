@@ -38,6 +38,7 @@ import org.apache.lucene.store.SimpleFSLockFactory;
 import org.apache.lucene.store.SingleInstanceLockFactory;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.IOUtils;
+import org.apache.solr.filestore.UnsafeMMapDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,7 @@ public class StandardDirectoryFactory extends CachingDirectoryFactory {
 //        }
 //      }
 //    };
+    //return new UnsafeMMapDirectory(new File(path).toPath(), lockFactory);
     return new RAFDirectory(new File(path).toPath(), lockFactory);
   }
   

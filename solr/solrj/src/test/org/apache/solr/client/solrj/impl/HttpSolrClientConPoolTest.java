@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.pool.PoolStats;
@@ -150,7 +151,7 @@ public class HttpSolrClientConPoolTest extends SolrJettyTestBase {
           } else {
             final UpdateRequest updateRequest = new UpdateRequest();
             updateRequest.add(doc); // here we mimic CloudSolrClient impl
-            final List<String> urls = Arrays.asList(jettyUrl, yettyUrl);
+            final ObjectArrayList<String> urls =new ObjectArrayList<String>(Arrays.asList(jettyUrl, yettyUrl));
             Collections.shuffle(urls, random());
             LBHttpSolrClient.Req req = new LBHttpSolrClient.Req(updateRequest, 
                     urls);

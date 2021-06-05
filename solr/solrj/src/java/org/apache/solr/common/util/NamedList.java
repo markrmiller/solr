@@ -31,6 +31,9 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.MultiMapSolrParams;
@@ -97,17 +100,17 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
     }
   };
 
-  protected final List<Object> nvPairs;
+  protected final ObjectList<T> nvPairs;
   private Entry mapEntry;
 
   /** Creates an empty instance */
   public NamedList() {
-    nvPairs = new ArrayList<>();
+    nvPairs = new ObjectArrayList<>();
   }
 
 
   public NamedList(int sz) {
-    nvPairs = new ArrayList<>(sz<<1);
+    nvPairs = new ObjectArrayList<>(sz);
   }
 
   public static <T> NamedList<T>  emptyList() {
@@ -154,11 +157,11 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    */
   public NamedList(Map<String,? extends T> nameValueMap) {
     if (null == nameValueMap) {
-      nvPairs = new ArrayList<>();
+      nvPairs = new ObjectArrayList<>();
     } else {
-      nvPairs = new ArrayList<>(nameValueMap.size() << 1);
+      nvPairs = new ObjectArrayList<>(nameValueMap.size());
       nameValueMap.forEach((key, value) -> {
-        nvPairs.add(key);
+        nvPairs.add((T) key);
         nvPairs.add(value);
       });
     }
@@ -182,7 +185,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * @lucene.internal
    * @see #nameValueMapToList
    */
-  NamedList(List<Object> nameValuePairs) {
+  NamedList(ObjectList<T> nameValuePairs) {
     nvPairs=nameValuePairs;
   }
 
@@ -199,11 +202,11 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * @return Modified List as per the above description
    * @see <a href="https://issues.apache.org/jira/browse/SOLR-912">SOLR-912</a>
    */
-  private List<Object> nameValueMapToList(Map.Entry<String, ? extends T>[] nameValuePairs) {
-    List<Object> result = new ArrayList<>(nameValuePairs.length << 1);
+  private ObjectArrayList<T> nameValueMapToList(Map.Entry<String, ? extends T>[] nameValuePairs) {
+    ObjectArrayList<T> result = new ObjectArrayList<>(nameValuePairs.length << 1);
     for (Map.Entry<String, ?> ent : nameValuePairs) {
-      result.add(ent.getKey());
-      result.add(ent.getValue());
+      result.add((T) ent.getKey());
+      result.add((T) ent.getValue());
     }
     return result;
   }
@@ -242,7 +245,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * Adds a name/value pair to the end of the list.
    */
   public void add(String name, T val) {
-    nvPairs.add(name);
+    nvPairs.add((T) name);
     nvPairs.add(val);
   }
 
@@ -250,7 +253,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * Modifies the name of the pair at the specified index.
    */
   public void setName(int idx, String name) {
-    nvPairs.set(idx<<1, name);
+    nvPairs.set(idx<<1, (T) name);
   }
 
   /**
@@ -348,7 +351,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    * @return List of values
    */
   public List<T> getAll(String name) {
-    List<T> result = new ArrayList<>();
+    List<T> result = new ObjectArrayList<>();
     int sz = size();
     for (int i = 0; i < sz; i++) {
       String n = getName(i);
@@ -459,7 +462,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
   public NamedList<T> getImmutableCopy() {
     NamedList<T> copy = clone();
-    return new NamedList<>( Collections.unmodifiableList(copy.nvPairs));
+    return new NamedList<>(ObjectLists.unmodifiable(copy.nvPairs));
   }
 
   public Map<String,T> asShallowMap() {
@@ -485,7 +488,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
           list.add(val);
           result.put(getName(i),old);
         } else {
-          ArrayList l = new ArrayList();
+          ObjectArrayList l = new ObjectArrayList(2);
           l.add(old);
           l.add(val);
           result.put(getName(i), l);
@@ -581,7 +584,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
    */
   @Override
   public NamedList<T> clone() {
-    ArrayList<Object> newList = new ArrayList<>(nvPairs.size());
+    ObjectArrayList<T> newList = new ObjectArrayList<>(nvPairs.size());
     newList.addAll(nvPairs);
     return new NamedList<>(newList);
   }
@@ -713,8 +716,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
     } else if (o instanceof CharSequence) {
       bool = Boolean.parseBoolean(o.toString());
     } else {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
-          "'" + name + "' must have type Boolean or CharSequence; found " + o.getClass());
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, '\'' + name + "' must have type Boolean or CharSequence; found " + o.getClass());
     }
     return bool;
   }
@@ -921,7 +923,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
     @Override
     public String toString() {
-      return getKey() + "=" + getValue();
+      return getKey() + '=' + getValue();
     }
 
     @Override

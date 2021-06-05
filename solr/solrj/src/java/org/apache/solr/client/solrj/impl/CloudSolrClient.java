@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.http.NoHttpResponseException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ConnectTimeoutException;
@@ -142,7 +144,7 @@ public class CloudSolrClient extends BaseCloudSolrClient {
   }
 
   protected Map<String, LBHttpSolrClient.Req> createRoutes(UpdateRequest updateRequest, ModifiableSolrParams routableParams,
-                                                       DocCollection col, DocRouter router, Map<String, List<String>> urlMap,
+                                                       DocCollection col, DocRouter router, Object2ObjectMap<String,ObjectList<String>> urlMap,
                                                        String idField) {
     return urlMap == null ? null : updateRequest.getRoutes(router, col, urlMap, routableParams, idField);
   }

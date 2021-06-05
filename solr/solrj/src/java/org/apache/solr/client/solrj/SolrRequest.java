@@ -29,6 +29,8 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SynchronizedNamedList;
 
 /**
  * 
@@ -197,7 +199,7 @@ public abstract class SolrRequest<T extends SolrResponse> implements Serializabl
    * Create a new SolrResponse to hold the response from the server
    * @param client the {@link SolrClient} the request will be sent to
    */
-  protected abstract T createResponse(SolrClient client);
+  protected abstract T createResponse(SolrClient client, NamedList<Object> nl);
 
   /**
    * Send this request to a {@link SolrClient} and return the response
@@ -212,8 +214,8 @@ public abstract class SolrRequest<T extends SolrResponse> implements Serializabl
    */
   public final T process(SolrClient client, String collection) throws SolrServerException, IOException {
     long startNanos = System.nanoTime();
-    T res = createResponse(client);
-    res.setResponse(client.request(this, collection));
+    T res = createResponse(client, client.request(this, collection));
+
     long endNanos = System.nanoTime();
     res.setElapsedTime(TimeUnit.NANOSECONDS.toMillis(endNanos - startNanos));
     return res;

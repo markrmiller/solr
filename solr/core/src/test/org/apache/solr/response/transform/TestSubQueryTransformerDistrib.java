@@ -124,8 +124,8 @@ public class TestSubQueryTransformerDistrib extends SolrCloudTestCase {
     final SolrDocumentList hits;
     {
       final QueryRequest qr = new QueryRequest(params);
-      final QueryResponse  rsp = new QueryResponse();
-      rsp.setResponse(cluster.getSolrClient().request(qr, people+","+depts));
+      final QueryResponse  rsp = new QueryResponse(cluster.getSolrClient().request(qr, people+","+depts), cluster.getSolrClient());
+
       hits = rsp.getResults();
       
       assertEquals(peopleMultiplier, hits.getNumFound());

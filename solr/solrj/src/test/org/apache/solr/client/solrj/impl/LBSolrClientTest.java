@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -37,8 +39,8 @@ public class LBSolrClientTest {
 
   @Test
   public void testServerIterator() throws SolrServerException {
-    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(), Arrays.asList("1", "2", "3", "4"));
-    LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, new HashMap<>());
+    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(), new ObjectArrayList(Arrays.asList("1", "2", "3", "4")));
+    LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, new Object2ObjectLinkedOpenHashMap<>());
     List<String> actualServers = new ArrayList<>();
     while (serverIterator.hasNext()) {
       actualServers.add(serverIterator.nextOrError());
@@ -50,8 +52,8 @@ public class LBSolrClientTest {
 
   @Test
   public void testServerIteratorWithZombieServers() throws SolrServerException {
-    HashMap<String, LBSolrClient.ServerWrapper> zombieServers = new HashMap<>();
-    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(), Arrays.asList("1", "2", "3", "4"));
+    Object2ObjectLinkedOpenHashMap<String, LBSolrClient.ServerWrapper> zombieServers = new Object2ObjectLinkedOpenHashMap<>();
+    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(), new ObjectArrayList(Arrays.asList("1", "2", "3", "4")));
     LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, zombieServers);
     zombieServers.put("2", new LBSolrClient.ServerWrapper("2"));
 
@@ -69,8 +71,8 @@ public class LBSolrClientTest {
   public void testServerIteratorTimeAllowed() throws SolrServerException, InterruptedException {
     ModifiableSolrParams params = new ModifiableSolrParams();
     params.set(CommonParams.TIME_ALLOWED, 300);
-    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(params), Arrays.asList("1", "2", "3", "4"), 2);
-    LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, new HashMap<>());
+    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(params), new ObjectArrayList(Arrays.asList("1", "2", "3", "4")), 2);
+    LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, new Object2ObjectLinkedOpenHashMap<>());
     assertTrue(serverIterator.hasNext());
     serverIterator.nextOrError();
     Thread.sleep(300);
@@ -79,8 +81,8 @@ public class LBSolrClientTest {
 
   @Test
   public void testServerIteratorMaxRetry() throws SolrServerException {
-    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(), Arrays.asList("1", "2", "3", "4"), 2);
-    LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, new HashMap<>());
+    LBSolrClient.Req req = new LBSolrClient.Req(new QueryRequest(), new ObjectArrayList(Arrays.asList("1", "2", "3", "4")), 2);
+    LBSolrClient.ServerIterator serverIterator = new LBSolrClient.ServerIterator(req, new Object2ObjectLinkedOpenHashMap<>());
     assertTrue(serverIterator.hasNext());
     serverIterator.nextOrError();
     assertTrue(serverIterator.hasNext());

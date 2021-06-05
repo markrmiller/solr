@@ -161,6 +161,7 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
       @Override
       public void cancelAll() {
         wrapped.cancelAll();
+        wrapped.clearPending();
       }
 
       @Override

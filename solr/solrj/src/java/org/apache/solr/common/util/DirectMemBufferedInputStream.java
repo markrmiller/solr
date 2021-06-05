@@ -127,6 +127,12 @@ public class DirectMemBufferedInputStream extends JavaBinInputStream implements 
     }
 
     @Override
+    public void readFully(JavaBinInputStream dis, byte[] bytes) {
+      buffer.getBytes(position, bytes);
+      position += bytes.length;
+    }
+
+    @Override
     public int readUnsignedShort() throws IOException {
         var s = buffer.getShort(position, ByteOrder.LITTLE_ENDIAN);
         position += BitUtil.SIZE_OF_SHORT;

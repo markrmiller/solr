@@ -34,6 +34,7 @@ import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.Utils;
 
 import static org.apache.solr.common.params.CommonParams.JAVABIN_MIME;
@@ -43,6 +44,7 @@ public class V2Request extends SolrRequest<V2Response> implements MapWriter {
   //only for debugging purposes
   public static final ThreadLocal<AtomicLong> v2Calls = new ThreadLocal<>();
   static final Pattern COLL_REQ_PATTERN = Pattern.compile("/(c|collections)/([^/])+/(?!shards)");
+
   private Object payload;
   private SolrParams solrParams;
   public final boolean useBinary;
@@ -60,7 +62,6 @@ public class V2Request extends SolrRequest<V2Response> implements MapWriter {
       isPerCollectionRequest = true;
     }
     this.useBinary = useBinary;
-
   }
 
   public boolean isForceV2() {
@@ -116,8 +117,8 @@ public class V2Request extends SolrRequest<V2Response> implements MapWriter {
   }
 
   @Override
-  protected V2Response createResponse(SolrClient client) {
-    return new V2Response();
+  protected V2Response createResponse(SolrClient client, NamedList<Object> nl) {
+    return new V2Response(nl);
   }
 
   @Override
@@ -152,7 +153,7 @@ public class V2Request extends SolrRequest<V2Response> implements MapWriter {
      * @param resource resource of the request for example "/collections" or "/cores/core-name"
      */
     public Builder(String resource) {
-      if (!resource.startsWith("/") && !resource.isEmpty()) resource = "/" + resource;
+      if (!(!resource.isEmpty() && resource.charAt(0) == '/') && !resource.isEmpty()) resource = '/' + resource;
       this.resource = resource;
     }
 

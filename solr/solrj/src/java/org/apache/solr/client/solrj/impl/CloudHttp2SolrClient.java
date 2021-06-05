@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -161,7 +162,9 @@ public class CloudHttp2SolrClient extends BaseCloudSolrClient {
 
     Set<Map.Entry<String,NamedList>> entries = tsResponses.entrySet();
     for (Map.Entry<String,NamedList> entry : entries) {
-      shardResponses.add(entry.getKey(), entry.getValue());
+      NamedList rsp = entry.getValue();
+      Objects.nonNull(rsp);
+      shardResponses.add(entry.getKey(), rsp);
     }
 
     if (tsExceptions.isEmpty() && tsResponses.size() < routes.size()) {

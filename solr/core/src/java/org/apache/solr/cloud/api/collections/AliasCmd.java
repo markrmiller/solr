@@ -88,6 +88,7 @@ abstract class AliasCmd implements OverseerCollectionMessageHandler.Cmd {
     } catch (SolrException e) {
       // The collection might already exist, and that's okay -- we can adopt it.
       if (!e.getMessage().contains("collection already exists")) {
+
         throw e;
       }
     }

@@ -114,3 +114,4 @@ org.agrona:agrona-agent=1.10.0
 com.netflix.concurrency-limits:*=0.3.6
 com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru=1.4.2
 com.google.http-client:google-http-client=1.39.2
+it.unimi.dsi:fastutil=8.5.4

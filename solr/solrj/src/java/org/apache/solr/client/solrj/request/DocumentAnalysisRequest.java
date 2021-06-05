@@ -32,6 +32,7 @@ import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.AnalysisParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
+import org.apache.solr.common.util.NamedList;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -82,8 +83,8 @@ public class DocumentAnalysisRequest extends SolrRequest<DocumentAnalysisRespons
   }
 
   @Override
-  protected DocumentAnalysisResponse createResponse(SolrClient client) {
-    return new DocumentAnalysisResponse();
+  protected DocumentAnalysisResponse createResponse(SolrClient client, NamedList<Object> nl) {
+    return new DocumentAnalysisResponse(nl);
   }
 
   @Override

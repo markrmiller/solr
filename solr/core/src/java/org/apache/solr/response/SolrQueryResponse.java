@@ -79,7 +79,7 @@ public class SolrQueryResponse {
    * @see #setAllValues
    * @see <a href="#returnable_data">Note on Returnable Data</a>
    */
-  protected NamedList<Object> values = new SimpleOrderedMap<>();
+  protected final NamedList<Object> values = new SimpleOrderedMap<>();
   
   
 /**
@@ -132,7 +132,8 @@ public class SolrQueryResponse {
    * @see <a href="#returnable_data">Note on Returnable Data</a>
    */
   public void setAllValues(NamedList<Object> nameValuePairs) {
-    values=nameValuePairs;
+    values.clear();
+    values.addAll(nameValuePairs);
   }
 
   /**
@@ -385,7 +386,9 @@ public class SolrQueryResponse {
   }
 
   public void asyncDone() {
-    this.finished.run();
+    if (this.finished != null) {
+      this.finished.run();
+    }
   }
 
   public boolean isAsync() {

@@ -137,6 +137,11 @@ public class FastInputStream extends JavaBinInputStream implements DataInputInpu
   }
 
   @Override
+  public void readFully(JavaBinInputStream dis, byte[] bytes) throws IOException {
+    din.readFully(bytes);
+  }
+
+  @Override
   public int readUnsignedShort() throws IOException {
     byte b1 = readAndCheckByte();
     byte b2 = readAndCheckByte();

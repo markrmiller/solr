@@ -26,6 +26,9 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrays;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.IsUpdateRequest;
@@ -34,6 +37,7 @@ import org.apache.solr.client.solrj.util.Cancellable;
 import org.apache.solr.client.solrj.util.AsyncListener;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SynchronizedNamedList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -83,7 +87,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
   }
 
   public LBHttp2SolrClient(Http2SolrClient httpClient, boolean markInternal, String... baseSolrUrls) {
-    super(Arrays.asList(baseSolrUrls));
+    super(new ObjectArrayList<>(baseSolrUrls));
     // MRM TODO: - should only be internal for us
 //    Http2SolrClient.Builder builder = new Http2SolrClient.Builder().withHttpClient(httpClient);
 //    if (markInternal) {
@@ -93,7 +97,8 @@ public class LBHttp2SolrClient extends LBSolrClient {
   }
 
   public LBHttp2SolrClient(String... baseSolrUrls) {
-    super(Arrays.asList(baseSolrUrls));
+    super(new ObjectArrayList<>(baseSolrUrls) {
+    });
     // MRM TODO: - should only be internal for us
     Http2SolrClient.Builder builder = new Http2SolrClient.Builder();
     this.httpClient = builder.build();
@@ -181,7 +186,7 @@ public class LBHttp2SolrClient extends LBSolrClient {
 
     return ((Http2SolrClient) getClient(baseUrl)).asyncRequest(req.getRequest(), null, new AsyncListener<>() {
       @Override public void onSuccess(NamedList<Object> result, int statusCode, Object context) {
-        rsp.rsp = result;
+        rsp.rsp = new SynchronizedNamedList<>(result);
         if (isZombie) {
           zombieServers.remove(baseUrl);
         }

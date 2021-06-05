@@ -712,11 +712,11 @@ public class FacetComponent extends SearchComponent {
         facet_counts = (NamedList) srsp.getSolrResponse().getResponse().get("facet_counts");
         if (facet_counts==null) {
           NamedList<?> responseHeader = (NamedList<?>)srsp.getSolrResponse().getResponse().get("responseHeader");
-//          if (responseHeader == null) {
-//            if (ShardParams.getShardsTolerantAsBool(rb.req.getParams())) {
-//              continue; // looks like a shard did not return anything
-//            }
-//          }
+          if (responseHeader == null) {
+            if (ShardParams.getShardsTolerantAsBool(rb.req.getParams())) {
+              continue; // looks like a shard did not return anything
+            }
+          }
           if (Boolean.TRUE.equals(responseHeader.getBooleanArg(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY))) {
             continue;
           } else {

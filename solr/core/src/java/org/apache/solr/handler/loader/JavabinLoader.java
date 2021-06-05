@@ -19,6 +19,7 @@ package org.apache.solr.handler.loader;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,8 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Update handler which uses the JavaBin format
@@ -171,6 +174,7 @@ public class JavabinLoader extends ContentStreamLoader {
   }
 
   private static class MyStreamingUpdateHandler implements JavaBinUpdateRequestCodec.StreamingUpdateHandler {
+    private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private final SolrQueryRequest req;
     private final UpdateRequestProcessor processor;
@@ -182,6 +186,7 @@ public class JavabinLoader extends ContentStreamLoader {
 
     @Override
     public void update(SolrInputDocument document, UpdateRequest updateRequest, Integer commitWithin, Boolean overwrite) {
+      log.info("update SolrInputDocument={}", document);
       if (document == null) {
         return;
       }

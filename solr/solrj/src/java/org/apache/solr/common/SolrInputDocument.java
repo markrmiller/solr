@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.apache.solr.common.params.CommonParams;
 
 /**
@@ -49,7 +50,7 @@ public class SolrInputDocument extends SolrDocumentBase<SolrInputField, SolrInpu
   private List<SolrInputDocument> _childDocuments;
 
   public SolrInputDocument(String... fields) {
-    _fields = new LinkedHashMap<>();
+    _fields = new Object2ObjectLinkedOpenHashMap<>(16, 0.5f);
     assert fields.length % 2 == 0;
     for (int i = 0; i < fields.length; i += 2) {
       addField(fields[i], fields[i + 1]);
@@ -60,10 +61,8 @@ public class SolrInputDocument extends SolrDocumentBase<SolrInputField, SolrInpu
   public void writeMap(EntryWriter ew) throws IOException {
     BiConsumer<CharSequence, Object> bc = ew.getBiConsumer();
     BiConsumer<CharSequence, Object> wrapper = (k, o) -> {
-      if (o instanceof SolrInputField) {
-        o = ((SolrInputField) o).getValue();
-      }
-      bc.accept(k, o);
+
+      bc.accept(((SolrInputField) o).getName(), ((SolrInputField) o).getValue());
     };
     _fields.forEach(wrapper);
     if (_childDocuments != null) {
@@ -199,7 +198,7 @@ public class SolrInputDocument extends SolrDocumentBase<SolrInputField, SolrInpu
   {
     return "SolrInputDocument(fields: " + _fields.values()
         + ( _childDocuments == null ? "" : (", children: " + _childDocuments) )
-        + ")";
+        + ')';
   }
 
   public SolrInputDocument deepCopy() {

@@ -142,7 +142,7 @@ public class TransactionLog implements Closeable {
         return globalStringList.get(idx - 1);
       } else {// idx == 0 means it has a string value
         //   this shouldn't happen with this codec subclass.
-        return readStr(fis);
+        return readStr(fis, fis.readInt());
         //   throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Corrupt transaction log");
       }
     }
@@ -370,16 +370,16 @@ public class TransactionLog implements Closeable {
       int lastSize = out.position();
 
 
-      raf.setLength(raf.length() + out.position() + 4);
+      raf.setLength(fos.length() + out.position() + 4);
       log.info("headerSize={} fileSize={}", out.position(), raf.length());
 
       //   fos.flushBuffer();
       expandableBuffer1.byteBuffer().position(0 +  expandableBuffer1.wrapAdjustment());
       expandableBuffer1.byteBuffer().limit(out.position() + expandableBuffer1.wrapAdjustment());
 
-      fos.putBytes( pos, expandableBuffer1.byteBuffer(), out.position());
+      fos.putBytes( pos, expandableBuffer1.byteBuffer(), lastSize);
 
-      fos.putInt(out.position(), lastSize);
+      fos.putInt((int) (pos + lastSize), lastSize);
 
       numRecords.increment();
 
@@ -486,7 +486,7 @@ public class TransactionLog implements Closeable {
 
 
 
-          raf.setLength(raf.length() + lastAddSize+ 4);
+          raf.setLength(fos.size() + lastAddSize+ 4);
 
         } finally {
           fosLock.unlock();
@@ -796,7 +796,7 @@ public class TransactionLog implements Closeable {
       try {
 
         fos.close();
-        buffer.close();
+
         channel.close();
       } finally {
         fosLock.unlock();
@@ -827,7 +827,7 @@ public class TransactionLog implements Closeable {
 
   @Override
   public String toString() {
-    return "tlog{file=" + tlogFile.toString() + " refcount=" + refcount.get() + " size=" + fos.size() + "}";
+    return "tlog{file=" + tlogFile.toString() + " refcount=" + refcount.get() + " size=" + fos.size() + '}';
   }
 
   public long getLogSize() {
@@ -945,7 +945,7 @@ public class TransactionLog implements Closeable {
     public String toString() {
       synchronized (TransactionLog.this) {
 
-        return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + "}";
+        return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + '}';
 
       }
     }
@@ -1032,7 +1032,7 @@ public class TransactionLog implements Closeable {
     DirectMemBufferedInputStream fis;
     private final LogCodec codec = new LogCodec(resolver) {
       @Override
-      public SolrInputDocument readSolrInputDocument(JavaBinInputStream dis) {
+      public SolrInputDocument readSolrInputDocument(JavaBinInputStream dis, int sz) {
         // Given that the SolrInputDocument is last in an add record, it's OK to just skip
         // reading it completely.
         return null;
@@ -1133,7 +1133,7 @@ public class TransactionLog implements Closeable {
     public String toString() {
       fosLock.lock();
       try {
-        return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + "}";
+        return "LogReader{" + "file=" + tlogFile + ", position=" + fis.position() + ", end=" + fos.size() + '}';
       } finally {
         fosLock.unlock();
       }

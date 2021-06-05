@@ -380,7 +380,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
 
       if (results.get("failure") != null) {
         SimpleOrderedMap<Object> nl = new SimpleOrderedMap<>();
-        nl.add("msg", "Operation failed " + operation + " " + results.get("failure"));
+        nl.add("msg", "Operation failed " + operation + ' ' + results.get("failure"));
         nl.add("rspCode", 500);
         results.add("exception", nl);
       }
@@ -843,7 +843,7 @@ public class OverseerCollectionMessageHandler implements OverseerMessageHandler,
 
     if (e != null && (rootThrowable == null || !okayExceptions.contains(rootThrowable))) {
       log.error("Error from shard: {}", shard, e);
-      addFailure(results, nodeName, e.getClass().getName() + ":" + e.getMessage());
+      addFailure(results, nodeName, e.getClass().getName() + ':' + e.getMessage());
     } else {
       addSuccess(results, nodeName, solrResponse.getResponse());
     }

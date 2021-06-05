@@ -33,7 +33,15 @@ import java.util.Map;
  */
 public abstract class DelegationTokenResponse extends SolrResponseBase {
 
+  public DelegationTokenResponse(NamedList response) {
+    super(response);
+  }
+
   public static class Get extends DelegationTokenResponse {
+
+    public Get(NamedList response) {
+      super(response);
+    }
 
     /**
      * Get the urlString to be used as the delegation token
@@ -53,6 +61,10 @@ public abstract class DelegationTokenResponse extends SolrResponseBase {
   }
 
   public static class Renew extends DelegationTokenResponse {
+    public Renew(NamedList response) {
+      super(response);
+    }
+
     public Long getExpirationTime() {
       try {
         return (Long)getResponse().get("long");
@@ -64,6 +76,9 @@ public abstract class DelegationTokenResponse extends SolrResponseBase {
   }
 
   public static class Cancel extends DelegationTokenResponse {
+    public Cancel(NamedList response) {
+      super(response);
+    }
   }
 
   /**

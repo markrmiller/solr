@@ -29,6 +29,9 @@ import org.apache.solr.common.util.ExpandableBuffers;
 import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.request.SolrQueryRequest;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 /**
  * Static utility methods relating to {@link QueryResponseWriter}s
  */
@@ -43,12 +46,17 @@ public final class QueryResponseWriterUtil {
    * @see BinaryQueryResponseWriter#write(Writer,SolrQueryRequest,SolrQueryResponse)
    */
   public static ExpandableDirectBufferOutputStream writeQueryResponse(QueryResponseWriter responseWriter, SolrQueryRequest solrRequest,
-      SolrQueryResponse solrResponse, String contentType) throws IOException {
+      SolrQueryResponse solrResponse, HttpServletRequest request, HttpServletResponse response, String contentType) throws IOException {
 
 
     MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);//ExpandableBuffers.buffer1.get();
 
     ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+
+    if (request != null) {
+      request.setAttribute("responseBuffer", expandableBuffer1);
+    }
+
     if (responseWriter instanceof BinaryQueryResponseWriter) {
       BinaryQueryResponseWriter binWriter = (BinaryQueryResponseWriter) responseWriter;
       binWriter.write(outStream, solrRequest, solrResponse);

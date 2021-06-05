@@ -31,6 +31,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import org.agrona.collections.ObjectHashSet;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
@@ -152,7 +155,7 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
       forEachReplica(result, r -> {
         for (String key : keys) {
           if (r.getVariables().containsKey(key)) continue;// it's already collected
-          String perReplicaMetricsKey = "solr.core." + r.getCollection() + "." + r.getShard() + "." + r.getName() + ":";
+          String perReplicaMetricsKey = "solr.core." + r.getCollection() + "." + r.getShard() + '.' + r.getName() + ":";
           String perReplicaValue = key;
           perReplicaMetricsKey += perReplicaValue;
           metricsKeyVsTagReplica.put(perReplicaMetricsKey, new Pair<>(key, r));
@@ -236,8 +239,8 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
         fetchReplicaMetrics(solrNode, snitchContext, metricsKeyVsTag);
       }
 
-      Set<String> groups = new HashSet<>();
-      List<String> prefixes = new ArrayList<>();
+      Set<String> groups = new ObjectHashSet<>();
+      ObjectList<String> prefixes = new ObjectArrayList<>();
       if (requestedTags.contains(DISK)) {
         groups.add("solr.node");
         prefixes.add("CONTAINER.fs.usableSpace");
@@ -374,11 +377,13 @@ public class SolrClientNodeStateProvider implements NodeStateProvider, MapWriter
       String url = zkClientClusterStateProvider.getZkStateReader().getBaseUrlForNodeName(solrNode);
 
       try {
-        GenericSolrRequest request = new GenericSolrRequest(SolrRequest.METHOD.POST, path, params); // params too long for GET
+        GenericSolrRequest request;
         try (Http2SolrClient client = new Http2SolrClient.Builder().withHttpClient(httpClient).withBaseUrl(url).markInternalRequest().build()) {
+          request = new GenericSolrRequest(SolrRequest.METHOD.POST, path, params); // params too long for GET
           NamedList<Object> rsp = client.request(request);
-          request.response.nl = rsp;
-          return request.response;
+
+
+          return request.createResponse(client, rsp);
         }
       } catch (Exception e) {
         throw new SolrException(ErrorCode.SERVICE_UNAVAILABLE, url, e);

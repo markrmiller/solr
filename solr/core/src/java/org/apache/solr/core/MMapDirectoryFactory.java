@@ -58,8 +58,8 @@ public class MMapDirectoryFactory extends StandardDirectoryFactory {
 
   @Override public Directory create(String path, LockFactory lockFactory, DirContext dirContext) throws IOException {
     // we pass NoLockFactory, because the real lock factory is set later by injectLockFactory:
-    UnsafeMMapDirectory mapDirectory = new UnsafeMMapDirectory(new File(path).toPath(), lockFactory, maxChunk);
-
+    //UnsafeMMapDirectory mapDirectory = new UnsafeMMapDirectory(new File(path).toPath(), lockFactory, maxChunk);
+    MMapDirectory mapDirectory = new MMapDirectory(new File(path).toPath(), lockFactory, maxChunk);
     mapDirectory.setPreload(preload);
     return mapDirectory;
   }

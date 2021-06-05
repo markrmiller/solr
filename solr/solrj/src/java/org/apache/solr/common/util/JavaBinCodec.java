@@ -20,6 +20,9 @@ package org.apache.solr.common.util;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import org.agrona.BufferUtil;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.io.DirectBufferInputStream;
@@ -66,35 +69,36 @@ public class JavaBinCodec implements PushWriter {
 
 
     public static final byte
-            NULL = 1,
-            BOOL_TRUE = 2,
-            BOOL_FALSE = 3,
-            BYTE = 4,
-            SHORT = 5,
-            DOUBLE = 6,
-            INT = 7,
-            LONG = 8,
-            FLOAT = 9,
-            DATE = 10,
-            MAP = 11,
-            SOLRDOC = 12,
-            SOLRDOCLST = 13,
-            BYTEARR = 14,
-            ITERATOR = 15,
+            NULL = 0,
+            BOOL_TRUE = 1,
+            BOOL_FALSE = 2,
+            BYTE = 3,
+            SHORT = 4,
+            DOUBLE = 5,
+            INT = 6,
+            LONG = 7,
+            FLOAT = 8,
+            DATE = 9,
+            MAP = 10,
+            SOLRDOC = 11,
+            SOLRDOCLST = 12,
+            BYTEARR = 13,
+            ITERATOR = 14,
 
     /**
      * this is a special tag signals an end. No value is associated with it
      */
-    END = 16,
+    END = 15,
 
-    SOLRINPUTDOC = 17,
-            MAP_ENTRY_ITER = 18,
-            ENUM_FIELD_VALUE = 19,
-            MAP_ENTRY = 20,
-            UUID = 21, // This is reserved to be used only in LogCodec
-            STR = 22,
+    SOLRINPUTDOC = 16,
+            MAP_ENTRY_ITER = 17,
+            ENUM_FIELD_VALUE = 18,
+            MAP_ENTRY = 19,
+        STR = 20,
+        EXTERN_STRING =21,
+            VINT = 22,
 
-    VINT = 23,
+    UUID = 23,// This is reserved to be used only in LogCodec
 
     // types that combine tag + length (or other info) in a single byte
     TAG_AND_LEN = (byte) (1 << 5),
@@ -103,8 +107,7 @@ public class JavaBinCodec implements PushWriter {
             ARR = (byte) (4 << 5), //
             ORDERED_MAP = (byte) (5 << 5), // SimpleOrderedMap (a NamedList subclass, and more common)
             NAMED_LST = (byte) (6 << 5), // NamedList
-            EXTERN_STRING = (byte) (7 << 5),
-            STD_EXTERN_STRING = (byte) (9 << 5);
+        STD_EXTERN_STRING= (byte) (7 << 5);
 
     private static final byte VERSION = 3;
     private final ObjectResolver resolver;
@@ -505,31 +508,29 @@ public class JavaBinCodec implements PushWriter {
         }
     }
 
-    public SimpleOrderedMap<Object> readOrderedMap(JavaBinInputStream dis) throws IOException {
+    public SimpleOrderedMap<Object> readOrderedMap(JavaBinInputStream dis, int sz) throws IOException {
         log.trace("read ordered map");
-        int sz = readSize(dis);
+
         SimpleOrderedMap<Object> nl = new SimpleOrderedMap<>(sz);
         for (int i = 0; i < sz; i++) {
 
-            String name = readVal(dis).toString();
+            String name = String.valueOf(readVal(dis));
             Object val = readVal(dis);
             nl.add(name, val);
         }
         return nl;
     }
 
-    public NamedList<Object> readNamedList(JavaBinInputStream dis) throws IOException {
+    public NamedList<Object> readNamedList(JavaBinInputStream dis, int sz) throws IOException {
         log.trace("read namedlist");
-        int sz = readSize(dis);
+
         NamedList<Object> nl = new NamedList<>(sz);
         for (int i = 0; i < sz; i++) {
 
-            Object name = readVal(dis);
-            if (name != null && !(name instanceof String)) {
-                name = name.toString();
-            }
+            String name = String.valueOf(readVal(dis));
+
             Object val = readVal(dis);
-            nl.add((String) name, val);
+            nl.add( name, val);
         }
         return nl;
     }
@@ -587,31 +588,17 @@ public class JavaBinCodec implements PushWriter {
         //  }
 
         //  log.trace("tag with size");
-        // OK, try type + size in single byte
-        switch (tagByte >>> 5) {
 
-            case SINT >>> 5:
-                return readSmallInt(dis);
-            case SLONG >>> 5:
-                return readSmallLong(dis);
-            case ARR >>> 5:
-                return readArray(dis);
-            case ORDERED_MAP >>> 5:
-                return readOrderedMap(dis);
-            case NAMED_LST >>> 5:
-                return readNamedList(dis);
-            case EXTERN_STRING >>> 5:
-                return readExternString(dis);
-            case STD_EXTERN_STRING >>> 5:
-                return readStdExternString(dis);
-        }
+        // OK, try type + size in single byte
 
 
         switch (tagByte) {
             case NULL:
                 return null;
             case STR:
-                return readStr(dis);
+                return readStr(dis, dis.readInt());
+            case EXTERN_STRING:
+                return readExternString(dis);
             case DATE:
                 return new Date(dis.readLong());
             case INT:
@@ -637,7 +624,9 @@ public class JavaBinCodec implements PushWriter {
             case MAP:
                 return readMap(dis);
             case SOLRDOC:
-                return readSolrDocument(dis);
+                tagByte = read(dis);
+                int size = readSize(dis);
+                return readSolrDocument(dis, size);
             case SOLRDOCLST:
                 return readSolrDocumentList(dis);
             case BYTEARR:
@@ -647,7 +636,9 @@ public class JavaBinCodec implements PushWriter {
             case END:
                 return END_OBJ;
             case SOLRINPUTDOC:
-                return readSolrInputDocument(dis);
+              //  tagByte = read(dis);
+                size = dis.readInt();//readSize(dis);
+                return readSolrInputDocument(dis, size);
             case ENUM_FIELD_VALUE:
                 return readEnumFieldValue(dis);
             case MAP_ENTRY:
@@ -657,11 +648,24 @@ public class JavaBinCodec implements PushWriter {
             case VINT:
                 return readVInt(dis);
             default:
-                throw new UnsupportedOperationException("Unknown type " + tagByte + " string=" + readStr(dis));
+     //           throw new UnsupportedOperationException("Unknown type " + tagByte + " string=" + readStr(dis));
+        }
+        switch (tagByte >>> 5) {
+            case SINT >>> 5:
+                return readSmallInt(dis);
+            case SLONG >>> 5:
+                return readSmallLong(dis);
+            case ARR >>> 5:
+                return readArray(dis, readSize(dis));
+            case ORDERED_MAP >>> 5:
+                return readOrderedMap(dis, readSize(dis));
+            case NAMED_LST >>> 5:
+                return readNamedList(dis, readSize(dis));
+            case STD_EXTERN_STRING >>> 5:
+                return readStdExternString(dis);
         }
 
-
-        //throw new UnsupportedOperationException("Unknown type " + tagByte);
+        throw new UnsupportedOperationException("Unknown type " + tagByte);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -676,22 +680,6 @@ public class JavaBinCodec implements PushWriter {
                 writeSolrDocumentList((SolrDocumentList) val);
                 return true;
             }
-            if (val instanceof SolrInputField) {
-                val = ((SolrInputField) val).getValue();
-                continue;
-            }
-            if (val instanceof IteratorWriter) {
-                writeIterator((IteratorWriter) val);
-                return true;
-            }
-            if (val instanceof Collection) {
-                writeArray((Collection) val);
-                return true;
-            }
-            if (val instanceof Object[]) {
-                writeArray((Object[]) val);
-                return true;
-            }
             if (val instanceof SolrDocument) {
                 //this needs special treatment to know which fields are to be written
                 writeSolrDocument((SolrDocument) val);
@@ -701,12 +689,29 @@ public class JavaBinCodec implements PushWriter {
                 writeSolrInputDocument((SolrInputDocument) val);
                 return true;
             }
+            if (val instanceof SolrInputField) {
+                val = ((SolrInputField) val).getValue();
+                log.trace("write SolrInputField value={}", val);
+                return true;
+            }
+            if (val instanceof IteratorWriter) {
+                writeIterator((IteratorWriter) val);
+                return true;
+            }
             if (val instanceof MapWriter) {
                 writeMap((MapWriter) val);
                 return true;
             }
             if (val instanceof Map) {
                 writeMap((Map) val);
+                return true;
+            }
+            if (val instanceof Collection) {
+                writeArray((Collection) val);
+                return true;
+            }
+            if (val instanceof Object[]) {
+                writeArray((Object[]) val);
                 return true;
             }
             if (val instanceof Iterator) {
@@ -773,7 +778,7 @@ public class JavaBinCodec implements PushWriter {
 
         @Override
         public String toString() {
-            return "MapEntry[" + key + ":" + value + "]";
+            return "MapEntry[" + key + ':' + value + ']';
         }
 
         @Override
@@ -915,7 +920,7 @@ public class JavaBinCodec implements PushWriter {
         return arr;
     }
 
-    public void readFully(InputStream dis, byte[] b) throws IOException {
+    public static void readFully(InputStream dis, byte[] b) throws IOException {
         readFully(dis, b, 0, b.length);
     }
 
@@ -932,7 +937,7 @@ public class JavaBinCodec implements PushWriter {
 
     //use this to ignore the writable interface because , child docs will ignore the fl flag
     // is it a good design?
-    private boolean ignoreWritable = false;
+   private boolean ignoreWritable = false;
     private MapWriter.EntryWriter cew;
 
     public void writeSolrDocument(SolrDocument doc) throws IOException {
@@ -965,22 +970,21 @@ public class JavaBinCodec implements PushWriter {
     }
 
     protected boolean toWrite(String key) {
-        return writableDocFields == null || ignoreWritable || writableDocFields.isWritable(key);
+        return writableDocFields == null || writableDocFields.isWritable(key) || ignoreWritable;
     }
 
-    public SolrDocument readSolrDocument(JavaBinInputStream dis) throws IOException {
+    public SolrDocument readSolrDocument(JavaBinInputStream dis, int sz) throws IOException {
         log.trace("read SolrDocument");
-        tagByte = read(dis);
-        int size = readSize(dis);
-        SolrDocument doc = new SolrDocument(new LinkedHashMap<>(size));
-        for (int i = 0; i < size; i++) {
+
+        SolrDocument doc = new SolrDocument(new LinkedHashMap<>(sz));
+        for (int i = 0; i < sz; i++) {
             String fieldName;
             Object obj = readVal(dis); // could be a field name, or a child document
             if (obj instanceof SolrDocument) {
                 doc.addChildDocument((SolrDocument) obj);
                 continue;
             } else {
-                fieldName = (String) obj;
+                fieldName = String.valueOf( obj);
             }
             Object fieldVal = readVal(dis);
             doc.setField(fieldName, fieldVal);
@@ -989,20 +993,29 @@ public class JavaBinCodec implements PushWriter {
     }
 
     public SolrDocumentList readSolrDocumentList(JavaBinInputStream dis) throws IOException {
-        log.trace("read SolrDocumentList");
+        log.trace("read SolrDocumentList metadata");
         SolrDocumentList solrDocs = new SolrDocumentList();
         @SuppressWarnings("unchecked")
         List<Object> list = (List<Object>) readVal(dis);
         solrDocs.setNumFound((Long) list.get(0));
         solrDocs.setStart((Long) list.get(1));
         solrDocs.setMaxScore((Float) list.get(2));
-        if (list.size() > 3) { //needed for back compatibility
-            solrDocs.setNumFoundExact((Boolean) list.get(3));
-        }
+//        if (list.size() > 3) { //needed for back compatibility
+//            solrDocs.setNumFoundExact((Boolean) list.get(3));
+//        }
 
-        @SuppressWarnings("unchecked")
-        List<SolrDocument> l = (List<SolrDocument>) readVal(dis);
-        solrDocs.addAll(l);
+        int docs = dis.readInt();
+        //@SuppressWarnings("unchecked")
+       // List<SolrDocument> l = (List<SolrDocument>) readVal(dis);
+           for (int i = 0; i < docs; i++) {
+               dis.read();
+               dis.read();
+
+               int sz = readSize(dis);
+               solrDocs.add(readSolrDocument(dis, sz));
+           }
+        log.trace("read SolrDocuments {}", solrDocs);
+       // solrDocs.addAll(l);
         return solrDocs;
     }
 
@@ -1016,12 +1029,17 @@ public class JavaBinCodec implements PushWriter {
         l.add(docs.getMaxScore());
         l.add(docs.getNumFoundExact());
         writeArray(l);
-        writeArray(docs);
+
+        daos.writeInt(docs.size());
+        for (SolrDocument doc : docs) {
+            writeSolrDocument(doc);
+        }
+        //writeArray(docs);
     }
 
-    public SolrInputDocument readSolrInputDocument(JavaBinInputStream dis) throws IOException {
-        log.trace("read SolrDocument");
-        int sz = readVInt(dis);
+    public SolrInputDocument readSolrInputDocument(JavaBinInputStream dis, int sz) throws IOException {
+        log.trace("read SolrInputDocument");
+    //    int sz = dis.readInt();//readVInt(dis);
 //    float docBoost = (Float)readVal(dis);
 //    if (docBoost != 1f) {
 //      String message = "Ignoring document boost: " + docBoost + " as index-time boosts are not supported anymore";
@@ -1034,14 +1052,15 @@ public class JavaBinCodec implements PushWriter {
         SolrInputDocument sdoc = createSolrInputDocument(sz);
         for (int i = 0; i < sz; i++) {
             String fieldName;
-            Object obj = readVal(dis); // could be a boost, a field name, or a child document
+            Object obj = readVal(dis); //  a field name, or a child document
             if (obj instanceof SolrInputDocument) {
                 sdoc.addChildDocument((SolrInputDocument) obj);
                 continue;
             } else {
-                fieldName = (String) obj;
+                fieldName = String.valueOf(obj);
             }
             Object fieldVal = readVal(dis);
+            log.trace("read SolrInputDocument field key={} value={}", fieldName, fieldVal);
             sdoc.setField(fieldName, fieldVal);
         }
         return sdoc;
@@ -1054,9 +1073,12 @@ public class JavaBinCodec implements PushWriter {
     static final Predicate<CharSequence> IGNORECHILDDOCS = it -> !CommonParams.CHILDDOC.equals(it.toString());
 
     public void writeSolrInputDocument(SolrInputDocument sdoc) throws IOException {
+        log.trace("write SolrDocument");
         List<SolrInputDocument> children = sdoc.getChildDocuments();
         int sz = sdoc.size() + (children == null ? 0 : children.size());
-        writeTag(SOLRINPUTDOC, sz);
+        writeTag(SOLRINPUTDOC);
+        daos.writeInt(sz);
+     //   writeTag(ORDERED_MAP, sz);
         sdoc.writeMap(new ConditionalKeyMapWriter.EntryWriterWrapper(ew, IGNORECHILDDOCS));
         if (children != null) {
             for (SolrInputDocument child : children) {
@@ -1199,22 +1221,28 @@ public class JavaBinCodec implements PushWriter {
         }
     }
 
-    @SuppressWarnings({"unchecked"})
-    public List<Object> readArray(JavaBinInputStream dis) throws IOException {
-
-        int sz = readSize(dis);
-        log.trace("read array sz, {}", sz);
-        return readArray(dis, sz);
-    }
+  @SuppressWarnings({"unchecked"})
+  public List<Object> readArray(JavaBinInputStream dis) throws IOException {
+    int sz = readSize(dis);
+    return readArray(dis, sz);
+  }
 
     @SuppressWarnings({"rawtypes"})
     protected List readArray(JavaBinInputStream dis, int sz) throws IOException {
         log.trace("read array of size {}", sz);
-        ArrayList<Object> l = new ArrayList<>(sz);
+        ObjectList<Object> l = new ObjectArrayList<>(sz);
         for (int i = 0; i < sz; i++) {
             l.add(readVal(dis));
         }
-        log.trace("return list {}", l);
+
+        if (log.isTraceEnabled()) {
+            log.trace("return list {}", l);
+            for (ObjectListIterator<Object> it = l.iterator(); it.hasNext(); ) {
+                Object item = it.next();
+                log.trace("return list {} {}", item == null ? "null" : item.getClass().getName(), l);
+            }
+        }
+
         return l;
     }
 
@@ -1262,9 +1290,6 @@ public class JavaBinCodec implements PushWriter {
      * write the string as tag+length, with length being the number of UTF-8 bytes
      */
     public void writeStr(CharSequence s) throws IOException {
-        if (log.isTraceEnabled()) {
-            log.trace("write str {} len={}", s, s.length());
-        }
 
         if (s instanceof Utf8CharSequence) {
             writeUTF8Str((Utf8CharSequence) s);
@@ -1273,26 +1298,28 @@ public class JavaBinCodec implements PushWriter {
 
         byte[] bytes = ((String) s).getBytes(UTF_8);
         writeTag(STR);
+
+        if (log.isTraceEnabled()) {
+            log.trace("write str {} len={}", s, s.length());
+        }
         daos.writeInt(bytes.length);
-
-
         daos.write(bytes, 0, bytes.length);
 
     }
 
-    protected String readStr(JavaBinInputStream dis) throws IOException {
+    protected static String readStr(JavaBinInputStream dis, int sz) throws IOException {
 
-        int sz = dis.readInt();
+
         byte[] bytes = new byte[sz];
-        readFully(dis, bytes);
+        dis.readFully(dis, bytes);
         return new String(bytes, UTF_8);
 
     }
 
-    protected CharSequence readUtf8(JavaBinInputStream dis) throws IOException {
-
-        return readStr(dis);
-    }
+//    protected static CharSequence readUtf8(JavaBinInputStream dis) throws IOException {
+//
+//        return readStr(dis);
+//    }
 
     public void writeSInt(int v) throws IOException {
         log.trace("write sint {}", v);
@@ -1435,7 +1462,7 @@ public class JavaBinCodec implements PushWriter {
 
 
     public void writeMap(Map<?, ?> val) throws IOException {
-        log.trace("write map");
+        //log.trace("write map");
 
         if (val instanceof MapWriter) {
             writeMap((MapWriter) val);
@@ -1507,7 +1534,7 @@ public class JavaBinCodec implements PushWriter {
      *
      * @throws IOException If there is a low-level I/O error.
      */
-    public int readVInt(InputStream in) throws IOException {
+    public static int readVInt(InputStream in) throws IOException {
         byte b = read(in);
         int i = b & 0x7F;
         for (int shift = 7; (b & 0x80) != 0; shift += 7) {
@@ -1537,25 +1564,18 @@ public class JavaBinCodec implements PushWriter {
         daos.writeByte((byte) i);
     }
 
-    public float readFloat(JavaBinInputStream is) throws IOException {
+    public static float readFloat(JavaBinInputStream is) throws IOException {
         return is.readFloat();
     }
 
-    public double readDouble(JavaBinInputStream is) throws IOException {
+    public static double readDouble(JavaBinInputStream is) throws IOException {
         log.trace("read double");
         return is.readDouble();
     }
 
-    public short readShort(InputStream in) throws IOException {
-        log.trace("read short");
-        return (short) ((readUnsignedByte(in) << 8) | readUnsignedByte(in));
-    }
 
-    public int readUnsignedShort(InputStream in) throws IOException {
-        return (readUnsignedByte(in) << 8) | readUnsignedByte(in);
-    }
 
-    public int readUnsignedByte(InputStream in) throws IOException {
+    public static int readUnsignedByte(InputStream in) throws IOException {
         return in.read() & 0xff;
     }
 
@@ -1646,6 +1666,7 @@ public class JavaBinCodec implements PushWriter {
         stdStringsMap.put("EXECUTE_QUERY", stdSstringsCount++);
 
         stdStringsMap.put("track", stdSstringsCount++);
+        stdStringsMap.put("cat", stdSstringsCount++);
 
         stdStringsMap.put("timing", stdSstringsCount++);
         stdStringsMap.put("time", stdSstringsCount++);
@@ -1716,7 +1737,8 @@ public class JavaBinCodec implements PushWriter {
             idx = stringsMap == null ? 0 : stringsMap.getInt(s);
         }
 
-        writeTag(EXTERN_STRING, idx);
+        writeTag(EXTERN_STRING);
+        daos.writeInt(idx);
         log.trace("write string sz {}", idx);
 
         if (idx == 0) {
@@ -1731,7 +1753,7 @@ public class JavaBinCodec implements PushWriter {
     }
 
     public CharSequence readExternString(JavaBinInputStream fis) throws IOException {
-        int idx = readSize(fis);
+        int idx = fis.readInt();
         log.trace("read extern idx={}", idx);
 
 
@@ -1747,7 +1769,7 @@ public class JavaBinCodec implements PushWriter {
         // idx == 0 means it has a string value
         tagByte = read(fis);
 
-        String s = readStr(fis);
+        String s = readStr(fis, fis.readInt());
 
         if (stringsList == null) stringsList = new ArrayList<>();
         stringsList.add(s);
@@ -1827,7 +1849,7 @@ public class JavaBinCodec implements PushWriter {
         }
     }
 
-    private String name(byte tagByte) {
+    private static String name(byte tagByte) {
         switch (tagByte >>> 5) {
 
             case SINT >>> 5:
@@ -1840,13 +1862,11 @@ public class JavaBinCodec implements PushWriter {
                 return "ORDERED_MAP";
             case NAMED_LST >>> 5:
                 return "NAMED_LST";
-            case EXTERN_STRING >>> 5:
-                return "EXTERN_STRING";
             case STD_EXTERN_STRING >>> 5:
                 return "STD_EXTERN_STRING";
         }
 
-        log.trace("norm tag");
+       // log.trace("norm tag");
         switch (tagByte) {
             case NULL:
                 return "NULL";
@@ -1892,6 +1912,8 @@ public class JavaBinCodec implements PushWriter {
                 return "MAP_ENTRY_ITER";
             case VINT:
                 return "VINT";
+            case EXTERN_STRING:
+                return "EXTERN_STRING";
         }
         throw new IllegalArgumentException("Unknown tag=" + tagByte);
     }

@@ -792,7 +792,7 @@ public class BasicDistributedZkTest extends AbstractFullDistribZkTestBase {
     SolrRequest request = new QueryRequest(params);
     request.setPath("/admin/collections");
 
-    CollectionAdminResponse res = new CollectionAdminResponse();
+    CollectionAdminResponse res;
     if (client == null) {
       final String baseUrl = ((HttpSolrClient) clients.get(clientIndex)).getBaseURL().substring(
           0,
@@ -800,10 +800,10 @@ public class BasicDistributedZkTest extends AbstractFullDistribZkTestBase {
               - DEFAULT_COLLECTION.length() - 1);
       
       try (SolrClient aClient = createNewSolrClient("", baseUrl)) {
-        res.setResponse(aClient.request(request));
+        res = new CollectionAdminResponse(aClient.request(request));
       }
     } else {
-      res.setResponse(client.request(request));
+      res = new CollectionAdminResponse(client.request(request));
     }
     return res;
   }

@@ -563,8 +563,8 @@ public class TestConfigSetsAPI extends SolrTestCaseJ4 {
     SolrRequest request = new QueryRequest(params);
     request.setPath("/admin/collections");
 
-    CollectionAdminResponse res = new CollectionAdminResponse();
-    res.setResponse(client.request(request));
+    CollectionAdminResponse res = new CollectionAdminResponse(client.request(request));
+
     return res;
   }
   
@@ -577,7 +577,7 @@ public class TestConfigSetsAPI extends SolrTestCaseJ4 {
 
       Map<String, String> headers = new HashMap<>(1);
       if (username != null) {
-        String userPass = username + ":" + password;
+        String userPass = username + ':' + password;
         String encoded = Base64.byteArrayToBase64(userPass.getBytes(UTF_8));
 
         headers.put("Authorization", "Basic " + encoded);

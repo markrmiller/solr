@@ -26,6 +26,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.lucene.index.ExitableDirectoryReader;
@@ -87,7 +89,7 @@ public class Grouping {
   private final QueryResult qr;
   private final QueryCommand cmd;
   @SuppressWarnings({"rawtypes"})
-  private final List<Command> commands = new ArrayList<>();
+  private final ObjectList<Command> commands = new ObjectArrayList<>();
   private final boolean main;
   private final boolean cacheSecondPassSearch;
   private final int maxDocsPercentageToCache;
@@ -800,7 +802,7 @@ public class Grouping {
       }
 
       @SuppressWarnings({"rawtypes"})
-      List groupList = new ArrayList();
+      ObjectList groupList = new ObjectArrayList();
       groupResult.add("groups", groupList);        // grouped={ key={ groups=[
 
       if (result == null) {
@@ -1023,7 +1025,7 @@ public class Grouping {
       }
 
       @SuppressWarnings({"rawtypes"})
-      List groupList = new ArrayList();
+      ObjectList groupList = new ObjectArrayList();
       groupResult.add("groups", groupList);        // grouped={ key={ groups=[
 
       if (result == null) {

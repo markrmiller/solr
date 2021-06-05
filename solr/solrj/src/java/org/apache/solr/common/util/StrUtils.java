@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.solr.common.SolrException;
 
 /**
@@ -112,15 +114,16 @@ public class StrUtils {
    * @param decode    decode backslash escaping
    * @return not null
    */
-  public static List<String> splitSmart(String s, String separator, boolean decode) {
-    ArrayList<String> lst = new ArrayList<>(2);
+  public static ObjectList<String> splitSmart(String s, String separator, boolean decode) {
+    ObjectList<String> lst = new ObjectArrayList<>(2);
     StringBuilder sb = new StringBuilder();
+
     int pos = 0, end = s.length();
     while (pos < end) {
       if (s.startsWith(separator, pos)) {
         if (sb.length() > 0) {
           lst.add(sb.toString());
-          sb = new StringBuilder();
+          sb.setLength(0);
         }
         pos += separator.length();
         continue;

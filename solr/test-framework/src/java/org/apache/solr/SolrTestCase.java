@@ -837,8 +837,8 @@ public class SolrTestCase extends Assert {
     }
 
     if (factory == null) {
-      factory = "solr.StandardDirectoryFactory";
-     // factory = random().nextInt(100) < 75 ? "solr.StandardDirectoryFactory" : "solr.MMapDirectoryFactory"; // test the default most of the time
+     // factory = "solr.StandardDirectoryFactory";
+      factory = random().nextInt(100) < 75 ? "solr.StandardDirectoryFactory" : "solr.MMapDirectoryFactory"; // test the default most of the time
     }
     System.setProperty("solr.directoryFactory", factory);
     changedFactory = true;

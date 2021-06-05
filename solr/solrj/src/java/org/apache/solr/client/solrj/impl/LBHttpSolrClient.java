@@ -25,6 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
@@ -35,6 +39,7 @@ import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.QoSParams;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.ObjectReleaseTracker;
+import org.apache.solr.common.util.Utils;
 
 /**
  * LBHttpSolrClient or "LoadBalanced HttpSolrClient" is a load balancing wrapper around
@@ -91,11 +96,11 @@ public class LBHttpSolrClient extends LBSolrClient {
    */
   @Deprecated
   public static class Req extends LBSolrClient.Req {
-    public Req(SolrRequest request, List<String> servers) {
+    public Req(SolrRequest request, ObjectList<String> servers) {
       super(request, servers);
     }
 
-    public Req(SolrRequest request, List<String> servers, Integer numServersToTry) {
+    public Req(SolrRequest request, ObjectList<String> servers, Integer numServersToTry) {
       super(request, servers, numServersToTry);
     }
   }
@@ -137,7 +142,7 @@ public class LBHttpSolrClient extends LBSolrClient {
 
   // MRM TODO:
   public LBHttpSolrClient(Http2SolrClient solrClient) {
-    super(Collections.emptyList());
+    super(ObjectLists.emptyList());
     assert ObjectReleaseTracker.getInstance().track(this);
     this.solrClient = solrClient;
     this.httpSolrClientBuilder = null;
@@ -157,7 +162,7 @@ public class LBHttpSolrClient extends LBSolrClient {
 
 
     if (http2SolrClientBuilder == null && httpSolrClientBuilder == null) {
-      this.httpClient = builder.httpClient == null ? constructClient(builder.baseSolrUrls.toArray(new String[0])) : builder.httpClient;
+      this.httpClient = builder.httpClient == null ? constructClient(builder.baseSolrUrls.toArray(Utils.EMPTY_STRINGS)) : builder.httpClient;
     } else {
       httpClient = null;
     }
@@ -331,13 +336,13 @@ public class LBHttpSolrClient extends LBSolrClient {
    * Constructs {@link LBHttpSolrClient} instances from provided configuration.
    */
   public static class Builder extends SolrClientBuilder<Builder> {
-    protected final List<String> baseSolrUrls;
+    protected final ObjectList<String> baseSolrUrls;
     protected HttpSolrClient.Builder httpSolrClientBuilder;
-    protected Map<String,String> headers = new HashMap<>();
+    protected Map<String,String> headers = new Object2ObjectOpenHashMap<>(8, 0.25f);
     private Http2SolrClient.Builder http2SolrClientBuilder;
 
     public Builder() {
-      this.baseSolrUrls = new ArrayList<>();
+      this.baseSolrUrls = new ObjectArrayList<>();
       this.responseParser = new BinaryResponseParser();
     }
 

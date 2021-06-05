@@ -16,6 +16,8 @@
  */
 package org.apache.solr;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.apache.lucene.util.LuceneTestCase;
@@ -983,7 +985,7 @@ public class TestGroupingSearch extends SolrTestCaseJ4 {
     if (includeNGroups) {
       result.put("ngroups", sortedGroups.size());
     }
-    List<Map<String,Object>> groupList = new ArrayList<>();
+    ObjectList<Map<String,Object>> groupList = new ObjectArrayList<>();
     result.put("groups", groupList);
 
     for (int i=start; i<sortedGroups.size(); i++) {

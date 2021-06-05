@@ -16,16 +16,26 @@
  */
 package org.apache.solr.handler.component;
 import org.apache.solr.client.solrj.SolrResponse;
+import org.apache.solr.client.solrj.impl.LBSolrClient;
+import org.apache.solr.client.solrj.response.SimpleSolrResponse;
 import org.apache.solr.common.SolrException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.util.Objects;
 
 public final class ShardResponse {
-  private ShardRequest req;
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+
+  private volatile ShardRequest req;
   private String shard;
   private String nodeName;
   private volatile String shardAddress;  // the specific shard that this response was received from
   private int rspCode;
   private volatile Throwable exception;
-  private SolrResponse rsp;
+  private final SolrResponse rsp;
 
   @Override
   public String toString() {
@@ -34,6 +44,11 @@ public final class ShardResponse {
             +"\n\tresponse=" + rsp
             + (exception==null ? "" : "\n\texception="+ SolrException.toStr(exception))
             +"\n}";
+  }
+
+  public ShardResponse(SolrResponse rsp) {
+    Objects.nonNull(rsp);
+    this.rsp = rsp;
   }
 
   public Throwable getException()
@@ -66,10 +81,10 @@ public final class ShardResponse {
     this.req = rsp;
   }
 
-  public void setSolrResponse(SolrResponse rsp)
-  {
-    this.rsp = rsp;
-  }
+//  public void setSolrResponse(SolrResponse rsp)
+//  {
+//    this.rsp = rsp;
+//  }
 
   void setShard(String shard)
   {
@@ -77,6 +92,7 @@ public final class ShardResponse {
   }
 
   void setException(Throwable exception) {
+    log.warn("ShardResponse Exception", exception);
     this.exception = exception;
     if (exception instanceof SolrException) {
       this.rspCode = ((SolrException) exception).code();

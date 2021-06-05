@@ -65,12 +65,14 @@ public class SolrInputStreamResponseListener extends Listener.Adapter {
   private final CountDownLatch resultLatch = new CountDownLatch(1);
   private final AtomicReference<InputStream> stream = new AtomicReference<>();
   private final Queue<Chunk> chunks = new ArrayDeque<>();
+  private final SolrHttpRequest req;
   private Response response;
   private Result result;
   private volatile Throwable failure;
   private boolean closed;
 
-  public SolrInputStreamResponseListener() {
+  public SolrInputStreamResponseListener(SolrHttpRequest req) {
+    this.req = req;
   }
 
   public Throwable getFailure() {
@@ -274,20 +276,24 @@ public class SolrInputStreamResponseListener extends Listener.Adapter {
     }
 
     @Override public void close() throws IOException {
-      List<Callback> callbacks;
-      synchronized (lock) {
-        if (closed) return;
-        closed = true;
-        callbacks = drain();
-        lock.notifyAll();
+      try {
+        List<Callback> callbacks;
+        synchronized (lock) {
+          if (closed) return;
+          closed = true;
+          callbacks = drain();
+          lock.notifyAll();
+        }
+
+        if (LOG.isDebugEnabled()) LOG.debug("InputStream close");
+
+        Throwable failure = new AsynchronousCloseException();
+        callbacks.forEach(callback -> callback.failed(failure));
+
+        super.close();
+      } finally {
+        req.freeBuffer();
       }
-
-      if (LOG.isDebugEnabled()) LOG.debug("InputStream close");
-
-      Throwable failure = new AsynchronousCloseException();
-      callbacks.forEach(callback -> callback.failed(failure));
-
-      super.close();
     }
   }
 

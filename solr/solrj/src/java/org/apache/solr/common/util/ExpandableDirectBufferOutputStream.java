@@ -134,6 +134,10 @@ public class ExpandableDirectBufferOutputStream extends OutputStream
         ++position;
     }
 
+    public long size() {
+        return position - offset;
+    }
+
     /**
      * Write a byte[] to the buffer.
      *
@@ -155,24 +159,24 @@ public class ExpandableDirectBufferOutputStream extends OutputStream
     }
 
     public void putInt(int val) {
-        buffer.putInt(position, val, ByteOrder.LITTLE_ENDIAN);
+        buffer.putInt(offset + position, val, ByteOrder.LITTLE_ENDIAN);
         this.position += BitUtil.SIZE_OF_INT;
     }
 
     public void putLong(long val) {
-        buffer.putLong(position, val, ByteOrder.LITTLE_ENDIAN);
+        buffer.putLong(offset + position, val, ByteOrder.LITTLE_ENDIAN);
         this.position += BitUtil.SIZE_OF_LONG;
     }
 
     public void putFloat(float val) {
 
-        buffer.putFloat(position, val, ByteOrder.LITTLE_ENDIAN);
+        buffer.putFloat(offset + position, val, ByteOrder.LITTLE_ENDIAN);
         this.position += BitUtil.SIZE_OF_FLOAT;
 
     }
 
     public void putShort(short val) {
-        buffer.putShort(position, val, ByteOrder.LITTLE_ENDIAN);
+        buffer.putShort(offset + position, val, ByteOrder.LITTLE_ENDIAN);
         this.position += BitUtil.SIZE_OF_SHORT;
     }
 }

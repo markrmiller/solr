@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.beans.DocumentObjectBinder;
 import org.apache.solr.client.solrj.response.json.NestableJsonFacet;
@@ -41,9 +43,9 @@ import org.apache.solr.common.util.SimpleOrderedMap;
 public class QueryResponse extends SolrResponseBase 
 {
   // Direct pointers to known types
-  private volatile NamedList<Object> _header = null;
+  private NamedList<Object> _header = null;
   private SolrDocumentList _results = null;
-  private NamedList<ArrayList> _sortvalues = null;
+  private NamedList<ObjectArrayList> _sortvalues = null;
   private NamedList<Object> _facetInfo = null;
   private NamedList<Object> _debugInfo = null;
   private NamedList<Object> _highlightingInfo = null;
@@ -68,59 +70,50 @@ public class QueryResponse extends SolrResponseBase
   private List<FacetField> _facetFields = null;
   private List<FacetField> _limitingFacets = null;
   private List<FacetField> _facetDates = null;
-  private List<RangeFacet> _facetRanges = null;
-  private NamedList<List<PivotField>> _facetPivot = null;
-  private List<IntervalFacet> _intervalFacets = null;
+  private volatile List<RangeFacet> _facetRanges = null;
+  private volatile NamedList<List<PivotField>> _facetPivot = null;
+  private volatile List<IntervalFacet> _intervalFacets = null;
 
   // Highlight Info
-  private Map<String,Map<String,List<String>>> _highlighting = null;
+  private volatile Map<String,Map<String,List<String>>> _highlighting = null;
 
   // SpellCheck Response
-  private SpellCheckResponse _spellResponse = null;
+  private volatile SpellCheckResponse _spellResponse = null;
 
   // Clustering Response
-  private ClusteringResponse _clusterResponse = null;
+  private volatile ClusteringResponse _clusterResponse = null;
 
   // Json Faceting Response
-  private NestableJsonFacet _jsonFacetingResponse = null;
+  private volatile NestableJsonFacet _jsonFacetingResponse = null;
 
   // Suggester Response
-  private SuggesterResponse _suggestResponse = null;
+  private volatile SuggesterResponse _suggestResponse = null;
 
   // Terms Response
-  private TermsResponse _termsResponse = null;
+  private volatile TermsResponse _termsResponse = null;
   
   // Field stats Response
-  private Map<String,FieldStatsInfo> _fieldStatsInfo = null;
+  private volatile Map<String,FieldStatsInfo> _fieldStatsInfo = null;
   
   // Debug Info
-  private Map<String,Object> _debugMap = null;
-  private Map<String,Object> _explainMap = null;
+  private volatile Map<String,Object> _debugMap = null;
+  private volatile Map<String,Object> _explainMap = null;
 
   // utility variable used for automatic binding -- it should not be serialized
   private transient final SolrClient solrClient;
 
-  public QueryResponse() {
-    solrClient = null;
-  }
+//  public QueryResponse() {
+//    super(null);
+//
+//    solrClient = null;
+//  }
   
   /**
    * Utility constructor to set the solrServer and namedList
    */
   public QueryResponse( NamedList<Object> res , SolrClient solrClient){
-    this.setResponse( res );
+    super(res);
     this.solrClient = solrClient;
-  }
-
-  public QueryResponse(SolrClient solrClient) {
-    this.solrClient = solrClient;
-  }
-
-  @Override
-  public void setResponse( NamedList<Object> res )
-  {
-    super.setResponse( res );
-    
     // Look for known things
     for( int i=0; i<res.size(); i++ ) {
       String n = res.getName( i );
@@ -131,7 +124,7 @@ public class QueryResponse extends SolrResponseBase
         _results = (SolrDocumentList) res.getVal( i );
       }
       else if( "sort_values".equals( n ) ) {
-        _sortvalues = (NamedList<ArrayList>) res.getVal( i );
+        _sortvalues = (NamedList<ObjectArrayList>) res.getVal( i );
       }
       else if( "facet_counts".equals( n ) ) {
         _facetInfo = (NamedList<Object>) res.getVal( i );
@@ -159,7 +152,7 @@ public class QueryResponse extends SolrResponseBase
         extractSpellCheckInfo( _spellInfo );
       }
       else if ("clusters".equals(n)) {
-        _clusterInfo = (ArrayList<NamedList<Object>>) res.getVal(i);
+        _clusterInfo = (ObjectArrayList<NamedList<Object>>) res.getVal(i);
         extractClusteringInfo(_clusterInfo);
       }
       else if ("facets".equals(n)) {
@@ -187,6 +180,12 @@ public class QueryResponse extends SolrResponseBase
     }
     if(_facetInfo != null) extractFacetInfo( _facetInfo );
   }
+
+//  public QueryResponse(SolrClient solrClient) {
+//    super(null);
+//    this.solrClient = solrClient;
+//  }
+
 
   private void extractSpellCheckInfo(NamedList<Object> spellInfo) {
     _spellResponse = new SpellCheckResponse(spellInfo);
@@ -232,7 +231,7 @@ public class QueryResponse extends SolrResponseBase
 
   private void extractDebugInfo( NamedList<Object> debug )
   {
-    _debugMap = new LinkedHashMap<>(); // keep the order
+    _debugMap = new Object2ObjectArrayMap<>(8); // keep the order
     for( Map.Entry<String, Object> info : debug ) {
       _debugMap.put( info.getKey(), info.getValue() );
     }
@@ -267,7 +266,7 @@ public class QueryResponse extends SolrResponseBase
 
         if (oGroups != null) {
           int iMatches = (Integer) oMatches;
-          ArrayList<Object> groupsArr = (ArrayList<Object>) oGroups;
+          ObjectList<Object> groupsArr = (ObjectList<Object>) oGroups;
           GroupCommand groupedCommand;
           if (oNGroups != null) {
             Integer iNGroups = (Integer) oNGroups;
@@ -330,8 +329,8 @@ public class QueryResponse extends SolrResponseBase
     // TODO?? The list could be <int> or <long>?  If always <long> then we can switch to <Long>
     NamedList<NamedList<Number>> ff = (NamedList<NamedList<Number>>) info.get( "facet_fields" );
     if( ff != null ) {
-      _facetFields = new ArrayList<>( ff.size() );
-      _limitingFacets = new ArrayList<>( ff.size() );
+      _facetFields = new ObjectArrayList<>( ff.size() );
+      _limitingFacets = new ObjectArrayList<>( ff.size() );
       
       long minsize = _results == null ? Long.MAX_VALUE :_results.getNumFound();
       for(Map.Entry<String,NamedList<Number>> facet : ff ) {
@@ -366,10 +365,10 @@ public class QueryResponse extends SolrResponseBase
     //Parse interval facets
     NamedList<NamedList<Object>> intervalsNL = (NamedList<NamedList<Object>>) info.get("facet_intervals");
     if (intervalsNL != null) {
-      _intervalFacets = new ArrayList<>(intervalsNL.size());
+      _intervalFacets = new ObjectArrayList<>(intervalsNL.size());
       for (Map.Entry<String, NamedList<Object>> intervalField : intervalsNL) {
         String field = intervalField.getKey();
-        List<IntervalFacet.Count> counts = new ArrayList<IntervalFacet.Count>(intervalField.getValue().size());
+        List<IntervalFacet.Count> counts = new ObjectArrayList<IntervalFacet.Count>(intervalField.getValue().size());
         for (Map.Entry<String, Object> interval : intervalField.getValue()) {
           counts.add(new IntervalFacet.Count(interval.getKey(), (Integer)interval.getValue()));
         }
@@ -379,7 +378,7 @@ public class QueryResponse extends SolrResponseBase
   }
 
   private static List<RangeFacet> extractRangeFacets(NamedList<NamedList<Object>> rf) {
-    List<RangeFacet> facetRanges = new ArrayList<>( rf.size() );
+    List<RangeFacet> facetRanges = new ObjectArrayList<>( rf.size() );
 
     for (Map.Entry<String, NamedList<Object>> facet : rf) {
       NamedList<Object> values = facet.getValue();
@@ -430,7 +429,7 @@ public class QueryResponse extends SolrResponseBase
 
   protected static List<PivotField> readPivots(List<NamedList> list)
   {
-    ArrayList<PivotField> values = new ArrayList<>( list.size() );
+    ObjectArrayList<PivotField> values = new ObjectArrayList<>( list.size() );
     for( NamedList nl : list ) {
       // NOTE, this is cheating, but we know the order they are written in, so no need to check
       assert "field".equals(nl.getName(0));
@@ -499,7 +498,7 @@ public class QueryResponse extends SolrResponseBase
    * Remove the field facet info
    */
   public void removeFacets() {
-    _facetFields = new ArrayList<>();
+    _facetFields = new ObjectArrayList<>();
   }
   
   //------------------------------------------------------
@@ -513,7 +512,7 @@ public class QueryResponse extends SolrResponseBase
     return _results;
   }
  
-  public NamedList<ArrayList> getSortValues(){
+  public NamedList<ObjectArrayList> getSortValues(){
     return _sortvalues;
   }
 

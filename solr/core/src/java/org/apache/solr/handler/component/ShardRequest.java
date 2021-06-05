@@ -21,6 +21,7 @@ import org.jctools.maps.NonBlockingHashMap;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -53,10 +54,11 @@ public class ShardRequest {
 
 
   /** list of responses... filled out by framework */
-  public Set<ShardResponse> responses = Collections.newSetFromMap(new NonBlockingHashMap<>());
+  public final Set<ShardResponse> responses = Collections.newSetFromMap(new NonBlockingHashMap<>());
+  //public final List<ShardResponse> responses = new ArrayList();
 
   /** actual shards to send the request to, filled out by framework */
-  public String[] actualShards;
+  public volatile String[] actualShards;
 
   /** may be null */
   public String nodeName;
@@ -71,6 +73,6 @@ public class ShardRequest {
     return "ShardRequest:{params=" + params
             + ", purpose=" + Integer.toHexString(purpose)
             + ", nResponses =" + responses.size()
-            + "}";
+            + '}';
   }
 }

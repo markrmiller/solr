@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +46,13 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
+import org.agrona.collections.ObjectHashSet;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -108,7 +116,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
   private long retryExpiryTime = TimeUnit.NANOSECONDS.convert(3, TimeUnit.SECONDS);//3 seconds or 3 million nanos
   private final Set<String> NON_ROUTABLE_PARAMS;
   {
-    NON_ROUTABLE_PARAMS = new HashSet<>();
+    NON_ROUTABLE_PARAMS = new ObjectHashSet<>(16, 0.25f);
     NON_ROUTABLE_PARAMS.add(UpdateParams.EXPUNGE_DELETES);
     NON_ROUTABLE_PARAMS.add(UpdateParams.MAX_OPTIMIZE_SEGMENTS);
     NON_ROUTABLE_PARAMS.add(UpdateParams.COMMIT);
@@ -490,7 +498,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     //Create the URL map, which is keyed on slice name.
     //The value is a list of URLs for each replica in the slice.
     //The first value in the list is the leader for the slice.
-    final Map<String,List<String>> urlMap = buildUrlMap(col, replicaListTransformer);
+    final Object2ObjectMap<String,ObjectList<String>> urlMap = buildUrlMap(col, replicaListTransformer);
     final Map<String, ? extends LBSolrClient.Req> routes = createRoutes(updateRequest, routableParams, col, router, urlMap, idField);
     if (routes == null) {
       if (directUpdatesToLeadersOnly && hasInfoToFindLeaders(updateRequest, idField)) {
@@ -517,6 +525,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
         LBSolrClient.Req lbRequest = entry.getValue();
         try {
           NamedList<Object> rsp = getLbClient().request(lbRequest).getResponse();
+          Objects.nonNull(rsp);
           shardResponses.add(url, rsp);
         } catch (Exception e) {
           ParWork.propagateInterrupt(e);
@@ -530,7 +539,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     }
 
     UpdateRequest nonRoutableRequest = null;
-    List<String> deleteQuery = updateRequest.getDeleteQuery();
+    ObjectList<String> deleteQuery = updateRequest.getDeleteQuery();
     if (deleteQuery != null && deleteQuery.size() > 0) {
       UpdateRequest deleteQueryRequest = new UpdateRequest();
       deleteQueryRequest.setDeleteQuery(deleteQuery);
@@ -548,11 +557,12 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       }
       nonRoutableRequest.setParams(nonRoutableParams);
       nonRoutableRequest.setBasicAuthCredentials(request.getBasicAuthUser(), request.getBasicAuthPassword());
-      List<String> urlList = new ArrayList<>(routes.keySet());
+      ObjectList<String> urlList = new ObjectArrayList<>(routes.keySet());
       Collections.shuffle(urlList, rand);
       LBSolrClient.Req req = new LBSolrClient.Req(nonRoutableRequest, urlList);
       try {
         LBSolrClient.Rsp rsp = getLbClient().request(req);
+        Objects.nonNull(rsp);
         shardResponses.add(urlList.get(0), rsp.getResponse());
       } catch (Exception e) {
         ParWork.propagateInterrupt(e);
@@ -583,7 +593,9 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
     responseFutures.forEach((url, responseFuture) -> {
       try {
-        shardResponses.add(url, responseFuture.get());
+        NamedList<?> rsp = responseFuture.get();
+        Objects.nonNull(rsp);
+        shardResponses.add(url, rsp);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new RuntimeException(e);
@@ -610,17 +622,17 @@ public abstract class BaseCloudSolrClient extends SolrClient {
   }
 
   protected Map<String, ? extends LBSolrClient.Req> createRoutes(UpdateRequest updateRequest, ModifiableSolrParams routableParams,
-                                                       DocCollection col, DocRouter router, Map<String, List<String>> urlMap,
+                                                       DocCollection col, DocRouter router, Object2ObjectMap<String, ObjectList<String>> urlMap,
                                                        String idField) {
     return urlMap == null ? null : updateRequest.getRoutesToCollection(router, col, urlMap, routableParams, idField);
   }
 
-  Map<String,List<String>> buildUrlMap(DocCollection col, ReplicaListTransformer replicaListTransformer) {
-    Map<String, List<String>> urlMap = new HashMap<>();
+  Object2ObjectMap<String,ObjectList<String>> buildUrlMap(DocCollection col, ReplicaListTransformer replicaListTransformer) {
+    Object2ObjectMap<String, ObjectList<String>> urlMap = new Object2ObjectOpenHashMap<>(16, 0.5f);
     Collection<Slice> slices = col.getActiveSlices();
     for (Slice slice : slices) {
       String name = slice.getName();
-      List<Replica> sortedReplicas = new ArrayList<>();
+      ObjectList<Replica> sortedReplicas = new ObjectArrayList<>();
       Replica leader = slice.getLeader(getClusterStateProvider().getLiveNodes());
       if (directUpdatesToLeadersOnly && leader == null) {
         for (Replica replica : slice.getReplicas(
@@ -652,7 +664,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
       // put the leaderUrl first.
       sortedReplicas.add(0, leader);
 
-      urlMap.put(name, sortedReplicas.stream().map(Replica::getCoreUrl).collect(Collectors.toList()));
+      urlMap.put(name, sortedReplicas.stream().map(Replica::getCoreUrl).collect(ObjectArrayList.toList()));
     }
     return urlMap;
   }
@@ -1068,7 +1080,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
 
     final Set<String> liveNodes = getClusterStateProvider().getLiveNodes();
 
-    final List<String> theUrlList = new ArrayList<>(); // we populate this as follows...
+    final ObjectList<String> theUrlList = new ObjectArrayList<>(); // we populate this as follows...
 
     if (request instanceof V2Request) {
       if (!liveNodes.isEmpty()) {
@@ -1163,7 +1175,7 @@ public abstract class BaseCloudSolrClient extends SolrClient {
     if (inputCollections.isEmpty()) {
       return Collections.emptySet();
     }
-    LinkedHashSet<String> uniqueNames = new LinkedHashSet<>(); // consistent ordering
+    Set<String> uniqueNames = new ObjectLinkedOpenHashSet<>(); // consistent ordering
     for (String collectionName : inputCollections) {
       if (getClusterStateProvider().getState(collectionName) == null) {
         // perhaps it's an alias

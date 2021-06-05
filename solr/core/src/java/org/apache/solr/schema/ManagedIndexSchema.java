@@ -379,7 +379,7 @@ public final class ManagedIndexSchema extends IndexSchema {
   }
 
 
-    private static class GetZkSchemaVersionCallable extends SolrRequest implements Callable<Integer> {
+    private static class GetZkSchemaVersionCallable<SolrResponse> extends SolrRequest<org.apache.solr.client.solrj.SolrResponse> implements Callable<Integer> {
 
     private final ConnectionManager.IsClosed isClosed;
     private final Http2SolrClient solrClient;
@@ -442,7 +442,7 @@ public final class ManagedIndexSchema extends IndexSchema {
     }
 
     @Override
-    protected SolrResponse createResponse(SolrClient client) {
+    protected org.apache.solr.client.solrj.SolrResponse createResponse(SolrClient client, NamedList<Object> nl) {
       return null;
     }
 

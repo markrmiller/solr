@@ -39,6 +39,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.solr.api.Api;
 import org.apache.solr.api.ApiBag;
 import org.apache.solr.client.solrj.SolrClient;
@@ -764,7 +766,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
 
   static {
     for (SolrConfig.SolrPluginInfo solrPluginInfo : SolrConfig.plugins)
-      subPaths.add("/" + solrPluginInfo.getCleanTag());
+      subPaths.add('/' + solrPluginInfo.getCleanTag());
 
   }
 
@@ -802,7 +804,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
                                               int maxWaitSecs) {
     final RTimer timer = new RTimer();
     // get a list of active replica cores to query for the schema zk version (skipping this core of course)
-    List<PerReplicaCallable> concurrentTasks = new ArrayList<>();
+    ObjectList<PerReplicaCallable> concurrentTasks = new ObjectArrayList<>();
 
     for (String coreUrl : getActiveReplicaCoreUrls(zkController, collection)) {
       PerReplicaCallable e = new PerReplicaCallable(
@@ -823,7 +825,7 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
 
     try {
       List<Future<Boolean>> results =
-          parallelExecutor.invokeAll(concurrentTasks, maxWaitSecs, TimeUnit.SECONDS);
+          parallelExecutor.invokeAll((Collection<? extends Callable<Boolean>>)concurrentTasks, maxWaitSecs, TimeUnit.SECONDS);
 
       // determine whether all replicas have the update
       List<String> failedList = null; // lazily init'd
@@ -926,6 +928,11 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
     }
 
     @Override
+    protected SolrResponse createResponse(SolrClient client, NamedList nl) {
+      return null;
+    }
+
+    @Override
     public Boolean call() throws Exception {
       final RTimer timer = new RTimer();
       long timeElapsed = (long) timer.getTime() / 1000;
@@ -967,11 +974,6 @@ public class SolrConfigHandler extends RequestHandlerBase implements SolrCoreAwa
       return true;
     }
 
-
-    @Override
-    protected SolrResponse createResponse(SolrClient client) {
-      return null;
-    }
   }
 
   @Override

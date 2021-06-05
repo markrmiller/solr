@@ -122,9 +122,10 @@ public class StreamingBinaryResponseParser extends BinaryResponseParser {
       private int nestedLevel;
 
       @Override
-      public SolrDocument readSolrDocument(JavaBinInputStream dis) throws IOException {
+      public SolrDocument readSolrDocument(JavaBinInputStream dis, int sz) throws IOException {
         nestedLevel++;
-        SolrDocument doc = super.readSolrDocument(dis);
+
+        SolrDocument doc = super.readSolrDocument(dis, sz);
         nestedLevel--;
         if (nestedLevel == 0) {
           // parent document

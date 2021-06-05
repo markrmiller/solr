@@ -27,6 +27,10 @@ import org.apache.solr.common.util.NamedList;
 
 public class CollectionAdminResponse extends SolrResponseBase
 {
+  public CollectionAdminResponse(NamedList<Object> nl) {
+    super(nl);
+  }
+
   @SuppressWarnings("unchecked")
   public NamedList<NamedList<Object>> getCollectionStatus()
   {

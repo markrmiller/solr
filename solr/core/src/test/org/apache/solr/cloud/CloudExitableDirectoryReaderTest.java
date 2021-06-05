@@ -133,7 +133,7 @@ public class CloudExitableDirectoryReaderTest extends SolrCloudTestCase {
       final String v = "a" + counter;
       req.add(SolrTestCaseJ4.sdoc("id", Integer.toString(counter), "name", v,
           "name_dv", v,
-          "name_dvs", v,"name_dvs", v+"1",
+          "name_dvs", v,"name_dvs", v+ '1',
           "num",""+counter));
     }
 

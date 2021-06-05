@@ -17,6 +17,7 @@
 package org.apache.solr.handler.component;
 
 import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
@@ -327,7 +328,7 @@ public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.
     return solrMetricsContext;
   }
 
-  protected LBSolrClient.Req newLBHttpSolrClientReq(final QueryRequest req, List<String> urls) {
+  protected LBSolrClient.Req newLBHttpSolrClientReq(final QueryRequest req, ObjectList<String> urls) {
     int numServersToTry = (int)Math.floor(urls.size() * this.permittedLoadBalancerRequestsMaximumFraction);
     if (numServersToTry < this.permittedLoadBalancerRequestsMinimumAbsolute) {
       numServersToTry = this.permittedLoadBalancerRequestsMinimumAbsolute;
@@ -341,8 +342,8 @@ public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.
    * @param shard the urls for the shard, separated by '|'
    * @return A list of valid urls (including protocol) that are replicas for the shard
    */
-  public List<String> buildURLList(String shard) {
-    List<String> urls = StrUtils.splitSmart(shard, "|", true);
+  public ObjectList<String> buildURLList(String shard) {
+    ObjectList<String> urls = StrUtils.splitSmart(shard, "|", true);
 
     // convert shard to URL
     for (int i=0; i<urls.size(); i++) {

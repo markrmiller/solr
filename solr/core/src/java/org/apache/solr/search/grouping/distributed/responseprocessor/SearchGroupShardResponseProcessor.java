@@ -62,9 +62,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
     for (String field : fields) {
       commandSearchGroups.put(field, new ArrayList<Collection<SearchGroup<BytesRef>>>(shardRequest.responses.size()));
       tempSearchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
-      if (rb.searchGroupToShards == null) {
-        rb.searchGroupToShards = new HashMap<>();
-      }
+
       if (!rb.searchGroupToShards.containsKey(field)) {
         rb.searchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
       }
@@ -125,11 +123,9 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
         final Integer groupCount = firstPhaseCommandResult.getGroupCount();
         if (groupCount != null) {
           Integer existingGroupCount = null;
-          if (rb.mergedGroupCounts != null) {
-             existingGroupCount = rb.mergedGroupCounts.get(field);
-          } else {
-            rb.mergedGroupCounts = new HashMap<>();
-          }
+
+          existingGroupCount = rb.mergedGroupCounts.get(field);
+
           // Assuming groups don't cross shard boundary...
           rb.mergedGroupCounts.put(field, existingGroupCount != null ? Integer.valueOf(existingGroupCount + groupCount) : groupCount);
         }
@@ -161,7 +157,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
       if (mergedTopGroups == null) {
         continue;
       }
-      if (rb.mergedSearchGroups == null) rb.mergedSearchGroups = new HashMap<>();
+
       rb.mergedSearchGroups.put(groupField, mergedTopGroups);
       for (SearchGroup<BytesRef> mergedTopGroup : mergedTopGroups) {
         rb.searchGroupToShards.get(groupField).put(mergedTopGroup, tempSearchGroupToShards.get(groupField).get(mergedTopGroup));

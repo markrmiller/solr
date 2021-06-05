@@ -168,9 +168,7 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
           docsPerGroup += subTopGroups.totalGroupedHitCount;
         }
       }
-      if (rb.mergedTopGroups == null) {
-        rb.mergedTopGroups = new HashMap<>();
-      }
+
       rb.mergedTopGroups.put(entry.getKey(), TopGroups.merge(topGroups.toArray(topGroupsArr), groupSort, withinGroupSort, groupOffsetDefault, docsPerGroup, TopGroups.ScoreMergeMode.None));
     }
 
@@ -209,7 +207,7 @@ public class TopGroupsShardResponseProcessor implements ShardResponseProcessor {
         mergedTopDocs = TopDocs.merge(
             withinGroupSort, start, topN, topDocs.toArray(EMPTY_TOP_FIELD_DOCS));
       }
-      if (rb.mergedQueryCommandResults == null) rb.mergedQueryCommandResults = new HashMap<>();
+
       rb.mergedQueryCommandResults.put(entry.getKey(), new QueryCommandResult(mergedTopDocs, mergedMatches, maxScore));
     }
     fillResultIds(rb);

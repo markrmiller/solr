@@ -65,6 +65,7 @@ import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
 import net.sf.saxon.expr.sort.CodepointCollator;
+import org.agrona.MutableDirectBuffer;
 import org.apache.commons.ForkJoinParWorkRootExec;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
@@ -79,6 +80,7 @@ import org.apache.solr.common.cloud.ConnectionManager;
 import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.ExpandableBuffers;
 import org.apache.solr.common.util.ExpandableDirectBufferOutputStream;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
@@ -681,7 +683,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
 
           HttpOutput out = (HttpOutput) ((SolrDispatchFilter.CloseShieldHttpServletResponseWrapper) response).response.getOutputStream();
-          ExpandableDirectBufferOutputStream outStream = QueryResponseWriterUtil.writeQueryResponse(responseWriter, solrRequest, solrResponse, ct);
+          ExpandableDirectBufferOutputStream outStream = QueryResponseWriterUtil.writeQueryResponse(responseWriter, solrRequest, solrResponse, request, response, ct);
           ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
           buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
           buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
@@ -942,6 +944,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     @Override public void onComplete(AsyncEvent event) throws IOException {
       log.debug("onComplete {}", event, event.getThrowable());
+      ServletRequest request = event.getSuppliedRequest();
+      if (request != null) {
+        MutableDirectBuffer responseBuffer = (MutableDirectBuffer) request.getAttribute("responseBuffer");
+        ExpandableBuffers.getInstance().release(responseBuffer);
+      }
     }
 
     @Override public void onTimeout(AsyncEvent event) throws IOException {
@@ -963,6 +970,11 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 //      } finally {
 //        event.getAsyncContext().complete();
 //      }
+      ServletRequest request = event.getSuppliedRequest();
+      if (request != null) {
+        MutableDirectBuffer responseBuffer = (MutableDirectBuffer) request.getAttribute("responseBuffer");
+        ExpandableBuffers.getInstance().release(responseBuffer);
+      }
     }
   }
 }

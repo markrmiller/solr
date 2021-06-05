@@ -16,6 +16,7 @@
  */
 package org.apache.solr.client.solrj.impl;
 
+import com.google.api.client.util.escape.CharEscapers;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.io.DirectBufferInputStream;
@@ -123,7 +124,7 @@ public class Http2SolrClient extends SolrClient {
 
   private CloseTracker closeTracker;
 
-  private final HttpClient httpClient;
+  private final SolrInternalHttpClient httpClient;
   private volatile Set<String> queryParams = Collections.emptySet();
   private final int idleTimeout;
   private final boolean strictEventOrdering;
@@ -194,8 +195,8 @@ public class Http2SolrClient extends SolrClient {
     return httpClient.getProtocolHandlers();
   }
 
-  private HttpClient createHttpClient(Builder builder) {
-    HttpClient httpClient;
+  private SolrInternalHttpClient createHttpClient(Builder builder) {
+    SolrInternalHttpClient httpClient;
 
     SslContextFactory.Client sslContextFactory = null;
 
@@ -431,8 +432,8 @@ public class Http2SolrClient extends SolrClient {
 
     OutputStreamContentProvider provider = new OutputStreamContentProvider();
     Request postRequest = httpClient
-        .newRequest(basePath + "update"
-            + requestParams.toQueryString())
+        .newSolrRequest(basePath + "update"
+            + requestParams.toQueryString(), null)
         .method(HttpMethod.POST)
         .headers(httpFields -> httpFields.add(HttpHeader.CONTENT_TYPE, contentType))
         .content(provider);
@@ -440,7 +441,7 @@ public class Http2SolrClient extends SolrClient {
 
     decorateRequest(postRequest, updateRequest);
     updateRequest.setBasePath(baseUrl);
-    SolrInputStreamResponseListener responseListener = new SolrInputStreamResponseListener();
+    SolrInputStreamResponseListener responseListener = new SolrInputStreamResponseListener((SolrHttpRequest) postRequest);
     postRequest.send(responseListener);
 
     boolean isXml = ClientUtils.TEXT_XML.equals(requestWriter.getUpdateContentType());
@@ -467,8 +468,7 @@ public class Http2SolrClient extends SolrClient {
         }
         if (fmt != null) {
           byte[] content = String.format(Locale.ROOT,
-              fmt, params.getBool(UpdateParams.WAIT_SEARCHER, false)
-                  + "")
+              fmt, String.valueOf(params.getBool(UpdateParams.WAIT_SEARCHER, false)))
               .getBytes(FALLBACK_CHARSET);
           outStream.write(content);
         }
@@ -556,7 +556,7 @@ public class Http2SolrClient extends SolrClient {
           } finally {
             try {
               org.apache.solr.common.util.IOUtils.closeQuietly(is);
-              ExpandableBuffers.getInstance().release(expandableBuffer);
+              ((SolrHttpRequest) req).freeBuffer();
             } finally {
               asyncTracker.arrive();
             }
@@ -649,7 +649,7 @@ public class Http2SolrClient extends SolrClient {
 
     Response response;
     if (wantStream(parser)) {
-      SolrInputStreamResponseListener listener = new SolrInputStreamResponseListener();
+      SolrInputStreamResponseListener listener = new SolrInputStreamResponseListener((SolrHttpRequest) req);
       req.send(listener);
       try {
         response = listener.get(30000, TimeUnit.MILLISECONDS);
@@ -668,11 +668,9 @@ public class Http2SolrClient extends SolrClient {
       InputStream is = listener.getInputStream();
 
       org.apache.solr.common.util.IOUtils.closeQuietly(is);
+      ((SolrHttpRequest)req).freeBuffer();
       throw new SolrServerException("Request failed with status " + response.getStatus());
     }
-
-
-
 
 
     InputStream is = null;
@@ -700,13 +698,11 @@ public class Http2SolrClient extends SolrClient {
 
         return processErrorsAndResponse(req, solrRequest, parser, res, is);
       } finally {
-        // BufferUtil.free(buff); not ours
-        //buff.byteBuffer().position(buff.byteBuffer().limit());
+
       }
     } finally {
       org.apache.solr.common.util.IOUtils.closeQuietly(is);
-      ExpandableBuffers.getInstance().release(expandableBuffer);
-
+      ((SolrHttpRequest)req).freeBuffer();
     }
   }
 
@@ -817,7 +813,7 @@ public class Http2SolrClient extends SolrClient {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "GET can't send streams!");
       }
 
-      Request req = httpClient.newRequest(basePath + path + wparams.toQueryString()).method(HttpMethod.GET);
+      Request req = httpClient.newSolrRequest(basePath + path + wparams.toQueryString(), null).method(HttpMethod.GET);
 
       req = req.headers(new AddHeaders(headers));
 
@@ -825,7 +821,7 @@ public class Http2SolrClient extends SolrClient {
     }
 
     if (SolrRequest.METHOD.DELETE == solrRequest.getMethod()) {
-      Request req = httpClient.newRequest(basePath + path + wparams.toQueryString()).method(HttpMethod.DELETE);
+      Request req = httpClient.newSolrRequest(basePath + path + wparams.toQueryString(), null).method(HttpMethod.DELETE);
 
       req = req.headers(new AddHeaders(headers));
 
@@ -845,9 +841,13 @@ public class Http2SolrClient extends SolrClient {
       HttpMethod method = SolrRequest.METHOD.POST == solrRequest.getMethod() ? HttpMethod.POST : HttpMethod.PUT;
 
       if (contentWriter != null) {
+
+        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);
+        ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
+        contentWriter.write(outStream);
         Request req;
         try {
-          req = httpClient.newRequest(url + wparams.toQueryString()).method(method);
+          req = httpClient.newSolrRequest(url + wparams.toQueryString(), expandableBuffer1).method(method);
         } catch (IllegalArgumentException e) {
           throw new SolrServerException("Illegal url for request url=" + url, e);
         }
@@ -857,14 +857,6 @@ public class Http2SolrClient extends SolrClient {
         //req = req.idleTimeout(httpClient.getIdleTimeout(), TimeUnit.MILLISECONDS);
 
 
-        MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);
-
-        //ExpandableBuffers.buffer2.get();
-    //    expandableBuffer1.byteBuffer().clear();
-       // int pos = BufferUtil.flipToFill(expandableBuffer1.byteBuffer());
-     //   MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
-        ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
-        contentWriter.write(outStream);
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
@@ -872,13 +864,15 @@ public class Http2SolrClient extends SolrClient {
      //   BufferUtil.flipToFlush(expandableBuffer1.byteBuffer(), pos);
         ByteBufferRequestContent bcp = new ByteBufferRequestContent(contentWriter.getContentType(), buffer);
       //  return req.headers(httpFields -> httpFields.add(HttpHeader.CONTENT_LENGTH, String.valueOf(outStream.position()))).body(bcp);
-        return req.headers(httpFields -> httpFields.add(HttpHeader.CONTENT_LENGTH, String.valueOf(outStream.position()))).onComplete(request -> ExpandableBuffers.getInstance().release(expandableBuffer1)).body(bcp);
+        return req.headers(httpFields -> httpFields.add(HttpHeader.CONTENT_LENGTH, String.valueOf(outStream.position()))).
+            onComplete(request -> ExpandableBuffers.getInstance().release(expandableBuffer1)).body(bcp);
       } else if (streams == null || isMultipart) {
         // send server list and request list as query string params
         ModifiableSolrParams queryParams = calculateQueryParams(this.queryParams, wparams);
         queryParams.add(calculateQueryParams(solrRequest.getQueryParams(), wparams));
+
         Request req = httpClient
-            .newRequest(url + queryParams.toQueryString())
+            .newSolrRequest(url + queryParams.toQueryString(), null)
             .method(method);
 
         req = req.headers(new AddHeaders(headers));
@@ -891,17 +885,13 @@ public class Http2SolrClient extends SolrClient {
 
         MutableDirectBuffer expandableBuffer1 = ExpandableBuffers.getInstance().acquire(-1, true);
 
-        //ExpandableBuffers.buffer2.get();
-        //    expandableBuffer1.byteBuffer().clear();
-        // int pos = BufferUtil.flipToFill(expandableBuffer1.byteBuffer());
-        //   MutableDirectBuffer expandableBuffer1 = new ExpandableDirectByteBuffer(8192);
         ExpandableDirectBufferOutputStream outStream = new ExpandableDirectBufferOutputStream(expandableBuffer1);
         contentWriter.write(outStream);
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
         buffer.limit( outStream.position() + outStream.buffer().wrapAdjustment());
-        //   BufferUtil.flipToFlush(expandableBuffer1.byteBuffer(), pos);
+
 
 
         InputStream is = contentStream.getStream();
@@ -910,7 +900,7 @@ public class Http2SolrClient extends SolrClient {
 
         ByteBufferRequestContent bcp = new ByteBufferRequestContent(contentStream.getContentType(), buffer);
 
-        Request req = httpClient.newRequest(url + wparams.toQueryString()).method(method).body(bcp)
+        Request req = httpClient.newSolrRequest(url + wparams.toQueryString(), expandableBuffer1).method(method).body(bcp)
             .onComplete(request -> ExpandableBuffers.getInstance().release(expandableBuffer1)).headers(new AddHeaders(headers));
 
         return req;
@@ -1147,7 +1137,12 @@ public class Http2SolrClient extends SolrClient {
         } catch (IOException ioException) {
 
         }
-        throw new RemoteSolrException(remoteHost, httpStatus, txt == null || txt.isEmpty() ? (httpStatus > 0 ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : "No message") : txt, e);
+        String msg = "";
+        if (httpStatus == 200) {
+          msg = "Request was succesful on the server, but we failed parsing the response. ";
+        }
+
+        throw new RemoteSolrException(remoteHost, httpStatus, msg +  txt == null || txt.isEmpty() ? (httpStatus > 0 ? org.eclipse.jetty.http.HttpStatus.getCode(httpStatus).getMessage() : "") : txt, e);
       }
 
       // log.error("rsp:{}", rsp);
@@ -1504,7 +1499,7 @@ public class Http2SolrClient extends SolrClient {
 
   public static int HEAD(String url, Http2SolrClient httpClient) throws InterruptedException, ExecutionException, TimeoutException {
     ContentResponse response;
-    Request req = httpClient.httpClient.newRequest(URI.create(url));
+    Request req = httpClient.httpClient.newSolrRequest(url, null);
     response = req.method(HEAD).send();
     if (response.getStatus() != 200) {
       throw new RemoteSolrException(url, response.getStatus(), response.getReason(), null);
@@ -1573,7 +1568,7 @@ public class Http2SolrClient extends SolrClient {
   private static SimpleResponse doGet(String url, Http2SolrClient httpClient, Map<String,String> headers)
           throws InterruptedException, ExecutionException, TimeoutException {
     assert url != null;
-    Request req = httpClient.httpClient.newRequest(url).method(GET);
+    Request req = httpClient.httpClient.newSolrRequest(url, null).method(GET);
     ContentResponse response = req.send();
     SimpleResponse sResponse = new SimpleResponse();
     sResponse.asString = response.getContentAsString();
@@ -1588,7 +1583,7 @@ public class Http2SolrClient extends SolrClient {
       throws InterruptedException, ExecutionException, TimeoutException {
     assert url != null;
     try (Http2SolrClient http2SolrClient = new Builder().build()) {
-      Request req = http2SolrClient.httpClient.newRequest(url).method(DELETE);
+      Request req = http2SolrClient.httpClient.newSolrRequest(url, null).method(DELETE);
       return getSimpleResponse(req);
     }
   }
@@ -1654,6 +1649,7 @@ public class Http2SolrClient extends SolrClient {
     private final Request request;
 
     public MyInputStreamResponseListener(HttpClient httpClient, Request request, AsyncListener<InputStream> asyncListener) {
+      super((SolrHttpRequest) request);
       this.asyncListener = asyncListener;
       this.request = request;
     }

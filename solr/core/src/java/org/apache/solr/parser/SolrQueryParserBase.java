@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.agrona.collections.Object2NullableObjectHashMap;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenFilterFactory;
 import org.apache.lucene.analysis.reverse.ReverseStringFilter;
@@ -162,10 +163,14 @@ public abstract class SolrQueryParserBase extends QueryBuilder {
     public String toString() {
       return field;
     }
-    private final static Map<String,MagicFieldName> lookup
-        = new HashMap<>();
+    private final static Map<String,MagicFieldName> lookup;
+
+
     static {
-      for(MagicFieldName s : EnumSet.allOf(MagicFieldName.class))
+      EnumSet<MagicFieldName> fn = EnumSet.allOf(MagicFieldName.class);
+      lookup
+          = new Object2NullableObjectHashMap<>(fn.size(), 0.25f);
+      for(MagicFieldName s : fn)
         lookup.put(s.toString(), s);
     }
     public static MagicFieldName get(final String field) {
@@ -201,7 +206,7 @@ public abstract class SolrQueryParserBase extends QueryBuilder {
 
     @Override
     public String toString(String field) {
-      return "RAW(" + field + "," + getJoinedExternalVal() + ")";
+      return "RAW(" + field + ',' + getJoinedExternalVal() + ')';
     }
 
     @Override
@@ -1241,7 +1246,7 @@ public abstract class SolrQueryParserBase extends QueryBuilder {
             Automata.makeChar(factory.getMarkerChar()),
             Automata.makeAnyString());
         // subtract these away
-        automaton = Operations.minus(automaton, falsePositives, Operations.DEFAULT_MAX_DETERMINIZED_STATES);
+        automaton = Operations.minus(automaton, falsePositives, Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
       }
       return new AutomatonQuery(term, automaton);
     }

@@ -1,6 +1,5 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="CreateCollectionsIndexAndRestartTest.start non debug logging NEWRELIC" type="JUnit" factoryName="JUnit" repeat_count="10" repeat_mode="N Times">
-    <module name="lucene-solr.solr.core.test" />
     <useClassPathOnly />
     <extension name="History Recorder Settings" includeConstructors="false" includeGettersSetters="false" minMethodSize="2" maxBreakpointsPerMethod="5" maxBreakpoints="200" maxDepthVariables="3" mode="1" nrCollectionItems="5" includeCollections="true" nrFieldsToShow="10" />
     <extension name="coverage">

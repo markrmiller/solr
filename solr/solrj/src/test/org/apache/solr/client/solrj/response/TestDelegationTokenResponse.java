@@ -28,6 +28,7 @@ import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.request.DelegationTokenRequest;
 import org.apache.solr.common.SolrException;
 
+import org.apache.solr.common.util.NamedList;
 import org.junit.Test;
 
 import org.noggit.CharArr;
@@ -35,11 +36,18 @@ import org.noggit.JSONWriter;
 
 public class TestDelegationTokenResponse extends SolrTestCase {
 
-  private void delegationTokenResponse(DelegationTokenRequest request,
-      DelegationTokenResponse response, String responseBody) throws Exception {
+  private DelegationTokenResponse.Get delegationTokenResponseGet(DelegationTokenRequest request, String responseBody) throws Exception {
     ResponseParser parser = request.getResponseParser();
-    response.setResponse(parser.processResponse(
-      IOUtils.toInputStream(responseBody, "UTF-8"), "UTF-8"));
+    NamedList<Object> nl = parser.processResponse(IOUtils.toInputStream(responseBody, "UTF-8"), "UTF-8");
+    return new DelegationTokenResponse.Get(nl);
+
+  }
+
+  private DelegationTokenResponse.Renew delegationTokenResponseRenew(DelegationTokenRequest request, String responseBody) throws Exception {
+    ResponseParser parser = request.getResponseParser();
+    NamedList<Object> nl = parser.processResponse(IOUtils.toInputStream(responseBody, "UTF-8"), "UTF-8");
+    return new DelegationTokenResponse.Renew(nl);
+
   }
 
   private String getNestedMapJson(String outerKey, String innerKey, Object innerValue) {
@@ -66,29 +74,29 @@ public class TestDelegationTokenResponse extends SolrTestCase {
   // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
   public void testGetResponse() throws Exception {
     DelegationTokenRequest.Get getRequest = new DelegationTokenRequest.Get();
-    DelegationTokenResponse.Get getResponse = new DelegationTokenResponse.Get();
+
 
     // not a map
     LuceneTestCase.expectThrows(SolrException.class, () -> {
-      delegationTokenResponse(getRequest, getResponse, "");
-      getResponse.getDelegationToken();
+      delegationTokenResponseGet(getRequest, "").getDelegationToken();
+
     });
 
     // doesn't have Token outerMap
     final String someToken = "someToken";
-    delegationTokenResponse(getRequest, getResponse, getNestedMapJson("NotToken", "urlString", someToken));
+    DelegationTokenResponse.Get getResponse = delegationTokenResponseGet(getRequest, getNestedMapJson("NotToken", "urlString", someToken));
     assertNull(getResponse.getDelegationToken());
 
     // Token is not a map
-    delegationTokenResponse(getRequest, getResponse, getMapJson("Token", someToken));
+    getResponse = delegationTokenResponseGet(getRequest, getMapJson("Token", someToken));
     LuceneTestCase.expectThrows(SolrException.class, getResponse::getDelegationToken);
 
     // doesn't have urlString
-    delegationTokenResponse(getRequest, getResponse, getNestedMapJson("Token", "notUrlString", someToken));
+     getResponse = delegationTokenResponseGet(getRequest, getNestedMapJson("Token", "notUrlString", someToken));
     assertNull(getResponse.getDelegationToken());
 
     // has Token + urlString
-    delegationTokenResponse(getRequest, getResponse, getNestedMapJson("Token", "urlString", someToken));
+    getResponse = delegationTokenResponseGet(getRequest, getNestedMapJson("Token", "urlString", someToken));
     assertEquals(someToken, getResponse.getDelegationToken());
   }
 
@@ -96,25 +104,26 @@ public class TestDelegationTokenResponse extends SolrTestCase {
   // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
   public void testRenewResponse() throws Exception {
     DelegationTokenRequest.Renew renewRequest = new DelegationTokenRequest.Renew("token");
-    DelegationTokenResponse.Renew renewResponse = new DelegationTokenResponse.Renew();
+
 
     // not a map
+
     LuceneTestCase.expectThrows(SolrException.class, () -> {
-      delegationTokenResponse(renewRequest, renewResponse, "");
+      DelegationTokenResponse.Renew renewResponse = delegationTokenResponseRenew(renewRequest, "");
       renewResponse.getExpirationTime();
     });
 
     // doesn't have long
-    delegationTokenResponse(renewRequest, renewResponse, getMapJson("notLong", "123"));
+    DelegationTokenResponse.Renew renewResponse = delegationTokenResponseRenew(renewRequest, getMapJson("notLong", "123"));
     assertNull(renewResponse.getExpirationTime());
 
     // long isn't valid
-    delegationTokenResponse(renewRequest, renewResponse, getMapJson("long", "aaa"));
+    // renewResponse =delegationTokenResponseGet(renewRequest, getMapJson("long", "aaa"));
     LuceneTestCase.expectThrows(SolrException.class, renewResponse::getExpirationTime);
 
     // valid
     Long expirationTime = Long.MAX_VALUE;
-    delegationTokenResponse(renewRequest, renewResponse,
+    renewResponse = delegationTokenResponseRenew(renewRequest,
       getMapJson("long", expirationTime));
     assertEquals(expirationTime, renewResponse.getExpirationTime());
   }
@@ -123,7 +132,7 @@ public class TestDelegationTokenResponse extends SolrTestCase {
   public void testCancelResponse() throws Exception {
     // expect empty response
     DelegationTokenRequest.Cancel cancelRequest = new DelegationTokenRequest.Cancel("token");
-    DelegationTokenResponse.Cancel cancelResponse = new DelegationTokenResponse.Cancel();
-    delegationTokenResponse(cancelRequest, cancelResponse, "");
+    DelegationTokenResponse.Cancel cancelResponse = new DelegationTokenResponse.Cancel(null);
+    delegationTokenResponseGet(cancelRequest, "");
   }
 }

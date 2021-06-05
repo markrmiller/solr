@@ -22,6 +22,7 @@ import java.io.StringWriter;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.LinkedTransferQueue;
@@ -347,7 +348,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
             rb.addDebugInfo("timing", timer.asNamedList());
           }
         }
-        finishResponse(req, rsp, rb);
+    //    finishResponse(req, rsp, rb);
       } catch (ExitableDirectoryReader.ExitingReaderException ex) {
         log.warn("Query: {}; {}", req.getParamString(), ex.getMessage());
         if (rb.rsp.getResponse() == null) {
@@ -362,231 +363,114 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
       } finally {
         SolrQueryTimeoutImpl.reset();
       }
-      finishResponse(req, rsp, rb);
+      //finishResponse(req, rsp, rb);
     } else {
       // a distributed request
 
       if (rb.outgoing == null) {
-        rb.outgoing = new LinkedTransferQueue<>();
+     //   rb.outgoing = new LinkedTransferQueue<>();
+        rb.outgoing = new LinkedList<>();
       }
       rb.finished = new ArrayList<>();
+
       int nextStage = 0;
-      if (!rsp.isAsync()) {
-        do {
-          nextStage = getNextStage(req, rsp, components, rb, shardHandler1, nextStage);
+      do {
+        rb.stage = nextStage;
+        nextStage = ResponseBuilder.STAGE_DONE;
 
-          // we are done when the next stage is MAX_VALUE
-        } while (nextStage != Integer.MAX_VALUE);
-        finishResponse(req, rsp, rb);
-      }  else {
-        getNextStageAsync(req, rsp, components, rb, shardHandler1, nextStage);
-      }
-
-    }
-
-
-  }
-
-  private int getNextStage(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components, ResponseBuilder rb, ShardHandler shardHandler1, int nextStage) throws IOException {
-
-    rb.stage = nextStage;
-
-    nextStage = ResponseBuilder.STAGE_DONE;
-
-    // call all components
-    for (SearchComponent c : components) {
-      // the next stage is the minimum of what all components report
-      nextStage = Math.min(nextStage, c.distributedProcess(rb));
-    }
-
-    // check the outgoing queue and send requests
-    while (rb.outgoing.size() > 0) {
-
-      // submit all current request tasks at once
-      while (rb.outgoing.size() > 0) {
-        ShardRequest sreq = rb.outgoing.poll();
-
-        sendRequest(req, rsp, rb, shardHandler1, sreq);
-      }
-      // now wait for replies, but if anyone puts more requests on
-      // the outgoing queue, send them out immediately (by exiting
-      // this loop)
-      boolean tolerant = ShardParams.getShardsTolerantAsBool(rb.req.getParams());
-      processResults(rb, shardHandler1, tolerant, rsp);
-     // done(rsp, rb, shardHandler1, tolerant);
-    }
-
-    for (SearchComponent c : components) {
-      c.finishStage(rb);
-    }
-    return nextStage;
-  }
-
-  private void getNextStageAsync(SolrQueryRequest req, SolrQueryResponse rsp, List<SearchComponent> components, ResponseBuilder rb, ShardHandler shardHandler1, int nextStage) throws IOException {
-    rb.stage = nextStage;
-
-    if (nextStage == Integer.MAX_VALUE) {
-      finishResponse(req, rsp, rb);
-      rsp.asyncDone();
-      return;
-    }
-
-    nextStage = ResponseBuilder.STAGE_DONE;
-
-    // call all components
-    for (SearchComponent c : components) {
-      // the next stage is the minimum of what all components report
-      nextStage = Math.min(nextStage, c.distributedProcess(rb));
-    }
-
-    // check the outgoing queue and send requests
-
-    submitAndProcess(req, rsp, rb, shardHandler1, nextStage);
-
-  }
-
-  private void submitAndProcess(SolrQueryRequest req, SolrQueryResponse rsp, ResponseBuilder rb, ShardHandler shardHandler1, int nextStage) throws IOException {
-    // submit all current request tasks at once
-    while (rb.outgoing.size() > 0) {
-      ShardRequest sreq = rb.outgoing.poll();
-
-      if (nextStage > 0) {
-        shardHandler1.setFinish(() -> {
-
-          try {
-            submitAndProcess(req, rsp, rb, shardHandler1, nextStage);
-          } catch (IOException e) {
-            log.error("async error", e);
-          }
-        });
-      }
-      return;
-    }
-    // now wait for replies, but if anyone puts more requests on
-    // the outgoing queue, send them out immediately (by exiting
-    // this loop)
-    doneAsync(rsp, rb, shardHandler1, nextStage);
-    for (SearchComponent c : components) {
-      c.finishStage(rb);
-    }
-  }
-
-  private void doneAsync(SolrQueryResponse rsp, ResponseBuilder rb, ShardHandler shardHandler1, int nextStage) throws IOException {
-    boolean tolerant = ShardParams.getShardsTolerantAsBool(rb.req.getParams());
-    if (rb.outgoing.size() != 0) {
-
-        submitAndProcess(rb.req,rsp, rb, shardHandler1, nextStage);  // no more requests to wait for
-        return;
-
-    }
-
-    getNextStageAsync(rb.req, rsp, components, rb, shardHandler1, nextStage);
-  }
-
-  private void done(SolrQueryResponse rsp, ResponseBuilder rb, ShardHandler shardHandler1, boolean tolerant) throws IOException {
-
-    while (rb.outgoing.size() == 0) {
-      ShardResponse srsp = tolerant ? shardHandler1.takeCompletedIncludingErrors() : shardHandler1.takeCompletedOrError();
-      if (srsp == null) {
-        return;
-      }
-
-      // Was there an exception?
-      if (srsp.getException() != null) {
-        // If things are not tolerant, abort everything and rethrow
-        if (!tolerant) {
-          shardHandler1.cancelAll();
-          if (srsp.getException() instanceof SolrException) {
-            throw (SolrException) srsp.getException();
-          } else {
-            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, srsp.getException());
-          }
-        } else {
-          rsp.getResponseHeader().asShallowMap().put(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY, Boolean.TRUE);
+        // call all components
+        for( SearchComponent c : components ) {
+          // the next stage is the minimum of what all components report
+          nextStage = Math.min(nextStage, c.distributedProcess(rb));
         }
-      }
-
-      rb.finished.add(srsp.getShardRequest());
-
-      // let the components see the responses to the request
-      for (SearchComponent c : components) {
-        c.handleResponses(rb, srsp.getShardRequest());
-      }
-    }
 
 
-  }
+        // check the outgoing queue and send requests
+        while (rb.outgoing.size() > 0) {
 
-  private void processResults(ResponseBuilder rb, ShardHandler shardHandler1, boolean tolerant, SolrQueryResponse rsp) {
-    while (rb.outgoing.size() == 0) {
-      ShardResponse srsp = tolerant ? shardHandler1.takeCompletedIncludingErrors() : shardHandler1.takeCompletedOrError();
-      if (srsp == null) break;  // no more requests to wait for
+          // submit all current request tasks at once
+          while (rb.outgoing.size() > 0) {
+            ShardRequest sreq = rb.outgoing.remove(0);
+            sreq.actualShards = sreq.shards;
+            if (sreq.actualShards==ShardRequest.ALL_SHARDS) {
+              sreq.actualShards = rb.shards;
+            }
+            //sreq.responses = new ArrayList<>(sreq.actualShards.length); // presume we'll get a response from each shard we send to
 
-      // Was there an exception?
-      if (srsp.getException() != null) {
-        // If things are not tolerant, abort everything and rethrow
-        if (!tolerant) {
-          shardHandler1.cancelAll();
-          if (srsp.getException() instanceof SolrException) {
-            throw (SolrException) srsp.getException();
-          } else {
-            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, srsp.getException());
+            // TODO: map from shard to address[]
+            for (String shard : sreq.actualShards) {
+              ModifiableSolrParams params = new ModifiableSolrParams(sreq.params);
+              params.remove(ShardParams.SHARDS);      // not a top-level request
+              params.set(DISTRIB, "false");               // not a top-level request
+              params.remove("indent");
+              params.remove(CommonParams.HEADER_ECHO_PARAMS);
+              params.set(ShardParams.IS_SHARD, true);  // a sub (shard) request
+              params.set(ShardParams.SHARDS_PURPOSE, sreq.purpose);
+              params.set(ShardParams.SHARD_URL, shard); // so the shard knows what was asked
+              params.set(CommonParams.OMIT_HEADER, false);
+              if (rb.requestInfo != null) {
+                // we could try and detect when this is needed, but it could be tricky
+                params.set("NOW", Long.toString(rb.requestInfo.getNOW().getTime()));
+              }
+              String shardQt = params.get(ShardParams.SHARDS_QT);
+              if (shardQt != null) {
+                params.set(CommonParams.QT, shardQt);
+              } else {
+                // for distributed queries that don't include shards.qt, use the original path
+                // as the default but operators need to update their luceneMatchVersion to enable
+                // this behavior since it did not work this way prior to 5.1
+                String reqPath = (String) req.getContext().get(PATH);
+                if (!"/select".equals(reqPath)) {
+                  params.set(CommonParams.QT, reqPath);
+                } // else if path is /select, then the qt gets passed thru if set
+              }
+              shardHandler1.submit(sreq, shard, params);
+            }
           }
-        } else {
-          rsp.getResponseHeader().asShallowMap().put(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY, Boolean.TRUE);
+
+
+          // now wait for replies, but if anyone puts more requests on
+          // the outgoing queue, send them out immediately (by exiting
+          // this loop)
+          boolean tolerant = ShardParams.getShardsTolerantAsBool(rb.req.getParams());
+          while (rb.outgoing.size() == 0) {
+            ShardResponse srsp = tolerant ?
+                shardHandler1.takeCompletedIncludingErrors():
+                shardHandler1.takeCompletedOrError();
+            if (srsp == null) break;  // no more requests to wait for
+
+            // Was there an exception?
+            if (srsp.getException() != null) {
+              // If things are not tolerant, abort everything and rethrow
+              if(!tolerant) {
+                shardHandler1.cancelAll();
+                if (srsp.getException() instanceof SolrException) {
+                  throw (SolrException)srsp.getException();
+                } else {
+                  throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, srsp.getException());
+                }
+              } else {
+                rsp.getResponseHeader().asShallowMap().put(SolrQueryResponse.RESPONSE_HEADER_PARTIAL_RESULTS_KEY, Boolean.TRUE);
+              }
+            }
+
+            rb.finished.add(srsp.getShardRequest());
+
+            // let the components see the responses to the request
+            for(SearchComponent c : components) {
+              c.handleResponses(rb, srsp.getShardRequest());
+            }
+          }
         }
-      }
 
-      rb.finished.add(srsp.getShardRequest());
+        for(SearchComponent c : components) {
+          c.finishStage(rb);
+        }
 
-      // let the components see the responses to the request
-      for (SearchComponent c : components) {
-        c.handleResponses(rb, srsp.getShardRequest());
-      }
-
-    }
-  }
-
-  public void sendRequest(SolrQueryRequest req, SolrQueryResponse rsp, ResponseBuilder rb, ShardHandler shardHandler1, ShardRequest sreq) {
-    sreq.actualShards = sreq.shards;
-    if (sreq.actualShards==ShardRequest.ALL_SHARDS) {
-      sreq.actualShards = rb.shards;
+        // we are done when the next stage is MAX_VALUE
+      } while (nextStage != Integer.MAX_VALUE);
     }
 
-
-
-    // TODO: map from shard to address[]
-    for (String shard : sreq.actualShards) {
-      ModifiableSolrParams params = new ModifiableSolrParams(sreq.params);
-      params.remove(ShardParams.SHARDS);      // not a top-level request
-      params.set(DISTRIB, "false");               // not a top-level request
-      params.remove("indent");
-      params.remove(CommonParams.HEADER_ECHO_PARAMS);
-      params.set(ShardParams.IS_SHARD, true);  // a sub (shard) request
-      params.set(ShardParams.SHARDS_PURPOSE, sreq.purpose);
-      params.set(ShardParams.SHARD_URL, shard); // so the shard knows what was asked
-      params.set(CommonParams.OMIT_HEADER, false);
-      if (rb.requestInfo != null) {
-        // we could try and detect when this is needed, but it could be tricky
-        params.set("NOW", Long.toString(rb.requestInfo.getNOW().getTime()));
-      }
-      String shardQt = params.get(ShardParams.SHARDS_QT);
-      if (shardQt != null) {
-        params.set(CommonParams.QT, shardQt);
-      } else {
-        // for distributed queries that don't include shards.qt, use the original path
-        // as the default but operators need to update their luceneMatchVersion to enable
-        // this behavior since it did not work this way prior to 5.1
-        String reqPath = (String) req.getContext().get(PATH);
-        if (!"/select".equals(reqPath)) {
-          params.set(CommonParams.QT, reqPath);
-        } // else if path is /select, then the qt gets passed thru if set
-      }
-      shardHandler1.submit(sreq, shard, params);
-    }
-  }
-
-  private void finishResponse(SolrQueryRequest req, SolrQueryResponse rsp, ResponseBuilder rb) {
     // SOLR-5550: still provide shards.info if requested even for a short circuited distrib request
     if(!rb.isDistrib && req.getParams().getBool(ShardParams.SHARDS_INFO, false) && rb.shortCircuitedURL != null) {
       NamedList<Object> shardInfo = new SimpleOrderedMap<Object>();

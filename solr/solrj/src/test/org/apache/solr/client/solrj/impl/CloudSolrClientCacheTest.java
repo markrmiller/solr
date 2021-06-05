@@ -37,6 +37,7 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SynchronizedNamedList;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 
@@ -118,7 +119,7 @@ public class CloudSolrClientCacheTest extends SolrTestCaseJ4 {
       Object res = f.apply(null);
       if (res instanceof Exception) throw (Throwable) res;
       LBHttpSolrClient.Rsp rsp = new LBHttpSolrClient.Rsp();
-      rsp.rsp = (NamedList<Object>) res;
+      rsp.rsp = new SynchronizedNamedList<>((NamedList<Object>) res);
       rsp.server = req.servers.get(0);
       return rsp;
     });

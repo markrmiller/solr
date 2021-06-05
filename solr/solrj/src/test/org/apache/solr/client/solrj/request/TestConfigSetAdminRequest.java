@@ -20,6 +20,7 @@ import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.response.ConfigSetAdminResponse;
+import org.apache.solr.common.util.NamedList;
 import org.junit.Test;
 
 /**
@@ -62,8 +63,8 @@ public class TestConfigSetAdminRequest extends SolrTestCaseJ4 {
       }
 
       @Override
-      public ConfigSetAdminResponse createResponse(SolrClient client) {
-        return new ConfigSetAdminResponse();
+      public ConfigSetAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+        return new ConfigSetAdminResponse(nl);
       }
     };
 }

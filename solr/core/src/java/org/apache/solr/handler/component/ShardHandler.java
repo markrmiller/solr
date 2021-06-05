@@ -28,4 +28,8 @@ public abstract class ShardHandler {
   public void setFinish(Runnable runnable) {
 
   }
+
+  public void clearPending() {
+
+  }
 }

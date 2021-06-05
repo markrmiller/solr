@@ -521,7 +521,7 @@ public class HdfsTransactionLog extends TransactionLog {
     FSDataFastInputStream fis;
     private LogCodec codec = new LogCodec(resolver) {
       @Override
-      public SolrInputDocument readSolrInputDocument(JavaBinInputStream dis) {
+      public SolrInputDocument readSolrInputDocument(JavaBinInputStream dis, int sz) {
         // Given that the SolrInputDocument is last in an add record, it's OK to just skip
         // reading it completely.
         return null;

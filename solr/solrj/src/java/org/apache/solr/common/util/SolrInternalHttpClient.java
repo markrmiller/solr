@@ -16,13 +16,19 @@
  */
 package org.apache.solr.common.util;
 
+import org.agrona.MutableDirectBuffer;
+import org.apache.solr.client.solrj.impl.GenericUrl;
+import org.apache.solr.client.solrj.impl.SolrHttpRequest;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpClientTransport;
+import org.eclipse.jetty.client.HttpConversation;
 import org.eclipse.jetty.client.HttpDestination;
 import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.Origin;
 import org.eclipse.jetty.client.api.Destination;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.api.Response;
+import org.eclipse.jetty.http.HttpField;
 import org.jctools.maps.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +73,17 @@ public class SolrInternalHttpClient extends HttpClient {
     return dests.remove(destination.getOrigin(), destination);
   }
 
+  public HttpField getAcceptEncodingField()
+  {
+    return super.getAcceptEncodingField();
+  }
+
+  public static void send(final Request request, List<Response.ResponseListener> listeners)
+  {
+    send(request, listeners);
+  }
+
+
   public List<Destination> getDestinations() {
     return new ArrayList<>(dests.values());
   }
@@ -74,6 +91,12 @@ public class SolrInternalHttpClient extends HttpClient {
   public Request copyRequest(HttpRequest oldRequest, URI newURI)
   {
     return super.copyRequest(oldRequest, newURI);
+  }
+
+  public SolrHttpRequest newSolrRequest(String uri, MutableDirectBuffer buffer)
+  {
+
+    return new SolrHttpRequest(this,  new HttpConversation(), uri, buffer);
   }
 
   @Override protected void doStop() throws Exception {

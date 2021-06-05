@@ -657,9 +657,7 @@ public class QueryComponent extends SearchComponent
   protected static void groupedFinishStage(final ResponseBuilder rb) {
     // To have same response as non-distributed request.
     GroupingSpecification groupSpec = rb.getGroupingSpec();
-    if (rb.mergedTopGroups == null) {
-      rb.mergedTopGroups = new HashMap<>();
-    }
+
     if (rb.mergedTopGroups.isEmpty()) {
       for (String field : groupSpec.getFields()) {
         rb.mergedTopGroups.put(field, new TopGroups(null, null, 0, 0, EMPTY_GROUPS, Float.NaN));
@@ -683,9 +681,6 @@ public class QueryComponent extends SearchComponent
     }
     Map<String,Object> combinedMap = new LinkedHashMap<>(rb.mergedTopGroups);
 
-    if (rb.mergedQueryCommandResults == null) {
-      rb.mergedQueryCommandResults = new HashMap<>();
-    }
 
     combinedMap.putAll(rb.mergedQueryCommandResults);
     endResultTransformer.transform(combinedMap, rb, solrDocumentSource);
@@ -954,7 +949,7 @@ public class QueryComponent extends SearchComponent
 
         @SuppressWarnings({"rawtypes"})
         NamedList sortFieldValues = (NamedList)(srsp.getSolrResponse().getResponse().get("sort_values"));
-        if (sortFieldValues.size()==0 && // we bypass merging this response only if it's partial itself
+        if (sortFieldValues != null && sortFieldValues.size()==0 && // we bypass merging this response only if it's partial itself
                             thisResponseIsPartial) { // but not the previous one!!
           continue; //fsv timeout yields empty sort_vlaues
         }
@@ -1109,7 +1104,7 @@ public class QueryComponent extends SearchComponent
   protected static NamedList unmarshalSortValues(SortSpec sortSpec, NamedList sortFieldValues, IndexSchema schema) {
     NamedList unmarshalledSortValsPerField = new NamedList();
 
-    if (0 == sortFieldValues.size()) return unmarshalledSortValsPerField;
+    if (sortFieldValues == null || 0 == sortFieldValues.size()) return unmarshalledSortValsPerField;
     
     List<SchemaField> schemaFields = sortSpec.getSchemaFields();
     SortField[] sortFields = sortSpec.getSort().getSort();

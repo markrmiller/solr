@@ -229,16 +229,16 @@ public abstract class RequestHandlerBase implements SolrRequestHandler, SolrInfo
           }
         };
 
-        if (rsp.isAsync()) {
-          rsp.onFinished(finish);
-        }
+//        if (rsp.isAsync()) {
+//          rsp.onFinished(finish);
+//        }
 
         handleRequestBody(req, rsp);
         // count timeouts
 
-        if (!rsp.isAsync()) {
+       // if (!rsp.isAsync()) {
           finish.run();
-        }
+      //  }
 
       } catch (InterruptedException e) {
         ParWork.propagateInterrupt(e);

@@ -55,7 +55,7 @@
         <AsyncLogger name="org.apache.solr.update.LoggingInfoStream" level="OFF"/>
 
 
-        <AsyncLogger name="org.apache.solr.common.util.JavaBinCodec" level="INFO"/>
+        <AsyncLogger name="org.apache.solr.common.util.JavaBinCodec" level="TRACE"/>
 
         <AsyncLogger name="org.apache.solr.core.CoreContainer.Deprecation" additivity="false" level="OFF">
             <AppenderRef ref="null"/>

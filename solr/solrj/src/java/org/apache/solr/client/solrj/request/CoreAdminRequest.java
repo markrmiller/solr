@@ -31,6 +31,7 @@ import org.apache.solr.common.params.CoreAdminParams;
 import org.apache.solr.common.params.CoreAdminParams.CoreAdminAction;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.common.util.NamedList;
 
 /**
  * This class is experimental and subject to change.
@@ -577,8 +578,8 @@ public class CoreAdminRequest extends SolrRequest<CoreAdminResponse> {
 
 
   @Override
-  protected CoreAdminResponse createResponse(SolrClient client) {
-    return new CoreAdminResponse();
+  protected CoreAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+    return new CoreAdminResponse(nl);
   }
 
   //---------------------------------------------------------------------------------------

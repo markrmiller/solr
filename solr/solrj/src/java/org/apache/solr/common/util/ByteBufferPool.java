@@ -53,7 +53,7 @@ public interface ByteBufferPool
      * @param buffer the buffer to return
      * @see #acquire(int, boolean)
      */
-    public void release(MutableDirectBuffer buffer);
+    void release(MutableDirectBuffer buffer);
 
     /**
      * <p>Removes a {@link ByteBuffer} that was previously obtained with {@link #acquire(int, boolean)}.</p>
@@ -188,15 +188,15 @@ public interface ByteBufferPool
                 _size.decrementAndGet();
         }
 
-        protected void decrementMemory(MutableDirectBuffer buffer)
+        protected static void decrementMemory(MutableDirectBuffer buffer)
         {
 
-            org.agrona.BufferUtil.free(buffer);
+           // org.agrona.BufferUtil.free(buffer);
         }
 
         public void clear()
         {
-            clear(this::decrementMemory);
+            clear(Bucket::decrementMemory);
         }
 
         void clear(Consumer<MutableDirectBuffer> memoryFn)

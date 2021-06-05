@@ -156,8 +156,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
 
     private static String generateAsyncId() {
@@ -296,7 +296,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
   }
 
   @SuppressWarnings({"rawtypes"})
-  protected abstract static class ShardSpecificAdminRequest extends CollectionAdminRequest {
+  protected abstract static class ShardSpecificAdminRequest<CollectionAdminResponse> extends CollectionAdminRequest<org.apache.solr.client.solrj.response.CollectionAdminResponse> {
 
     protected String collection;
     protected String shard;
@@ -317,8 +317,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected SolrResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected org.apache.solr.client.solrj.response.CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new org.apache.solr.client.solrj.response.CollectionAdminResponse(nl);
     }
   }
 
@@ -1497,6 +1497,10 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
    */
   public static class RequestStatusResponse extends CollectionAdminResponse {
 
+    public RequestStatusResponse(NamedList<Object> nl) {
+      super(nl);
+    }
+
     public RequestStatusState getRequestStatus() {
       @SuppressWarnings({"rawtypes"})
       NamedList innerResponse = (NamedList) getResponse().get("status");
@@ -1540,8 +1544,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected RequestStatusResponse createResponse(SolrClient client) {
-      return new RequestStatusResponse();
+    protected RequestStatusResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new RequestStatusResponse(nl);
     }
 
     /**
@@ -1623,8 +1627,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
 
   }
@@ -1959,7 +1963,7 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
 
     private static String withDimensionIndexIfRequired(String param, int index) {
       if (param.startsWith(ROUTER_PREFIX)) {
-        return ROUTER_PREFIX + index + "." + param.split("\\.")[1];
+        return ROUTER_PREFIX + index + '.' + param.split("\\.")[1];
       } else {
         return param;
       }
@@ -2409,8 +2413,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
 
 
@@ -2450,8 +2454,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
   }
 
@@ -2632,8 +2636,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
 
   }
@@ -2646,8 +2650,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
 
   }
@@ -2668,8 +2672,8 @@ public abstract class CollectionAdminRequest<T extends CollectionAdminResponse> 
     }
 
     @Override
-    protected CollectionAdminResponse createResponse(SolrClient client) {
-      return new CollectionAdminResponse();
+    protected CollectionAdminResponse createResponse(SolrClient client, NamedList<Object> nl) {
+      return new CollectionAdminResponse(nl);
     }
   }
 

@@ -16,4 +16,6 @@ public abstract class JavaBinInputStream extends InputStream {
     public abstract byte readByte() throws IOException;
 
     public abstract short readShort() throws IOException;
+
+    public abstract void readFully(JavaBinInputStream dis, byte[] bytes) throws IOException;
 }

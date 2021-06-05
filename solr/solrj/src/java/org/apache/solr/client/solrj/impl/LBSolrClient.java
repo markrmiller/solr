@@ -17,28 +17,15 @@
 
 package org.apache.solr.client.solrj.impl;
 
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.lang.ref.WeakReference;
-import java.net.ConnectException;
-import java.net.MalformedURLException;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArraySet;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
+import org.agrona.collections.ObjectHashSet;
 import org.apache.solr.client.solrj.ResponseParser;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
@@ -54,28 +41,44 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.ObjectReleaseTracker;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
+import org.apache.solr.common.util.SynchronizedNamedList;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-import static org.apache.solr.common.params.CommonParams.ADMIN_PATHS;
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.ref.WeakReference;
+import java.net.ConnectException;
+import java.net.MalformedURLException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class LBSolrClient extends SolrClient {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // defaults
-  protected static final Set<Integer> RETRY_CODES = new HashSet<>(Arrays.asList(403, 500, 502, 503));
+  protected static final Set<Integer> RETRY_CODES = new ObjectArraySet<>(Arrays.asList(403, 500, 502, 503));
   private static final int CHECK_INTERVAL = 30 * 1000; //30 seconds between checks
   private static final int NONSTANDARD_PING_LIMIT = 10;  // number of times we'll ping dead servers not in the server list
   public static final ServerWrapper[] EMPTY_SERVER_WRAPPER = new ServerWrapper[0];
 
   // keys to the maps are currently of the form "http://localhost:8983/solr"
   // which should be equivalent to HttpSolrServer.getBaseURL()
-  private final Map<String, ServerWrapper> aliveServers = new LinkedHashMap<>();
+  private final Map<String, ServerWrapper> aliveServers = new Object2ObjectLinkedOpenHashMap<>(8, 0.5f);
   // access to aliveServers should be synchronized on itself
 
-  protected final Map<String, ServerWrapper> zombieServers = new ConcurrentHashMap<>();
+  protected final Object2ObjectMap<String,ServerWrapper> zombieServers;
 
   // changes to aliveServers are reflected in this array, no need to synchronize
   private volatile ServerWrapper[] aliveServerList = EMPTY_SERVER_WRAPPER;
@@ -90,7 +93,7 @@ public abstract class LBSolrClient extends SolrClient {
   protected volatile ResponseParser parser;
   protected volatile RequestWriter requestWriter;
 
-  protected Set<String> queryParams = new HashSet<>();
+  protected Set<String> queryParams = new ObjectHashSet<>();
 
   static {
     solrQuery.setRows(0);
@@ -114,7 +117,7 @@ public abstract class LBSolrClient extends SolrClient {
     // "standard" servers are used by default.  They normally live in the alive list
     // and move to the zombie list when unavailable.  When they become available again,
     // they move back to the alive list.
-    boolean standard = true;
+    volatile boolean standard = true;
 
     int failedPings = 0;
 
@@ -145,20 +148,20 @@ public abstract class LBSolrClient extends SolrClient {
   }
 
   protected static class ServerIterator {
-    volatile String serverStr;
-    volatile List<String> skipped;
+    String serverStr;
+    List<String> skipped;
     final AtomicInteger numServersTried = new AtomicInteger();
-    volatile Iterator<String> it;
-    volatile Iterator<String> skippedIt;
+    final Iterator<String> it;
+    Iterator<String> skippedIt;
     String exceptionMessage;
     long timeAllowedNano;
     long timeOutTime;
 
-    final Map<String, ServerWrapper> zombieServers;
+    final Object2ObjectMap<String, ServerWrapper> zombieServers;
     final Req req;
 
-    public ServerIterator(Req req, Map<String, ServerWrapper> zombieServers) {
-      this.it = req.getServers().iterator();
+    public ServerIterator(Req req, Object2ObjectMap<String, ServerWrapper> zombieServers) {
+      this.it = req.getServers().listIterator();
       this.req = req;
       this.zombieServers = zombieServers;
       this.timeAllowedNano = getTimeAllowedInNanos(req.getRequest());
@@ -187,7 +190,7 @@ public abstract class LBSolrClient extends SolrClient {
           final int numDeadServersToTry = req.getNumDeadServersToTry();
           if (numDeadServersToTry > 0) {
             if (skipped == null) {
-              skipped = new ArrayList<>(numDeadServersToTry);
+              skipped = ObjectLists.synchronize(new ObjectArrayList<>(numDeadServersToTry));
               skipped.add(wrapper.getBaseUrl());
             } else if (skipped.size() < numDeadServersToTry) {
               skipped.add(wrapper.getBaseUrl());
@@ -204,6 +207,9 @@ public abstract class LBSolrClient extends SolrClient {
         }
         if (skippedIt.hasNext()) {
           serverStr = skippedIt.next();
+          if (serverStr.equals(((Object2ObjectLinkedOpenHashMap)zombieServers).lastKey()))  {
+            serverStr = null;
+          }
         }
       }
     }
@@ -245,17 +251,17 @@ public abstract class LBSolrClient extends SolrClient {
 
   public static class Req {
     protected SolrRequest request;
-    protected List<String> servers;
+    protected ObjectList<String> servers;
     protected int numDeadServersToTry;
     private final Integer numServersToTry;
 
     protected AtomicInteger retryCount = new AtomicInteger();
 
-    public Req(SolrRequest request, List<String> servers) {
+    public Req(SolrRequest request, ObjectList<String> servers) {
       this(request, servers, null);
     }
 
-    public Req(SolrRequest request, List<String> servers, Integer numServersToTry) {
+    public Req(SolrRequest request, ObjectList<String> servers, Integer numServersToTry) {
       this.request = request;
       this.servers = servers;
       this.numDeadServersToTry = servers.size();
@@ -265,7 +271,7 @@ public abstract class LBSolrClient extends SolrClient {
     public SolrRequest getRequest() {
       return request;
     }
-    public List<String> getServers() {
+    public ObjectList<String> getServers() {
       return servers;
     }
 
@@ -287,10 +293,10 @@ public abstract class LBSolrClient extends SolrClient {
 
   public static class Rsp {
     protected String server;
-    protected NamedList<Object> rsp;
+    protected SynchronizedNamedList<Object> rsp;
 
     /** The response from the server */
-    public NamedList<Object> getResponse() {
+    public SynchronizedNamedList<Object> getResponse() {
       return rsp;
     }
 
@@ -300,8 +306,9 @@ public abstract class LBSolrClient extends SolrClient {
     }
   }
 
-  public LBSolrClient(List<String> baseSolrUrls) {
+  public LBSolrClient(ObjectList<String> baseSolrUrls) {
     assert ObjectReleaseTracker.getInstance().track(this);
+    zombieServers = Object2ObjectMaps.synchronize(new Object2ObjectLinkedOpenHashMap<>(baseSolrUrls.size(), 0.25f));
     if (!baseSolrUrls.isEmpty()) {
       for (String s : baseSolrUrls) {
         ServerWrapper wrapper = createServerWrapper(s);
@@ -337,7 +344,7 @@ public abstract class LBSolrClient extends SolrClient {
   }
 
   public static String normalize(String server) {
-    if (server.endsWith("/"))
+    if (!server.isEmpty() && server.charAt(server.length() - 1) == '/')
       server = server.substring(0, server.length() - 1);
     return server;
   }
@@ -404,7 +411,7 @@ public abstract class LBSolrClient extends SolrClient {
     try {
       rsp.server = baseUrl;
       req.getRequest().setBasePath(baseUrl);
-      rsp.rsp = getClient(baseUrl).request(req.getRequest(), null);
+      rsp.rsp = new SynchronizedNamedList<Object>(getClient(baseUrl).request(req.getRequest(), null));
       if (isZombie) {
         zombieServers.remove(baseUrl);
       }
@@ -595,7 +602,7 @@ public abstract class LBSolrClient extends SolrClient {
 
 
 
-  public void addSolrServer(List<String> servers) {
+  public void addSolrServer(ObjectList<String> servers) {
     boolean changed = false;
     synchronized (aliveServers) {
 
@@ -619,7 +626,7 @@ public abstract class LBSolrClient extends SolrClient {
     } catch (MalformedURLException e) {
       throw new RuntimeException(e);
     }
-    if (server.endsWith("/")) {
+    if (!server.isEmpty() && server.charAt(server.length() - 1) == '/') {
       server = server.substring(0, server.length() - 1);
     }
 
@@ -675,7 +682,7 @@ public abstract class LBSolrClient extends SolrClient {
          if (e.getCause() instanceof KeeperException.SessionExpiredException || e.getCause() instanceof KeeperException.ConnectionLossException) {
            ex = e;
            moveAliveToDead(wrapper);
-           if (justFailed == null) justFailed = new HashMap<>();
+           if (justFailed == null) justFailed = new Object2ObjectArrayMap<>();
            justFailed.put(wrapper.getBaseUrl(), wrapper);
            continue;
          }
@@ -686,12 +693,12 @@ public abstract class LBSolrClient extends SolrClient {
         if (e.getRootCause() instanceof IOException) {
           ex = e;
           moveAliveToDead(wrapper);
-          if (justFailed == null) justFailed = new HashMap<>();
+          if (justFailed == null) justFailed = new Object2ObjectArrayMap<>();
           justFailed.put(wrapper.getBaseUrl(), wrapper);
         } else if (e.getRootCause() instanceof KeeperException.SessionExpiredException || e.getRootCause() instanceof KeeperException.ConnectionLossException) {
           ex = e;
           moveAliveToDead(wrapper);
-          if (justFailed == null) justFailed = new HashMap<>();
+          if (justFailed == null) justFailed = new Object2ObjectArrayMap<>();
           justFailed.put(wrapper.getBaseUrl(), wrapper);
         } else {
           throw e;
@@ -700,7 +707,7 @@ public abstract class LBSolrClient extends SolrClient {
         log.warn("LBSolrClient request fail", e);
         if (e instanceof KeeperException.SessionExpiredException || e instanceof KeeperException.ConnectionLossException) {
           moveAliveToDead(wrapper);
-          if (justFailed == null) justFailed = new HashMap<>();
+          if (justFailed == null) justFailed = new Object2ObjectArrayMap<>();
           justFailed.put(wrapper.getBaseUrl(), wrapper);
         } else {
           ParWork.propagateInterrupt(e);

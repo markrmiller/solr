@@ -19,10 +19,12 @@ package org.apache.solr.client.solrj;
 import java.io.IOException;
 import java.io.Serializable;
 
+import org.apache.solr.client.solrj.impl.LBSolrClient;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.SynchronizedNamedList;
 
 /**
  * 
@@ -36,8 +38,7 @@ public abstract class SolrResponse implements Serializable, MapWriter {
 
   /** Elapsed time in milliseconds for the request as seen from the client. */
   public abstract long getElapsedTime();
-  
-  public abstract void setResponse(NamedList<Object> rsp);
+
 
   public abstract void setElapsedTime(long elapsedTime);
   

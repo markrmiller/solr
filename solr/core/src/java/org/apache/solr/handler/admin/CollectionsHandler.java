@@ -497,56 +497,47 @@ public class CollectionsHandler extends RequestHandlerBase implements Permission
 
   public enum CollectionOperation implements CollectionOp {
     CREATE_OP(CREATE, (req, rsp, h) -> {
-      Object2ObjectMap<String, Object> props = copy(req.getParams().required(), null, NAME);
-      props.put("fromApi", "true");
-      copy(req.getParams(), props,
-          REPLICATION_FACTOR,
-          COLL_CONF,
-          ZkStateReader.NUM_SHARDS_PROP,
-          MAX_SHARDS_PER_NODE,
-          ZkStateReader.CREATE_NODE_SET,
-          CREATE_NODE_SET_SHUFFLE,
-          SHARDS_PROP,
-          PULL_REPLICAS,
-          TLOG_REPLICAS,
-          NRT_REPLICAS,
-          WAIT_FOR_FINAL_STATE,
-          WITH_COLLECTION,
-          ALIAS);
+      try {
+        Object2ObjectMap<String,Object> props = copy(req.getParams().required(), null, NAME);
+        props.put("fromApi", "true");
+        copy(req.getParams(), props, REPLICATION_FACTOR, COLL_CONF, ZkStateReader.NUM_SHARDS_PROP, MAX_SHARDS_PER_NODE, ZkStateReader.CREATE_NODE_SET, CREATE_NODE_SET_SHUFFLE, SHARDS_PROP,
+            PULL_REPLICAS, TLOG_REPLICAS, NRT_REPLICAS, WAIT_FOR_FINAL_STATE, WITH_COLLECTION, ALIAS);
 
-      if (props.get(REPLICATION_FACTOR) != null && props.get(NRT_REPLICAS) != null) {
-        //TODO: Remove this in 8.0 . Keep this for SolrJ client back-compat. See SOLR-11676 for more details
-        int replicationFactor = Integer.parseInt((String) props.get(REPLICATION_FACTOR));
-        int nrtReplicas = Integer.parseInt((String) props.get(NRT_REPLICAS));
-        if (replicationFactor != nrtReplicas) {
-          throw new SolrException(ErrorCode.BAD_REQUEST,
-              "Cannot specify both replicationFactor and nrtReplicas as they mean the same thing");
+        if (props.get(REPLICATION_FACTOR) != null && props.get(NRT_REPLICAS) != null) {
+          //TODO: Remove this in 8.0 . Keep this for SolrJ client back-compat. See SOLR-11676 for more details
+          int replicationFactor = Integer.parseInt((String) props.get(REPLICATION_FACTOR));
+          int nrtReplicas = Integer.parseInt((String) props.get(NRT_REPLICAS));
+          if (replicationFactor != nrtReplicas) {
+            throw new SolrException(ErrorCode.BAD_REQUEST, "Cannot specify both replicationFactor and nrtReplicas as they mean the same thing");
+          }
         }
-      }
-      if (props.get(REPLICATION_FACTOR) != null) {
-        props.put(NRT_REPLICAS, props.get(REPLICATION_FACTOR));
-      } else if (props.get(NRT_REPLICAS) != null) {
-        props.put(REPLICATION_FACTOR, props.get(NRT_REPLICAS));
-      }
+        if (props.get(REPLICATION_FACTOR) != null) {
+          props.put(NRT_REPLICAS, props.get(REPLICATION_FACTOR));
+        } else if (props.get(NRT_REPLICAS) != null) {
+          props.put(REPLICATION_FACTOR, props.get(NRT_REPLICAS));
+        }
 
-      final String collectionName = SolrIdentifierValidator.validateCollectionName((String) props.get(NAME));
-      final String shardsParam = (String) props.get(SHARDS_PROP);
-      if (StringUtils.isNotEmpty(shardsParam)) {
-        verifyShardsParam(shardsParam);
-      }
-      if (CollectionAdminParams.SYSTEM_COLL.equals(collectionName)) {
-        //We must always create a .system collection with only a single shard
-        props.put(ZkStateReader.NUM_SHARDS_PROP, 1);
-        props.remove(SHARDS_PROP);
-        createSysConfigSet(h.coreContainer);
+        final String collectionName = SolrIdentifierValidator.validateCollectionName((String) props.get(NAME));
+        final String shardsParam = (String) props.get(SHARDS_PROP);
+        if (StringUtils.isNotEmpty(shardsParam)) {
+          verifyShardsParam(shardsParam);
+        }
+        if (CollectionAdminParams.SYSTEM_COLL.equals(collectionName)) {
+          //We must always create a .system collection with only a single shard
+          props.put(ZkStateReader.NUM_SHARDS_PROP, 1);
+          props.remove(SHARDS_PROP);
+          createSysConfigSet(h.coreContainer);
 
+        }
+        //      if (shardsParam == null) h.copyFromClusterProp(props, ZkStateReader.NUM_SHARDS_PROP);
+        //      for (String prop : ImmutableSet.of(NRT_REPLICAS, PULL_REPLICAS, TLOG_REPLICAS))
+        //        h.copyFromClusterProp(props, prop);
+        copyPropertiesWithPrefix(req.getParams(), props, COLL_PROP_PREFIX);
+        return copyPropertiesWithPrefix(req.getParams(), props, "router.");
+      } catch (Exception e) {
+        log.error("Exception", e);
+        throw e;
       }
-//      if (shardsParam == null) h.copyFromClusterProp(props, ZkStateReader.NUM_SHARDS_PROP);
-//      for (String prop : ImmutableSet.of(NRT_REPLICAS, PULL_REPLICAS, TLOG_REPLICAS))
-//        h.copyFromClusterProp(props, prop);
-      copyPropertiesWithPrefix(req.getParams(), props, COLL_PROP_PREFIX);
-      return copyPropertiesWithPrefix(req.getParams(), props, "router.");
-
     }),
     @SuppressWarnings({"unchecked"})
     COLSTATUS_OP(COLSTATUS, (req, rsp, h) -> {

@@ -16,7 +16,8 @@
  */
 package org.apache.solr.common;
 
-import java.util.ArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+
 
 
 /**
@@ -26,7 +27,7 @@ import java.util.ArrayList;
  *
  * @since solr 1.3
  */
-public class SolrDocumentList extends ArrayList<SolrDocument>
+public class SolrDocumentList extends ObjectArrayList<SolrDocument>
 { 
   private long numFound = 0;
   private long start = 0;
@@ -72,6 +73,6 @@ public class SolrDocumentList extends ArrayList<SolrDocument>
             +",start="+start
             + (maxScore!=null ? ",maxScore="+maxScore : "")
             +",docs="+super.toString()
-            +"}";
+            + '}';
   }
 }

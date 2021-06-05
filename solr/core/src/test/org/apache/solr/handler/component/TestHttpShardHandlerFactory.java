@@ -16,6 +16,8 @@
  */
 package org.apache.solr.handler.component;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.SolrTestCaseUtil;
 import org.apache.solr.SolrTestUtil;
@@ -83,7 +85,7 @@ public class TestHttpShardHandlerFactory extends SolrTestCaseJ4 {
 
       // create a dummy request and dummy url list
       final QueryRequest queryRequest = null;
-      final List<String> urls = new ArrayList<>();
+      final ObjectList<String> urls = new ObjectArrayList<>();
       for (int ii=0; ii<10; ++ii) {
         urls.add(null);
       }

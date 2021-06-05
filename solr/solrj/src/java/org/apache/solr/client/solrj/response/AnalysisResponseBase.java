@@ -30,6 +30,10 @@ import java.util.Map;
  */
 public class AnalysisResponseBase extends SolrResponseBase {
 
+  public AnalysisResponseBase(NamedList response) {
+    super(response);
+  }
+
   /**
    * Parses the given named list and builds a list of analysis phases form it. Expects a named list of the form:
    * <br>

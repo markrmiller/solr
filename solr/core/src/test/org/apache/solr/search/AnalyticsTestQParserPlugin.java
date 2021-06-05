@@ -33,6 +33,7 @@ import org.apache.solr.handler.component.MergeStrategy;
 import org.apache.solr.handler.component.ShardResponse;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Future;
 import java.io.IOException;
 

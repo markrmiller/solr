@@ -25,6 +25,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -94,7 +96,7 @@ public class CloudHttp2SolrClientWireMockTest extends BaseSolrClientWireMockTest
 
     final int numDocs = 20;
     UpdateRequest ur = buildUpdateRequest(numDocs);
-    Map<String,List<String>> urlMap = testClient.buildUrlMap(mockDocCollection, new ShufflingReplicaListTransformer(random()));
+    Object2ObjectMap<String,ObjectList<String>> urlMap = testClient.buildUrlMap(mockDocCollection, new ShufflingReplicaListTransformer(random()));
     assertEquals(2, urlMap.size());
     List<String> shard1 = urlMap.get("s1");
     assertEquals(1, shard1.size());

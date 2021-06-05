@@ -380,18 +380,13 @@ public abstract class SolrCall {
 
 
       if (Method.HEAD != reqMethod) {
-
-
-        ExpandableDirectBufferOutputStream outStream = QueryResponseWriterUtil.writeQueryResponse(responseWriter, solrReq, solrRsp, ct);
-
-       // response.setContentLength(outStream.position() - outStream.offset());
+        ExpandableDirectBufferOutputStream outStream = QueryResponseWriterUtil.writeQueryResponse(responseWriter, solrReq, solrRsp, req, response, ct);
 
         ByteBuffer buffer = outStream.buffer().byteBuffer().asReadOnlyBuffer();
         buffer.position(outStream.offset() + outStream.buffer().wrapAdjustment());
         buffer.limit(outStream.position() + outStream.buffer().wrapAdjustment());
 
-
-
+        response.setContentLength((int) outStream.size());
         if (req.isAsyncStarted() && SolrDispatchFilter.ASYNC_IO) {
 
           HttpOutput out = (HttpOutput) response.getOutputStream();
@@ -399,13 +394,12 @@ public abstract class SolrCall {
           out.setWriteListener(new WriteListener() {
             @Override
             public void onWritePossible() throws IOException {
-//              if (out.isWritten() || out.isClosed() || response.isCommitted()) {
-//                req.getAsyncContext().complete();
-//                return;
-//              }
+
               try {
                 //SolrDispatchFilter.consumeInputFully((ServletInputStream) solrReq.getContentStreams().iterator().next().getStream());
-                while (out.isReady()) {
+                while (true) {
+                  boolean ready = out.isReady();
+                  if (!ready ||  out.isClosed()) break;
                   if (!buffer.hasRemaining()) {
                     req.getAsyncContext().complete();
                     ExpandableBuffers.getInstance().release(outStream.buffer());
@@ -413,10 +407,6 @@ public abstract class SolrCall {
                   }
                   out.write(buffer);
                 }
-
-
-
-
 
                 req.getAsyncContext().complete();
               } catch (Exception e) {
@@ -426,7 +416,6 @@ public abstract class SolrCall {
                   SolrDispatchFilter.sendException(e, SolrCall.this, req, response);
                 } finally {
                   req.getAsyncContext().complete();
-                  ExpandableBuffers.getInstance().release(outStream.buffer());
                 }
               }
 
@@ -436,7 +425,7 @@ public abstract class SolrCall {
             public void onError(Throwable t) {
               log.error("Solr ran into an unexpected problem", t);
               try {
-                ExpandableBuffers.getInstance().release(outStream.buffer());
+
                 //  response.sendError(code, t.getClass().getName() + ' ' + t.getMessage());
                 SolrDispatchFilter.sendException(t, SolrCall.this, req, response);
               } catch (IOException ioException) {
@@ -1045,7 +1034,10 @@ public abstract class SolrCall {
       int requestId = 0;
       ServletInputStream input = request.getInputStream();
 
-      while (input.isReady()) {
+      while (true) {
+        final boolean ready = input.isReady();
+
+        if (!ready) break;
         int read = input.read(buffer);
         if (log.isDebugEnabled()) log.debug("{} asynchronous read {} bytes on {}", requestId, read, input);
         if (read > 0) {
