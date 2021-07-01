@@ -22,6 +22,7 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Random;
 
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
@@ -104,10 +105,10 @@ public @interface RandomizeSSL {
     public SSLTestConfig createSSLTestConfig() {
       // even if we know SSL is disabled, always consume the same amount of randomness
       // that way all other test behavior should be consistent even if a user adds/removes @SuppressSSL
-      
-      final boolean useSSL = TestUtil.nextInt(LuceneTestCase.random(), 0, 999) <
+      Random random = new Random();
+      final boolean useSSL = TestUtil.nextInt(random, 0, 999) <
         (int)(1000 * getEffectiveOdds(ssl, LuceneTestCase.TEST_NIGHTLY, LuceneTestCase.RANDOM_MULTIPLIER));
-      final boolean useClientAuth = TestUtil.nextInt(LuceneTestCase.random(), 0, 999) <
+      final boolean useClientAuth = TestUtil.nextInt(random, 0, 999) <
         (int)(1000 * getEffectiveOdds(clientAuth, LuceneTestCase.TEST_NIGHTLY, LuceneTestCase.RANDOM_MULTIPLIER));
 
       return new SSLTestConfig(useSSL, useClientAuth);
