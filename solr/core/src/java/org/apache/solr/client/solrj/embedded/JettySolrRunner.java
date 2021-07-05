@@ -268,55 +268,55 @@ public class JettySolrRunner {
     server.manage(qtp);
     server.setStopAtShutdown(config.stopAtShutdown);
 
-    if (System.getProperty("jetty.testMode") != null) {
-      // if this property is true, then jetty will be configured to use SSL
-      // leveraging the same system properties as java to specify
-      // the keystore/truststore if they are set unless specific config
-      // is passed via the constructor.
-      //
-      // This means we will use the same truststore, keystore (and keys) for
-      // the server as well as any client actions taken by this JVM in
-      // talking to that server, but for the purposes of testing that should
-      // be good enough
-      final SslContextFactory.Server sslcontext = SSLConfig.createContextFactory(config.sslConfig);
-
-      HttpConfiguration configuration = new HttpConfiguration();
-      ServerConnector connector;
-      if (sslcontext != null) {
-        configuration.setSecureScheme("https");
-        configuration.addCustomizer(new SecureRequestCustomizer());
-        HttpConnectionFactory http1ConnectionFactory = new HttpConnectionFactory(configuration);
-
-        if (config.onlyHttp1 || !Constants.JRE_IS_MINIMUM_JAVA9) {
-          connector = new ServerConnector(server, new SslConnectionFactory(sslcontext,
-              http1ConnectionFactory.getProtocol()),
-              http1ConnectionFactory);
-        } else {
-          sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
-
-          connector = new ServerConnector(server);
-          SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
-          connector.addConnectionFactory(sslConnectionFactory);
-          connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
-
-          HTTP2ServerConnectionFactory http2ConnectionFactory = new HTTP2ServerConnectionFactory(configuration);
-
-          ALPNServerConnectionFactory alpn = new ALPNServerConnectionFactory(
-              http2ConnectionFactory.getProtocol(),
-              http1ConnectionFactory.getProtocol());
-          alpn.setDefaultProtocol(http1ConnectionFactory.getProtocol());
-          connector.addConnectionFactory(alpn);
-          connector.addConnectionFactory(http1ConnectionFactory);
-          connector.addConnectionFactory(http2ConnectionFactory);
-        }
-      } else {
-        if (config.onlyHttp1) {
-          connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
-        } else {
-          connector = new ServerConnector(server, new HttpConnectionFactory(configuration),
-              new HTTP2CServerConnectionFactory(configuration));
-        }
-      }
+//    if (System.getProperty("jetty.testMode") != null) {
+//      // if this property is true, then jetty will be configured to use SSL
+//      // leveraging the same system properties as java to specify
+//      // the keystore/truststore if they are set unless specific config
+//      // is passed via the constructor.
+//      //
+//      // This means we will use the same truststore, keystore (and keys) for
+//      // the server as well as any client actions taken by this JVM in
+//      // talking to that server, but for the purposes of testing that should
+//      // be good enough
+//      final SslContextFactory.Server sslcontext = null;//SSLConfig.createContextFactory(config.sslConfig);
+//
+//      HttpConfiguration configuration = new HttpConfiguration();
+//      ServerConnector connector;
+//      if (sslcontext != null) {
+//        configuration.setSecureScheme("https");
+//        configuration.addCustomizer(new SecureRequestCustomizer());
+//        HttpConnectionFactory http1ConnectionFactory = new HttpConnectionFactory(configuration);
+//
+//        if (config.onlyHttp1) {
+//          connector = new ServerConnector(server, new SslConnectionFactory(sslcontext,
+//              http1ConnectionFactory.getProtocol()),
+//              http1ConnectionFactory);
+//        } else {
+//          sslcontext.setCipherComparator(HTTP2Cipher.COMPARATOR);
+//
+//          connector = new ServerConnector(server);
+//          SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslcontext, "alpn");
+//          connector.addConnectionFactory(sslConnectionFactory);
+//          connector.setDefaultProtocol(sslConnectionFactory.getProtocol());
+//
+//          HTTP2ServerConnectionFactory http2ConnectionFactory = new HTTP2ServerConnectionFactory(configuration);
+//
+//          ALPNServerConnectionFactory alpn = new ALPNServerConnectionFactory(
+//              http2ConnectionFactory.getProtocol(),
+//              http1ConnectionFactory.getProtocol());
+//          alpn.setDefaultProtocol(http1ConnectionFactory.getProtocol());
+//          connector.addConnectionFactory(alpn);
+//          connector.addConnectionFactory(http1ConnectionFactory);
+//          connector.addConnectionFactory(http2ConnectionFactory);
+//        }
+//      } else {
+    //    if (config.onlyHttp1) {
+    //      connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
+   //     } else {
+    HttpConfiguration configuration = new HttpConfiguration();
+    ServerConnector connector = new ServerConnector(server,  new HTTP2CServerConnectionFactory(configuration));
+ //       }
+  //    }
 
       connector.setReuseAddress(true);
       connector.setPort(port);
@@ -325,13 +325,13 @@ public class JettySolrRunner {
       connector.setStopTimeout(0);
       server.setConnectors(new Connector[] {connector});
       server.setSessionIdManager(new DefaultSessionIdManager(server, new Random()));
-    } else {
-      HttpConfiguration configuration = new HttpConfiguration();
-      ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
-      connector.setPort(port);
-      connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
-      server.setConnectors(new Connector[] {connector});
-    }
+//    } else {
+//      HttpConfiguration configuration = new HttpConfiguration();
+//      ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
+//      connector.setPort(port);
+//      connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
+//      server.setConnectors(new Connector[] {connector});
+//    }
 
     HandlerWrapper chain;
     {

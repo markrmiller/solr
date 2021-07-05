@@ -102,7 +102,7 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
     private final int nodeCount;
     private final Path baseDir;
     private String solrxml = MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML;
-    private JettyConfig.Builder jettyConfigBuilder = JettyConfig.builder().setContext("/solr").withSSLConfig(sslConfig.buildServerSSLConfig());
+    private JettyConfig.Builder jettyConfigBuilder = JettyConfig.builder().setContext("/solr").useOnlyHttp1(false);
     private Optional<String> securityJson = Optional.empty();
 
     private List<Config> configs = new ArrayList<>();
@@ -124,8 +124,8 @@ public class SolrCloudTestCase extends SolrTestCaseJ4 {
       // By default the MiniSolrCloudCluster being built will randomly (seed based) decide which collection API strategy
       // to use (distributed or Overseer based) and which cluster update strategy to use (distributed if collection API
       // is distributed, but Overseer based or distributed randomly chosen if Collection API is Overseer based)
-      this.useDistributedCollectionConfigSetExecution = LuceneTestCase.random().nextInt(2) == 0;
-      this.useDistributedClusterStateUpdate = useDistributedCollectionConfigSetExecution || LuceneTestCase.random().nextInt(2) == 0;
+      this.useDistributedCollectionConfigSetExecution = true; // LuceneTestCase.random().nextInt(2) == 0;
+      this.useDistributedClusterStateUpdate = true; //useDistributedCollectionConfigSetExecution || LuceneTestCase.random().nextInt(2) == 0;
     }
 
     /**
