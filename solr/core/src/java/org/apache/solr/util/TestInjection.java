@@ -149,6 +149,8 @@ public class TestInjection {
 
   public volatile static Integer delayInExecutePlanAction=null;
 
+  public volatile static Integer delayBeforeCreatingNewDocSet = null;
+
   public volatile static boolean failInExecutePlanAction = false;
 
   /**
@@ -190,6 +192,7 @@ public class TestInjection {
     wrongIndexFingerprint = null;
     delayBeforeFollowerCommitRefresh = null;
     delayInExecutePlanAction = null;
+    delayBeforeCreatingNewDocSet = null;
     failInExecutePlanAction = false;
     skipIndexWriterCommitOnClose = false;
     uifOutOfMemoryError = false;
@@ -572,6 +575,18 @@ public class TestInjection {
   public static boolean injectUIFOutOfMemoryError() {
     if (uifOutOfMemoryError ) {
       throw new OutOfMemoryError("Test Injection");
+    }
+    return true;
+  }
+
+  public static boolean injectDocSetDelay() {
+    if (delayBeforeCreatingNewDocSet != null)  {
+      try {
+        log.info("Pausing DocSet for {}ms", delayBeforeCreatingNewDocSet);
+        Thread.sleep(delayBeforeCreatingNewDocSet);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
     return true;
   }

@@ -805,15 +805,35 @@ public class SolrIndexSearcher extends IndexSearcher implements Closeable, SolrI
 
   // only handle positive (non negative) queries
   DocSet getPositiveDocSet(Query q) throws IOException {
-    DocSet answer;
     if (filterCache != null) {
-      answer = filterCache.get(q);
-      if (answer != null) return answer;
+      return filterCache.computeIfAbsent(q, query -> {
+        try {
+          return getDocSetNC(q, null);
+        } catch (IOException e) {
+          Rethrow.rethrow(e);
+        }
+        return null;
+      });
+    } else {
+      return getDocSetNC(q, null);
     }
-    answer = getDocSetNC(q, null);
-    if (filterCache != null) filterCache.put(q, answer);
-    return answer;
   }
+
+  // Adapted from lucene Rethrow
+  private static final class Rethrow {
+    private Rethrow() {}
+
+    /** Rethrows <code>t</code> (identical object). */
+    public static void rethrow(IOException t) {
+      Rethrow.<Error>rethrow0(t);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> void rethrow0(IOException t) throws T {
+      throw (T) t;
+    }
+  }
+
 
   private static Query matchAllDocsQuery = new MatchAllDocsQuery();
   private volatile BitDocSet liveDocs;
