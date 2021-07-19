@@ -580,14 +580,14 @@ public class TestInjection {
   }
 
   public static boolean injectDocSetDelay() {
-    if (delayBeforeCreatingNewDocSet != null)  {
-      try {
-        log.info("Pausing DocSet for {}ms", delayBeforeCreatingNewDocSet);
-        Thread.sleep(delayBeforeCreatingNewDocSet);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
+//    if (delayBeforeCreatingNewDocSet != null)  {
+//      try {
+//        log.info("Pausing DocSet for {}ms", delayBeforeCreatingNewDocSet);
+//        Thread.sleep(delayBeforeCreatingNewDocSet);
+//      } catch (InterruptedException e) {
+//        Thread.currentThread().interrupt();
+//      }
+//    }
     return true;
   }
 

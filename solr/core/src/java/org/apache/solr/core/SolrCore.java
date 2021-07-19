@@ -1519,6 +1519,16 @@ public final class SolrCore implements SolrInfoBean, Closeable {
   public void open() {
     refCount.incrementAndGet();
     MDCLoggingContext.setCore(this);
+
+    if (log.isErrorEnabled()) {
+      RuntimeException e = new RuntimeException();
+      StackTraceElement[] stack = e.getStackTrace();
+      for (int i = 0; i < Math.min(8, stack.length - 1); i++) {
+        log.error(stack[i].toString());
+      }
+
+      log.error("open refCount {} {} {}", this, name, refCount.get());
+    }
   }
 
   /**
@@ -1550,6 +1560,17 @@ public final class SolrCore implements SolrInfoBean, Closeable {
   public void close() {
     MDCLoggingContext.clear(); // balance out open with close
     int count = refCount.decrementAndGet();
+    if (log.isErrorEnabled()) {
+      RuntimeException e = new RuntimeException();
+      StackTraceElement[] stack = e.getStackTrace();
+      int min = Math.min(8, stack.length - 1);
+      for (int i = 0; i < min; i++) {
+        log.error(stack[i].toString());
+      }
+
+      log.error("close refcount after {} {} {}", this, name, count);
+    }
+
     if (count > 0) return; // close is called often, and only actually closes if nothing is using it.
     if (count < 0) {
       log.error("Too many close [count:{}] on {}. Please report this exception to solr-user@lucene.apache.org", count, this);
@@ -1557,136 +1578,144 @@ public final class SolrCore implements SolrInfoBean, Closeable {
       return;
     }
     log.info("{} CLOSING SolrCore {}", logid, this);
-
-    ExecutorUtil.shutdownAndAwaitTermination(coreAsyncTaskExecutor);
-
-    // stop reporting metrics
     try {
-      coreMetricManager.close();
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
+      ExecutorUtil.shutdownAndAwaitTermination(coreAsyncTaskExecutor);
 
-    if (closeHooks != null) {
-      for (CloseHook hook : closeHooks) {
-        try {
-          hook.preClose(this);
-        } catch (Throwable e) {
-          SolrException.log(log, e);
-          if (e instanceof Error) {
-            throw (Error) e;
-          }
-        }
-      }
-    }
-
-    if (reqHandlers != null) reqHandlers.close();
-    responseWriters.close();
-    searchComponents.close();
-    qParserPlugins.close();
-    valueSourceParsers.close();
-    transformerFactories.close();
-
-    try {
-      if (null != updateHandler) {
-        updateHandler.close();
-      }
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-
-    boolean coreStateClosed = false;
-    try {
-      if (solrCoreState != null) {
-        if (updateHandler instanceof IndexWriterCloser) {
-          coreStateClosed = solrCoreState.decrefSolrCoreState((IndexWriterCloser) updateHandler);
-        } else {
-          coreStateClosed = solrCoreState.decrefSolrCoreState(null);
-        }
-      }
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-
-    try {
-      ExecutorUtil.shutdownAndAwaitTermination(searcherExecutor);
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-    assert ObjectReleaseTracker.release(searcherExecutor);
-
-    try {
-      // Since we waited for the searcherExecutor to shut down,
-      // there should be no more searchers warming in the background
-      // that we need to take care of.
-      //
-      // For the case that a searcher was registered *before* warming
-      // then the searchExecutor will throw an exception when getSearcher()
-      // tries to use it, and the exception handling code should close it.
-      closeSearcher();
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-
-    if (coreStateClosed) {
+      // stop reporting metrics
       try {
-        cleanupOldIndexDirectories(false);
-      } catch (Exception e) {
-        SolrException.log(log, e);
-      }
-    }
-
-    try {
-      infoRegistry.clear();
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-
-    // Close the snapshots meta-data directory.
-    Directory snapshotsDir = snapshotMgr.getSnapshotsDir();
-    try {
-      this.directoryFactory.release(snapshotsDir);
-    } catch (Throwable e) {
-      SolrException.log(log, e);
-      if (e instanceof Error) {
-        throw (Error) e;
-      }
-    }
-
-    if (coreStateClosed) {
-
-      try {
-        directoryFactory.close();
+        coreMetricManager.close();
       } catch (Throwable e) {
         SolrException.log(log, e);
         if (e instanceof Error) {
           throw (Error) e;
         }
       }
-    }
 
-    if (closeHooks != null) {
-      for (CloseHook hook : closeHooks) {
+      if (closeHooks != null) {
+        for (CloseHook hook : closeHooks) {
+          try {
+            hook.preClose(this);
+          } catch (Throwable e) {
+            SolrException.log(log, e);
+            if (e instanceof Error) {
+              throw (Error) e;
+            }
+          }
+        }
+      }
+
+      synchronized(searcherLock) {
+        for (RefCounted<SolrIndexSearcher> searcher : _searchers) {
+          try {
+            searcher.get().close();
+          } catch (IOException e) {
+            log.error("", e);
+          }
+          _realtimeSearchers.clear();
+        }
+        _searchers.clear();
+        for (RefCounted<SolrIndexSearcher> searcher : _realtimeSearchers) {
+          try {
+            searcher.get().close();
+          } catch (IOException e) {
+            log.error("", e);
+          }
+        }
+        _realtimeSearchers.clear();
+      }
+
+      if (reqHandlers != null) reqHandlers.close();
+      responseWriters.close();
+      searchComponents.close();
+      qParserPlugins.close();
+      valueSourceParsers.close();
+      transformerFactories.close();
+
+      try {
+        if (null != updateHandler) {
+          updateHandler.close();
+        }
+      } catch (Throwable e) {
+        SolrException.log(log, e);
+        if (e instanceof Error) {
+          throw (Error) e;
+        }
+      }
+
+      try {
+        ExecutorUtil.shutdownAndAwaitTermination(searcherExecutor);
+      } catch (Throwable e) {
+        SolrException.log(log, e);
+        if (e instanceof Error) {
+          throw (Error) e;
+        }
+      }
+      assert ObjectReleaseTracker.release(searcherExecutor);
+
+//      try {
+//        // Since we waited for the searcherExecutor to shut down,
+//        // there should be no more searchers warming in the background
+//        // that we need to take care of.
+//        //
+//        // For the case that a searcher was registered *before* warming
+//        // then the searchExecutor will throw an exception when getSearcher()
+//        // tries to use it, and the exception handling code should close it.
+//        closeSearcher();
+//      } catch (Throwable e) {
+//        SolrException.log(log, e);
+//        if (e instanceof Error) {
+//          throw (Error) e;
+//        }
+//      }
+
+      boolean coreStateClosed = false;
+      try {
+        if (solrCoreState != null) {
+          if (updateHandler instanceof IndexWriterCloser) {
+            coreStateClosed = solrCoreState.decrefSolrCoreState((IndexWriterCloser) updateHandler);
+          } else {
+            coreStateClosed = solrCoreState.decrefSolrCoreState(null);
+          }
+        }
+      } catch (Throwable e) {
+        SolrException.log(log, e);
+        if (e instanceof Error) {
+          throw (Error) e;
+        }
+      }
+
+      if (coreStateClosed) {
         try {
-          hook.postClose(this);
+          cleanupOldIndexDirectories(false);
+        } catch (Exception e) {
+          SolrException.log(log, e);
+        }
+      }
+
+      try {
+        infoRegistry.clear();
+      } catch (Throwable e) {
+        SolrException.log(log, e);
+        if (e instanceof Error) {
+          throw (Error) e;
+        }
+      }
+
+      // Close the snapshots meta-data directory.
+      Directory snapshotsDir = snapshotMgr.getSnapshotsDir();
+      try {
+        this.directoryFactory.release(snapshotsDir);
+      } catch (Throwable e) {
+        SolrException.log(log, e);
+        if (e instanceof Error) {
+          throw (Error) e;
+        }
+      }
+
+      if (coreStateClosed) {
+
+        try {
+          directoryFactory.close();
         } catch (Throwable e) {
           SolrException.log(log, e);
           if (e instanceof Error) {
@@ -1694,9 +1723,23 @@ public final class SolrCore implements SolrInfoBean, Closeable {
           }
         }
       }
-    }
 
-    assert ObjectReleaseTracker.release(this);
+      if (closeHooks != null) {
+        for (CloseHook hook : closeHooks) {
+          try {
+            hook.postClose(this);
+          } catch (Throwable e) {
+            SolrException.log(log, e);
+            if (e instanceof Error) {
+              throw (Error) e;
+            }
+          }
+        }
+      }
+    } finally {
+
+      assert ObjectReleaseTracker.release(this);
+    }
   }
 
   /**

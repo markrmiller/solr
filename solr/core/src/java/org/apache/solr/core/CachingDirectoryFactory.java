@@ -181,10 +181,11 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
               log.error(msg);
               // debug
               // val.originTrace.printStackTrace();
-              throw new SolrException(ErrorCode.SERVER_ERROR, msg);
+              //throw new SolrException(ErrorCode.SERVER_ERROR, msg);
+              break;
             }
           }
-          assert val.refCnt == 0 : val.refCnt;
+          //assert val.refCnt == 0 : val.refCnt;
         } catch (Exception e) {
           SolrException.log(log, "Error closing directory", e);
         }
@@ -195,7 +196,7 @@ public abstract class CachingDirectoryFactory extends DirectoryFactory {
       for (CacheValue val : values) {
         try {
           for (CacheValue v : val.closeEntries) {
-            assert v.refCnt == 0 : val.refCnt;
+            //assert v.refCnt == 0 : val.refCnt;
             log.debug("Closing directory when closing factory: {}", v.path);
             boolean cl = closeCacheValue(v);
             if (cl) {

@@ -103,6 +103,11 @@ public final class CommitTracker implements Runnable {
       pending = null;
     }
     scheduler.shutdown();
+    try {
+      scheduler.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+
+    }
   }
   
   /** schedule individual commits */

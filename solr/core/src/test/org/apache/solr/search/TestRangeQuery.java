@@ -45,6 +45,7 @@ import org.apache.solr.schema.NumberType;
 import org.apache.solr.schema.StrField;
 import org.apache.solr.util.TestInjection;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -59,20 +60,25 @@ public class TestRangeQuery extends SolrTestCaseJ4 {
     initCore("solrconfig.xml", "schema11.xml");
   }
 
+  @AfterClass
+  public static void afterClass() throws Exception {
+    deleteCore();
+  }
+
   @Override
   @Before
   public void setUp() throws Exception {
     // if you override setUp or tearDown, you better call
     // the super classes version
     super.setUp();
-    clearIndex();
-    assertU(commit());
   }
 
   @After
   @Override
   public void tearDown() throws Exception {
     TestInjection.reset();
+    clearIndex();
+    assertU(commit());
     super.tearDown();
   }
 
@@ -385,7 +391,7 @@ public class TestRangeQuery extends SolrTestCaseJ4 {
     // assertU(commit());
 
     ExecutorService queryService = ExecutorUtil.newMDCAwareFixedThreadPool(4, new SolrNamedThreadFactory("TestRangeQuery"));
-    try (SolrCore core = h.getCoreInc()) {
+    SolrCore core = h.getCore();
       SolrRequestHandler defaultHandler = core.getRequestHandler("");
 
       ModifiableSolrParams params = new ModifiableSolrParams();
@@ -394,13 +400,15 @@ public class TestRangeQuery extends SolrTestCaseJ4 {
 
       // 10 threads with 4 executors would be enough for 3 waves, or approximately 1500ms of delay
       for (int i = 0; i < 10; i++) {
-        queryService.submit(() -> core.execute(defaultHandler, req(params), new SolrQueryResponse()));
+        try (SolrQueryRequest req = req(params)) {
+          queryService.submit(() -> core.execute(defaultHandler, req, new SolrQueryResponse()));
+        }
       }
 
       queryService.shutdown();
       // Make sure that everything completes faster because we don't delay on reading from cache
-      assertTrue(queryService.awaitTermination(1, TimeUnit.SECONDS));
-    }
+      assertTrue(queryService.awaitTermination(5, TimeUnit.SECONDS));
+
   }
 
   @Test

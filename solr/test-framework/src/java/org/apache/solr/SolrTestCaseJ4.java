@@ -462,7 +462,7 @@ public abstract class SolrTestCaseJ4 extends SolrTestCase {
       try {
         if (retries % 10 == 0) {
           log.info("Waiting for all tracked resources to be released");
-          if (retries > 10) {
+          if (retries > 2) {
             TraceFormatting tf = new TraceFormatting(DEFAULT_STACK_FILTERS);
             Map<Thread,StackTraceElement[]> stacksMap = Thread.getAllStackTraces();
             Set<Entry<Thread,StackTraceElement[]>> entries = stacksMap.entrySet();

@@ -797,15 +797,17 @@ public class DirectUpdateHandler2 extends UpdateHandler implements SolrCoreState
   public void close() throws IOException {
     log.debug("closing {}", this);
 
-    commitTracker.close();
-    softCommitTracker.close();
-
-    numDocsPending.reset();
     try {
       super.close();
     } catch (Exception e) {
       throw new IOException("Error closing", e);
     }
+
+    commitTracker.close();
+    softCommitTracker.close();
+
+    numDocsPending.reset();
+
   }
 
   // IndexWriterCloser interface method - called from solrCoreState.decref(this)
