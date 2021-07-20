@@ -22,17 +22,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-import java.util.SortedMap;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -43,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import javax.servlet.Filter;
 
@@ -57,15 +48,8 @@ import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.ConfigSetAdminRequest;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
-import org.apache.solr.common.cloud.Aliases;
-import org.apache.solr.common.cloud.CloudCollectionsListener;
-import org.apache.solr.common.cloud.CollectionStatePredicate;
-import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkMaintenanceUtils;
-import org.apache.solr.common.cloud.ZkStateReader;
+import org.apache.solr.common.cloud.*;
+import org.apache.solr.common.params.CollectionAdminParams;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
@@ -659,7 +643,7 @@ public class MiniSolrCloudCluster {
   }
   
   protected CloudSolrClient buildSolrClient() {
-    return new Builder(Collections.singletonList(getZkServer().getZkAddress()), Optional.empty())
+    return new CloudSolrClient.Builder(Collections.singletonList(getZkServer().getZkAddress()), Optional.empty())
         .withSocketTimeout(90000).withConnectionTimeout(15000).build(); // we choose 90 because we run in some harsh envs
   }
 
@@ -855,4 +839,240 @@ public class MiniSolrCloudCluster {
     }
   }
 
+
+  private static class Config {
+    final String name;
+    final Path path;
+    private Config(String name, Path path) {
+      this.name = name;
+      this.path = path;
+    }
+  }
+
+  /**
+  * Builder class for a MiniSolrCloudCluster
+  */
+  public static class Builder {
+
+    private final int nodeCount;
+    private final Path baseDir;
+    private String solrxml = DEFAULT_CLOUD_SOLR_XML;
+    private JettyConfig.Builder jettyConfigBuilder;
+    private Optional<String> securityJson = Optional.empty();
+
+    private List<Config> configs = new ArrayList<>();
+    private Map<String, Object> clusterProperties = new HashMap<>();
+
+    private boolean trackJettyMetrics;
+    private boolean useDistributedCollectionConfigSetExecution;
+    private boolean useDistributedClusterStateUpdate;
+
+    /**
+     * Create a builder
+     *
+     * @param nodeCount the number of nodes in the cluster
+     * @param baseDir   a base directory for the cluster
+     */
+    public Builder(int nodeCount, Path baseDir) {
+      this.nodeCount = nodeCount;
+      this.baseDir = baseDir;
+
+      jettyConfigBuilder = JettyConfig.builder().setContext("/solr");
+      if (SolrTestCaseJ4.sslConfig != null) {
+        jettyConfigBuilder = jettyConfigBuilder.withSSLConfig(SolrTestCaseJ4.sslConfig.buildServerSSLConfig());
+      }
+    }
+
+    /**
+     * Use a JettyConfig.Builder to configure the cluster's jetty servers
+     */
+    public Builder withJettyConfig(Consumer<JettyConfig.Builder> fun) {
+      fun.accept(jettyConfigBuilder);
+      return this;
+    }
+
+    /**
+     * Use the provided string as solr.xml content
+     */
+    public Builder withSolrXml(String solrXml) {
+      this.solrxml = solrXml;
+      return this;
+    }
+
+    /**
+     * Read solr.xml from the provided path
+     */
+    public Builder withSolrXml(Path solrXml) {
+      try {
+        this.solrxml = new String(Files.readAllBytes(solrXml), Charset.defaultCharset());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return this;
+    }
+
+    /**
+     * Configure the specified security.json for the {@linkplain MiniSolrCloudCluster}
+     *
+     * @param securityJson The path specifying the security.json file
+     * @return the instance of {@linkplain Builder}
+     */
+    public Builder withSecurityJson(Path securityJson) {
+      try {
+        this.securityJson = Optional.of(new String(Files.readAllBytes(securityJson), Charset.defaultCharset()));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return this;
+    }
+
+    /**
+     * Configure the specified security.json for the {@linkplain MiniSolrCloudCluster}
+     *
+     * @param securityJson The string specifying the security.json configuration
+     * @return the instance of {@linkplain Builder}
+     */
+    public Builder withSecurityJson(String securityJson) {
+      this.securityJson = Optional.of(securityJson);
+      return this;
+    }
+
+    /**
+     * Upload a collection config before tests start
+     *
+     * @param configName the config name
+     * @param configPath the path to the config files
+     */
+    public Builder addConfig(String configName, Path configPath) {
+      this.configs.add(new Config(configName, configPath));
+      return this;
+    }
+
+    /**
+     * <p>This method makes the MiniSolrCloudCluster use the "other" Collection API execution strategy than it normally
+     * would. When some test classes call this method (and some don't) we make sure that a run of multiple tests with a
+     * single seed will exercise both code lines (distributed and Overseer based Collection API) so regressions can be
+     * spotted faster.</p>
+     *
+     * <p> The real need is for a few tests covering reasonable use cases to call this method. If you're adding a new test,
+     * you don't have to call it (but it's ok if you do).</p>
+     */
+    public Builder useOtherCollectionConfigSetExecution() {
+      // Switch from Overseer to distributed Collection execution and vice versa
+      useDistributedCollectionConfigSetExecution = !useDistributedCollectionConfigSetExecution;
+      // Reverse distributed cluster state updates as well if possible (state can't be Overseer based if Collections API is distributed)
+      useDistributedClusterStateUpdate = !useDistributedClusterStateUpdate || useDistributedCollectionConfigSetExecution;
+      return this;
+    }
+
+    /**
+     * Force the cluster Collection and config state API execution as well as the cluster state update strategy to be
+     * either Overseer based or distributed. <b>This method can be useful when debugging tests</b> failing in only one
+     * of the two modes to have all local runs exhibit the issue, as well obviously for tests that are not compatible
+     * with one of the two modes.
+     * <p>
+     * If this method is not called, the strategy being used will be random if the configuration passed to the cluster
+     * ({@code solr.xml} equivalent) contains a placeholder similar to:
+     * <pre>
+     * {@code
+     * <solrcloud>
+     *   ....
+     *   <str name="distributedClusterStateUpdates">${solr.distributedClusterStateUpdates:false}</str>
+     *   <str name="distributedCollectionConfigSetExecution">${solr.distributedCollectionConfigSetExecution:false}</str>
+     *   ....
+     * </solrcloud>
+     * }</pre>
+     * For an example of a configuration supporting this setting, see {@link MiniSolrCloudCluster#DEFAULT_CLOUD_SOLR_XML}.
+     * When a test sets a different {@code solr.xml} config (using {@link #withSolrXml}), if the config does not contain
+     * the placeholder, the strategy will be defined by the values assigned to {@code useDistributedClusterStateUpdates}
+     * and {@code useDistributedCollectionConfigSetExecution} in {@link org.apache.solr.core.CloudConfig.CloudConfigBuilder}.
+     *
+     * @param distributedCollectionConfigSetApi When {@code true}, Collection and Config Set API commands are executed
+     *                                          in a distributed way by nodes. When {@code false}, they are executed by
+     *                                          Overseer.
+     * @param distributedClusterStateUpdates    When {@code true}, cluster state updates are handled in a distributed
+     *                                          way by nodes. When {@code false}, cluster state updates are handled by
+     *                                          Overseer.<p> If {@code distributedCollectionConfigSetApi} is {@code
+     *                                          true} then this parameter must be {@code true}.
+     */
+    public Builder withDistributedClusterStateUpdates(boolean distributedCollectionConfigSetApi, boolean distributedClusterStateUpdates) {
+      useDistributedCollectionConfigSetExecution = distributedCollectionConfigSetApi;
+      useDistributedClusterStateUpdate = distributedClusterStateUpdates;
+      return this;
+    }
+
+    /**
+     * Set a cluster property
+     *
+     * @param propertyName  the property name
+     * @param propertyValue the property value
+     */
+    public Builder withProperty(String propertyName, String propertyValue) {
+      this.clusterProperties.put(propertyName, propertyValue);
+      return this;
+    }
+
+    public Builder withMetrics(boolean trackJettyMetrics) {
+      this.trackJettyMetrics = trackJettyMetrics;
+      return this;
+    }
+
+    /**
+     * Configure and run the {@link MiniSolrCloudCluster}
+     *
+     * @throws Exception if an error occurs on startup
+     */
+    public MiniSolrCloudCluster configure() throws Exception {
+      return SolrCloudTestCase.cluster = build();
+    }
+
+    /**
+     * Configure, run and return the {@link MiniSolrCloudCluster}
+     *
+     * @throws Exception if an error occurs on startup
+     */
+    public MiniSolrCloudCluster build() throws Exception {
+      // Two lines below will have an impact on how the MiniSolrCloudCluster and therefore the test run if the config being
+      // used in the test does have the appropriate placeholders. See for example DEFAULT_CLOUD_SOLR_XML in MiniSolrCloudCluster.
+      // Hard coding values here will impact such tests.
+      // To hard code behavior for tests not having these placeholders - and for SolrCloud as well for that matter! -
+      // change the values assigned to useDistributedClusterStateUpdates and useDistributedCollectionConfigSetExecution in
+      // org.apache.solr.core.CloudConfig.CloudConfigBuilder. Do not forget then to revert before commit!
+      System.setProperty("solr.distributedCollectionConfigSetExecution", Boolean.toString(useDistributedCollectionConfigSetExecution));
+      System.setProperty("solr.distributedClusterStateUpdates", Boolean.toString(useDistributedClusterStateUpdate));
+
+      JettyConfig jettyConfig = jettyConfigBuilder.build();
+      MiniSolrCloudCluster cluster = new MiniSolrCloudCluster(nodeCount, baseDir, solrxml, jettyConfig,
+          null, securityJson, trackJettyMetrics);
+      CloudSolrClient client = cluster.getSolrClient();
+      for (Config config : configs) {
+        cluster.uploadConfigSet(config.path, config.name);
+      }
+
+      if (clusterProperties.size() > 0) {
+        ClusterProperties props = new ClusterProperties(cluster.getSolrClient().getZkStateReader().getZkClient());
+        for (Map.Entry<String, Object> entry : clusterProperties.entrySet()) {
+          props.setClusterProperty(entry.getKey(), entry.getValue());
+        }
+      }
+      return cluster;
+    }
+
+    public Builder withDefaultClusterProperty(String key, String value) {
+      @SuppressWarnings({"unchecked"})
+      HashMap<String, Object> defaults = (HashMap<String, Object>) this.clusterProperties.get(CollectionAdminParams.DEFAULTS);
+      if (defaults == null) {
+        defaults = new HashMap<>();
+        this.clusterProperties.put(CollectionAdminParams.DEFAULTS, defaults);
+      }
+      @SuppressWarnings({"unchecked"})
+      HashMap<String, Object> cluster = (HashMap<String, Object>) defaults.get(CollectionAdminParams.CLUSTER);
+      if (cluster == null) {
+        cluster = new HashMap<>();
+        defaults.put(CollectionAdminParams.CLUSTER, cluster);
+      }
+      cluster.put(key, value);
+      return this;
+    }
+  }
 }

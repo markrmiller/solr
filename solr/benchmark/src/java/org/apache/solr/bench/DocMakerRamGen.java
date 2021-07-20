@@ -243,27 +243,4 @@ public class DocMakerRamGen {
 
     return startInclusive + random.nextLong(endExclusive - startInclusive);
   }
-
-  public static void main(String[] args) {
-    DocMakerRamGen docMaker = new DocMakerRamGen();
-    docMaker.addField("AlphaCard3", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMakerRamGen.Content.ALPHEBETIC).withMaxCardinality(3));
-
-    for (int i = 0; i < 10; i++) {
-      System.out.println(docMaker.getDocument());
-    }
-
-    docMaker = new DocMakerRamGen();
-    docMaker.addField("IntCard2", FieldDef.FieldDefBuilder.aFieldDef().withContent(Content.INTEGER).withMaxCardinality(3));
-
-    for (int i = 0; i < 10; i++) {
-      System.out.println(docMaker.getDocument());
-    }
-
-    docMaker = new DocMakerRamGen();
-    docMaker.addField("UnicodeCard3", FieldDef.FieldDefBuilder.aFieldDef().withContent(Content.UNICODE).withMaxCardinality(3));
-
-    for (int i = 0; i < 10; i++) {
-      System.out.println(docMaker.getDocument());
-    }
-  }
 }

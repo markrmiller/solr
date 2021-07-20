@@ -24,7 +24,6 @@ import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
-import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.IOUtils;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -89,9 +88,6 @@ public class CloudIndexing {
       // set the seed used by ThreadLocalRandom
       System.setProperty("threadLocalRandomSeed", Long.toString(new Random(seed).nextLong()));
 
-      // we want to pin this for benchmarks and currently these options require Carrot RandomizedTesting thread contexts.
-      System.setProperty("solr.tests.skipDistributedConfigAndClusterStateRandomSetup", "true");
-
       System.setProperty("pkiHandlerPrivateKeyPath", "");
       System.setProperty("pkiHandlerPublicKeyPath", "");
 
@@ -105,7 +101,7 @@ public class CloudIndexing {
       // System.getProperty("jetty.testMode", "true");
       // SolrCloudTestCase.sslConfig = SolrTestCaseJ4.buildSSLConfig();
 
-      cluster = new SolrCloudTestCase.Builder(nodeCount, Files.createTempDirectory("solr-bench")).
+      cluster = new MiniSolrCloudCluster.Builder(nodeCount, Files.createTempDirectory("solr-bench")).
           addConfig("conf", Paths.get("src/resources/configs/cloud-minimal/conf")).configure();
       System.out.println("cluster base path=" + cluster.getBaseDir());
 

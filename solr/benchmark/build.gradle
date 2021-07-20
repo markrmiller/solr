@@ -24,10 +24,6 @@ compileJava {
     options.compilerArgs.remove("-Werror")
     options.compilerArgs.remove("-proc:none")
   }
-  doLast {
-    options.compilerArgs.remove("-Werror")
-    options.compilerArgs.remove("-proc:none")
-  }
 }
 
 forbiddenApis {
