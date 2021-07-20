@@ -16,7 +16,7 @@
  limitations under the License.
 -->
 <schema name="minimal" version="1.1">
-  <fieldType name="string" class="solr.StrField"/>
+  <fieldType name="string" class="solr.StrField" docValues="true"/>
   <fieldType name="int" class="org.apache.solr.schema.IntPointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
   <fieldType name="long" class="org.apache.solr.schema.LongPointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
   <fieldType name="text" class="solr.TextField">
@@ -25,12 +25,13 @@
       <filter class="solr.LowerCaseFilterFactory"/>
     </analyzer>
   </fieldType>
-  <dynamicField name="*" type="string" indexed="true" stored="true"/>
+
   <!-- for versioning -->
   <field name="_version_" type="long" indexed="true" stored="true"/>
   <field name="_root_" type="string" indexed="true" stored="true" multiValued="false" required="false"/>
   <field name="id" type="string" indexed="true" stored="true"/>
   <field name="text" type="text" indexed="true" stored="false"/>
   <dynamicField name="*_s"  type="string"  indexed="true"  stored="true" />
+  <dynamicField name="*_i"  type="int"  indexed="false"  stored="false" />
   <uniqueKey>id</uniqueKey>
 </schema>

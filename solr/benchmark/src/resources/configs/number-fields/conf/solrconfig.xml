@@ -96,11 +96,11 @@
           initialSize="0"
           autowarmCount="0"/>
    <filterCache
-          enabled ="false"
-          class="solr.LRUCache"
-          size="0"
-          initialSize="0"
-          autowarmCount="0"/>
+        enabled ="${filterCache.enabled:false}"
+        class="solr.LRUCache"
+        size="${filterCache.size:0}"
+        initialSize="0"
+        autowarmCount="0"/>
   </query>
 </config>
 

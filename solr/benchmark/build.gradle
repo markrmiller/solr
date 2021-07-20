@@ -78,7 +78,7 @@ task jmh(type: JavaExec) {
     }
   }
 
-  args '-jvmArgsPrepend', '-Xms4g'
+  args '-jvmArgsPrepend', '-Xms6g' // make param-able
   args '-jvmArgsPrepend', '-Djmh.separateClassLoader=true'
   args '-jvmArgsPrepend', '-Dlog4j2.is.webapp=false'
   args '-jvmArgsPrepend', '-Dlog4j2.garbagefreeThreadContextMap=true'
@@ -108,6 +108,8 @@ task jmh(type: JavaExec) {
     // println "\nClasspath:" + jmh.classpath.toList()
     println "\nExecuting JMH with: $args \n"
 
+    getJvmArgs().remove("-XX:TieredStopAtLevel=1")
+
     args '-jvmArgsPrepend', '-Djava.class.path='+ toPath(getClasspath().files)
     resultFile.parentFile.mkdirs()
   }
@@ -119,7 +121,7 @@ task jmh(type: JavaExec) {
 }
 
 
-private String toPath(Set<File> classpathUnderTest) {
+private static String toPath(Set<File> classpathUnderTest) {
   StringBuilder sb = new StringBuilder();
   for (File entry : classpathUnderTest) {
     sb.append(entry.getAbsolutePath());

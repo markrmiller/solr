@@ -135,7 +135,7 @@ public class CloudIndexing {
       public void setupDoc(BenchState state) throws Exception {
         largeDocMaker = new DocMakerRamGen();
         largeDocMaker.addField("id", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMakerRamGen.Content.UNIQUE_INT));
-        largeDocMaker.addField("text", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMakerRamGen.Content.ALPHEBETIC).
+        largeDocMaker.addField("text_t", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMakerRamGen.Content.ALPHEBETIC).
             withMaxLength(64).withTokenCount(ThreadLocalRandom.current().nextInt(512) + 1));
 
         largeDocMaker.preGenerateDocs(numDocs);

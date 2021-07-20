@@ -20,10 +20,12 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class FieldDef {
+  public static final int DEFAULT_MAX_LENGTH = 64;
+
   private DocMakerRamGen.Content content;
   private int numTokens = 1;
   private int maxCardinality = -1;
-  private int maxLength = 64;
+  private int maxLength = -1;
   private int length = -1;
   private long cardinalityStart;
 
@@ -56,7 +58,7 @@ public class FieldDef {
     private DocMakerRamGen.Content content;
     private int numTokens = 1;
     private int maxCardinality = -1;
-    private int maxLength = 64;
+    private int maxLength = -1;
     private int length = -1;
     private long cardinalityStart;
 
@@ -91,13 +93,16 @@ public class FieldDef {
 
     public FieldDefBuilder withMaxLength(int maxLength) {
       if (length > -1) {
-        throw new UnsupportedOperationException("maxLength cannot be used with maxLength");
+        throw new UnsupportedOperationException("maxLength cannot be used with length");
       }
       this.maxLength = maxLength;
       return this;
     }
 
     public FieldDefBuilder withLength(int length) {
+      if (maxLength > -1) {
+        throw new UnsupportedOperationException("length cannot be used with maxLength");
+      }
       this.length = length;
       return this;
     }
@@ -107,7 +112,8 @@ public class FieldDef {
       fieldDef.numTokens = this.numTokens;
       fieldDef.content = this.content;
       fieldDef.maxCardinality = this.maxCardinality;
-      fieldDef.maxLength = this.maxLength;
+      fieldDef.maxLength = this.maxLength == -1 ? DEFAULT_MAX_LENGTH : this.maxLength;
+      fieldDef.length = this.length;
       fieldDef.cardinalityStart = this.cardinalityStart;
       return fieldDef;
     }
