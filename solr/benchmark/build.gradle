@@ -78,21 +78,24 @@ task jmh(type: JavaExec) {
     }
   }
 
-  args '-jvmArgsPrepend', '-Xms6g' // make param-able
+  args '-jvmArgsPrepend', '-Xms8g' // make param-able
   args '-jvmArgsPrepend', '-Djmh.separateClassLoader=true'
   args '-jvmArgsPrepend', '-Dlog4j2.is.webapp=false'
   args '-jvmArgsPrepend', '-Dlog4j2.garbagefreeThreadContextMap=true'
   args '-jvmArgsPrepend', '-Dlog4j2.enableDirectEncoders=true'
   args '-jvmArgsPrepend', '-Dlog4j2.enable.threadlocals=true'
-//  args '-jvmArgsPrepend', '-XX:ConcGCThreads=2'
-//  args '-jvmArgsPrepend', '-XX:ParallelGCThreads=3'
-//  args '-jvmArgsPrepend', '-XX:+UseG1GC'
+  args '-jvmArgsPrepend', '-XX:ConcGCThreads=3'
+  args '-jvmArgsPrepend', '-XX:ParallelGCThreads=6'
+  args '-jvmArgsPrepend', '-XX:+UseG1GC'
   args '-jvmArgsPrepend', '-Djetty.insecurerandom=1'
   args '-jvmArgsPrepend', '-Djava.security.egd=file:/dev/./urandom'
   args '-jvmArgsPrepend', '-XX:-UseBiasedLocking'
   args '-jvmArgsPrepend', '-XX:+PerfDisableSharedMem'
   args '-jvmArgsPrepend', '-XX:+ParallelRefProcEnabled'
 //  args '-jvmArgsPrepend', '-XX:MaxGCPauseMillis=250'
+//  args '-jvmArgsPrepend', '-XX:+FlightRecorder'
+//  args '-jvmArgsPrepend', '-XX:StartFlightRecording=filename=jfr_results/,dumponexit=true,settings=profile,path-to-gc-roots=true'
+
   args '-jvmArgsPrepend', '-Dsolr.log.dir='
 
   if (jvmArgs) {
