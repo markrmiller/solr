@@ -313,8 +313,7 @@ public class JettySolrRunner {
         if (config.onlyHttp1) {
           connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
         } else {
-          connector = new ServerConnector(server, new HttpConnectionFactory(configuration),
-              new HTTP2CServerConnectionFactory(configuration));
+          connector = new ServerConnector(server, new HttpConnectionFactory(configuration), new HTTP2CServerConnectionFactory(configuration));
         }
       }
 
@@ -322,13 +321,15 @@ public class JettySolrRunner {
       connector.setPort(port);
       connector.setHost("127.0.0.1");
       connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
-      connector.setStopTimeout(0);
+
       server.setConnectors(new Connector[] {connector});
       server.setSessionIdManager(new DefaultSessionIdManager(server, new Random()));
     } else {
       HttpConfiguration configuration = new HttpConfiguration();
-      ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(configuration));
+      ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(configuration), new HTTP2CServerConnectionFactory(configuration));
+      connector.setReuseAddress(true);
       connector.setPort(port);
+      connector.setHost("127.0.0.1");
       connector.setIdleTimeout(THREAD_POOL_MAX_IDLE_TIME_MS);
       server.setConnectors(new Connector[] {connector});
     }

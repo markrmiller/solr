@@ -266,7 +266,7 @@ public abstract class SolrTestCaseJ4 extends SolrTestCase {
   
   // these are meant to be accessed sequentially, but are volatile just to ensure any test
   // thread will read the latest value
-  protected static volatile SSLTestConfig sslConfig;
+  public static volatile SSLTestConfig sslConfig;
 
   @Rule
   public TestRule solrTestRules = 
@@ -548,10 +548,10 @@ public abstract class SolrTestCaseJ4 extends SolrTestCase {
     }
   }
 
-  private static SSLTestConfig buildSSLConfig() {
+  public static SSLTestConfig buildSSLConfig() {
 
     SSLRandomizer sslRandomizer =
-      SSLRandomizer.getSSLRandomizerForClass(RandomizedContext.current().getTargetClass());
+      SSLRandomizer.getSSLRandomizerForClass(SolrTestCaseJ4.class);
     
     if (Constants.MAC_OS_X) {
       // see SOLR-9039
