@@ -29,6 +29,7 @@ import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 @LuceneTestCase.Slow
@@ -51,6 +52,7 @@ public class FuzzySearchTest extends SolrCloudTestCase {
   }
 
   @Test
+  @Ignore //  no longer too complex in latest Lucene ...
   public void testTooComplex() throws IOException, SolrServerException {
     SolrInputDocument doc = new SolrInputDocument();
 

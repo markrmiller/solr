@@ -92,7 +92,6 @@ public class SolrIndexConfigTest extends SolrTestCaseJ4 {
     assertNotNull("null mp", iwc.getMergePolicy());
     assertTrue("mp is not TieredMergePolicy", iwc.getMergePolicy() instanceof TieredMergePolicy);
     TieredMergePolicy mp = (TieredMergePolicy) iwc.getMergePolicy();
-    assertEquals("mp.maxMergeAtOnceExplicit", 19, mp.getMaxMergeAtOnceExplicit());
     assertEquals("mp.segmentsPerTier",9,(int)mp.getSegmentsPerTier());
 
     assertNotNull("null ms", iwc.getMergeScheduler());

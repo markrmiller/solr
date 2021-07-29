@@ -19,7 +19,6 @@ package org.apache.solr.search.similarities;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.PerFieldSimilarityWrapper;
 import org.apache.lucene.search.similarities.Similarity;
-import org.apache.lucene.misc.search.similarity.LegacyBM25Similarity;
 import org.apache.lucene.util.Version;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -39,7 +38,6 @@ import org.apache.solr.util.plugin.SolrCoreAware;
  * matching configured:
  * </p>
  * <ul>
- *  <li><code>luceneMatchVersion &lt; 8.0</code> = {@link LegacyBM25Similarity}</li>
  *  <li><code>luceneMatchVersion &gt;= 8.0</code> = {@link BM25Similarity}</li>
  * </ul>
  * <p>
@@ -111,9 +109,7 @@ public class SchemaSimilarityFactory extends SimilarityFactory implements SolrCo
       Similarity defaultSim = null;
       if (null == defaultSimFromFieldType) {
         // nothing configured, choose a sensible implicit default...
-        defaultSim = coreVersion.onOrAfter(Version.LUCENE_8_0_0) ? 
-            new BM25Similarity() :
-            new LegacyBM25Similarity();
+        defaultSim = new BM25Similarity();
       } else {
         FieldType defSimFT = core.getLatestSchema().getFieldTypeByName(defaultSimFromFieldType);
         if (null == defSimFT) {
