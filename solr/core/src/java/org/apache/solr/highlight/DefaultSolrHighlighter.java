@@ -39,6 +39,7 @@ import org.apache.lucene.index.FilterLeafReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.TermVectors;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.highlight.Encoder;
@@ -986,12 +987,19 @@ public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInf
     }
 
     @Override
-    public Fields getTermVectors(int docID) throws IOException {
-      if (docID != lastDocId) {
-        lastDocId = docID;
-        tvFields = in.getTermVectors(docID);
-      }
-      return tvFields;
+    public TermVectors getTermVectorsReader() {
+      TermVectors tvReader = in.getTermVectorsReader();
+      return new TermVectors() {
+
+        @Override
+        public Fields get(int docID) throws IOException {
+          if (docID != lastDocId) {
+            lastDocId = docID;
+            tvFields = tvReader.get(docID);
+          }
+          return tvFields;
+        }
+      };
     }
 
     @Override

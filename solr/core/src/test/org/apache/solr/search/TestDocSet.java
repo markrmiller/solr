@@ -25,7 +25,6 @@ import java.util.function.ToIntFunction;
 
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.FieldInfos;
-import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexReaderContext;
 import org.apache.lucene.index.LeafMetaData;
@@ -38,6 +37,7 @@ import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.index.SortedNumericDocValues;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.StoredFieldVisitor;
+import org.apache.lucene.index.TermVectors;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.search.DocIdSet;
@@ -308,7 +308,7 @@ public class TestDocSet extends SolrTestCase {
       }
 
       @Override
-      public Fields getTermVectors(int doc) {
+      public TermVectors getTermVectorsReader() {
         return null;
       }
 

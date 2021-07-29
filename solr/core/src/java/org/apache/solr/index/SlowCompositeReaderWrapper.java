@@ -243,9 +243,9 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   }
   
   @Override
-  public Fields getTermVectors(int docID) throws IOException {
+  public TermVectors getTermVectorsReader() {
     ensureOpen();
-    return in.getTermVectors(docID);
+    return in.getTermVectorsReader();
   }
 
   @Override
