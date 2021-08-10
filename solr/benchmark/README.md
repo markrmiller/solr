@@ -103,6 +103,16 @@ See org.apache.solr.bench.index.CloudIndexing for an example of this.
 
 After every iteration, the metrics collected by Solr will be dumped to the build/work/metrics-results folder. You can disable metrics collection using the metricsEnabled method of the MiniClusterState, in which case the same output files will be dumped, but the values will all be 0/null.
 
+### Benchmark Outputs
+
+By default, output that benchmarks generate is created in the build/work directory. You can change this location by setting the workBaseDir system property like this:
+
+    -jvmArgsAppend -DworkBaseDir=/data3/bench_work
+
+If a profiler generates output, it will generally be written to the current working directory - that is the benchmark module directory itself. You can usually change this via the dir option, for example:
+
+    ./jmh.sh -prof jfr:dir=build/work/profile-results JsonFaceting
+
 ### JMH Options
 Some common JMH options are:
 

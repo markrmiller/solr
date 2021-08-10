@@ -89,7 +89,9 @@ public class MiniClusterState {
 
     boolean deleteMiniCluster = true;
 
-    Path baseDir;
+    private String workDir;
+
+    Path miniClusterBaseDir;
     boolean allowClusterReuse = false;
 
     boolean isWarmup;
@@ -101,8 +103,8 @@ public class MiniClusterState {
 
       // dump Solr metrics
       Path metricsResults =
-          Paths.get(
-              "work/metrics-results",
+          Paths.get(workDir,
+              "metrics-results",
               benchmarkParams.id(),
               String.valueOf(runCnt++),
               benchmarkParams.getBenchmark() + ".txt");
@@ -160,16 +162,18 @@ public class MiniClusterState {
       // System.getProperty("jetty.testMode", "true");
       // SolrCloudTestCase.sslConfig = SolrTestCaseJ4.buildSSLConfig();
 
+      workDir = System.getProperty("workBaseDir", "build/work");
+
       String baseDirSysProp = System.getProperty("miniClusterBaseDir");
       if (baseDirSysProp != null) {
         deleteMiniCluster = false;
-        baseDir = Paths.get(baseDirSysProp);
-        if (Files.exists(baseDir)) {
+        miniClusterBaseDir = Paths.get(baseDirSysProp);
+        if (Files.exists(miniClusterBaseDir)) {
           createCollectionAndIndex = false;
           allowClusterReuse = true;
         }
       } else {
-        baseDir = Paths.get("work/mini-cluster");
+        miniClusterBaseDir = Paths.get(workDir, "mini-cluster");
       }
 
       System.setProperty("metricsEnabled", String.valueOf(metricsEnabled));
@@ -180,31 +184,31 @@ public class MiniClusterState {
     }
 
     public void startMiniCluster(int nodeCount) {
-      log("starting mini cluster at base directory: " + baseDir.toAbsolutePath());
+      log("starting mini cluster at base directory: " + miniClusterBaseDir.toAbsolutePath());
 
-      if (!allowClusterReuse && Files.exists(baseDir)) {
+      if (!allowClusterReuse && Files.exists(miniClusterBaseDir)) {
         log("mini cluster base directory exists, removing ...");
         try {
-          deleteDirectory(baseDir);
+          deleteDirectory(miniClusterBaseDir);
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
         createCollectionAndIndex = true;
-      } else if (Files.exists(baseDir)) {
+      } else if (Files.exists(miniClusterBaseDir)) {
         createCollectionAndIndex = false;
         deleteMiniCluster = false;
       }
 
       try {
         cluster =
-            new MiniSolrCloudCluster.Builder(nodeCount, baseDir)
+            new MiniSolrCloudCluster.Builder(nodeCount, miniClusterBaseDir)
                 .formatZkServer(false)
                 .addConfig("conf", Paths.get("src/resources/configs/cloud-minimal/conf"))
                 .configure();
       } catch (Exception e) {
-        if (Files.exists(baseDir)) {
+        if (Files.exists(miniClusterBaseDir)) {
           try {
-            deleteDirectory(baseDir);
+            deleteDirectory(miniClusterBaseDir);
           } catch (IOException ex) {
             e.addSuppressed(ex);
           }
@@ -242,8 +246,8 @@ public class MiniClusterState {
           cluster.waitForActiveCollection(
               collection, 15, TimeUnit.SECONDS, numShards, numShards * numReplicas);
         } catch (Exception e) {
-          if (Files.exists(baseDir)) {
-            deleteDirectory(baseDir);
+          if (Files.exists(miniClusterBaseDir)) {
+            deleteDirectory(miniClusterBaseDir);
           }
           throw e;
         }
