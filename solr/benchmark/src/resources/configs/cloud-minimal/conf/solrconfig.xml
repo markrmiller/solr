@@ -30,7 +30,7 @@
   <luceneMatchVersion>${tests.luceneMatchVersion:LATEST}</luceneMatchVersion>
 
   <indexConfig>
-    <mergePolicyFactory class="org.apache.solr.index.TieredMergePolicyFactory">
+    <mergePolicyFactory class="${solr.mergePolicyFactory:org.apache.solr.index.TieredMergePolicyFactory}">
       <int name="maxMergeAtOnce">${maxMergeAtOnce:10}</int>
       <int name="segmentsPerTier">${segmentsPerTier:10}</int>
       <double name="noCFSRatio">${noCFSRatio:.1}</double>

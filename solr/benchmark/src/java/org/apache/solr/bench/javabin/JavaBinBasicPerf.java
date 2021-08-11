@@ -27,7 +27,6 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.util.Utils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -52,6 +51,11 @@ import org.openjdk.jmh.annotations.Warmup;
 @Timeout(time = 60)
 /** A benchmark for basic JavaBin encode/decode performance . */
 public class JavaBinBasicPerf {
+
+  @State(Scope.Thread)
+  public static class ThreadState {
+    private BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS(1024 * 1024 * 24);
+  }
 
   @State(Scope.Benchmark)
   public static class BenchState {
@@ -152,8 +156,13 @@ public class JavaBinBasicPerf {
 
   @Benchmark
   @Timeout(time = 300)
-  public Object encode(BenchState state) throws Exception {
-    return Utils.toJavabin(state.response, 1024 * 1024 * 2);
+  public Object encode(BenchState state, ThreadState threadState) throws Exception {
+    try (final JavaBinCodec jbc = new JavaBinCodec()) {
+      jbc.marshal(state.response, threadState.baos);
+      return threadState.baos;
+    } finally {
+      threadState.baos.reset();
+    }
   }
 
   @Benchmark
