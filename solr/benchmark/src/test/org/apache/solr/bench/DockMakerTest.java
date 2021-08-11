@@ -75,7 +75,7 @@ public class DockMakerTest extends SolrTestCaseJ4 {
             .withMaxCardinality(500, random));
 
     for (int i = 0; i < 5; i++) {
-      SolrInputDocument doc = docMaker.getDocument(random);
+      SolrInputDocument doc = docMaker.getInputDocument(random);
       // System.out.println("doc:\n" + doc);
     }
   }
@@ -93,7 +93,7 @@ public class DockMakerTest extends SolrTestCaseJ4 {
 
     Set<String> values = new HashSet<>();
     for (int i = 0; i < 10; i++) {
-      SolrInputDocument doc = docMaker.getDocument(random);
+      SolrInputDocument doc = docMaker.getInputDocument(random);
       SolrInputField field = doc.getField("AlphaCard3");
       values.add(field.getValue().toString());
     }
@@ -113,7 +113,7 @@ public class DockMakerTest extends SolrTestCaseJ4 {
 
     HashSet<Object> values = new HashSet<>();
     for (int i = 0; i < 20; i++) {
-      SolrInputDocument doc = docMaker.getDocument(random);
+      SolrInputDocument doc = docMaker.getInputDocument(random);
       SolrInputField field = doc.getField("UnicodeCard3");
       // System.out.println("field=" + doc);
       values.add(field.getValue().toString());
@@ -135,7 +135,7 @@ public class DockMakerTest extends SolrTestCaseJ4 {
 
     HashSet<Object> values = new HashSet<>();
     for (int i = 0; i < 30; i++) {
-      SolrInputDocument doc = docMaker.getDocument(random);
+      SolrInputDocument doc = docMaker.getInputDocument(random);
       SolrInputField field = doc.getField("IntCard2");
       values.add(field.getValue().toString());
     }

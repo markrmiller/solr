@@ -74,6 +74,21 @@ public class MiniClusterState {
     }
   }
 
+  public static Long getRandomSeed() {
+    Long seed = Long.getLong("solr.bench.seed");
+
+    if (seed == null) {
+      seed = RANDOM_SEED;
+    }
+
+    log("benchmark random seed: " + seed);
+
+    // set the seed used by hard to reach places
+    System.setProperty("randomSeed", Long.toString(new Random(seed).nextLong()));
+
+    return seed;
+  }
+
   @State(Scope.Benchmark)
   public static class MiniClusterBenchState {
 
@@ -134,16 +149,7 @@ public class MiniClusterState {
       String s = currentRelativePath.toAbsolutePath().toString();
       log("current relative path is: " + s);
 
-      Long seed = Long.getLong("solr.bench.seed");
-
-      if (seed == null) {
-        seed = RANDOM_SEED;
-      }
-
-      log("benchmark random seed: " + seed);
-
-      // set the seed used by ThreadLocalRandom
-      System.setProperty("randomSeed", Long.toString(new Random(seed).nextLong()));
+      Long seed = getRandomSeed();
 
       this.random = new SplittableRandom(seed);
 
@@ -284,7 +290,7 @@ public class MiniClusterState {
                   UpdateRequest updateRequest = new UpdateRequest();
                   updateRequest.setBasePath(
                       nodes.get(threadRandom.nextInt(cluster.getJettySolrRunners().size())));
-                  SolrInputDocument doc = docMaker.getDocument(threadRandom);
+                  SolrInputDocument doc = docMaker.getInputDocument(threadRandom);
                   // log("add doc " + doc);
                   updateRequest.add(doc);
                   meter.mark();

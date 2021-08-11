@@ -32,6 +32,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.lucene.util.TestUtil;
+import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.SuppressForbidden;
@@ -73,7 +74,7 @@ public class DocMaker {
             @Override
             public void run() {
               try {
-                SolrInputDocument doc = DocMaker.this.getDocument(threadRandom);
+                SolrInputDocument doc = DocMaker.this.getInputDocument(threadRandom);
                 docs.add(doc);
               } catch (Exception e) {
                 executorService.shutdownNow();
@@ -103,8 +104,18 @@ public class DocMaker {
     return docs.iterator();
   }
 
-  public SolrInputDocument getDocument(SplittableRandom random) {
+  public SolrInputDocument getInputDocument(SplittableRandom random) {
     SolrInputDocument doc = new SolrInputDocument();
+
+    for (Map.Entry<String, FieldDef> entry : fields.entrySet()) {
+      doc.addField(entry.getKey(), getValue(entry.getValue(), random));
+    }
+
+    return doc;
+  }
+
+  public SolrDocument getDocument(SplittableRandom random) {
+    SolrDocument doc = new SolrDocument();
 
     for (Map.Entry<String, FieldDef> entry : fields.entrySet()) {
       doc.addField(entry.getKey(), getValue(entry.getValue(), random));
@@ -130,6 +141,14 @@ public class DocMaker {
         }
 
         return threadRandom.nextInt(Integer.MAX_VALUE);
+      case LONG:
+        if (fieldDef.getMaxCardinality() > 0) {
+          long start = fieldDef.getCardinalityStart();
+          long seed = nextLong(start, start + fieldDef.getMaxCardinality(), threadRandom.split());
+          return nextInt(0, Integer.MAX_VALUE, new SplittableRandom(seed));
+        }
+
+        return threadRandom.nextLong(Long.MAX_VALUE);
       case ALPHEBETIC:
         return getString(
             fieldDef, value -> getAlphabeticString(fieldDef, threadRandom), threadRandom);
@@ -246,7 +265,8 @@ public class DocMaker {
     UNICODE,
     ALPHEBETIC,
     INTEGER,
-    UNIQUE_INT
+    LONG,
+    UNIQUE_INT;
   }
 
   @Override

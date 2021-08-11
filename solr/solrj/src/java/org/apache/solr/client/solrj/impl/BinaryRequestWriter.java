@@ -88,6 +88,14 @@ public class BinaryRequestWriter extends RequestWriter {
    * A hack to get access to the protected internal buffer and avoid an additional copy
    */
   public static class BAOS extends ByteArrayOutputStream {
+    public BAOS(int size) {
+      super(size);
+    }
+
+    public BAOS() {
+      super(512);
+    }
+
     public byte[] getbuf() {
       return super.buf;
     }

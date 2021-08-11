@@ -173,8 +173,12 @@ public class Utils {
   }
 
   public static InputStream toJavabin(Object o) throws IOException {
+    return toJavabin(o, 32);
+  }
+
+  public static InputStream toJavabin(Object o, int size) throws IOException {
     try (final JavaBinCodec jbc = new JavaBinCodec()) {
-      BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS();
+      BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS(size);
       jbc.marshal(o, baos);
       return new ByteBufferInputStream(ByteBuffer.wrap(baos.getbuf(), 0, baos.size()));
     }
