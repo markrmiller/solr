@@ -4,14 +4,9 @@ import java.util.*;
 import java.util.logging.*;
 import java.util.stream.*;
 
-import org.apiguardian.api.*;
-
-import static org.apiguardian.api.API.Status.*;
-
 /**
  * A statistics report format to display collected statistics entries as a histogram
  */
-@API(status = EXPERIMENTAL, since = "1.3.0")
 public class Histogram {
 
 	private static final Logger LOG = Logger.getLogger(Histogram.class.getName());

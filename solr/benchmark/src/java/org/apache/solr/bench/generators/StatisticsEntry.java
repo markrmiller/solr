@@ -136,9 +136,12 @@ public class StatisticsEntry {
       // else
       return obj.toString();
     } catch (Throwable throwable) {
-      //  JqwikExceptionSupport.rethrowIfBlacklisted(throwable);
+      rethrowIfBlacklisted(throwable);
       return defaultToString(obj);
     }
+  }
+
+  private static void rethrowIfBlacklisted(Throwable throwable) {
   }
 
   private static String defaultToString(Object obj) {

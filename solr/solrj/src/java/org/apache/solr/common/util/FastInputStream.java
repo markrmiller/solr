@@ -41,7 +41,7 @@ public class FastInputStream extends DataInputInputStream {
   }
 
 
-  private FastInputStream(InputStream in, byte[] tempBuffer, int start, int end) {
+  public FastInputStream(InputStream in, byte[] tempBuffer, int start, int end) {
     this.in = in;
     this.buf = tempBuffer;
     this.pos = start;

@@ -45,6 +45,17 @@ public class StatisticsCollector {
     return this;
   }
 
+  public void printReport() {
+    // nocommit
+    // NumberRangeHistogram histogram =new NumberRangeHistogram();
+    Histogram histogram = new Histogram();
+    List<String> report = histogram.formatReport(statisticsEntries());
+
+    System.out.println("report:");
+
+    report.forEach(s -> System.out.println(s));
+  }
+
   private void updateCounts(List<Object> key) {
     int count = counts.computeIfAbsent(key, any -> 0);
     counts.put(key, ++count);

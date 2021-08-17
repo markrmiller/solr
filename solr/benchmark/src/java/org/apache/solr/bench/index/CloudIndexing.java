@@ -92,6 +92,7 @@ public class CloudIndexing {
       miniClusterState.shutdownMiniCluster();
     }
 
+    // nocommit
     public static void dumpHeap(String filePath, boolean live) throws IOException {
       MBeanServer server = ManagementFactory.getPlatformMBeanServer();
       HotSpotDiagnosticMXBean mxBean =
@@ -117,15 +118,15 @@ public class CloudIndexing {
           throws Exception {
         if (benchmarkParams.getBenchmark().endsWith("indexLargeDoc")) {
           largeDocMaker = docs().addField("id", integers().incrementing())
-              .addField("text", strings().multiString(512, strings().basicLatinAlphabet().ofLengthBetween(1, 64)))
-              .addField("text", strings().multiString(512, 1600, strings().basicLatinAlphabet().ofLengthBetween(1, 64))).addField("int1_i", integers().all())
+              .addField("text", strings().multi(512, strings().basicLatinAlphabet().ofLengthBetween(1, 64)))
+              .addField("text", strings().multi(512, 1600, strings().basicLatinAlphabet().ofLengthBetween(1, 64))).addField("int1_i", integers().all())
               .addField("int2_i", integers().all()).addField("int3_i", integers().all()).addField("long1_l", longs().all()).addField("long2_l", longs().all());
 
           largeDocMaker.preGenerateDocs(state.largeDocCount, miniClusterState.getRandom());
           largeDocIterator = largeDocMaker.getGeneratedDocsIterator();
         } else if (benchmarkParams.getBenchmark().endsWith("indexSmallDoc")) {
           smallDocMaker = docs().addField("id", integers().incrementing())
-              .addField("text", strings().multiString(2, strings().basicLatinAlphabet().ofLengthBetween(1, 32))).addField("int1_i", integers().all())
+              .addField("text", strings().multi(2, strings().basicLatinAlphabet().ofLengthBetween(1, 32))).addField("int1_i", integers().all())
               .addField("int2_i", integers().all()).addField("long1_l", longs().all());
 
           smallDocMaker.preGenerateDocs(state.smallDocCount, miniClusterState.getRandom());

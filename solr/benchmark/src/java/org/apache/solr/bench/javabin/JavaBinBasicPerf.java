@@ -47,7 +47,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Timeout;
 import org.openjdk.jmh.annotations.Warmup;
-import org.quicktheories.impl.BenchmarkRandomSource;
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -128,14 +127,16 @@ public class JavaBinBasicPerf {
       response.add("header", header);
 
       DocMaker docMaker = docs().addField("id", integers().incrementing())
-          .addField("facet_s", strings().maxCardinality(5, strings().basicLatinAlphabet().ofLengthBetween(1, 64), new BenchmarkRandomSource(random)))
-          .addField("facet2_s", strings().maxCardinality(100, strings().basicLatinAlphabet().ofLengthBetween(1, 16), new BenchmarkRandomSource(random)))
-          .addField("facet3_s", strings().maxCardinality(1200, strings().basicLatinAlphabet().ofLengthBetween(1, 128), new BenchmarkRandomSource(random)))
-          .addField("text", strings().multiString(800, 1500, strings().basicLatinAlphabet().ofLengthBetween(1, 800)))
-          .addField("text2_s", strings().multiString(500, 800, strings().basicLatinAlphabet().ofLengthBetween(1, 2500)))
-          .addField("text3_t", strings().multiString(500, 800, strings().basicLatinAlphabet().ofLengthBetween(1, 3500))).addField("int_i", integers().all())
-          .addField("long1_l", longs().all()).addField("long2_l", longs().all()).addField("long3_l", longs().all())
-          .addField("int2_i", integers().maxCardinality(500, integers().all(), new BenchmarkRandomSource(random)));
+          .addField("facet_s", strings().basicLatinAlphabet().maxCardinality(5).ofLengthBetween(1, 64))
+          .addField("facet2_s", strings().basicLatinAlphabet().maxCardinality(100).ofLengthBetween(1, 16))
+          .addField("facet3_s", strings().basicLatinAlphabet().maxCardinality(1200).ofLengthBetween(1, 128))
+          .addField("text", strings().multi(800, 1500, strings().basicLatinAlphabet().ofLengthBetween(1, 800)))
+          .addField("text2_s", strings().multi(500, 800, strings().basicLatinAlphabet().ofLengthBetween(1, 2500)))
+          .addField("text3_t", strings().multi(500, 800, strings().basicLatinAlphabet().ofLengthBetween(1, 3500)))
+          .addField("int_i", integers().all())
+          .addField("long1_l", longs().all())
+          .addField("long2_l", longs().all()).addField("long3_l", longs().all())
+          .addField("int2_i", integers().all(500));
 
       SolrDocumentList docList = new SolrDocumentList();
       for (int i = 0; i < docCount; i++) {
@@ -177,12 +178,7 @@ public class JavaBinBasicPerf {
 
   private static Object largeStringsContent(SplittableRandom random, int count) {
     DocMaker docMaker =
-        docs()
-            .addField(
-                "string_s",
-                strings()
-                    .multiString(
-                        3000, 5500, strings().basicLatinAlphabet().ofLengthBetween(2000, 2800)));
+        docs().addField("string_s", strings().multi(3000, 5500, strings().basicLatinAlphabet().ofLengthBetween(2000, 2800)));
 
     SolrDocumentList docList = new SolrDocumentList();
     for (int i = 0; i < count; i++) {
@@ -197,13 +193,7 @@ public class JavaBinBasicPerf {
   }
 
   private static Object manyTokenFieldContent(SplittableRandom random, int count) {
-    DocMaker docMaker =
-        docs()
-            .addField(
-                "string_s",
-                strings()
-                    .multiString(
-                        1000, 1500, strings().basicLatinAlphabet().ofLengthBetween(50, 100)));
+    DocMaker docMaker = docs().addField("string_s", strings().multi(1000, 1500, strings().basicLatinAlphabet().ofLengthBetween(50, 100)));
     SolrDocumentList docList = new SolrDocumentList();
     for (int i = 0; i < count; i++) {
       SolrDocument doc = docMaker.getDocument(random);

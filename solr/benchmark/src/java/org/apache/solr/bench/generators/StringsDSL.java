@@ -18,41 +18,20 @@ package org.apache.solr.bench.generators;
 
 import static org.apache.solr.bench.generators.SourceDSL.checkArguments;
 
-import java.util.List;
 import java.util.SplittableRandom;
 import org.quicktheories.core.Gen;
-import org.quicktheories.core.RandomnessSource;
 import org.quicktheories.generators.Generate;
 import org.quicktheories.impl.BenchmarkRandomSource;
 
 public class StringsDSL {
-
-  private static final boolean  TRACK = false;
 
   private static final int BASIC_LATIN_LAST_CODEPOINT = 0x007E;
   private static final int BASIC_LATIN_FIRST_CODEPOINT = 0x0020;
   private static final int ASCII_LAST_CODEPOINT = 0x007F;
   private static final int LARGEST_DEFINED_BMP_CODEPOINT = 65533;
 
-  static StatisticsCollector collector = new StatisticsCollector("Label");
-
-  private Gen<String> maybeTrack(Gen<String> gen) {
-    if (!TRACK) return gen;
-    return new TrackingGenerator<>(gen, collector);
-  }
-
-  public static void printReport() {
-    // NumberRangeHistogram histogram =new NumberRangeHistogram();
-    Histogram histogram = new Histogram();
-    List<String> report = histogram.formatReport(collector.statisticsEntries());
-
-    System.out.println("report:");
-
-    report.forEach(s -> System.out.println(s));
-  }
-
-  public Gen<String> multiString(int startInclusive, int endInclusive, Gen<String> strings) {
-    return maybeTrack(
+  public SolrGen<String> multi(int startInclusive, int endInclusive, Gen<String> strings) {
+    return  new SolrGen<>(
         Generate.range(startInclusive, endInclusive)
             .mutate(
                 (base, randomness) -> {
@@ -67,21 +46,8 @@ public class StringsDSL {
                 }));
   }
 
-  public Gen<String> multiString(int endInclusive, Gen<String> strings) {
-    return multiString(1, endInclusive, strings);
-  }
-
-  public Gen<String> maxCardinality(int max, Gen<String> strings, RandomnessSource random) {
-    return maybeTrack(
-        new Gen<>() {
-          int cardinalityStart = Generate.range(0, Integer.MAX_VALUE - max).generate(random);
-
-          @Override
-          public String generate(RandomnessSource in) {
-            long seed = Generate.range(cardinalityStart, cardinalityStart + max).generate(in);
-            return strings.generate(new BenchmarkRandomSource(new SplittableRandom(seed)));
-          }
-        });
+  public SolrGen<String> multi(int endInclusive, Gen<String> strings) {
+    return multi(1, endInclusive, strings);
   }
 
   /**
@@ -89,8 +55,8 @@ public class StringsDSL {
    *
    * @return a Source of type String
    */
-  public Gen<String> numeric() {
-    return maybeTrack(numericBetween(Integer.MIN_VALUE, Integer.MAX_VALUE));
+  public SolrGen<String> numeric() {
+    return new SolrGen<>(numericBetween(Integer.MIN_VALUE, Integer.MAX_VALUE));
   }
 
   /**
@@ -100,13 +66,13 @@ public class StringsDSL {
    * @param endInclusive - upper inclusive bound of integer domain
    * @return a Source of type String
    */
-  public Gen<String> numericBetween(int startInclusive, int endInclusive) {
+  public SolrGen<String> numericBetween(int startInclusive, int endInclusive) {
     checkArguments(
         startInclusive <= endInclusive,
         "There are no Integer values to be generated between startInclusive (%s) and endInclusive (%s)",
         startInclusive,
         endInclusive);
-    return maybeTrack(Strings.boundedNumericStrings(startInclusive, endInclusive));
+    return new SolrGen<>(Strings.boundedNumericStrings(startInclusive, endInclusive));
   }
 
   /**
@@ -173,6 +139,9 @@ public class StringsDSL {
     private final int minCodePoint;
     private final int maxCodePoint;
 
+    private Integer cardinalityStart;
+    private int maxCardinality;
+
     private StringGeneratorBuilder(int minCodePoint, int maxCodePoint) {
       this.minCodePoint = minCodePoint;
       this.maxCodePoint = maxCodePoint;
@@ -184,12 +153,12 @@ public class StringsDSL {
      * @param codePoints - the fixed number of code points for the String
      * @return a a Source of type String
      */
-    public Gen<String> ofFixedNumberOfCodePoints(int codePoints) {
+    public SolrGen<String> ofFixedNumberOfCodePoints(int codePoints) {
       checkArguments(
           codePoints >= 0,
           "The number of codepoints cannot be negative; %s is not an accepted argument",
           codePoints);
-      return Strings.withCodePoints(minCodePoint, maxCodePoint, Generate.constant(codePoints));
+      return new SolrGen<>(Strings.withCodePoints(minCodePoint, maxCodePoint, Generate.constant(codePoints)));
     }
 
     /**
@@ -198,8 +167,13 @@ public class StringsDSL {
      * @param fixedLength - the fixed length for the Strings
      * @return a Source of type String
      */
-    public Gen<String> ofLength(int fixedLength) {
+    public SolrGen<String> ofLength(int fixedLength) {
       return ofLengthBetween(fixedLength, fixedLength);
+    }
+
+    public StringGeneratorBuilder maxCardinality(int max) {
+      maxCardinality = max;
+      return this;
     }
 
     /**
@@ -209,7 +183,7 @@ public class StringsDSL {
      * @param maxLength - maximum inclusive length of String
      * @return a Source of type String
      */
-    public Gen<String> ofLengthBetween(int minLength, int maxLength) {
+    public SolrGen<String> ofLengthBetween(int minLength, int maxLength) {
       checkArguments(
           minLength <= maxLength,
           "The minLength (%s) is longer than the maxLength(%s)",
@@ -219,7 +193,20 @@ public class StringsDSL {
           minLength >= 0,
           "The length of a String cannot be negative; %s is not an accepted argument",
           minLength);
-      return Strings.ofBoundedLengthStrings(minCodePoint, maxCodePoint, minLength, maxLength);
+      Gen<String> strings = Strings.ofBoundedLengthStrings(minCodePoint, maxCodePoint, minLength, maxLength);
+
+      if (maxCardinality > 0) {
+        return new SolrGen<>(in -> {
+          if (cardinalityStart == null) {
+            cardinalityStart = Generate.range(0, Integer.MAX_VALUE - maxCardinality).generate(in);
+          }
+
+          long seed = Generate.range(cardinalityStart, cardinalityStart + maxCardinality).generate(in);
+          return strings.generate(new BenchmarkRandomSource(new SplittableRandom(seed)));
+        });
+      } else {
+        return new SolrGen<>(strings);
+      }
     }
   }
 }
