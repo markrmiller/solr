@@ -18,6 +18,7 @@ package org.apache.solr.handler.admin;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -40,12 +41,11 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.client.solrj.response.CollectionAdminResponse;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.cloud.SolrCloudTestCase;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.core.SolrCore;
-import org.apache.solr.search.SolrIndexSearcher;
-import org.apache.solr.util.RefCounted;
 import org.apache.solr.util.TimeOut;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -62,7 +62,7 @@ public class IndexSizeEstimatorTest extends SolrCloudTestCase {
   private static CloudSolrClient solrClient;
   private static String collection = IndexSizeEstimator.class.getSimpleName() + "_collection";
   private static int NUM_DOCS = 2000;
-  private static Set<String> fields;
+  private static volatile Set<String> fields;
 
   @BeforeClass
   public static void setupCluster() throws Exception {
@@ -74,16 +74,16 @@ public class IndexSizeEstimatorTest extends SolrCloudTestCase {
         .addConfig("conf", configset("cloud-dynamic"))
         .configure();
     solrClient = cluster.getSolrClient();
-    CollectionAdminRequest.createCollection(collection, "conf", 2, 2)
+    CollectionAdminRequest.createCollection(collection, "conf", 3, 2)
         .process(solrClient);
-    cluster.waitForActiveCollection(collection, 2, 4);
+    cluster.waitForActiveCollection(collection, 3, 6);
     SolrInputDocument lastDoc = addDocs(collection, NUM_DOCS);
     HashSet<String> docFields = new HashSet<>(lastDoc.keySet());
     docFields.add("_version_");
     docFields.add("_root_");
     docFields.add("point_0___double");
     docFields.add("point_1___double");
-    fields = docFields;
+    fields = Collections.unmodifiableSet(docFields);;
   }
 
   @AfterClass
@@ -96,61 +96,72 @@ public class IndexSizeEstimatorTest extends SolrCloudTestCase {
     JettySolrRunner jetty = cluster.getRandomJetty(random());
     String randomCoreName = jetty.getCoreContainer().getAllCoreNames().iterator().next();
     SolrCore core = jetty.getCoreContainer().getCore(randomCoreName);
-    RefCounted<SolrIndexSearcher> searcherRef = core.getSearcher();
-    try {
-      SolrIndexSearcher searcher = searcherRef.get();
-      // limit the max length
-      IndexSizeEstimator estimator = new IndexSizeEstimator(searcher.getRawReader(), 20, 50, true, true);
-      IndexSizeEstimator.Estimate estimate = estimator.estimate();
-      Map<String, Long> fieldsBySize = estimate.getFieldsBySize();
-      assertFalse("empty fieldsBySize", fieldsBySize.isEmpty());
-      assertEquals(fieldsBySize.toString(), fields.size(), fieldsBySize.size());
-      fieldsBySize.forEach((k, v) -> assertTrue("unexpected size of " + k + ": " + v, v > 0));
-      Map<String, Long> typesBySize = estimate.getTypesBySize();
-      assertFalse("empty typesBySize", typesBySize.isEmpty());
-      assertTrue("expected at least 8 types: " + typesBySize.toString(), typesBySize.size() >= 8);
-      typesBySize.forEach((k, v) -> assertTrue("unexpected size of " + k + ": " + v, v > 0));
-      Map<String, Object> summary = estimate.getSummary();
-      assertNotNull("summary", summary);
-      assertFalse("empty summary", summary.isEmpty());
-      assertEquals(summary.keySet().toString(), fields.size(), summary.keySet().size());
-      Map<String, Object> details = estimate.getDetails();
-      assertNotNull("details", details);
-      assertFalse("empty details", details.isEmpty());
-      // by type
-      assertEquals(details.keySet().toString(), 6, details.keySet().size());
 
-      // check sampling
-      estimator.setSamplingThreshold(searcher.getRawReader().maxDoc() / 2);
-      IndexSizeEstimator.Estimate sampledEstimate = estimator.estimate();
-      Map<String, Long> sampledFieldsBySize = sampledEstimate.getFieldsBySize();
-      assertFalse("empty fieldsBySize", sampledFieldsBySize.isEmpty());
-      // verify that the sampled values are within 50% of the original values
-      fieldsBySize.forEach((field, size) -> {
-        Long sampledSize = sampledFieldsBySize.get(field);
-        assertNotNull("sampled size for " + field + " is missing in " + sampledFieldsBySize, sampledSize);
-        double delta = (double) size * 0.5;
-        assertEquals("sampled size of " + field + " is wildly off", (double)size, (double)sampledSize, delta);
-      });
-      // verify the reader is still usable - SOLR-13694
-      IndexReader reader = searcher.getRawReader();
-      for (LeafReaderContext context : reader.leaves()) {
-        LeafReader leafReader = context.reader();
-        assertTrue("unexpected LeafReader class: " + leafReader.getClass().getName(), leafReader instanceof CodecReader);
-        Bits liveDocs = leafReader.getLiveDocs();
-        CodecReader codecReader = (CodecReader) leafReader;
-        StoredFieldsReader storedFieldsReader = codecReader.getFieldsReader();
-        StoredFieldVisitor visitor = new DocumentStoredFieldVisitor();
-        assertNotNull(storedFieldsReader);
-        for (int docId = 0; docId < leafReader.maxDoc(); docId++) {
-          if (liveDocs != null && !liveDocs.get(docId)) {
-            continue;
-          }
-          storedFieldsReader.visitDocument(docId, visitor);
+    try {
+      core.withSearcher(searcher -> {
+        // limit the max length
+        IndexSizeEstimator estimator = new IndexSizeEstimator(searcher.getRawReader(), 20, 20, true, true);
+        IndexSizeEstimator.Estimate estimate = null;
+        try {
+          estimate = estimator.estimate();
+        } catch (Exception e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
         }
-      }
+        Map<String, Long> fieldsBySize = estimate.getFieldsBySize();
+        assertFalse("empty fieldsBySize", fieldsBySize.isEmpty());
+        assertEquals(fieldsBySize.toString(), fields.size(), fieldsBySize.size());
+        fieldsBySize.forEach((k, v) -> assertTrue("unexpected size of " + k + ": " + v, v > 0));
+        Map<String, Long> typesBySize = estimate.getTypesBySize();
+        assertFalse("empty typesBySize", typesBySize.isEmpty());
+        assertTrue("expected at least 8 types: " + typesBySize.toString(), typesBySize.size() >= 8);
+        typesBySize.forEach((k, v) -> assertTrue("unexpected size of " + k + ": " + v, v > 0));
+        Map<String, Object> summary = estimate.getSummary();
+        assertNotNull("summary", summary);
+        assertFalse("empty summary", summary.isEmpty());
+        assertEquals(summary.keySet().toString(), fields.size(), summary.keySet().size());
+        Map<String, Object> details = estimate.getDetails();
+        assertNotNull("details", details);
+        assertFalse("empty details", details.isEmpty());
+        // by type
+        assertEquals(details.keySet().toString(), 6, details.keySet().size());
+
+        // check sampling
+        estimator.setSamplingThreshold(searcher.getRawReader().maxDoc() / 2);
+        IndexSizeEstimator.Estimate sampledEstimate = null;
+        try {
+          sampledEstimate = estimator.estimate();
+        } catch (Exception e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
+        }
+        Map<String, Long> sampledFieldsBySize = sampledEstimate.getFieldsBySize();
+        assertFalse("empty fieldsBySize", sampledFieldsBySize.isEmpty());
+        // verify that the sampled values are within 50% of the original values
+        fieldsBySize.forEach((field, size) -> {
+          Long sampledSize = sampledFieldsBySize.get(field);
+          assertNotNull("sampled size for " + field + " is missing in " + sampledFieldsBySize, sampledSize);
+          double delta = (double) size * 0.5;
+          assertEquals("sampled size of " + field + " is wildly off", (double) size, (double) sampledSize, delta);
+        });
+        // verify the reader is still usable - SOLR-13694
+        IndexReader reader = searcher.getRawReader();
+        for (LeafReaderContext context : reader.leaves()) {
+          LeafReader leafReader = context.reader();
+          assertTrue("unexpected LeafReader class: " + leafReader.getClass().getName(), leafReader instanceof CodecReader);
+          Bits liveDocs = leafReader.getLiveDocs();
+          CodecReader codecReader = (CodecReader) leafReader;
+          StoredFieldsReader storedFieldsReader = codecReader.getFieldsReader();
+          StoredFieldVisitor visitor = new DocumentStoredFieldVisitor();
+          assertNotNull(storedFieldsReader);
+          for (int docId = 0; docId < leafReader.maxDoc(); docId++) {
+            if (liveDocs != null && !liveDocs.get(docId)) {
+              continue;
+            }
+            storedFieldsReader.visitDocument(docId, visitor);
+          }
+        }
+        return null;
+      });
     } finally {
-      searcherRef.decref();
       core.close();
     }
   }

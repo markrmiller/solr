@@ -39,6 +39,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.util.ExecutorUtil;
+import org.apache.solr.common.util.IOUtils;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.eclipse.jetty.client.api.Response;
@@ -235,7 +236,6 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
                   break;
                 }
                 client.send(out, upd.getRequest(), upd.getCollection());
-                out.flush();
 
                 notifyQueueAndRunnersIfEmptyQueue();
                 upd = queue.poll(pollQueueTime, TimeUnit.MILLISECONDS);
@@ -301,7 +301,7 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
 
   private void consumeFully(InputStream is) {
     if (is != null) {
-      try (is) {
+      try {
         // make sure the stream is full read
         is.skip(is.available());
         while (is.read() != -1) {
@@ -310,6 +310,8 @@ public class ConcurrentUpdateHttp2SolrClient extends SolrClient {
         // nothing to do then
       } catch (IOException e) {
         // quiet
+      } finally {
+        IOUtils.closeQuietly(is);
       }
     }
   }

@@ -17,6 +17,7 @@
 package org.apache.solr.bench;
 
 import static org.apache.commons.io.file.PathUtils.deleteDirectory;
+import static org.apache.solr.bench.BaseBenchState.log;
 
 import com.codahale.metrics.Meter;
 import java.io.IOException;
@@ -26,7 +27,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.SplittableRandom;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -60,19 +60,8 @@ public class MiniClusterState {
 
   public static final boolean DEBUG_OUTPUT = false;
 
-  private static final long RANDOM_SEED = 6624420638116043983L;
-
   public static final int PROC_COUNT =
       ManagementFactory.getOperatingSystemMXBean().getAvailableProcessors();
-
-  private static boolean quietLog = Boolean.getBoolean("quietLog");
-
-  @SuppressForbidden(reason = "JMH uses std out for user output")
-  public static void log(String value) {
-    if (!quietLog) {
-      System.out.println((value.equals("") ? "" : "--> ") + value);
-    }
-  }
 
   @State(Scope.Benchmark)
   public static class MiniClusterBenchState {
@@ -89,11 +78,12 @@ public class MiniClusterState {
 
     boolean deleteMiniCluster = true;
 
-    Path baseDir;
+    private String workDir;
+
+    Path miniClusterBaseDir;
     boolean allowClusterReuse = false;
 
     boolean isWarmup;
-
     private SplittableRandom random;
 
     @TearDown(Level.Iteration)
@@ -102,7 +92,8 @@ public class MiniClusterState {
       // dump Solr metrics
       Path metricsResults =
           Paths.get(
-              "work/metrics-results",
+              workDir,
+              "metrics-results",
               benchmarkParams.id(),
               String.valueOf(runCnt++),
               benchmarkParams.getBenchmark() + ".txt");
@@ -127,49 +118,38 @@ public class MiniClusterState {
     }
 
     @Setup(Level.Trial)
-    public void doSetup(BenchmarkParams benchmarkParams) throws Exception {
+    public void doSetup(BenchmarkParams benchmarkParams, BaseBenchState baseBenchState)
+        throws Exception {
 
-      MiniClusterState.log("");
+      log("");
       Path currentRelativePath = Paths.get("");
       String s = currentRelativePath.toAbsolutePath().toString();
       log("current relative path is: " + s);
 
-      Long seed = Long.getLong("solr.bench.seed");
-
-      if (seed == null) {
-        seed = RANDOM_SEED;
-      }
-
-      log("benchmark random seed: " + seed);
-
-      // set the seed used by ThreadLocalRandom
-      System.setProperty("randomSeed", Long.toString(new Random(seed).nextLong()));
-
-      this.random = new SplittableRandom(seed);
-
       System.setProperty("pkiHandlerPrivateKeyPath", "");
       System.setProperty("pkiHandlerPublicKeyPath", "");
 
-      System.setProperty("solr.log.name", benchmarkParams.id());
-
       System.setProperty("solr.default.confdir", "../server/solr/configsets/_default");
 
+      this.random = baseBenchState.getRandom();
       // not currently usable, but would enable JettySolrRunner's ill-conceived jetty.testMode and
       // allow using SSL
 
       // System.getProperty("jetty.testMode", "true");
       // SolrCloudTestCase.sslConfig = SolrTestCaseJ4.buildSSLConfig();
 
+      workDir = System.getProperty("workBaseDir", "build/work");
+
       String baseDirSysProp = System.getProperty("miniClusterBaseDir");
       if (baseDirSysProp != null) {
         deleteMiniCluster = false;
-        baseDir = Paths.get(baseDirSysProp);
-        if (Files.exists(baseDir)) {
+        miniClusterBaseDir = Paths.get(baseDirSysProp);
+        if (Files.exists(miniClusterBaseDir)) {
           createCollectionAndIndex = false;
           allowClusterReuse = true;
         }
       } else {
-        baseDir = Paths.get("work/mini-cluster");
+        miniClusterBaseDir = Paths.get(workDir, "mini-cluster");
       }
 
       System.setProperty("metricsEnabled", String.valueOf(metricsEnabled));
@@ -180,31 +160,31 @@ public class MiniClusterState {
     }
 
     public void startMiniCluster(int nodeCount) {
-      log("starting mini cluster at base directory: " + baseDir.toAbsolutePath());
+      log("starting mini cluster at base directory: " + miniClusterBaseDir.toAbsolutePath());
 
-      if (!allowClusterReuse && Files.exists(baseDir)) {
+      if (!allowClusterReuse && Files.exists(miniClusterBaseDir)) {
         log("mini cluster base directory exists, removing ...");
         try {
-          deleteDirectory(baseDir);
+          deleteDirectory(miniClusterBaseDir);
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
         createCollectionAndIndex = true;
-      } else if (Files.exists(baseDir)) {
+      } else if (Files.exists(miniClusterBaseDir)) {
         createCollectionAndIndex = false;
         deleteMiniCluster = false;
       }
 
       try {
         cluster =
-            new MiniSolrCloudCluster.Builder(nodeCount, baseDir)
+            new MiniSolrCloudCluster.Builder(nodeCount, miniClusterBaseDir)
                 .formatZkServer(false)
                 .addConfig("conf", Paths.get("src/resources/configs/cloud-minimal/conf"))
                 .configure();
       } catch (Exception e) {
-        if (Files.exists(baseDir)) {
+        if (Files.exists(miniClusterBaseDir)) {
           try {
-            deleteDirectory(baseDir);
+            deleteDirectory(miniClusterBaseDir);
           } catch (IOException ex) {
             e.addSuppressed(ex);
           }
@@ -242,8 +222,8 @@ public class MiniClusterState {
           cluster.waitForActiveCollection(
               collection, 15, TimeUnit.SECONDS, numShards, numShards * numReplicas);
         } catch (Exception e) {
-          if (Files.exists(baseDir)) {
-            deleteDirectory(baseDir);
+          if (Files.exists(miniClusterBaseDir)) {
+            deleteDirectory(miniClusterBaseDir);
           }
           throw e;
         }
@@ -284,7 +264,7 @@ public class MiniClusterState {
                   UpdateRequest updateRequest = new UpdateRequest();
                   updateRequest.setBasePath(
                       nodes.get(threadRandom.nextInt(cluster.getJettySolrRunners().size())));
-                  SolrInputDocument doc = docMaker.getDocument(threadRandom);
+                  SolrInputDocument doc = docMaker.getInputDocument(threadRandom);
                   // log("add doc " + doc);
                   updateRequest.add(doc);
                   meter.mark();
@@ -325,11 +305,11 @@ public class MiniClusterState {
 
       NamedList<Object> result = client.request(queryRequest, collection);
 
-      if (DEBUG_OUTPUT) MiniClusterState.log("result: " + result);
+      if (DEBUG_OUTPUT) log("result: " + result);
 
-      MiniClusterState.log("");
+      log("");
 
-      MiniClusterState.log("Dump Core Info");
+      log("Dump Core Info");
       dumpCoreInfo();
     }
 
@@ -358,7 +338,7 @@ public class MiniClusterState {
 
     @SuppressForbidden(reason = "JMH uses std out for user output")
     public void dumpCoreInfo() throws IOException {
-      cluster.dumpCoreInfo(!quietLog ? System.out : new NullPrintStream());
+      cluster.dumpCoreInfo(!BaseBenchState.quietLog ? System.out : new NullPrintStream());
     }
   }
 

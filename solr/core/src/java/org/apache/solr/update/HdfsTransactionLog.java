@@ -632,6 +632,16 @@ class FSDataFastInputStream extends FastInputStream {
     return fis.read(readFromStream, target, offset, len);
   }
 
+  @Override
+  public void refill() throws IOException {
+    // this will set end to -1 at EOF
+
+    end = fis.read(readFromStream, buf, 0, buf.length);
+
+    if (end > 0) readFromStream += end;
+    pos = 0;
+  }
+
   public void seek(long position) throws IOException {
     if (position <= readFromStream && position >= getBufferPos()) {
       // seek within buffer

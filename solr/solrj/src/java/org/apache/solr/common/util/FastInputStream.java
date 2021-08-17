@@ -32,17 +32,22 @@ public class FastInputStream extends DataInputInputStream {
   protected long readFromStream; // number of bytes read from the underlying inputstream
 
   public FastInputStream(InputStream in) {
-  // use default BUFSIZE of BufferedOutputStream so if we wrap that
-  // it won't cause double buffering.
-    this(in, new byte[8192], 0, 0);
+    // Jetty uses 16384 or 32768 by default
+    this(in, new byte[16384], 0, 0);
   }
 
-  public FastInputStream(InputStream in, byte[] tempBuffer, int start, int end) {
+  public FastInputStream(InputStream in, byte[] buf) {
+    this(in, buf, 0, buf.length);
+  }
+
+
+  private FastInputStream(InputStream in, byte[] tempBuffer, int start, int end) {
     this.in = in;
     this.buf = tempBuffer;
     this.pos = start;
     this.end = end;
   }
+
 
   @Override
   boolean readDirectUtf8(ByteArrayUtf8CharSequence utf8, int len) {
@@ -96,8 +101,16 @@ public class FastInputStream extends DataInputInputStream {
 
   public void refill() throws IOException {
     // this will set end to -1 at EOF
-    end = readWrappedStream(buf, 0, buf.length);
+    if(in == null)  {
+      end = -1;
+    } else {
+      end =  in.read(buf, 0, buf.length);
+    }
+
+    if (end > 0) {
+      readFromStream += end;
     if (end > 0) readFromStream += end;
+    }
     pos = 0;
   }
 

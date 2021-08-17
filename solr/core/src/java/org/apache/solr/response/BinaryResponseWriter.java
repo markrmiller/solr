@@ -58,13 +58,13 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
     Resolver resolver = new Resolver(req, response.getReturnFields());
     if (req.getParams().getBool(CommonParams.OMIT_HEADER, false)) response.removeResponseHeader();
     try (JavaBinCodec jbc = new JavaBinCodec(resolver)) {
-      jbc.setWritableDocFields(resolver).marshal(response.getValues(), out);
+      jbc.setWritableDocFields(resolver).marshal(response.getValues(), out, true);
     }
   }
 
   private static void serialize(SolrQueryResponse response,Resolver resolver, String f) throws IOException {
     try (JavaBinCodec jbc = new JavaBinCodec(resolver); FileOutputStream fos = new FileOutputStream(f)) {
-      jbc.setWritableDocFields(resolver).marshal(response.getValues(), fos);
+      jbc.setWritableDocFields(resolver).marshal(response.getValues(), fos, true);
       fos.flush();
     }
 
@@ -195,9 +195,9 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
       }
       Resolver resolver = new Resolver(req, rsp.getReturnFields());
 
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      ByteArrayOutputStream out = new ByteArrayOutputStream(16384);
       try (JavaBinCodec jbc = new JavaBinCodec(resolver)) {
-        jbc.setWritableDocFields(resolver).marshal(rsp.getValues(), out);
+        jbc.setWritableDocFields(resolver).marshal(rsp.getValues(), out, true);
       }
 
       InputStream in = out.toInputStream();

@@ -80,7 +80,7 @@ public class MultiContentWriterRequest extends AbstractUpdateRequest {
               throw new RuntimeException("payload value must be byte[] or ByteBuffer");
             }
           }
-        }, os);
+        }, os, true);
       }
 
       @Override
@@ -118,7 +118,7 @@ public class MultiContentWriterRequest extends AbstractUpdateRequest {
   }
 
   public static ByteBuffer readByteBuffer(InputStream is) throws IOException {
-    BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS();
+    BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS(4096);
     org.apache.commons.io.IOUtils.copy(is, baos);
     return ByteBuffer.wrap(baos.getbuf(), 0, baos.size());
   }

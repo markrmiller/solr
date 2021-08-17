@@ -16,25 +16,27 @@
  */
 package org.apache.solr.bench;
 
+import static org.apache.solr.bench.BaseBenchState.log;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
-import java.util.Random;
 import java.util.SplittableRandom;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.lucene.util.RamUsageEstimator;
-import org.apache.lucene.util.TestUtil;
+import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
 import org.apache.solr.common.util.SuppressForbidden;
+import org.quicktheories.core.Gen;
+import org.quicktheories.impl.BenchmarkRandomSource;
 
 /**
  * A tool to generate controlled random data for a benchmark. {@link SolrInputDocument}s are created
@@ -48,17 +50,21 @@ public class DocMaker {
 
   private Queue<SolrInputDocument> docs = new ConcurrentLinkedQueue<>();
 
-  private final Map<String, FieldDef> fields = new HashMap<>();
+  private final Map<String, Gen<?>> fields = new HashMap<>();
 
   private static final AtomicInteger ID = new AtomicInteger();
 
   private ExecutorService executorService;
 
-  public DocMaker() {}
+  public static DocMaker docs() {
+    return new DocMaker();
+  }
+
+  private DocMaker() {}
 
   @SuppressForbidden(reason = "This module does not need to deal with logging context")
   public void preGenerateDocs(int numDocs, SplittableRandom random) throws InterruptedException {
-    MiniClusterState.log("preGenerateDocs " + numDocs + " ...");
+    log("preGenerateDocs " + numDocs + " ...");
     docs.clear();
     executorService =
         Executors.newFixedThreadPool(
@@ -73,7 +79,7 @@ public class DocMaker {
             @Override
             public void run() {
               try {
-                SolrInputDocument doc = DocMaker.this.getDocument(threadRandom);
+                SolrInputDocument doc = DocMaker.this.getInputDocument(threadRandom);
                 docs.add(doc);
               } catch (Exception e) {
                 executorService.shutdownNow();
@@ -88,7 +94,7 @@ public class DocMaker {
     if (!result) {
       throw new RuntimeException("Timeout waiting for doc adds to finish");
     }
-    MiniClusterState.log(
+    log(
         "done preGenerateDocs docs="
             + docs.size()
             + " ram="
@@ -103,150 +109,38 @@ public class DocMaker {
     return docs.iterator();
   }
 
-  public SolrInputDocument getDocument(SplittableRandom random) {
+  public SolrInputDocument getInputDocument(SplittableRandom random) {
     SolrInputDocument doc = new SolrInputDocument();
 
-    for (Map.Entry<String, FieldDef> entry : fields.entrySet()) {
-      doc.addField(entry.getKey(), getValue(entry.getValue(), random));
+    for (Map.Entry<String, Gen<?>> entry : fields.entrySet()) {
+      doc.addField(entry.getKey(), entry.getValue().generate(new BenchmarkRandomSource(random)));
     }
 
     return doc;
   }
 
-  public void addField(String name, FieldDef.FieldDefBuilder builder) {
-    fields.put(name, builder.build());
-  }
+  public SolrDocument getDocument(SplittableRandom random) {
+    SolrDocument doc = new SolrDocument();
 
-  private Object getValue(FieldDef fieldDef, SplittableRandom threadRandom) {
-
-    switch (fieldDef.getContent()) {
-      case UNIQUE_INT:
-        return ID.incrementAndGet();
-      case INTEGER:
-        if (fieldDef.getMaxCardinality() > 0) {
-          long start = fieldDef.getCardinalityStart();
-          long seed = nextLong(start, start + fieldDef.getMaxCardinality(), threadRandom.split());
-          return nextInt(0, Integer.MAX_VALUE, new SplittableRandom(seed));
-        }
-
-        return threadRandom.nextInt(Integer.MAX_VALUE);
-      case ALPHEBETIC:
-        return getString(
-            fieldDef, value -> getAlphabeticString(fieldDef, threadRandom), threadRandom);
-      case UNICODE:
-        return getString(fieldDef, value -> getUnicodeString(fieldDef, threadRandom), threadRandom);
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported content type type=" + fieldDef.getContent());
+    for (Map.Entry<String, Gen<?>> entry : fields.entrySet()) {
+      doc.addField(entry.getKey(), entry.getValue().generate(new BenchmarkRandomSource(random)));
     }
+
+    return doc;
   }
 
-  private String getString(
-      FieldDef fieldDef, StringSupplier supplier, SplittableRandom threadRandom) {
-    if (fieldDef.getNumTokens() > 1 || fieldDef.getMaxNumTokens() > 1) {
-      StringBuilder sb =
-          new StringBuilder(
-              fieldDef.getNumTokens()
-                  * (Math.max(fieldDef.getLength(), fieldDef.getMaxLength()) + 1));
-      SplittableRandom random = threadRandom.split();
-      for (int i = 0;
-          i
-              < (fieldDef.getMaxNumTokens() > 1
-                  ? random.nextInt(1, fieldDef.getMaxNumTokens())
-                  : fieldDef.getNumTokens());
-          i++) {
-        if (i > 0) {
-          sb.append(' ');
-        }
-        sb.append(supplier.getString(fieldDef));
-      }
-      return sb.toString();
-    }
-    return supplier.getString(fieldDef);
+  public DocMaker addField(String name, Gen<?> generator) {
+    fields.put(name, generator);
+    return this;
   }
 
-  private String getUnicodeString(FieldDef fieldDef, SplittableRandom threadRandom) {
-    try {
-      if (fieldDef.getMaxCardinality() > 0) {
-        long start = fieldDef.getCardinalityStart();
-        long seed = nextLong(start, start + fieldDef.getMaxCardinality(), threadRandom.split());
-        if (fieldDef.getLength() > -1) {
-          return TestUtil.randomRealisticUnicodeString(
-              new Random(seed), fieldDef.getLength(), fieldDef.getLength());
-        } else {
-          return TestUtil.randomRealisticUnicodeString(
-              new Random(seed), 1, fieldDef.getMaxLength());
-        }
-      }
-
-      if (fieldDef.getLength() > -1) {
-        return TestUtil.randomRealisticUnicodeString(
-            new Random(threadRandom.nextLong()), fieldDef.getLength(), fieldDef.getLength());
-      } else {
-        return TestUtil.randomRealisticUnicodeString(
-            new Random(threadRandom.nextLong()), 1, fieldDef.getMaxLength());
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("Failed getting UnicodeString with FieldDef=" + fieldDef, e);
-    }
-  }
-
-  private String getAlphabeticString(FieldDef fieldDef, SplittableRandom threadRandom) {
-    try {
-      if (fieldDef.getMaxCardinality() > 0) {
-        long start = fieldDef.getCardinalityStart();
-        long seed = nextLong(start, start + fieldDef.getMaxCardinality(), threadRandom.split());
-        SplittableRandom random = new SplittableRandom(seed);
-        if (fieldDef.getLength() > -1) {
-          return RandomStringUtils.random(
-              nextInt(fieldDef.getLength(), fieldDef.getLength(), random),
-              0,
-              0,
-              true,
-              false,
-              null,
-              new Random(seed));
-        } else {
-          return RandomStringUtils.random(
-              nextInt(1, fieldDef.getMaxLength(), random),
-              0,
-              0,
-              true,
-              false,
-              null,
-              new Random(seed));
-        }
-      }
-
-      SplittableRandom random = threadRandom.split();
-      Random r = new Random(random.nextLong());
-      if (fieldDef.getLength() > -1) {
-        return RandomStringUtils.random(
-            nextInt(fieldDef.getLength(), fieldDef.getLength(), random),
-            0,
-            0,
-            true,
-            false,
-            null,
-            r);
-      } else {
-        return RandomStringUtils.random(
-            nextInt(1, fieldDef.getMaxLength(), random), 0, 0, true, false, null, r);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("Failed getting AlphabeticString with FieldDef=" + fieldDef, e);
-    }
-  }
+  //  public DocMaker addField(String name, FieldDef.FieldDefBuilder fieldDef) {
+  //    fields.put(name, new FieldDefValueGenerator(fieldDef.build()));
+  //    return this;
+  //  }
 
   public void clear() {
     docs.clear();
-  }
-
-  public enum Content {
-    UNICODE,
-    ALPHEBETIC,
-    INTEGER,
-    UNIQUE_INT
   }
 
   @Override
@@ -291,9 +185,5 @@ public class DocMaker {
     }
 
     return startInclusive + random.nextLong(endExclusive - startInclusive);
-  }
-
-  private interface StringSupplier {
-    String getString(FieldDef value);
   }
 }

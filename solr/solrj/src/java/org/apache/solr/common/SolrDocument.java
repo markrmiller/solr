@@ -46,7 +46,8 @@ public class SolrDocument extends SolrDocumentBase<Object, SolrDocument> impleme
   protected final Map<String,Object> _fields;
   
   private List<SolrDocument> _childDocuments;
-  
+  private MyEntryWriter entryWriter;
+
   public SolrDocument()
   {
     _fields = new LinkedHashMap<>();
@@ -56,6 +57,23 @@ public class SolrDocument extends SolrDocumentBase<Object, SolrDocument> impleme
   public void writeMap(EntryWriter ew) throws IOException {
     _fields.forEach(ew.getBiConsumer());
   }
+
+  @Override
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public Map<String,Object> toMap(Map<String, Object> map) {
+    if (entryWriter == null) {
+      entryWriter = new MyEntryWriter(map);
+    } else {
+      entryWriter.setMap(map);
+    }
+    try {
+      writeMap(entryWriter);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return map;
+  }
+
 
   public SolrDocument(Map<String, Object> fields) {
     this._fields = fields;

@@ -16,11 +16,18 @@
  */
 package org.apache.solr.bench.index;
 
+import static org.apache.solr.bench.DocMaker.docs;
+import static org.apache.solr.bench.generators.SourceDSL.integers;
+import static org.apache.solr.bench.generators.SourceDSL.longs;
+import static org.apache.solr.bench.generators.SourceDSL.strings;
+
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Iterator;
-import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
+import javax.management.MBeanServer;
 import org.apache.solr.bench.DocMaker;
-import org.apache.solr.bench.FieldDef;
 import org.apache.solr.bench.MiniClusterState;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrInputDocument;
@@ -39,12 +46,13 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Timeout;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.BenchmarkParams;
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Threads(6)
-@Warmup(time = 3, iterations = 5)
-@Measurement(time = 15, iterations = 5)
+@Threads(4)
+@Warmup(time = 15, iterations = 5)
+@Measurement(time = 25, iterations = 5)
 @Fork(value = 1)
 @Timeout(time = 60)
 /** A benchmark to experiment with the performance of distributed indexing. */
@@ -61,24 +69,35 @@ public class CloudIndexing {
     @Param("5")
     int numShards;
 
-    @Param({"1", "3", "9"})
+    @Param({"1", "3"})
     int numReplicas;
 
     @Param({"100000"})
-    public int docCount;
+    public int smallDocCount;
+
+    @Param({"50000"})
+    public int largeDocCount;
 
     @Setup(Level.Iteration)
     public void doSetup(MiniClusterState.MiniClusterBenchState miniClusterState) throws Exception {
-
+      System.setProperty("solr.mergePolicyFactory", "org.apache.solr.index.NoMergePolicyFactory");
       miniClusterState.startMiniCluster(nodeCount);
-
       miniClusterState.createCollection(collection, numShards, numReplicas);
     }
 
     @TearDown(Level.Iteration)
     public void doTearDown(MiniClusterState.MiniClusterBenchState miniClusterState)
         throws Exception {
+      // dumpHeap("/home/markmiller/heap-" + System.nanoTime() + ".hprof", false);
       miniClusterState.shutdownMiniCluster();
+    }
+
+    public static void dumpHeap(String filePath, boolean live) throws IOException {
+      MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+      HotSpotDiagnosticMXBean mxBean =
+          ManagementFactory.newPlatformMXBeanProxy(
+              server, "com.sun.management:type=HotSpotDiagnostic", HotSpotDiagnosticMXBean.class);
+      mxBean.dumpHeap(filePath, live);
     }
 
     @State(Scope.Thread)
@@ -90,41 +109,28 @@ public class CloudIndexing {
       private DocMaker smallDocMaker;
       private Iterator<SolrInputDocument> smallDocIterator;
 
-      private SplittableRandom random;
-
       @Setup(Level.Trial)
-      public void setupDoc(BenchState state) throws Exception {
-        Long seed = Long.getLong("randomSeed");
+      public void setupDoc(
+          BenchmarkParams benchmarkParams,
+          BenchState state,
+          MiniClusterState.MiniClusterBenchState miniClusterState)
+          throws Exception {
+        if (benchmarkParams.getBenchmark().endsWith("indexLargeDoc")) {
+          largeDocMaker = docs().addField("id", integers().incrementing())
+              .addField("text", strings().multiString(512, strings().basicLatinAlphabet().ofLengthBetween(1, 64)))
+              .addField("text", strings().multiString(512, 1600, strings().basicLatinAlphabet().ofLengthBetween(1, 64))).addField("int1_i", integers().all())
+              .addField("int2_i", integers().all()).addField("int3_i", integers().all()).addField("long1_l", longs().all()).addField("long2_l", longs().all());
 
-        random = new SplittableRandom(seed);
+          largeDocMaker.preGenerateDocs(state.largeDocCount, miniClusterState.getRandom());
+          largeDocIterator = largeDocMaker.getGeneratedDocsIterator();
+        } else if (benchmarkParams.getBenchmark().endsWith("indexSmallDoc")) {
+          smallDocMaker = docs().addField("id", integers().incrementing())
+              .addField("text", strings().multiString(2, strings().basicLatinAlphabet().ofLengthBetween(1, 32))).addField("int1_i", integers().all())
+              .addField("int2_i", integers().all()).addField("long1_l", longs().all());
 
-        largeDocMaker = new DocMaker();
-        largeDocMaker.addField(
-            "id", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMaker.Content.UNIQUE_INT));
-        largeDocMaker.addField(
-            "text",
-            FieldDef.FieldDefBuilder.aFieldDef()
-                .withContent(DocMaker.Content.ALPHEBETIC)
-                .withMaxLength(64)
-                .withTokenCount(random.nextInt(350, 512)));
-
-        largeDocMaker.preGenerateDocs(state.docCount, random);
-
-        largeDocIterator = largeDocMaker.getGeneratedDocsIterator();
-
-        smallDocMaker = new DocMaker();
-        smallDocMaker.addField(
-            "id", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMaker.Content.UNIQUE_INT));
-        smallDocMaker.addField(
-            "text",
-            FieldDef.FieldDefBuilder.aFieldDef()
-                .withContent(DocMaker.Content.ALPHEBETIC)
-                .withMaxLength(32)
-                .withTokenCount(1));
-
-        smallDocMaker.preGenerateDocs(state.docCount, random);
-
-        smallDocIterator = smallDocMaker.getGeneratedDocsIterator();
+          smallDocMaker.preGenerateDocs(state.smallDocCount, miniClusterState.getRandom());
+          smallDocIterator = smallDocMaker.getGeneratedDocsIterator();
+        }
       }
 
       public SolrInputDocument getLargeDoc() {
@@ -151,9 +157,9 @@ public class CloudIndexing {
       BenchState.Docs docState)
       throws Exception {
     UpdateRequest updateRequest = new UpdateRequest();
-    updateRequest.setBasePath(miniClusterState.nodes.get(docState.random.nextInt(state.nodeCount)));
+    updateRequest.setBasePath(
+        miniClusterState.nodes.get(miniClusterState.getRandom().nextInt(state.nodeCount)));
     SolrInputDocument doc = docState.getLargeDoc();
-
     updateRequest.add(doc);
 
     return miniClusterState.client.request(updateRequest, state.collection);
@@ -167,9 +173,9 @@ public class CloudIndexing {
       BenchState.Docs docState)
       throws Exception {
     UpdateRequest updateRequest = new UpdateRequest();
-    updateRequest.setBasePath(miniClusterState.nodes.get(docState.random.nextInt(state.nodeCount)));
+    updateRequest.setBasePath(
+        miniClusterState.nodes.get(miniClusterState.getRandom().nextInt(state.nodeCount)));
     SolrInputDocument doc = docState.getSmallDoc();
-
     updateRequest.add(doc);
 
     return miniClusterState.client.request(updateRequest, state.collection);

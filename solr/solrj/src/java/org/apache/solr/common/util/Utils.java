@@ -16,6 +16,7 @@
  */
 package org.apache.solr.common.util;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -78,7 +79,6 @@ import org.apache.solr.common.cloud.ZkOperation;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.server.ByteBufferInputStream;
 import org.noggit.CharArr;
 import org.noggit.JSONParser;
 import org.noggit.JSONWriter;
@@ -173,10 +173,14 @@ public class Utils {
   }
 
   public static InputStream toJavabin(Object o) throws IOException {
+    return toJavabin(o, 4096);
+  }
+
+  public static InputStream toJavabin(Object o, int size) throws IOException {
     try (final JavaBinCodec jbc = new JavaBinCodec()) {
-      BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS();
-      jbc.marshal(o, baos);
-      return new ByteBufferInputStream(ByteBuffer.wrap(baos.getbuf(), 0, baos.size()));
+      BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS(size);
+      jbc.marshal(o, baos, true);
+      return new ByteArrayInputStream(baos.getbuf(), 0, baos.size());
     }
   }
   

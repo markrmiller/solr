@@ -154,7 +154,8 @@ public class TransactionLog implements Closeable {
         daos.writeLong(uuid.getLeastSignificantBits());
         return true;
       }
-      return super.writePrimitive(val);
+      if (super.writePrimitive(val)) return true;
+      return super.writeLessCommonPrimitive(val);
     }
   }
 
@@ -899,6 +900,17 @@ public class TransactionLog implements Closeable {
       ByteBuffer bb = ByteBuffer.wrap(target, offset, len);
       int ret = ch.read(bb, readFromStream);
       return ret;
+    }
+
+    @Override
+    public void refill() throws IOException {
+      // this will set end to -1 at EOF
+
+      ByteBuffer bb = ByteBuffer.wrap(buf, 0, buf.length);
+      end = ch.read(bb, readFromStream);
+
+      if (end > 0) readFromStream += end;
+      pos = 0;
     }
 
     public void seek(long position) throws IOException {

@@ -17,6 +17,7 @@
 
 package org.apache.solr.handler.export;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -75,6 +76,7 @@ import org.apache.solr.schema.StrField;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.SyntaxError;
+import org.eclipse.jetty.server.HttpOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,7 +187,7 @@ public class ExportWriter implements SolrCore.RawWriter, Closeable {
     QueryResponseWriter rw = req.getCore().getResponseWriters().get(wt);
     if (rw instanceof BinaryResponseWriter) {
       //todo add support for other writers after testing
-      writer = new JavaBinCodec(os, null);
+      writer = new JavaBinCodec(os, null, os instanceof HttpOutput || os instanceof ByteArrayOutputStream);
     } else {
       respWriter = new OutputStreamWriter(os, StandardCharsets.UTF_8);
       writer = JSONResponseWriter.getPushWriter(respWriter, req, res);

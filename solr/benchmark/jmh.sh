@@ -51,8 +51,10 @@ echo "running JMH with args: $@"
 
 # -XX:-UseBiasedLocking - should be unreflective in recent JVMs and removed in the latest.
 
-jvmArgs="-jvmArgs -Djmh.shutdownTimeout=5 -jvmArgs -Djmh.separateClassLoader=true -jvmArgs -XX:-UseBiasedLocking -jvmArgs -XX:+UnlockDiagnosticVMOptions -jvmArgs -XX:+DebugNonSafepoints -jvmArgs --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+jvmArgs="-jvmArgs -Djmh.shutdownTimeout=5 -jvmArgs -XX:-UseBiasedLocking -jvmArgs -XX:+UnlockDiagnosticVMOptions -jvmArgs -XX:+DebugNonSafepoints -jvmArgs --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
 gcArgs="-jvmArgs -XX:+UseG1GC -jvmArgs -XX:+ParallelRefProcEnabled"
+
+# -jvmArgs -Dlog4j2.debug 
 loggingArgs="-jvmArgs -Dlog4jConfigurationFile=./log4j2.xml -jvmArgs -Dlog4j2.is.webapp=false -jvmArgs -Dlog4j2.garbagefreeThreadContextMap=true -jvmArgs -Dlog4j2.enableDirectEncoders=true -jvmArgs -Dlog4j2.enable.threadlocals=true"
 
 logDir="work/solr-logs"

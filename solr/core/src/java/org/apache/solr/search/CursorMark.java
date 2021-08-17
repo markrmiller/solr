@@ -263,7 +263,7 @@ public final class CursorMark {
     // could help provide more validation beyond just the number of clauses.
 
     try (JavaBinCodec jbc = new JavaBinCodec(); ByteArrayOutputStream out = new ByteArrayOutputStream(256)) {
-      jbc.marshal(marshalledValues, out);
+      jbc.marshal(marshalledValues, out, true);
       byte[] rawData = out.toByteArray();
       return Base64.byteArrayToBase64(rawData, 0, rawData.length);
     } catch (Exception ex) {

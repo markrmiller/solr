@@ -16,10 +16,13 @@
  */
 package org.apache.solr.bench.search;
 
+import static org.apache.solr.bench.DocMaker.docs;
+import static org.apache.solr.bench.generators.SourceDSL.integers;
+import static org.apache.solr.bench.generators.SourceDSL.strings;
+
 import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.solr.bench.DocMaker;
-import org.apache.solr.bench.FieldDef;
 import org.apache.solr.bench.MiniClusterState;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -39,6 +42,7 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Timeout;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.BenchmarkParams;
+import org.quicktheories.impl.BenchmarkRandomSource;
 
 /** A benchmark to experiment with the performance of json faceting. */
 @BenchmarkMode(Mode.Throughput)
@@ -105,50 +109,51 @@ public class JsonFaceting {
       miniClusterState.createCollection(collection, numShards, numReplicas);
 
       // Define random documents
-      DocMaker docMaker = new DocMaker();
-      docMaker.addField(
-          "id", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMaker.Content.UNIQUE_INT));
-      docMaker.addField(
-          "facet_s",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.ALPHEBETIC)
-              .withMaxLength(64)
-              .withMaxCardinality(facetCard, random));
-      docMaker.addField(
-          "facet2_s",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.ALPHEBETIC)
-              .withMaxLength(16)
-              .withMaxCardinality(facetCard, random));
-      docMaker.addField(
-          "facet3_s",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.UNICODE)
-              .withMaxLength(128)
-              .withMaxCardinality(facetCard2, random));
-      docMaker.addField(
-          "text",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.ALPHEBETIC)
-              .withMaxLength(64)
-              .withTokenCount(random.nextInt(350, 512)));
-      docMaker.addField(
-          "int_i", FieldDef.FieldDefBuilder.aFieldDef().withContent(DocMaker.Content.INTEGER));
-      docMaker.addField(
-          "int2_i",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.INTEGER)
-              .withMaxCardinality(facetCard2, random));
-      docMaker.addField(
-          "int3_i",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.INTEGER)
-              .withMaxCardinality(facetCard2, random));
-      docMaker.addField(
-          "int4_i",
-          FieldDef.FieldDefBuilder.aFieldDef()
-              .withContent(DocMaker.Content.INTEGER)
-              .withMaxCardinality(facetCard2, random));
+      DocMaker docMaker =
+          docs()
+              .addField("id", integers().incrementing())
+              .addField(
+                  "facet_s",
+                  strings()
+                      .maxCardinality(
+                          facetCard,
+                          strings().basicLatinAlphabet().ofLengthBetween(1, 64),
+                          new BenchmarkRandomSource(random)))
+              .addField(
+                  "facet2_s",
+                  strings()
+                      .maxCardinality(
+                          facetCard,
+                          strings().basicLatinAlphabet().ofLengthBetween(1, 16),
+                          new BenchmarkRandomSource(random)))
+              .addField(
+                  "facet3_s",
+                  strings()
+                      .maxCardinality(
+                          facetCard2,
+                          strings().basicMultilingualPlaneAlphabet().ofLengthBetween(1, 128),
+                          new BenchmarkRandomSource(random)))
+              .addField(
+                  "text",
+                  strings()
+                      .multiString(
+                          350, 512, strings().basicLatinAlphabet().ofLengthBetween(32, 64)))
+              .addField("int1_i", integers().all())
+              .addField(
+                  "int2_i",
+                  integers()
+                      .maxCardinality(
+                          facetCard2, integers().all(), new BenchmarkRandomSource(random)))
+              .addField(
+                  "int3_i",
+                  integers()
+                      .maxCardinality(
+                          facetCard2, integers().all(), new BenchmarkRandomSource(random)))
+              .addField(
+                  "int4_i",
+                  integers()
+                      .maxCardinality(
+                          facetCard2, integers().all(), new BenchmarkRandomSource(random)));
 
       miniClusterState.index(collection, docMaker, docCount);
       miniClusterState.forceMerge(collection, 15);

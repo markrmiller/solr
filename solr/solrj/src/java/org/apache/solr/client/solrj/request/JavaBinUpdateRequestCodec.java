@@ -100,7 +100,7 @@ public class JavaBinUpdateRequestCodec {
       nl.add("docs", docIter);
     }
     try (JavaBinCodec codec = new JavaBinCodec()) {
-      codec.marshal(nl, os);
+      codec.marshal(nl, os, true);
     }
   }
 

@@ -51,7 +51,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
     faos.close();
 
 
-    FastInputStream fis = new FastInputStream(null, baos.getbuf(), 0, baos.size());
+    FastInputStream fis = new FastInputStream(null, baos.getbuf());
     try (FastJavaBinDecoder.StreamCodec scodec = new FastJavaBinDecoder.StreamCodec(fis)) {
       scodec.start();
       Tag tag = scodec.getTag();
@@ -84,18 +84,18 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
     @SuppressWarnings({"rawtypes"})
     Map m2;
     try (JavaBinCodec jbc = new JavaBinCodec()) {
-      m2 = (Map) jbc.unmarshal(new FastInputStream(null, baos.getbuf(), 0, baos.size()));
+      m2 = (Map) jbc.unmarshal(new FastInputStream(null, baos.getbuf()));
     }
     @SuppressWarnings({"rawtypes"})
     LinkedHashMap fastMap = (LinkedHashMap) new FastJavaBinDecoder()
-        .withInputStream(new FastInputStream(null, baos.getbuf(), 0, baos.size()))
+        .withInputStream(new FastInputStream(null, baos.getbuf()))
         .decode(FastJavaBinDecoder.getEntryListener());
     assertEquals(Utils.writeJson(m2, new StringWriter(), true).toString(),
         Utils.writeJson(fastMap, new StringWriter(), true).toString());
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     Object newMap = new FastJavaBinDecoder()
-        .withInputStream(new FastInputStream(null, baos.getbuf(), 0, baos.size()))
+        .withInputStream(new FastInputStream(null, baos.getbuf()))
         .decode(e -> {
           e.listenContainer(new LinkedHashMap<>(), e_ -> {
             Map rootMap = (Map) e_.ctx();
@@ -184,7 +184,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
           assertEquals((Float) doc.get("price"), pojo.price, 0.001);
       }
     });
-    parser.processResponse(new FastInputStream(null, baos.getbuf(), 0, baos.size()), null);
+    parser.processResponse(new FastInputStream(null, baos.getbuf()), null);
   }
 
   public void testParsingWithChildDocs() throws IOException {
@@ -291,7 +291,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
         return child;
       }
     });
-    binaryResponseParser.processResponse(new FastInputStream(null, baos.getbuf(), 0, baos.size()), null);
+    binaryResponseParser.processResponse(new FastInputStream(null, baos.getbuf()), null);
     for (int i = 0; i < sdocs.size(); i++) {
       l.get(i).compare(sdocs.get(i));
     }
@@ -299,7 +299,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
     l.clear();
 
     useListener[0] = false;
-    binaryResponseParser.processResponse(new FastInputStream(null, baos.getbuf(), 0, baos.size()), null);
+    binaryResponseParser.processResponse(new FastInputStream(null, baos.getbuf()), null);
     for (int i = 0; i < sdocs.size(); i++) {
       l.get(i).compare(sdocs.get(i));
     }

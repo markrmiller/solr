@@ -248,8 +248,8 @@ public class EmbeddedSolrServer extends SolrClient {
               };
 
 
-          try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            createJavaBinCodec(callback, resolver).setWritableDocFields(resolver).marshal(rsp.getValues(), out);
+          try (ByteArrayOutputStream out = new ByteArrayOutputStream(16384)) {
+            createJavaBinCodec(callback, resolver).setWritableDocFields(resolver).marshal(rsp.getValues(), out, true);
 
             try (InputStream in = out.toInputStream()) {
               @SuppressWarnings({"unchecked"})
@@ -288,7 +288,7 @@ public class EmbeddedSolrServer extends SolrClient {
     final RequestWriter.ContentWriter contentWriter = request.getContentWriter(null);
 
     String cType;
-    final BAOS baos = new BAOS();
+    final BAOS baos = new BAOS(4096);
     if (contentWriter != null) {
       contentWriter.write(baos);
       cType = contentWriter.getContentType();

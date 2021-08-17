@@ -30,8 +30,8 @@
 
     <RollingRandomAccessFile
         name="MainLogFile"
-        fileName="${sys:solr.log.dir}/${sys:solr.log.name}.log"
-        filePattern="${sys:solr.log.dir}/${sys:solr.log.name}.log.%i" >
+        fileName="${sys:solr.log.dir:-work/solr-logs}/${sys:solr.log.name:-solr}.log"
+        filePattern="${sys:solr.log.dir:-work/solr-logs}/${sys:solr.log.name:-solr}.log.%i" >
       <PatternLayout>
         <Pattern>
           %maxLen{%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%X{collection} %X{shard} %X{replica} %X{core}] %c{1.} %m%notEmpty{ =>%ex{short}}}{10240}%n
@@ -39,7 +39,7 @@
       </PatternLayout>
       <Policies>
         <OnStartupTriggeringPolicy />
-        <SizeBasedTriggeringPolicy size="32 MB"/>
+        <SizeBasedTriggeringPolicy size="128 MB"/>
       </Policies>
       <DefaultRolloverStrategy max="10"/>
     </RollingRandomAccessFile>
@@ -55,7 +55,7 @@
       </PatternLayout>
       <Policies>
         <OnStartupTriggeringPolicy />
-        <SizeBasedTriggeringPolicy size="32 MB"/>
+        <SizeBasedTriggeringPolicy size="128 MB"/>
       </Policies>
       <DefaultRolloverStrategy max="10"/>
     </RollingRandomAccessFile>

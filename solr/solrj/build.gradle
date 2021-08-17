@@ -68,4 +68,7 @@ dependencies {
     exclude group: "org.apache.logging.log4j", module: "log4j-api"
   })
   testImplementation "org.hsqldb:hsqldb"
+
+  testImplementation "org.quicktheories:quicktheories"
+  testImplementation 'org.hdrhistogram:HdrHistogram:2.1.12'
 }

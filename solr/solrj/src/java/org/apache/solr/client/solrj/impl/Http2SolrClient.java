@@ -83,7 +83,6 @@ import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.client.util.InputStreamContentProvider;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.client.util.MultiPartContentProvider;
-import org.eclipse.jetty.client.util.OutputStreamContentProvider;
 import org.eclipse.jetty.client.util.StringContentProvider;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpFields;
@@ -272,12 +271,12 @@ public class Http2SolrClient extends SolrClient {
   public static class OutStream implements Closeable{
     private final String origCollection;
     private final ModifiableSolrParams origParams;
-    private final OutputStreamContentProvider outProvider;
+    private final SolrOutputStreamContentProvider outProvider;
     private final InputStreamResponseListener responseListener;
     private final boolean isXml;
 
     public OutStream(String origCollection, ModifiableSolrParams origParams,
-                     OutputStreamContentProvider outProvider, InputStreamResponseListener responseListener, boolean isXml) {
+                     SolrOutputStreamContentProvider outProvider, InputStreamResponseListener responseListener, boolean isXml) {
       this.origCollection = origCollection;
       this.origParams = origParams;
       this.outProvider = outProvider;
@@ -333,7 +332,7 @@ public class Http2SolrClient extends SolrClient {
     if (!basePath.endsWith("/"))
       basePath += "/";
 
-    OutputStreamContentProvider provider = new OutputStreamContentProvider();
+    SolrOutputStreamContentProvider provider = new SolrOutputStreamContentProvider();
     Request postRequest = httpClient
         .newRequest(basePath + "update"
             + requestParams.toQueryString())
@@ -375,7 +374,6 @@ public class Http2SolrClient extends SolrClient {
         }
       }
     }
-    outStream.flush();
   }
 
   private static final Exception CANCELLED_EXCEPTION = new Exception();
@@ -400,7 +398,6 @@ public class Http2SolrClient extends SolrClient {
             InputStreamResponseListener listener = this;
             executor.execute(() -> {
               InputStream is = listener.getInputStream();
-              assert ObjectReleaseTracker.track(is);
               try {
                 NamedList<Object> body = processErrorsAndResponse(solrRequest, parser, response, is);
                 asyncListener.onSuccess(body);
@@ -436,7 +433,6 @@ public class Http2SolrClient extends SolrClient {
       req.send(listener);
       Response response = listener.get(idleTimeout, TimeUnit.MILLISECONDS);
       InputStream is = listener.getInputStream();
-      assert ObjectReleaseTracker.track(is);
 
       return processErrorsAndResponse(solrRequest, parser, response, is);
     } catch (InterruptedException e) {
@@ -786,11 +782,19 @@ public class Http2SolrClient extends SolrClient {
       return rsp;
     } finally {
       if (shouldClose) {
-        try {
-          is.close();
-          assert ObjectReleaseTracker.release(is);
-        } catch (IOException e) {
-          // quitely
+        if (is != null) {
+          try {
+            // make sure the stream is full read
+            is.skip(is.available());
+            while (is.read() != -1) {
+            }
+          } catch (UnsupportedOperationException e) {
+            // nothing to do then
+          } catch (IOException e) {
+            // quiet
+          } finally {
+            org.apache.solr.common.util.IOUtils.closeQuietly(is);
+          }
         }
       }
     }

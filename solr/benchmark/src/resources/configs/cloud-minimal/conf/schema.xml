@@ -19,6 +19,9 @@
   <fieldType name="string" class="solr.StrField" docValues="true"/>
   <fieldType name="int" class="org.apache.solr.schema.IntPointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
   <fieldType name="long" class="org.apache.solr.schema.LongPointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
+  <fieldType name="float" class="org.apache.solr.schema.FloatPointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
+  <fieldType name="double" class="org.apache.solr.schema.DoublePointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
+  <fieldType name="date" class="org.apache.solr.schema.DatePointField" docValues="true" omitNorms="true" positionIncrementGap="0"/>
   <fieldType name="text" class="solr.TextField">
     <analyzer>
       <tokenizer class="solr.StandardTokenizerFactory"/>
@@ -32,6 +35,12 @@
   <field name="id" type="string" indexed="true" stored="true"/>
   <field name="text" type="text" indexed="true" stored="false"/>
   <dynamicField name="*_s"  type="string"  indexed="true"  stored="true" />
+  <dynamicField name="*_t"  type="text"  indexed="true"  stored="false" />
   <dynamicField name="*_i"  type="int"  indexed="false"  stored="false" />
+  <dynamicField name="*_l"  type="long"  indexed="false"  stored="false" />
+  <dynamicField name="*_f"  type="float"  indexed="false"  stored="false" />
+  <dynamicField name="*_d"  type="double"  indexed="false"  stored="false" />
+  <dynamicField name="*_dt"  type="date"  indexed="false"  stored="false" />
+
   <uniqueKey>id</uniqueKey>
 </schema>

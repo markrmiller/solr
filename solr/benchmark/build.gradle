@@ -69,7 +69,11 @@ private static String toPath(Set<File> classpathUnderTest) {
 dependencies {
   implementation project(':solr:test-framework')
 
+  implementation 'org.apache.logging.log4j:log4j-layout-template-json'
+
   implementation 'org.openjdk.jmh:jmh-core'
   annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess'
+
+  implementation "org.quicktheories:quicktheories"
 
 }
