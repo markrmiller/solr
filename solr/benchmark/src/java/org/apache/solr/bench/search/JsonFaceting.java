@@ -16,14 +16,14 @@
  */
 package org.apache.solr.bench.search;
 
-import static org.apache.solr.bench.DocMaker.docs;
+import static org.apache.solr.bench.Docs.docs;
 import static org.apache.solr.bench.generators.SourceDSL.integers;
 import static org.apache.solr.bench.generators.SourceDSL.strings;
 
 import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.solr.bench.DocMaker;
+import org.apache.solr.bench.Docs;
 import org.apache.solr.bench.MiniClusterState;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -109,25 +109,19 @@ public class JsonFaceting {
       miniClusterState.createCollection(collection, numShards, numReplicas);
 
       // Define random documents
-      DocMaker docMaker =
+      Docs docs =
           docs()
-              .addField("id", integers().incrementing())
-              .addField("facet_s", strings().basicLatinAlphabet().maxCardinality(facetCard).ofLengthBetween(1, 64))
-              .addField("facet2_s", strings().basicLatinAlphabet().maxCardinality(facetCard).ofLengthBetween(1, 16))
-              .addField("facet3_s", strings().basicMultilingualPlaneAlphabet().maxCardinality(facetCard2).ofLengthBetween(1, 128))
-              .addField("text", strings().multi(350, 512, strings().basicLatinAlphabet().ofLengthBetween(32, 64)))
-              .addField("int1_i", integers().all())
-              .addField(
-                  "int2_i",
-                  integers().all(facetCard2))
-              .addField(
-                  "int3_i",
-                  integers().all(facetCard2))
-              .addField(
-                  "int4_i",
-                  integers().all(facetCard2));
+              .field("id", integers().incrementing())
+              .field("facet_s", strings().basicLatinAlphabet().maxCardinality(facetCard).ofLengthBetween(1, 64))
+              .field("facet2_s", strings().basicLatinAlphabet().maxCardinality(facetCard).ofLengthBetween(1, 16))
+              .field("facet3_s", strings().basicMultilingualPlaneAlphabet().maxCardinality(facetCard2).ofLengthBetween(1, 128))
+              .field(strings().basicLatinAlphabet().multi(512).ofLengthBetween(32, 64))
+              .field(integers().all())
+              .field(integers().allWithMaxCardinality(facetCard2))
+              .field(integers().allWithMaxCardinality(facetCard2))
+              .field(integers().allWithMaxCardinality(facetCard2));
 
-      miniClusterState.index(collection, docMaker, docCount);
+      miniClusterState.index(collection, docs, docCount);
       miniClusterState.forceMerge(collection, 15);
 
       params = new ModifiableSolrParams();
@@ -168,7 +162,6 @@ public class JsonFaceting {
       @Setup(Level.Trial)
       public void setup() throws Exception {
         Long seed = Long.getLong("randomSeed");
-
         this.random = new SplittableRandom(seed);
       }
     }

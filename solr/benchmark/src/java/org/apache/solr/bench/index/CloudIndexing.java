@@ -16,7 +16,7 @@
  */
 package org.apache.solr.bench.index;
 
-import static org.apache.solr.bench.DocMaker.docs;
+import static org.apache.solr.bench.Docs.docs;
 import static org.apache.solr.bench.generators.SourceDSL.integers;
 import static org.apache.solr.bench.generators.SourceDSL.longs;
 import static org.apache.solr.bench.generators.SourceDSL.strings;
@@ -27,7 +27,7 @@ import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import javax.management.MBeanServer;
-import org.apache.solr.bench.DocMaker;
+
 import org.apache.solr.bench.MiniClusterState;
 import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.common.SolrInputDocument;
@@ -104,10 +104,10 @@ public class CloudIndexing {
     @State(Scope.Thread)
     public static class Docs {
 
-      private DocMaker largeDocMaker;
+      private org.apache.solr.bench.Docs largeDocs;
       private Iterator<SolrInputDocument> largeDocIterator;
 
-      private DocMaker smallDocMaker;
+      private org.apache.solr.bench.Docs smallDocs;
       private Iterator<SolrInputDocument> smallDocIterator;
 
       @Setup(Level.Trial)
@@ -117,33 +117,37 @@ public class CloudIndexing {
           MiniClusterState.MiniClusterBenchState miniClusterState)
           throws Exception {
         if (benchmarkParams.getBenchmark().endsWith("indexLargeDoc")) {
-          largeDocMaker = docs().addField("id", integers().incrementing())
-              .addField("text", strings().multi(512, strings().basicLatinAlphabet().ofLengthBetween(1, 64)))
-              .addField("text", strings().multi(512, 1600, strings().basicLatinAlphabet().ofLengthBetween(1, 64))).addField("int1_i", integers().all())
-              .addField("int2_i", integers().all()).addField("int3_i", integers().all()).addField("long1_l", longs().all()).addField("long2_l", longs().all());
+          largeDocs = docs().field("id", integers().incrementing())
+              .field(strings().basicLatinAlphabet().multi(512).ofLengthBetween(1, 64))
+              .field(strings().basicLatinAlphabet().multi(512).ofLengthBetween(1, 64))
+              .field(integers().all())
+              .field(integers().all())
+              .field(integers().all())
+              .field(longs().all())
+              .field(longs().all());
 
-          largeDocMaker.preGenerateDocs(state.largeDocCount, miniClusterState.getRandom());
-          largeDocIterator = largeDocMaker.getGeneratedDocsIterator();
+          largeDocIterator = largeDocs.preGenerate(state.largeDocCount);
         } else if (benchmarkParams.getBenchmark().endsWith("indexSmallDoc")) {
-          smallDocMaker = docs().addField("id", integers().incrementing())
-              .addField("text", strings().multi(2, strings().basicLatinAlphabet().ofLengthBetween(1, 32))).addField("int1_i", integers().all())
-              .addField("int2_i", integers().all()).addField("long1_l", longs().all());
+          smallDocs = docs().field("id", integers().incrementing())
+              .field("text", strings().basicLatinAlphabet().multi(2).ofLengthBetween(1, 32))
+              .field("int1_i", integers().all())
+              .field("int2_i", integers().all())
+              .field("long1_l", longs().all());
 
-          smallDocMaker.preGenerateDocs(state.smallDocCount, miniClusterState.getRandom());
-          smallDocIterator = smallDocMaker.getGeneratedDocsIterator();
+          smallDocIterator = smallDocs.preGenerate(state.smallDocCount);
         }
       }
 
       public SolrInputDocument getLargeDoc() {
         if (!largeDocIterator.hasNext()) {
-          largeDocIterator = largeDocMaker.getGeneratedDocsIterator();
+          largeDocIterator = largeDocs.generatedDocsIterator();
         }
         return largeDocIterator.next();
       }
 
       public SolrInputDocument getSmallDoc() {
         if (!smallDocIterator.hasNext()) {
-          smallDocIterator = smallDocMaker.getGeneratedDocsIterator();
+          smallDocIterator = smallDocs.generatedDocsIterator();
         }
         return smallDocIterator.next();
       }

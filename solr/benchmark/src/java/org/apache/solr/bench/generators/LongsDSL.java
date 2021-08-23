@@ -16,7 +16,6 @@
  */
 package org.apache.solr.bench.generators;
 
-import org.quicktheories.core.Gen;
 import org.quicktheories.generators.Generate;
 
 import static org.apache.solr.bench.generators.SourceDSL.checkArguments;
@@ -44,7 +43,7 @@ public class LongsDSL {
    * 
    * @return a Source of type Long
    */
-  public Gen<Long> all() {
+  public SolrGen<Long> all() {
     return between(Long.MIN_VALUE, Long.MAX_VALUE);
   }
 
@@ -64,7 +63,7 @@ public class LongsDSL {
      *          - inclusive upper bound of domain
      * @return a Source of type Long
      */
-    public Gen<Long> upToAndIncluding(final long endInclusive) {
+    public SolrGen<Long> upToAndIncluding(final long endInclusive) {
       return between(startInclusive, endInclusive);
     }
 
@@ -76,7 +75,7 @@ public class LongsDSL {
      *          - exclusive upper bound of domain
      * @return a Source of type Long
      */
-    public Gen<Long> upTo(final long endExclusive) {
+    public SolrGen<Long> upTo(final long endExclusive) {
       return between(startInclusive, endExclusive - 1);
     }
   }
@@ -94,12 +93,12 @@ public class LongsDSL {
    *          - inclusive upper bound of domain
    * @return a Source of type Long
    */
-  public Gen<Long> between(final long startInclusive,
+  public SolrGen<Long> between(final long startInclusive,
       final long endInclusive) {
     checkArguments(startInclusive <= endInclusive,
         "There are no Long values to be generated between (%s) and (%s)",
         startInclusive, endInclusive);
-    return Generate.longRange(startInclusive, endInclusive);
+    return new SolrGen<>(Generate.longRange(startInclusive, endInclusive), Type.Long);
   }
 
 }

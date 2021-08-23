@@ -16,7 +16,7 @@
  */
 package org.apache.solr.bench.javabin;
 
-import static org.apache.solr.bench.DocMaker.docs;
+import static org.apache.solr.bench.Docs.docs;
 import static org.apache.solr.bench.generators.SourceDSL.integers;
 import static org.apache.solr.bench.generators.SourceDSL.longs;
 import static org.apache.solr.bench.generators.SourceDSL.strings;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.solr.bench.BaseBenchState;
-import org.apache.solr.bench.DocMaker;
+import org.apache.solr.bench.Docs;
 import org.apache.solr.client.solrj.impl.BinaryRequestWriter;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -79,13 +79,13 @@ public class JavaBinBasicPerf {
       SplittableRandom random = new SplittableRandom(baseBenchState.getRandomSeed());
 
       if (content.equals("default")) {
-        response = defaultContent(random, count);
+        response = defaultContent(count);
       } else if (content.equals("few_nums")) {
         response = fewNumContent(count);
       } else if (content.equals("large_strings")) {
-        response = largeStringsContent(random, count);
+        response = largeStringsContent(count);
       } else if (content.equals("many_token_field")) {
-        response = manyTokenFieldContent(random, count);
+        response = manyTokenFieldContent(count);
       } else if (content.equals("child_docs")) {
         response = childDocsContent(random, count);
       }
@@ -118,7 +118,7 @@ public class JavaBinBasicPerf {
       return topLevel;
     }
 
-    private static Object defaultContent(SplittableRandom random, int docCount) {
+    private static Object defaultContent(int docCount) {
       NamedList<Object> response = new NamedList<>();
 
       NamedList<Object> header = new NamedList<>();
@@ -126,21 +126,21 @@ public class JavaBinBasicPerf {
       header.add("headerStuff", "values");
       response.add("header", header);
 
-      DocMaker docMaker = docs().addField("id", integers().incrementing())
-          .addField("facet_s", strings().basicLatinAlphabet().maxCardinality(5).ofLengthBetween(1, 64))
-          .addField("facet2_s", strings().basicLatinAlphabet().maxCardinality(100).ofLengthBetween(1, 16))
-          .addField("facet3_s", strings().basicLatinAlphabet().maxCardinality(1200).ofLengthBetween(1, 128))
-          .addField("text", strings().multi(800, 1500, strings().basicLatinAlphabet().ofLengthBetween(1, 800)))
-          .addField("text2_s", strings().multi(500, 800, strings().basicLatinAlphabet().ofLengthBetween(1, 2500)))
-          .addField("text3_t", strings().multi(500, 800, strings().basicLatinAlphabet().ofLengthBetween(1, 3500)))
-          .addField("int_i", integers().all())
-          .addField("long1_l", longs().all())
-          .addField("long2_l", longs().all()).addField("long3_l", longs().all())
-          .addField("int2_i", integers().all(500));
+      Docs docs = docs().field("id", integers().incrementing())
+          .field("facet_s", strings().basicLatinAlphabet().maxCardinality(5).ofLengthBetween(1, 64))
+          .field("facet2_s", strings().basicLatinAlphabet().maxCardinality(100).ofLengthBetween(1, 16))
+          .field("facet3_s", strings().basicLatinAlphabet().maxCardinality(1200).ofLengthBetween(1, 128))
+          .field("text", strings().basicLatinAlphabet().multi(800).ofLengthBetween(1, 800))
+          .field("text2_s", strings().basicLatinAlphabet().multi(800).ofLengthBetween(1, 2500))
+          .field("text3_t", strings().basicLatinAlphabet().multi(800).ofLengthBetween(1, 3500))
+          .field("int_i", integers().all())
+          .field("long1_l", longs().all())
+          .field("long2_l", longs().all()).field("long3_l", longs().all())
+          .field("int2_i", integers().allWithMaxCardinality(500));
 
       SolrDocumentList docList = new SolrDocumentList();
       for (int i = 0; i < docCount; i++) {
-        SolrDocument doc = docMaker.getDocument(random);
+        SolrDocument doc = docs.document();
         docList.add(doc);
       }
       docList.setNumFound(docCount);
@@ -155,6 +155,7 @@ public class JavaBinBasicPerf {
 
       return response;
     }
+
   }
 
   @Benchmark
@@ -176,13 +177,13 @@ public class JavaBinBasicPerf {
     }
   }
 
-  private static Object largeStringsContent(SplittableRandom random, int count) {
-    DocMaker docMaker =
-        docs().addField("string_s", strings().multi(3000, 5500, strings().basicLatinAlphabet().ofLengthBetween(2000, 2800)));
+  private static Object largeStringsContent(int count) {
+    Docs docs =
+        docs().field("string_s", strings().basicLatinAlphabet().multi(5500).ofLengthBetween(2000, 2800));
 
     SolrDocumentList docList = new SolrDocumentList();
     for (int i = 0; i < count; i++) {
-      SolrDocument doc = docMaker.getDocument(random);
+      SolrDocument doc = docs.document();
       docList.add(doc);
     }
     docList.setNumFound(count);
@@ -192,11 +193,11 @@ public class JavaBinBasicPerf {
     return docList;
   }
 
-  private static Object manyTokenFieldContent(SplittableRandom random, int count) {
-    DocMaker docMaker = docs().addField("string_s", strings().multi(1000, 1500, strings().basicLatinAlphabet().ofLengthBetween(50, 100)));
+  private static Object manyTokenFieldContent(int count) {
+    Docs docs = docs().field("string_s", strings().basicLatinAlphabet().multi(1000).ofLengthBetween(50, 100));
     SolrDocumentList docList = new SolrDocumentList();
     for (int i = 0; i < count; i++) {
-      SolrDocument doc = docMaker.getDocument(random);
+      SolrDocument doc = docs.document();
       docList.add(doc);
     }
     docList.setNumFound(count);

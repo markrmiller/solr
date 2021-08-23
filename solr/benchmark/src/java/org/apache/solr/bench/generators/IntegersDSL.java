@@ -18,11 +18,12 @@ package org.apache.solr.bench.generators;
 
 import static org.apache.solr.bench.generators.SourceDSL.checkArguments;
 
-import java.util.SplittableRandom;
 import org.quicktheories.core.Gen;
 import org.quicktheories.core.RandomnessSource;
 import org.quicktheories.generators.Generate;
-import org.quicktheories.impl.BenchmarkRandomSource;
+import org.quicktheories.impl.SplittableRandomSource;
+
+import java.util.SplittableRandom;
 
 public class IntegersDSL {
 
@@ -46,7 +47,7 @@ public class IntegersDSL {
     return between(Integer.MIN_VALUE, Integer.MAX_VALUE);
   }
 
-  public SolrGen<Integer> all(int maxCardinality) {
+  public SolrGen<Integer> allWithMaxCardinality(int maxCardinality) {
     return between(Integer.MIN_VALUE, Integer.MAX_VALUE, maxCardinality);
   }
 
@@ -59,12 +60,12 @@ public class IntegersDSL {
     return between(1, Integer.MAX_VALUE);
   }
 
-  public SolrGen<Integer> allPositive(int maxCardinality) {
+  public SolrGen<Integer> allPositiveWithMaxCardinality(int maxCardinality) {
     return between(1, Integer.MAX_VALUE, maxCardinality);
   }
 
   public SolrGen<Integer> incrementing() {
-    return new SolrGen<>() {
+    return new SolrGen<>(Type.Integer) {
           int integer = 0;
 
           @Override
@@ -144,15 +145,15 @@ public class IntegersDSL {
         @Override
         public Integer generate(RandomnessSource in) {
           if (cardinalityStart == null) {
-            cardinalityStart = Generate.range(0, Integer.MAX_VALUE - maxCardinality).generate(in);
+            cardinalityStart = Generate.range(0, Integer.MAX_VALUE - maxCardinality -1 ).generate(in);
           }
 
-          long seed = Generate.range(cardinalityStart, cardinalityStart + maxCardinality).generate(in);
-          return integers.generate(new BenchmarkRandomSource(new SplittableRandom(seed)));
+          long seed = Generate.range(cardinalityStart, cardinalityStart + maxCardinality - 1).generate(in);
+          return integers.generate(new SplittableRandomSource(new SplittableRandom(seed)));
         }
-      });
+      }, Type.Integer);
     } else {
-      return new SolrGen<>(integers);
+      return new SolrGen<>(integers, Type.Integer);
     }
   }
 }

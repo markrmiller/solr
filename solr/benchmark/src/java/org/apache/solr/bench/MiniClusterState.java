@@ -231,7 +231,7 @@ public class MiniClusterState {
     }
 
     @SuppressForbidden(reason = "This module does not need to deal with logging context")
-    public void index(String collection, DocMaker docMaker, int docCount) throws Exception {
+    public void index(String collection, Docs docs, int docCount) throws Exception {
       if (createCollectionAndIndex) {
 
         log("indexing data for benchmark...");
@@ -239,12 +239,9 @@ public class MiniClusterState {
         ExecutorService executorService =
             Executors.newFixedThreadPool(
                 Runtime.getRuntime().availableProcessors(),
-                new SolrNamedThreadFactory("SolrJMH Indexer Progress"));
-        ScheduledExecutorService scheduledExecutor =
-            Executors.newSingleThreadScheduledExecutor(
                 new SolrNamedThreadFactory("SolrJMH Indexer"));
-        scheduledExecutor.scheduleAtFixedRate(
-            () -> {
+        ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new SolrNamedThreadFactory("SolrJMH Indexer Progress"));
+        scheduledExecutor.scheduleAtFixedRate(() -> {
               if (meter.getCount() == docCount) {
                 scheduledExecutor.shutdown();
               } else {
@@ -264,7 +261,7 @@ public class MiniClusterState {
                   UpdateRequest updateRequest = new UpdateRequest();
                   updateRequest.setBasePath(
                       nodes.get(threadRandom.nextInt(cluster.getJettySolrRunners().size())));
-                  SolrInputDocument doc = docMaker.getInputDocument(threadRandom);
+                  SolrInputDocument doc = docs.inputDocument();
                   // log("add doc " + doc);
                   updateRequest.add(doc);
                   meter.mark();

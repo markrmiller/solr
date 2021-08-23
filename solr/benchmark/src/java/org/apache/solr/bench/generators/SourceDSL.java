@@ -27,7 +27,6 @@ import org.quicktheories.generators.DoublesDSL;
 import org.quicktheories.generators.FloatsDSL;
 import org.quicktheories.generators.ListsDSL;
 import org.quicktheories.generators.LocalDatesDSL;
-import org.quicktheories.generators.LongsDSL;
 import org.quicktheories.generators.MapsDSL;
 
 public class SourceDSL {

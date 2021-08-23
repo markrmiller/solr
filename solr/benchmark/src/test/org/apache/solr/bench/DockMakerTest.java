@@ -16,7 +16,7 @@
  */
 package org.apache.solr.bench;
 
-import static org.apache.solr.bench.DocMaker.docs;
+import static org.apache.solr.bench.Docs.docs;
 import static org.apache.solr.bench.generators.SourceDSL.integers;
 import static org.apache.solr.bench.generators.SourceDSL.strings;
 
@@ -24,10 +24,10 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 import java.util.SplittableRandom;
+
 import org.apache.solr.SolrTestCaseJ4;
-import org.apache.solr.bench.generators.IntegersDSL;
-import org.apache.solr.bench.generators.StatisticsCollector;
-import org.apache.solr.bench.generators.StringsDSL;
+import org.apache.solr.bench.generators.Distribution;
+import org.apache.solr.bench.generators.StatCollector;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.junit.Before;
@@ -96,71 +96,152 @@ public class DockMakerTest extends SolrTestCaseJ4 {
 
   @Test
   public void testBasicCardinalityAlpha() throws Exception {
-    StatisticsCollector collector = new StatisticsCollector("Label");
+    StatCollector collector = new StatCollector("Label");
 
-    DocMaker docMaker = docs();
-    SplittableRandom random = new SplittableRandom();
+    Docs docs = docs();
+
     int cardinality = 2;
 
-    docMaker.addField(
-        "AlphaCard3", strings().alpha().maxCardinality(
-                    cardinality).ofLengthBetween(1, 6).tracked(collector));
+    docs.field("AlphaCard3", strings().alpha().maxCardinality(
+            cardinality).ofLengthBetween(1, 6).tracked(collector));
 
     Set<String> values = new HashSet<>();
     for (int i = 0; i < 10; i++) {
-      SolrInputDocument doc = docMaker.getInputDocument(random);
+      SolrInputDocument doc = docs.inputDocument();
       SolrInputField field = doc.getField("AlphaCard3");
       values.add(field.getValue().toString());
     }
+
+    collector.printHistogramReport();
+
     assertEquals(values.toString(), cardinality, values.size());
 
-    collector.printReport();
-
-    System.out.println(values);
+   // System.out.println(values);
   }
 
-    @Test
-    public void testBasicCardinalityUnicode() throws Exception {
-      DocMaker docMaker = docs();
-      SplittableRandom random = new SplittableRandom();
-      int cardinality = 4;
-      docMaker.addField("UnicodeCard3",
-          strings().basicMultilingualPlaneAlphabet().maxCardinality(
-              cardinality).ofLengthBetween(1, 6));
+  @Test
+  public void testBasicCardinalityUnicode() throws Exception {
+    Docs docs = docs();
+    SplittableRandom random = new SplittableRandom();
+    int cardinality = 4;
+    docs.field("UnicodeCard3",
+        strings().basicMultilingualPlaneAlphabet().maxCardinality(
+            cardinality).ofLengthBetween(1, 6));
 
-      HashSet<Object> values = new HashSet<>();
-      for (int i = 0; i < 20; i++) {
-        SolrInputDocument doc = docMaker.getInputDocument(random);
-        SolrInputField field = doc.getField("UnicodeCard3");
-        // System.out.println("field=" + doc);
-        values.add(field.getValue().toString());
-      }
-
-      assertEquals(values.toString(), cardinality, values.size());
+    HashSet<Object> values = new HashSet<>();
+    for (int i = 0; i < 20; i++) {
+      SolrInputDocument doc = docs.inputDocument();
+      SolrInputField field = doc.getField("UnicodeCard3");
+      // System.out.println("field=" + doc);
+      values.add(field.getValue().toString());
     }
+
+    assertEquals(values.toString(), cardinality, values.size());
+  }
 
   @Test
   public void testBasicCardinalityInteger() throws Exception {
-    StatisticsCollector collector = new StatisticsCollector("Label");
+    StatCollector collector = new StatCollector("Label");
 
-    SplittableRandom random = new SplittableRandom();
-    DocMaker docMaker = docs();
+    Docs docs = docs();
     int cardinality = 3;
 
-    docMaker.addField(
+    docs.field(
         "IntCard2",
-        integers().all(cardinality));
+        integers().allWithMaxCardinality(cardinality));
 
     HashSet<Object> values = new HashSet<>();
     for (int i = 0; i < 30; i++) {
-      SolrInputDocument doc = docMaker.getInputDocument(random);
+      SolrInputDocument doc = docs.inputDocument();
       SolrInputField field = doc.getField("IntCard2");
       values.add(field.getValue().toString());
     }
     assertEquals(values.toString(), cardinality, values.size());
 
-    collector.printReport();
+    collector.printHistogramReport();
 
-    System.out.println(values);
+    //System.out.println(values);
   }
+
+  @Test
+  public void testBasicInteger() throws Exception {
+    StatCollector collector = new StatCollector("Label");
+
+    Docs docs = docs();
+
+    docs.field("IntCard2", integers().between(10, 50).tracked(collector).withDistribution(Distribution.Gaussian));
+
+    HashSet<Object> values = new HashSet<>();
+    for (int i = 0; i < 300; i++) {
+      SolrInputDocument doc = docs.inputDocument();
+      SolrInputField field = doc.getField("IntCard2");
+      values.add(field.getValue().toString());
+    }
+
+    collector.printNumberRangeHistogramReport();
+
+    //System.out.println(values);
+  }
+
+  @Test
+  public void testBasicIntegerId() throws Exception {
+    StatCollector collector = new StatCollector("Label");
+
+    Docs docs = docs();
+
+    docs.field("id", integers().incrementing());
+
+    HashSet<Object> values = new HashSet<>();
+    for (int i = 0; i < 300; i++) {
+      SolrInputDocument doc = docs.inputDocument();
+      SolrInputField field = doc.getField("id");
+      values.add(field.getValue().toString());
+    }
+
+    collector.printHistogramReport();
+
+    //System.out.println(values);
+  }
+
+  @Test
+  public void testWordList() throws Exception {
+    StatCollector collector = new StatCollector("WordList");
+
+    Docs docs = docs();
+
+    docs.field("wordList", strings().wordList().tracked(collector).multi(4));
+
+    Set<String> values = new HashSet<>();
+    for (int i = 0; i < 1; i++) {
+      SolrInputDocument doc = docs.inputDocument();
+      SolrInputField field = doc.getField("wordList");
+      values.add(field.getValue().toString());
+    }
+
+    collector.printHistogramReport();
+
+    //System.out.println(values);
+  }
+
+  @Test
+  public void testWordListZipfian() throws Exception {
+    StatCollector collector = new StatCollector("Label");
+
+    Docs docs = docs();
+
+    docs.field("wordList", strings().wordList().withDistribution(Distribution.Zipfian).tracked(collector).multi(10));
+
+    Set<String> values = new HashSet<>();
+    for (int i = 0; i < 1; i++) {
+      SolrInputDocument doc = docs.inputDocument();
+      SolrInputField field = doc.getField("wordList");
+      values.add(field.getValue().toString());
+    }
+
+    collector.printHistogramReport();
+
+    // System.out.println(values);
+  }
+
+
 }

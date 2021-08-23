@@ -33,15 +33,19 @@ public class Histogram {
 
   static final char BOX = '\u25a0';
 
-  public List<String> formatReport(List<StatisticsEntry> entries) {
+  public List<String> formatReport(List<StatisticsEntry> entries, String label) {
+    return formatReport(entries, false, label);
+  }
+
+  public List<String> formatReport(List<StatisticsEntry> entries, boolean countsComparator, String label) {
     if (entries.isEmpty()) {
       log.warn("No entries for report");
       return Collections.singletonList("No entries for report");
     }
     try {
-      entries.sort(comparator());
+      entries.sort(countsComparator ? countsComparator()  : comparator());
       List<Bucket> buckets = cluster(entries);
-      return generateHistogram(entries, buckets);
+      return generateHistogram(label, buckets, countsComparator);
     } catch (Exception e) {
       log.warn("Cannot draw histogram", e);
       return Collections.singletonList("Cannot draw histogram: " + e.getMessage());
@@ -74,6 +78,18 @@ public class Histogram {
         Comparable<Object> leftFirst = (Comparable<Object>) left.values().get(0);
         Comparable<Object> rightFirst = (Comparable<Object>) right.values().get(0);
         return leftFirst.compareTo(rightFirst);
+      } catch (ClassCastException castException) {
+        return -Integer.compare(left.count(), right.count());
+      }
+    };
+  }
+
+  private Comparator<? super StatisticsEntry> countsComparator() {
+    return (left, right) -> {
+      try {
+        Integer leftFirst = left.count();
+        Integer rightFirst = right.count();
+        return rightFirst.compareTo(leftFirst);
       } catch (ClassCastException castException) {
         return -Integer.compare(left.count(), right.count());
       }
@@ -115,8 +131,7 @@ public class Histogram {
     return "label";
   }
 
-  private List<String> generateHistogram(
-      final List<StatisticsEntry> entries, final List<Bucket> buckets) {
+  private List<String> generateHistogram(String label, final List<Bucket> buckets, boolean countsComparator) {
     int labelWidth = calculateLabelWidth(buckets);
     int maxCount = buckets.stream().mapToInt(bucket1 -> bucket1.count).max().orElse(0);
     int countWidth = calculateCountWidth(maxCount);
@@ -126,7 +141,8 @@ public class Histogram {
     String headerFormat = "%1$4s | %2$" + labelWidth + "s | %3$" + countWidth + "s | %4$s";
     String bucketFormat = "%1$4s | %2$" + labelWidth + "s | %3$" + countWidth + "d | %4$s";
 
-    lines.add(header(headerFormat));
+    lines.add(this.getClass().getSimpleName() + " SortBy " + (countsComparator ? "counts" : label));
+    lines.add(header(headerFormat, label));
     lines.add(ruler(headerFormat));
     for (int i = 0; i < buckets.size(); i++) {
       Bucket bucket = buckets.get(i);
@@ -163,8 +179,8 @@ public class Histogram {
     return builder.toString();
   }
 
-  private String header(String format) {
-    return String.format(format, "#", labelColumnHeader(), "count", "");
+  private String header(String format, String label) {
+    return String.format(format, "#", label, "count", "");
   }
 
   private String ruler(String format) {

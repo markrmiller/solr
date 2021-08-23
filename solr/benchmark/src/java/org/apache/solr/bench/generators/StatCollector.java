@@ -25,7 +25,7 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-public class StatisticsCollector {
+public class StatCollector {
 
   private final Map<List<Object>, Integer> counts = new HashMap<>();
 
@@ -33,11 +33,11 @@ public class StatisticsCollector {
 
   private List<StatisticsEntry> statisticsEntries = null;
 
-  public StatisticsCollector(String label) {
+  public StatCollector(String label) {
     this.label = label;
   }
 
-  public StatisticsCollector collect(Object... values) {
+  public StatCollector collect(Object... values) {
     ensureAtLeastOneParameter(values);
     List<Object> key = keyFrom(values);
     ensureSameNumberOfValues(key);
@@ -45,13 +45,30 @@ public class StatisticsCollector {
     return this;
   }
 
-  public void printReport() {
-    // nocommit
-    // NumberRangeHistogram histogram =new NumberRangeHistogram();
-    Histogram histogram = new Histogram();
-    List<String> report = histogram.formatReport(statisticsEntries());
+  public void printHistogramReport() {
+    printHistogramReport(false);
+  }
 
-    System.out.println("report:");
+  public void printHistogramReport(boolean sortByCounts) {
+    Histogram histogram = new Histogram();
+
+    List<String> report = histogram.formatReport(statisticsEntries(), sortByCounts, label);
+
+    //System.out.println("report:");
+
+    report.forEach(s -> System.out.println(s));
+  }
+
+  public void printNumberRangeHistogramReport() {
+    printNumberRangeHistogramReport(false);
+  }
+
+  public void printNumberRangeHistogramReport(boolean sortByCounts) {
+    NumberRangeHistogram histogram =new NumberRangeHistogram();
+
+    List<String> report = histogram.formatReport(statisticsEntries(), true, label);
+
+    //System.out.println("report:");
 
     report.forEach(s -> System.out.println(s));
   }

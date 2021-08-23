@@ -23,14 +23,16 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
-import java.util.SplittableRandom;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.lang3.Validate;
+
+import org.apache.commons.math3.random.RandomGenerator;
+import org.apache.commons.math3.random.Well512a;
 import org.apache.lucene.util.RamUsageEstimator;
+import org.apache.solr.bench.generators.SolrGen;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.SolrNamedThreadFactory;
@@ -43,11 +45,13 @@ import org.quicktheories.impl.BenchmarkRandomSource;
  * based on supplied FieldDef definitions.
  *
  * <p>You can call getDocument to build and retrieve one {@link SolrInputDocument} at a time, or you
- * can call {@link #preGenerateDocs} to generate the given number of documents in RAM, and then
- * retrieve them via {@link #getGeneratedDocsIterator}.
+ * can call {@link #preGenerate} to generate the given number of documents in RAM, and then
+ * retrieve them via {@link #generatedDocsIterator}.
  */
-public class DocMaker {
+public class Docs {
 
+  private final ThreadLocal<RandomGenerator> random;
+  private final RandomGenerator randomParent;
   private Queue<SolrInputDocument> docs = new ConcurrentLinkedQueue<>();
 
   private final Map<String, Gen<?>> fields = new HashMap<>();
@@ -55,16 +59,32 @@ public class DocMaker {
   private static final AtomicInteger ID = new AtomicInteger();
 
   private ExecutorService executorService;
+  private int stringFields;
+  private int multiStringFields;
+  private int integerFields;
+  private int longFields;
 
-  public static DocMaker docs() {
-    return new DocMaker();
+  public static Docs docs() {
+    return new Docs();
   }
 
-  private DocMaker() {}
+  public static Docs docs(RandomGenerator random) {
+    return new Docs(random);
+  }
+
+  private Docs(RandomGenerator random) {
+    this.randomParent = random;
+    this.random = ThreadLocal.withInitial(() -> new Well512a(random.nextLong())); // TODO: pluggable
+  }
+
+  private Docs() {
+    this(new Well512a(Long.getLong("randomSeed")));
+  }
+
 
   @SuppressForbidden(reason = "This module does not need to deal with logging context")
-  public void preGenerateDocs(int numDocs, SplittableRandom random) throws InterruptedException {
-    log("preGenerateDocs " + numDocs + " ...");
+  public Iterator<SolrInputDocument> preGenerate(int numDocs) throws InterruptedException {
+    log("preGenerate docs " + numDocs + " ...");
     docs.clear();
     executorService =
         Executors.newFixedThreadPool(
@@ -73,18 +93,13 @@ public class DocMaker {
 
     for (int i = 0; i < numDocs; i++) {
       executorService.submit(
-          new Runnable() {
-            SplittableRandom threadRandom = random.split();
-
-            @Override
-            public void run() {
-              try {
-                SolrInputDocument doc = DocMaker.this.getInputDocument(threadRandom);
-                docs.add(doc);
-              } catch (Exception e) {
-                executorService.shutdownNow();
-                throw new RuntimeException(e);
-              }
+          () -> {
+            try {
+              SolrInputDocument doc = Docs.this.inputDocument();
+              docs.add(doc);
+            } catch (Exception e) {
+              executorService.shutdownNow();
+              throw new RuntimeException(e);
             }
           });
     }
@@ -103,34 +118,55 @@ public class DocMaker {
     if (numDocs != docs.size()) {
       throw new IllegalStateException("numDocs != " + docs.size());
     }
-  }
 
-  public Iterator<SolrInputDocument> getGeneratedDocsIterator() {
     return docs.iterator();
   }
 
-  public SolrInputDocument getInputDocument(SplittableRandom random) {
+  public Iterator<SolrInputDocument> generatedDocsIterator() {
+    return docs.iterator();
+  }
+
+  public SolrInputDocument inputDocument() {
     SolrInputDocument doc = new SolrInputDocument();
 
     for (Map.Entry<String, Gen<?>> entry : fields.entrySet()) {
-      doc.addField(entry.getKey(), entry.getValue().generate(new BenchmarkRandomSource(random)));
+      doc.addField(entry.getKey(), entry.getValue().generate(new BenchmarkRandomSource(random.get())));
     }
 
     return doc;
   }
 
-  public SolrDocument getDocument(SplittableRandom random) {
+  public SolrDocument document() {
     SolrDocument doc = new SolrDocument();
 
     for (Map.Entry<String, Gen<?>> entry : fields.entrySet()) {
-      doc.addField(entry.getKey(), entry.getValue().generate(new BenchmarkRandomSource(random)));
+      doc.addField(entry.getKey(), entry.getValue().generate(new BenchmarkRandomSource(random.get())));
     }
 
     return doc;
   }
 
-  public DocMaker addField(String name, Gen<?> generator) {
+  public Docs field(String name, SolrGen<?> generator) {
     fields.put(name, generator);
+    return this;
+  }
+
+  public Docs field(SolrGen<?> generator) {
+    switch (generator.type()) {
+      case String:
+        fields.put("string" + (stringFields++ > 0 ? stringFields : "") + "_s", generator);
+        break;
+      case MultiString:
+        fields.put("text" + (multiStringFields++ > 0 ? multiStringFields : "") + "_t", generator);
+        break;
+      case Integer:
+        fields.put("int" + (integerFields++ > 0 ? integerFields : "") + "_t", generator);
+        break;
+      case Long:
+        fields.put("long" + (longFields++ > 0 ? longFields : "") + "_t", generator);
+        break;
+    }
+
     return this;
   }
 
@@ -147,43 +183,12 @@ public class DocMaker {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-    DocMaker that = (DocMaker) o;
+    Docs that = (Docs) o;
     return fields.equals(that.fields);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(fields);
-  }
-
-  public static int nextInt(
-      final int startInclusive, final int endExclusive, SplittableRandom random) {
-    Validate.isTrue(
-        endExclusive >= startInclusive, "Start value must be smaller or equal to end value.");
-    Validate.isTrue(startInclusive >= 0, "Both range values must be non-negative.");
-
-    if (startInclusive == endExclusive) {
-      return startInclusive;
-    }
-
-    return startInclusive + random.nextInt(endExclusive - startInclusive);
-  }
-
-  public static long nextLong(
-      final long startInclusive, final long endExclusive, SplittableRandom random) {
-    Validate.isTrue(
-        endExclusive >= startInclusive, "Start value must be smaller or equal to end value.");
-    Validate.isTrue(
-        startInclusive >= 0,
-        "Both range values must be non-negative startInclusive="
-            + startInclusive
-            + " endExclusive="
-            + endExclusive);
-
-    if (startInclusive == endExclusive) {
-      return startInclusive;
-    }
-
-    return startInclusive + random.nextLong(endExclusive - startInclusive);
   }
 }
