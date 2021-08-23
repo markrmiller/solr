@@ -16,14 +16,23 @@
  */
 package org.apache.solr.bench;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Random;
 import java.util.SplittableRandom;
+
+import com.sun.management.HotSpotDiagnosticMXBean;
+import org.apache.commons.io.FileUtils;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.BenchmarkParams;
+
+import javax.management.MBeanServer;
 
 @State(Scope.Benchmark)
 public class BaseBenchState {
@@ -48,6 +57,28 @@ public class BaseBenchState {
     Long seed = getRandomSeed();
 
     this.random = new SplittableRandom(seed);
+  }
+
+  @TearDown(Level.Trial)
+  public void doTearDown(BenchmarkParams benchmarkParams) throws Exception {
+    String heapDump = System.getProperty("dumpheap" );
+    if (heapDump != null) {
+      File file = new File(heapDump);
+      FileUtils.deleteDirectory(file);
+      file.mkdirs();
+      File dumpFile = new File(file, benchmarkParams.id() + ".hprof");
+
+      dumpHeap(dumpFile.getAbsolutePath(), true);
+    }
+  }
+
+  // nocommit
+  public static void dumpHeap(String filePath, boolean live) throws IOException {
+    MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+    HotSpotDiagnosticMXBean mxBean =
+        ManagementFactory.newPlatformMXBeanProxy(
+            server, "com.sun.management:type=HotSpotDiagnostic", HotSpotDiagnosticMXBean.class);
+    mxBean.dumpHeap(filePath, live);
   }
 
   public static Long getRandomSeed() {

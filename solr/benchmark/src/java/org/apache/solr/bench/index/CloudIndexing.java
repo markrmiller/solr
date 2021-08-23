@@ -88,17 +88,8 @@ public class CloudIndexing {
     @TearDown(Level.Iteration)
     public void doTearDown(MiniClusterState.MiniClusterBenchState miniClusterState)
         throws Exception {
-      // dumpHeap("/home/markmiller/heap-" + System.nanoTime() + ".hprof", false);
-      miniClusterState.shutdownMiniCluster();
-    }
 
-    // nocommit
-    public static void dumpHeap(String filePath, boolean live) throws IOException {
-      MBeanServer server = ManagementFactory.getPlatformMBeanServer();
-      HotSpotDiagnosticMXBean mxBean =
-          ManagementFactory.newPlatformMXBeanProxy(
-              server, "com.sun.management:type=HotSpotDiagnostic", HotSpotDiagnosticMXBean.class);
-      mxBean.dumpHeap(filePath, live);
+      miniClusterState.shutdownMiniCluster();
     }
 
     @State(Scope.Thread)
