@@ -16,17 +16,8 @@
  */
 package org.apache.solr.bench.index;
 
-import static org.apache.solr.bench.Docs.docs;
-import static org.apache.solr.bench.generators.SourceDSL.integers;
-import static org.apache.solr.bench.generators.SourceDSL.longs;
-import static org.apache.solr.bench.generators.SourceDSL.strings;
-
-import com.sun.management.HotSpotDiagnosticMXBean;
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
-import javax.management.MBeanServer;
 
 import org.apache.solr.bench.MiniClusterState;
 import org.apache.solr.client.solrj.request.UpdateRequest;
@@ -46,13 +37,17 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Timeout;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.BenchmarkParams;
+
+import static org.apache.solr.bench.Docs.docs;
+import static org.apache.solr.bench.generators.SourceDSL.integers;
+import static org.apache.solr.bench.generators.SourceDSL.longs;
+import static org.apache.solr.bench.generators.SourceDSL.strings;
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Threads(4)
-@Warmup(time = 15, iterations = 5)
-@Measurement(time = 25, iterations = 5)
+@Warmup(time = 10, iterations = 3)
+@Measurement(time = 20, iterations = 4)
 @Fork(value = 1)
 @Timeout(time = 60)
 /** A benchmark to experiment with the performance of distributed indexing. */
@@ -72,11 +67,56 @@ public class CloudIndexing {
     @Param({"1", "3"})
     int numReplicas;
 
-    @Param({"100000"})
-    public int smallDocCount;
+    @Param({"25000"})
+    public int docCount;
 
-    @Param({"50000"})
-    public int largeDocCount;
+
+    private org.apache.solr.bench.Docs largeDocs;
+    private Iterator<SolrInputDocument> largeDocIterator;
+
+    private org.apache.solr.bench.Docs smallDocs;
+    private Iterator<SolrInputDocument> smallDocIterator;
+
+    public BenchState() {
+
+        largeDocs = docs().field("id", integers().incrementing())
+            .field(strings().basicLatinAlphabet().multi(312).ofLengthBetween(30, 64))
+            .field(strings().basicLatinAlphabet().multi(312).ofLengthBetween(30, 64))
+            .field(integers().all())
+            .field(integers().all())
+            .field(integers().all())
+            .field(longs().all())
+            .field(longs().all());
+
+      try {
+        largeDocIterator = largeDocs.preGenerate(25000);
+
+        smallDocs = docs().field("id", integers().incrementing())
+            .field("text", strings().basicLatinAlphabet().multi(2).ofLengthBetween(20, 32))
+            .field("int1_i", integers().all())
+            .field("int2_i", integers().all())
+            .field("long1_l", longs().all());
+
+        smallDocIterator = smallDocs.preGenerate(25000);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+
+    public SolrInputDocument getLargeDoc() {
+      if (!largeDocIterator.hasNext()) {
+        largeDocIterator = largeDocs.generatedDocsIterator();
+      }
+      return largeDocIterator.next();
+    }
+
+    public SolrInputDocument getSmallDoc() {
+      if (!smallDocIterator.hasNext()) {
+        smallDocIterator = smallDocs.generatedDocsIterator();
+      }
+      return smallDocIterator.next();
+    }
 
     @Setup(Level.Iteration)
     public void doSetup(MiniClusterState.MiniClusterBenchState miniClusterState) throws Exception {
@@ -91,71 +131,18 @@ public class CloudIndexing {
 
       miniClusterState.shutdownMiniCluster();
     }
-
-    @State(Scope.Thread)
-    public static class Docs {
-
-      private org.apache.solr.bench.Docs largeDocs;
-      private Iterator<SolrInputDocument> largeDocIterator;
-
-      private org.apache.solr.bench.Docs smallDocs;
-      private Iterator<SolrInputDocument> smallDocIterator;
-
-      @Setup(Level.Trial)
-      public void setupDoc(
-          BenchmarkParams benchmarkParams,
-          BenchState state,
-          MiniClusterState.MiniClusterBenchState miniClusterState)
-          throws Exception {
-        if (benchmarkParams.getBenchmark().endsWith("indexLargeDoc")) {
-          largeDocs = docs().field("id", integers().incrementing())
-              .field(strings().basicLatinAlphabet().multi(512).ofLengthBetween(1, 64))
-              .field(strings().basicLatinAlphabet().multi(512).ofLengthBetween(1, 64))
-              .field(integers().all())
-              .field(integers().all())
-              .field(integers().all())
-              .field(longs().all())
-              .field(longs().all());
-
-          largeDocIterator = largeDocs.preGenerate(state.largeDocCount);
-        } else if (benchmarkParams.getBenchmark().endsWith("indexSmallDoc")) {
-          smallDocs = docs().field("id", integers().incrementing())
-              .field("text", strings().basicLatinAlphabet().multi(2).ofLengthBetween(1, 32))
-              .field("int1_i", integers().all())
-              .field("int2_i", integers().all())
-              .field("long1_l", longs().all());
-
-          smallDocIterator = smallDocs.preGenerate(state.smallDocCount);
-        }
-      }
-
-      public SolrInputDocument getLargeDoc() {
-        if (!largeDocIterator.hasNext()) {
-          largeDocIterator = largeDocs.generatedDocsIterator();
-        }
-        return largeDocIterator.next();
-      }
-
-      public SolrInputDocument getSmallDoc() {
-        if (!smallDocIterator.hasNext()) {
-          smallDocIterator = smallDocs.generatedDocsIterator();
-        }
-        return smallDocIterator.next();
-      }
-    }
   }
 
   @Benchmark
   @Timeout(time = 300)
   public Object indexLargeDoc(
       MiniClusterState.MiniClusterBenchState miniClusterState,
-      BenchState state,
-      BenchState.Docs docState)
+      BenchState state)
       throws Exception {
     UpdateRequest updateRequest = new UpdateRequest();
     updateRequest.setBasePath(
         miniClusterState.nodes.get(miniClusterState.getRandom().nextInt(state.nodeCount)));
-    SolrInputDocument doc = docState.getLargeDoc();
+    SolrInputDocument doc = state.getLargeDoc();
     updateRequest.add(doc);
 
     return miniClusterState.client.request(updateRequest, state.collection);
@@ -164,14 +151,12 @@ public class CloudIndexing {
   @Benchmark
   @Timeout(time = 300)
   public Object indexSmallDoc(
-      MiniClusterState.MiniClusterBenchState miniClusterState,
-      BenchState state,
-      BenchState.Docs docState)
+      MiniClusterState.MiniClusterBenchState miniClusterState, BenchState state)
       throws Exception {
     UpdateRequest updateRequest = new UpdateRequest();
     updateRequest.setBasePath(
         miniClusterState.nodes.get(miniClusterState.getRandom().nextInt(state.nodeCount)));
-    SolrInputDocument doc = docState.getSmallDoc();
+    SolrInputDocument doc = state.getSmallDoc();
     updateRequest.add(doc);
 
     return miniClusterState.client.request(updateRequest, state.collection);

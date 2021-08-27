@@ -51,8 +51,8 @@ import org.openjdk.jmh.annotations.Warmup;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Threads(1)
-@Warmup(time = 15, iterations = 5)
-@Measurement(time = 45, iterations = 5)
+@Warmup(time = 10, iterations = 3)
+@Measurement(time = 30, iterations = 4)
 @Fork(value = 1)
 @Timeout(time = 60)
 public class JavaBinBasicPerf {
@@ -65,8 +65,11 @@ public class JavaBinBasicPerf {
   @State(Scope.Benchmark)
   public static class BenchState {
 
-    @Param({"50"})
+    @Param({"20"})
     public int count;
+
+    @Param({"1"})
+    public int scale;
 
     @Param({"default"}) // few_nums, large_strings, many_token_field, child_docs
     public String content;
@@ -79,11 +82,11 @@ public class JavaBinBasicPerf {
       SplittableRandom random = new SplittableRandom(baseBenchState.getRandomSeed());
 
       if (content.equals("default")) {
-        response = defaultContent(count);
-      } else if (content.equals("few_nums")) {
+        response = defaultContent(count, scale);
+      } else if (content.equals("few_numerics")) {
         response = fewNumContent(count);
       } else if (content.equals("large_strings")) {
-        response = largeStringsContent(count);
+        response = largeStringsContent(count, scale);
       } else if (content.equals("many_token_field")) {
         response = manyTokenFieldContent(count);
       } else if (content.equals("child_docs")) {
@@ -109,16 +112,16 @@ public class JavaBinBasicPerf {
         types.add(4);
         types.add(42);
 
-        types.add((long) -5);
-        types.add((long) 5);
-        types.add((long) 50);
+        types.add((long) -56547532);
+        types.add((long) 578675675);
+        types.add((long) 500000);
         topLevel.add(types);
       }
 
       return topLevel;
     }
 
-    private static Object defaultContent(int docCount) {
+    private static Object defaultContent(int docCount, int scale) {
       NamedList<Object> response = new NamedList<>();
 
       NamedList<Object> header = new NamedList<>();
@@ -130,9 +133,9 @@ public class JavaBinBasicPerf {
           .field("facet_s", strings().basicLatinAlphabet().maxCardinality(5).ofLengthBetween(1, 64))
           .field("facet2_s", strings().basicLatinAlphabet().maxCardinality(100).ofLengthBetween(1, 16))
           .field("facet3_s", strings().basicLatinAlphabet().maxCardinality(1200).ofLengthBetween(1, 128))
-          .field("text", strings().basicLatinAlphabet().multi(800).ofLengthBetween(1, 800))
-          .field("text2_s", strings().basicLatinAlphabet().multi(800).ofLengthBetween(1, 2500))
-          .field("text3_t", strings().basicLatinAlphabet().multi(800).ofLengthBetween(1, 3500))
+          .field("text", strings().basicLatinAlphabet().multi(80 * scale).ofLengthBetween(1, 160 * scale))
+          .field("text2_s", strings().basicLatinAlphabet().multi(80 * scale).ofLengthBetween(1, 200 * scale))
+          .field("text3_t", strings().basicLatinAlphabet().multi(80 * scale).ofLengthBetween(1, 300 * scale))
           .field("int_i", integers().all())
           .field("long1_l", longs().all())
           .field("long2_l", longs().all()).field("long3_l", longs().all())
@@ -177,9 +180,9 @@ public class JavaBinBasicPerf {
     }
   }
 
-  private static Object largeStringsContent(int count) {
+  private static Object largeStringsContent(int count, int scale) {
     Docs docs =
-        docs().field("string_s", strings().basicLatinAlphabet().multi(5500).ofLengthBetween(2000, 2800));
+        docs().field("string_s", strings().basicLatinAlphabet().multi(2000 * scale).ofLengthBetween(1000, 1800 * scale));
 
     SolrDocumentList docList = new SolrDocumentList();
     for (int i = 0; i < count; i++) {

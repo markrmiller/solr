@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.math3.random.RandomGenerator;
-import org.apache.commons.math3.random.Well512a;
 import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.solr.bench.generators.SolrGen;
 import org.apache.solr.common.SolrDocument;
@@ -74,11 +73,11 @@ public class Docs {
 
   private Docs(RandomGenerator random) {
     this.randomParent = random;
-    this.random = ThreadLocal.withInitial(() -> new Well512a(random.nextLong())); // TODO: pluggable
+    this.random = ThreadLocal.withInitial(() -> new SplittableRandomGenerator(random.nextLong())); // TODO: pluggable RandomGenerator
   }
 
   private Docs() {
-    this(new Well512a(Long.getLong("randomSeed")));
+    this(new SplittableRandomGenerator(Long.getLong("randomSeed")));
   }
 
 

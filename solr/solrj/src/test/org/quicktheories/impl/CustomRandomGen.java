@@ -18,9 +18,10 @@ package org.quicktheories.impl;
 
 import org.HdrHistogram.Histogram;
 import org.apache.commons.math3.random.RandomDataGenerator;
-import org.apache.commons.math3.random.Well512a;
+import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.solr.bench.SplittableRandomGenerator;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
@@ -90,7 +91,7 @@ public class CustomRandomGen {
 
       }
 
-      Well512a rnd = new Well512a();
+      RandomGenerator rnd = new SplittableRandomGenerator();
       RandomDataGenerator rdg = new RandomDataGenerator(rnd);
 
       @Override

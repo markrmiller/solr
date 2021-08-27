@@ -19,23 +19,16 @@ package org.apache.solr.common.util;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SplittableRandom;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import org.apache.commons.lang3.Validate;
-import org.apache.commons.math3.distribution.ZipfDistribution;
 import org.apache.commons.math3.random.RandomDataGenerator;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.random.Well512a;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
+import org.apache.solr.bench.SplittableRandomGenerator;
 import org.apache.solr.common.SolrDocument;
 import org.quicktheories.api.Pair;
 import org.quicktheories.core.DetatchedRandomnessSource;
@@ -95,7 +88,7 @@ public class TestJavaBinCodecTheory {
 
       }
 
-      Well512a rnd = new Well512a();
+      RandomGenerator rnd = new SplittableRandomGenerator();
       RandomDataGenerator rdg = new RandomDataGenerator(rnd);
 
       @Override
