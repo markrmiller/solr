@@ -23,9 +23,8 @@ import java.io.Writer;
  *  Internal Solr use only, subject to change.
  */
 public class FastWriter extends Writer {
-  // use default BUFSIZE of BufferedWriter so if we wrap that
-  // it won't cause double buffering.
-  private static final int BUFSIZE = 8192;
+  // match jetty output buffer
+  private static final int BUFSIZE = 32768;
   protected final Writer sink;
   protected char[] buf;
   protected int pos;

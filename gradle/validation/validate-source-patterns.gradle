@@ -231,9 +231,15 @@ class ValidateSourcePatternsTask extends DefaultTask {
       if (f.name.endsWith('.java')) {
         if (text.contains('org.slf4j.LoggerFactory')) {
           if (!validLoggerPattern.matcher(text).find()) {
+            if (text.contains("// nowarn_valid_logger")) {
+              return
+            }
             reportViolation(f, 'invalid logging pattern [not private static final, uses static class name]');
           }
           if (!validLoggerNamePattern.matcher(text).find()) {
+            if (text.contains("// nowarn_valid_logger")) {
+              return
+            }
             reportViolation(f, 'invalid logger name [log, uses static class name, not specialized logger]')
           }
         }

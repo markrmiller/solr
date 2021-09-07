@@ -32,9 +32,8 @@ public class FastInputStream extends DataInputInputStream {
   protected long readFromStream; // number of bytes read from the underlying inputstream
 
   public FastInputStream(InputStream in) {
-  // use default BUFSIZE of BufferedOutputStream so if we wrap that
-  // it won't cause double buffering.
-    this(in, new byte[8192], 0, 0);
+    // match jetty input buffer
+    this(in, new byte[16384], 0, 0);
   }
 
   public FastInputStream(InputStream in, byte[] tempBuffer, int start, int end) {

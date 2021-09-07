@@ -155,6 +155,7 @@ public class TransactionLog implements Closeable {
         return true;
       }
       return super.writePrimitive(val);
+   //   return super.writeLessCommonPrimitive(val);
     }
   }
 
@@ -314,7 +315,7 @@ public class TransactionLog implements Closeable {
     Map<String, Object> header = new LinkedHashMap<>();
     header.put("SOLR_TLOG", 1); // a magic string + version number
     header.put("strings", globalStringList);
-    codec.marshal(header, fos);
+    codec.marshal(header, fos, true);
 
     endRecord(pos);
   }

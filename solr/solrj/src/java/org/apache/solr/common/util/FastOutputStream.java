@@ -31,9 +31,8 @@ public class FastOutputStream extends OutputStream implements DataOutput {
   protected int pos;
 
   public FastOutputStream(OutputStream w) {
-  // use default BUFSIZE of BufferedOutputStream so if we wrap that
-  // it won't cause double buffering.
-    this(w, new byte[8192], 0);
+  // match jetty output buffer
+    this(w, new byte[32768], 0);
   }
 
   public FastOutputStream(OutputStream sink, byte[] tempBuffer, int start) {

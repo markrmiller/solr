@@ -18,9 +18,7 @@ package org.apache.solr.common.util;
 
 import java.io.IOException;
 import java.io.OutputStream;
-
 import org.noggit.CharArr;
-
 
 public class ByteUtils {
 
@@ -75,10 +73,8 @@ public class ByteUtils {
   public static String UTF8toUTF16(byte[] utf8, int offset, int len) {
     char[] out = new char[len];
     int n = UTF8toUTF16(utf8, offset, len, out, 0);
-    return new String(out,0,n);
+    return new String(out, 0, n);
   }
-
-
 
   /** Writes UTF8 into the byte array, starting at offset.  The caller should ensure that
    * there is enough space for the worst-case scenario.
