@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
@@ -149,9 +148,9 @@ public class TransactionLog implements Closeable {
     public boolean writePrimitive(Object val) throws IOException {
       if (val instanceof java.util.UUID) {
         java.util.UUID uuid = (java.util.UUID) val;
-        daos.writeByte(UUID);
-        daos.writeLong(uuid.getMostSignificantBits());
-        daos.writeLong(uuid.getLeastSignificantBits());
+        writeByteToOS(this, UUID);
+        writeLong(uuid.getMostSignificantBits());
+        writeLong(uuid.getLeastSignificantBits());
         return true;
       }
       return super.writePrimitive(val);

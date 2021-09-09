@@ -65,18 +65,19 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Defines a space-efficient serialization/deserialization format for transferring data.
- * <p>
- * JavaBinCodec has built in support many commonly used types.  This includes primitive types (boolean, byte,
- * short, double, int, long, float), common Java containers/utilities (Date, Map, Collection, Iterator, String,
- * Object[], byte[]), and frequently used Solr types ({@link NamedList}, {@link SolrDocument},
- * {@link SolrDocumentList}). Each of the above types has a pair of associated methods which read and write
- * that type to a stream.
- * <p>
- * Classes that aren't supported natively can still be serialized/deserialized by providing
- * an {@link JavaBinCodec.ObjectResolver} object that knows how to work with the unsupported class.
+ *
+ * <p>JavaBinCodec has built in support many commonly used types. This includes primitive types
+ * (boolean, byte, short, double, int, long, float), common Java containers/utilities (Date, Map,
+ * Collection, Iterator, String, Object[], byte[]), and frequently used Solr types ({@link
+ * NamedList}, {@link SolrDocument}, {@link SolrDocumentList}). Each of the above types has a pair
+ * of associated methods which read and write that type to a stream. b
+ *
+ * <p>Classes that aren't supported natively can still be serialized/deserialized by providing an
+ * {@link JavaBinCodec.ObjectResolver} object that knows how to work with the unsupported class.
  * This allows {@link JavaBinCodec} to be used to marshall/unmarshall arbitrary content.
- * <p>
- * NOTE -- {@link JavaBinCodec} instances cannot be reused for more than one marshall or unmarshall operation.
+ *
+ * <p>NOTE -- {@link JavaBinCodec} instances cannot be reused for more than one marshall or
+ * unmarshall operation.
  */
 public class JavaBinCodec implements PushWriter {
 
@@ -131,7 +132,7 @@ public class JavaBinCodec implements PushWriter {
   public static final Integer ZERO = 0;
   private final ObjectResolver resolver;
   private final boolean externStringLimits;
-  protected JavaBinOutputStream daos;
+  //  protected JavaBinOutputStream daos;
   private StringCache stringCache;
   private WritableDocFields writableDocFields;
   private boolean alreadyMarshalled;
@@ -139,6 +140,13 @@ public class JavaBinCodec implements PushWriter {
   protected boolean readStringAsCharSeq = false;
 
   private final int useStringUtf8Over;
+
+  private OutputStream out;
+
+  private boolean isFastOutputStream;
+  private byte[] buf;
+  // private long written;  // how many bytes written to the underlying stream
+  private int pos;
 
   public JavaBinCodec() {
     resolver =null;
@@ -251,29 +259,32 @@ public class JavaBinCodec implements PushWriter {
       writeVal(nl);
     } finally {
       alreadyMarshalled = true;
-      daos.flushBuffer();
+      flushBufferOS(this);
     }
   }
 
   protected void initWrite(OutputStream os, boolean streamIsBuffered) {
     assert !alreadyMarshalled;
     // streamIsBuffered = false;
-    init(streamIsBuffered ? new JavaBinOutputStream(os, null, 0) : new JavaBinOutputStream(os));
+    if (streamIsBuffered) {
+      initOutStream(os, null, 0);
+    } else {
+      initOutStream(os);
+    }
     try {
-      daos.writeByte(VERSION);
+      writeByteToOS(this, VERSION);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
-
   /** expert: sets a new output stream */
-  public void init(JavaBinOutputStream os) {
-    daos = os;
-  }
+  //  public void init(JavaBinOutputStream os) {
+  //    daos = os;
+  //  }
 
   public void init(FastOutputStream os) {
-    daos = JavaBinOutputStream.wrap(os);
+    initOutStream(os);
   }
 
   byte version;
@@ -711,26 +722,26 @@ public class JavaBinCodec implements PushWriter {
 
 
   public void writeTag(byte tag) throws IOException {
-    daos.writeByte(tag);
+    writeByteToOS(this, tag);
   }
 
   public void writeTag(byte tag, int size) throws IOException {
     if ((tag & 0xe0) != 0) {
       if (size < 0x1f) {
-        daos.writeByte(tag | size);
+        writeByteToOS(this, tag | size);
       } else {
-        daos.writeByte(tag | 0x1f);
-        writeVInt(size - 0x1f, daos);
+        writeByteToOS(this, tag | 0x1f);
+        writeVInt(size - 0x1f);
       }
     } else {
-      daos.writeByte(tag);
-      writeVInt(size, daos);
+      writeByteToOS(this, tag);
+      writeVInt(size);
     }
   }
 
   public void writeByteArray(byte[] arr, int offset, int len) throws IOException {
     writeTag(BYTEARR, len);
-    daos.write(arr, offset, len);
+    writeToOS(this, arr, offset, len);
   }
 
   public static byte[] readByteArray(DataInputInputStream dis) throws IOException {
@@ -1180,8 +1191,8 @@ public class JavaBinCodec implements PushWriter {
             if (bytes == null || bytes.length < readSize) bytes = new byte[readSize];
 
             writeTag(STR, sz);
-            daos.flushBuffer();
-        ByteUtils.writeUTF16toUTF8(s, 0, end, daos.getOutPut(), bytes);
+        flushBufferOS(this);
+        ByteUtils.writeUTF16toUTF8(s, 0, end, out, bytes);
             return;
        //   }
         }
@@ -1191,14 +1202,14 @@ public class JavaBinCodec implements PushWriter {
       // byte[] stringBytes = buffer.array();
 
       writeTag(STR, stringBytes.length);
-      daos.write(stringBytes);
+      writeToOS(this, stringBytes);
     } else {
       int sz = encodedLength(s);
       if (bytes == null || bytes.length < sz) bytes = new byte[sz];
       ByteUtils.UTF16toUTF8(s, 0, end, bytes, 0);
 
       writeTag(STR, sz);
-      daos.write(bytes, 0, sz);
+      writeToOS(this, bytes, 0, sz);
     }
     //  }
 //      if (bytes == null || bytes.length < maxSize) bytes = new byte[maxSize];
@@ -1220,7 +1231,7 @@ public class JavaBinCodec implements PushWriter {
    * @throws IllegalArgumentException if {@code sequence} contains ill-formed UTF-16 (unpaired
    *     surrogates)
    */
-  public static int encodedLength(CharSequence sequence) {
+  private static int encodedLength(CharSequence sequence) {
     // Warning to maintainers: this implementation is highly optimized.
     int utf16Length = sequence.length();
     int utf8Length = utf16Length;
@@ -1349,15 +1360,15 @@ public class JavaBinCodec implements PushWriter {
 
       if (val >= 0x0f) {
         b |= 0x10;
-        daos.writeByte(b);
-        writeVInt(val >>> 4, daos);
+        writeByteToOS(this, b);
+        writeVInt(val >>> 4);
       } else {
-        daos.writeByte(b);
+        writeByteToOS(this, b);
       }
 
     } else {
-      daos.writeByte(INT);
-      daos.writeInt(val);
+      writeByteToOS(this, INT);
+      writeIntToOS(this, val);
     }
   }
 
@@ -1373,14 +1384,14 @@ public class JavaBinCodec implements PushWriter {
       int b = SLONG | ((int) val & 0x0f);
       if (val >= 0x0f) {
         b |= 0x10;
-        daos.writeByte(b);
-        writeVLong(val >>> 4, daos);
+        writeByteToOS(this, b);
+        writeVLong(val >>> 4);
       } else {
-        daos.writeByte(b);
+        writeByteToOS(this, b);
       }
     } else {
-      daos.writeByte(LONG);
-      daos.writeLong(val);
+      writeByteToOS(this, LONG);
+      writeLongToOS(this, val);
     }
   }
 
@@ -1391,8 +1402,8 @@ public class JavaBinCodec implements PushWriter {
   }
 
   public void writeFloat(float val) throws IOException {
-    daos.writeByte(FLOAT);
-    daos.writeFloat(val);
+    writeByteToOS(this, FLOAT);
+    writeFloatToOS(this, val);
   }
 
   public boolean writePrimitive(Object val) throws IOException {
@@ -1405,8 +1416,8 @@ public class JavaBinCodec implements PushWriter {
       return writeNumber(val);
 
     } else if (val instanceof Date) {
-      daos.writeByte(DATE);
-      daos.writeLong(((Date) val).getTime());
+      writeByteToOS(this, DATE);
+      writeLongToOS(this, ((Date) val).getTime());
       return true;
     } else if (val instanceof Boolean) {
       writeBoolean((Boolean) val);
@@ -1418,7 +1429,7 @@ public class JavaBinCodec implements PushWriter {
 
   protected boolean writeLessCommonPrimitive(Object val) throws IOException {
     if (val == null) {
-      daos.writeByte(NULL);
+      writeByteToOS(this, NULL);
       return true;
     } else if (val instanceof byte[]) {
       writeByteArray((byte[]) val, 0, ((byte[]) val).length);
@@ -1448,25 +1459,25 @@ public class JavaBinCodec implements PushWriter {
       writeDouble((Double) val);
       return true;
     } else if (val instanceof Byte) {
-      daos.writeByte(BYTE);
-      daos.writeByte(((Byte) val).intValue());
+      writeByteToOS(this, BYTE);
+      writeByteToOS(this, ((Byte) val).intValue());
       return true;
     } else if (val instanceof Short) {
-      daos.writeByte(SHORT);
-      daos.writeShort(((Short) val).intValue());
+      writeByteToOS(this, SHORT);
+      writeShortToOS(this, ((Short) val).intValue());
       return true;
     }
     return false;
   }
 
   protected void writeBoolean(boolean val) throws IOException {
-    if (val) daos.writeByte(BOOL_TRUE);
-    else daos.writeByte(BOOL_FALSE);
+    if (val) writeByteToOS(this, BOOL_TRUE);
+    else writeByteToOS(this, BOOL_FALSE);
   }
 
   protected void writeDouble(double val) throws IOException {
-    daos.writeByte(DOUBLE);
-    daos.writeDouble(val);
+    writeByteToOS(this, DOUBLE);
+    writeDoubleToOS(this, val);
   }
 
 
@@ -1494,24 +1505,23 @@ public class JavaBinCodec implements PushWriter {
     return sz;
   }
 
-
   /**
-   * Special method for variable length int (copied from lucene). Usually used for writing the length of a
-   * collection/array/map In most of the cases the length can be represented in one byte (length &lt; 127) so it saves 3
-   * bytes/object
+   * Special method for variable length int (copied from lucene). Usually used for writing the
+   * length of a collection/array/map In most of the cases the length can be represented in one byte
+   * (length &lt; 127) so it saves 3 bytes/object
    *
    * @throws IOException If there is a low-level I/O error.
    */
-  public static void writeVInt(int i, JavaBinOutputStream out) throws IOException {
+  public void writeVInt(int i) throws IOException {
     while ((i & ~0x7F) != 0) {
-      out.writeByte((byte) ((i & 0x7f) | 0x80));
+      writeByteToOS(this, (byte) ((i & 0x7f) | 0x80));
       i >>>= 7;
     }
-    out.writeByte((byte) i);
+    writeByteToOS(this, (byte) i);
   }
 
   /**
-   * The counterpart for {@link #writeVInt(int, JavaBinOutputStream)}
+   * The counterpart for {@link #writeVInt(int)}
    *
    * @throws IOException If there is a low-level I/O error.
    */
@@ -1525,13 +1535,12 @@ public class JavaBinCodec implements PushWriter {
     return i;
   }
 
-
-  public static void writeVLong(long i, JavaBinOutputStream out) throws IOException {
+  public void writeVLong(long i) throws IOException {
     while ((i & ~0x7F) != 0) {
-      out.writeByte((byte) ((i & 0x7f) | 0x80));
+      writeByteToOS(this, (byte) ((i & 0x7f) | 0x80));
       i >>>= 7;
     }
-    out.writeByte((byte) i);
+    writeByteToOS(this, (byte) i);
   }
 
   public static long readVLong(DataInputInputStream in) throws IOException {
@@ -1592,7 +1601,7 @@ public class JavaBinCodec implements PushWriter {
 
   public void writeUTF8Str(Utf8CharSequence utf8) throws IOException {
     writeTag(STR, utf8.size());
-    daos.writeUtf8CharSeq(utf8);
+    writeUtf8CharSeqToOS(this, utf8);
   }
 
   /**
@@ -1643,9 +1652,307 @@ public class JavaBinCodec implements PushWriter {
 
   @Override
   public void close() throws IOException {
-    if (daos != null) {
-      daos.flushBuffer();
+    if (out != null) {
+      flushBufferOS(this);
     }
+  }
+
+  private void initOutStream(OutputStream sink, byte[] tempBuffer, int start) {
+    this.out = sink;
+    // daos = sink;
+    this.buf = tempBuffer;
+    this.pos = start;
+    if (sink instanceof FastOutputStream) {
+      isFastOutputStream = true;
+      if (tempBuffer != null) {
+        throw new IllegalArgumentException(
+            "FastInputStream cannot bass a buffer to JavaBinInputStream");
+      }
+    } else {
+      isFastOutputStream = false;
+    }
+  }
+
+  private void initOutStream(OutputStream w) {
+    // match jetty output buffer
+    initOutStream(w, new byte[32768], 0);
+  }
+
+  public static void writeToOS(JavaBinCodec javaBinCodec, int b) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write((byte) b);
+      return;
+    }
+
+    try {
+      javaBinCodec.buf[javaBinCodec.pos++] = (byte) b;
+    } catch (ArrayIndexOutOfBoundsException e) {
+
+      javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.buf.length);
+      javaBinCodec.pos = 0;
+
+      javaBinCodec.buf[javaBinCodec.pos++] = (byte) b;
+    }
+  }
+
+  public static void writeToOS(JavaBinCodec javaBinCodec, byte[] b) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write(b, 0, b.length);
+      return;
+    }
+    writeToOS(javaBinCodec, b, 0, b.length);
+  }
+
+  public static void writeToOS(JavaBinCodec javaBinCodec, byte b) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write(b);
+      return;
+    }
+
+    //    try {
+    //    buf[pos++] = b;
+    //    } catch (ArrayIndexOutOfBoundsException e) {
+    //      flush(buf, 0, buf.length);
+    //      pos=0;
+    //
+    //      buf[pos++] = b;
+    //    }
+    if (javaBinCodec.pos >= javaBinCodec.buf.length) {
+      // written += pos;
+      javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.buf.length);
+      javaBinCodec.pos = 0;
+    }
+    javaBinCodec.buf[javaBinCodec.pos++] = b;
+  }
+
+  public static void writeToOS(JavaBinCodec javaBinCodec, byte[] arr, int off, int len)
+      throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write(arr, off, len);
+      return;
+    }
+
+    for (; ; ) {
+      int space = javaBinCodec.buf.length - javaBinCodec.pos;
+
+      if (len <= space) {
+        System.arraycopy(arr, off, javaBinCodec.buf, javaBinCodec.pos, len);
+        javaBinCodec.pos += len;
+        return;
+      } else if (len > javaBinCodec.buf.length) {
+        if (javaBinCodec.pos > 0) {
+          javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.pos); // flush
+          javaBinCodec.pos = 0;
+        }
+        // don't buffer, just write to sink
+        javaBinCodec.flushOS(arr, off, len);
+        return;
+      }
+
+      // buffer is too big to fit in the free space, but
+      // not big enough to warrant writing on its own.
+      // write whatever we can fit, then flush and iterate.
+
+      System.arraycopy(arr, off, javaBinCodec.buf, javaBinCodec.pos, space);
+      javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.buf.length);
+      javaBinCodec.pos = 0;
+      off += space;
+      len -= space;
+    }
+  }
+
+  /** reserve at least len bytes at the end of the buffer. Invalid if len &gt; buffer.length */
+  public void reserveOS(int len) throws IOException {
+    if (buf == null) {
+      if (isFastOutputStream) {
+        ((FastOutputStream) out).reserve(len);
+      }
+      return;
+    }
+    if (len > (buf.length - pos))
+      if (pos > 0) {
+        flushOS(buf, 0, pos);
+        pos = 0;
+      }
+  }
+
+  ////////////////// DataOutput methods ///////////////////
+  public static void writeBooleanToOS(JavaBinCodec javaBinCodec, boolean v) throws IOException {
+    if (javaBinCodec.buf == null) {
+      if (v) {
+        javaBinCodec.out.write((byte) 1);
+      } else {
+        javaBinCodec.out.write((byte) 0);
+      }
+      return;
+    }
+
+    writeToOS(javaBinCodec, v ? 1 : 0);
+  }
+
+  public static void writeByteToOS(JavaBinCodec javaBinCodec, int v) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write((byte) v);
+      return;
+    }
+
+    try {
+      javaBinCodec.buf[javaBinCodec.pos++] = (byte) v;
+    } catch (ArrayIndexOutOfBoundsException e) {
+      javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.buf.length);
+      javaBinCodec.pos = 0;
+
+      javaBinCodec.buf[javaBinCodec.pos++] = (byte) v;
+    }
+  }
+
+  public static void writeShortToOS(JavaBinCodec javaBinCodec, int v) throws IOException {
+    writeToOS(javaBinCodec, (byte) (v >>> 8));
+    writeToOS(javaBinCodec, (byte) v);
+  }
+
+  public static void writeCharToOS(JavaBinCodec javaBinCodec, int v) throws IOException {
+    writeShortToOS(javaBinCodec, v);
+  }
+
+  public static void writeIntToOS(JavaBinCodec javaBinCodec, int v) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write((byte) (v >>> 24));
+      javaBinCodec.out.write((byte) (v >>> 16));
+      javaBinCodec.out.write((byte) (v >>> 8));
+      javaBinCodec.out.write((byte) (v));
+      javaBinCodec.pos += 4;
+      return;
+    }
+
+    if (4 > (javaBinCodec.buf.length - javaBinCodec.pos))
+      if (javaBinCodec.pos > 0) {
+        javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.pos);
+        javaBinCodec.pos = 0;
+      }
+    javaBinCodec.buf[javaBinCodec.pos] = (byte) (v >>> 24);
+    javaBinCodec.buf[javaBinCodec.pos + 1] = (byte) (v >>> 16);
+    javaBinCodec.buf[javaBinCodec.pos + 2] = (byte) (v >>> 8);
+    javaBinCodec.buf[javaBinCodec.pos + 3] = (byte) (v);
+    javaBinCodec.pos += 4;
+  }
+
+  public static void writeLongToOS(JavaBinCodec javaBinCodec, long v) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.write((byte) (v >>> 56));
+      javaBinCodec.out.write((byte) (v >>> 48));
+      javaBinCodec.out.write((byte) (v >>> 40));
+      javaBinCodec.out.write((byte) (v >>> 32));
+      javaBinCodec.out.write((byte) (v >>> 24));
+      javaBinCodec.out.write((byte) (v >>> 16));
+      javaBinCodec.out.write((byte) (v >>> 8));
+      javaBinCodec.out.write((byte) (v));
+      javaBinCodec.pos += 8;
+      return;
+    }
+
+    if (8 > (javaBinCodec.buf.length - javaBinCodec.pos))
+      if (javaBinCodec.pos > 0) {
+        javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.pos);
+        javaBinCodec.pos = 0;
+      }
+    javaBinCodec.buf[javaBinCodec.pos] = (byte) (v >>> 56);
+    javaBinCodec.buf[javaBinCodec.pos + 1] = (byte) (v >>> 48);
+    javaBinCodec.buf[javaBinCodec.pos + 2] = (byte) (v >>> 40);
+    javaBinCodec.buf[javaBinCodec.pos + 3] = (byte) (v >>> 32);
+    javaBinCodec.buf[javaBinCodec.pos + 4] = (byte) (v >>> 24);
+    javaBinCodec.buf[javaBinCodec.pos + 5] = (byte) (v >>> 16);
+    javaBinCodec.buf[javaBinCodec.pos + 6] = (byte) (v >>> 8);
+    javaBinCodec.buf[javaBinCodec.pos + 7] = (byte) (v);
+    javaBinCodec.pos += 8;
+  }
+
+  public static void writeFloatToOS(JavaBinCodec javaBinCodec, float v) throws IOException {
+    javaBinCodec.writeInt(Float.floatToRawIntBits(v));
+  }
+
+  public static void writeDoubleToOS(JavaBinCodec javaBinCodec, double v) throws IOException {
+    javaBinCodec.writeLong(Double.doubleToRawLongBits(v));
+  }
+
+  public static void flushOS(JavaBinCodec javaBinCodec) throws IOException {
+    if (javaBinCodec.buf == null) {
+      javaBinCodec.out.flush();
+      return;
+    }
+
+    if (javaBinCodec.pos > 0) {
+      javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.pos);
+      javaBinCodec.pos = 0;
+    }
+    if (javaBinCodec.out != null) javaBinCodec.out.flush();
+  }
+
+  public void closeOS() throws IOException {
+
+    if (buf == null) {
+      if (out != null) out.close();
+      return;
+    }
+
+    if (pos > 0) {
+      flushOS(buf, 0, pos);
+      pos = 0;
+    }
+    if (out != null) out.close();
+  }
+
+  /**
+   * Only flushes the buffer of the FastOutputStream, not that of the underlying stream.
+   *
+   * @param javaBinCodec
+   */
+  private static void flushBufferOS(JavaBinCodec javaBinCodec) throws IOException {
+    if (javaBinCodec.buf == null) {
+      if (javaBinCodec.isFastOutputStream) {
+        ((FastOutputStream) javaBinCodec.out).flushBuffer();
+      }
+      return;
+    }
+
+    if (javaBinCodec.pos > 0) {
+      javaBinCodec.flushOS(javaBinCodec.buf, 0, javaBinCodec.pos);
+      javaBinCodec.pos = 0;
+    }
+  }
+
+  /** All writes to the sink will go through this method */
+  private void flushOS(byte[] buf, int offset, int len) throws IOException {
+    out.write(buf, offset, len);
+  }
+
+  /** Copies a {@link Utf8CharSequence} without making extra copies */
+  private static void writeUtf8CharSeqToOS(JavaBinCodec javaBinCodec, Utf8CharSequence utf8)
+      throws IOException {
+    if (javaBinCodec.buf == null) {
+      if (utf8 instanceof ByteArrayUtf8CharSequence) {
+        javaBinCodec.out.write(((ByteArrayUtf8CharSequence) utf8).getBuf());
+        return;
+      }
+      utf8.write(javaBinCodec.out);
+      return;
+    }
+
+    int start = 0;
+    int totalWritten = 0;
+    while (true) {
+      final int size = utf8.size();
+      if (!(totalWritten < size)) break;
+      if (javaBinCodec.pos >= javaBinCodec.buf.length) JavaBinCodec.flushBufferOS(javaBinCodec);
+      int sz = utf8.write(start, javaBinCodec.buf, javaBinCodec.pos);
+      javaBinCodec.pos += sz;
+      totalWritten += sz;
+      start += sz;
+    }
+  }
+
+  public OutputStream getOutPut() {
+    return out;
   }
 
   private static class ByteArrayUtf8CharSequenceStringFunction
