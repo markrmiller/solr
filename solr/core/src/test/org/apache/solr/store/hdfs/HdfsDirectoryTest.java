@@ -16,6 +16,7 @@
  */
 package org.apache.solr.store.hdfs;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.HashSet;
@@ -48,14 +49,15 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@ThreadLeakLingering(linger = 5000)
 public class HdfsDirectoryTest extends SolrTestCaseJ4 {
   
-  private static final int MAX_NUMBER_OF_WRITES = 10000;
+  private static final int MAX_NUMBER_OF_WRITES = 1000;
   private static final int MIN_FILE_SIZE = 100;
-  private static final int MAX_FILE_SIZE = 100000;
+  private static final int MAX_FILE_SIZE = 10000;
   private static final int MIN_BUFFER_SIZE = 1;
   private static final int MAX_BUFFER_SIZE = 5000;
-  private static final int MAX_NUMBER_OF_READS = 10000;
+  private static final int MAX_NUMBER_OF_READS = 1000;
   private static MiniDFSCluster dfsCluster;
   private Configuration directoryConf;
   private Path directoryPath;
@@ -63,12 +65,12 @@ public class HdfsDirectoryTest extends SolrTestCaseJ4 {
   private Random random;
 
   @BeforeClass
-  public static void beforeClass() throws Exception {
+  public static void beforeHdfsDirectoryTest() throws Exception {
     dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
   }
   
   @AfterClass
-  public static void afterClass() throws Exception {
+  public static void afterHdfsDirectoryTest() throws Exception {
     try {
       HdfsTestUtil.teardownClass(dfsCluster);
     } finally {

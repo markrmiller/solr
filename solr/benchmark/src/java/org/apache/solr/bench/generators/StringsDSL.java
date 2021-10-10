@@ -19,13 +19,14 @@ package org.apache.solr.bench.generators;
 import static org.apache.solr.bench.generators.SourceDSL.checkArguments;
 import static org.apache.solr.bench.generators.SourceDSL.integers;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Objects;
-import java.util.Random;
+import java.util.RandomAccess;
 import java.util.Scanner;
 import java.util.SplittableRandom;
 import org.apache.solr.bench.BaseBenchState;
@@ -51,14 +52,18 @@ public class StringsDSL {
     // english word list via https://github.com/dwyl/english-words
 
     words = new ArrayList<>(1000);
-    InputStream inputStream = StringsDSL.class.getClassLoader().getResourceAsStream("words.txt");
-    try (Scanner scanner =
-        new Scanner(Objects.requireNonNull(inputStream), StandardCharsets.UTF_8.name())) {
+
+    try (InputStream inputStream =
+            StringsDSL.class.getClassLoader().getResourceAsStream("words.txt");
+        Scanner scanner =
+            new Scanner(Objects.requireNonNull(inputStream), StandardCharsets.UTF_8.name())) {
       while (scanner.hasNextLine()) {
         words.add(scanner.nextLine());
       }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    Collections.shuffle(words, new Random(BaseBenchState.getRandomSeed()));
+    shuffle(words, new SplittableRandom(BaseBenchState.getRandomSeed()));
     WORD_SIZE = words.size();
   }
 
@@ -436,6 +441,33 @@ public class StringsDSL {
               .describedAs("WordList Index")
               .withDistribution(this.getDistribution())
               .generate(in));
+    }
+  }
+
+  private static void shuffle(List<?> list, SplittableRandom random) {
+    @SuppressWarnings("unchecked") // we won't put foreign objects in
+    final List<Object> objectList = (List<Object>) list;
+
+    if (list instanceof RandomAccess) {
+      for (int i = objectList.size() - 1; i > 0; i--) {
+        int index = random.nextInt(i + 1);
+        objectList.set(index, objectList.set(i, objectList.get(index)));
+      }
+    } else {
+      Object[] array = objectList.toArray();
+      for (int i = array.length - 1; i > 0; i--) {
+        int index = random.nextInt(i + 1);
+        Object temp = array[i];
+        array[i] = array[index];
+        array[index] = temp;
+      }
+
+      int i = 0;
+      ListIterator<Object> it = objectList.listIterator();
+      while (it.hasNext()) {
+        it.next();
+        it.set(array[i++]);
+      }
     }
   }
 

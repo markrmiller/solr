@@ -16,6 +16,7 @@
  */
 package org.apache.solr.cloud.api.collections;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.URI;
@@ -67,6 +68,7 @@ import static org.apache.solr.core.backup.BackupManager.ZK_STATE_DIR;
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@ThreadLeakLingering(linger = 5000)
 public class TestHdfsCloudBackupRestore extends AbstractCloudBackupRestoreTestCase {
   public static final String SOLR_XML = "<solr>\n" +
       "\n" +
@@ -110,7 +112,7 @@ public class TestHdfsCloudBackupRestore extends AbstractCloudBackupRestoreTestCa
   private static FileSystem fs;
 
   @BeforeClass
-  public static void setupClass() throws Exception {
+  public static void beforeTestHdfsCloudBackupRestore() throws Exception {
     dfsCluster = HdfsTestUtil.setupClass(createTempDir().toFile().getAbsolutePath());
     hdfsUri = HdfsTestUtil.getURI(dfsCluster);
     try {
@@ -149,7 +151,7 @@ public class TestHdfsCloudBackupRestore extends AbstractCloudBackupRestoreTestCa
   }
 
   @AfterClass
-  public static void teardownClass() throws Exception {
+  public static void afterTestHdfsCloudBackupRestore() throws Exception {
     IOUtils.closeQuietly(fs);
     fs = null;
     try {

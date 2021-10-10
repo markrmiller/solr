@@ -30,7 +30,7 @@ public class ConditionalMapWriter implements MapWriter {
     this.predicate = predicate;
   }
 
-  public static class EntryWriterWrapper implements EntryWriter {
+  public static class EntryWriterWrapper extends EntryWriter {
     private final EntryWriter delegate;
     private final BiPredicate<CharSequence, Object> predicate;
 

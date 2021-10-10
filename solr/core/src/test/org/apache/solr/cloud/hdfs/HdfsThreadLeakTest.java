@@ -16,6 +16,8 @@
  */
 package org.apache.solr.cloud.hdfs;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -31,13 +33,12 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
-
 @ThreadLeakFilters(defaultFilters = true, filters = {
     SolrIgnoredThreadsFilter.class,
     QuickPatchThreadsFilter.class,
     BadHdfsThreadsFilter.class // hdfs currently leaks thread(s)
 })
+@ThreadLeakLingering(linger = 5000)
 public class HdfsThreadLeakTest extends SolrTestCaseJ4 {
   private static MiniDFSCluster dfsCluster;
 
@@ -53,8 +54,10 @@ public class HdfsThreadLeakTest extends SolrTestCaseJ4 {
     } finally {
       dfsCluster = null;
     }
+
+    interruptThreadsOnTearDown(); // not closed properly
   }
-  
+
   @Test
   public void testBasic() throws IOException {
     String uri = HdfsTestUtil.getURI(dfsCluster);

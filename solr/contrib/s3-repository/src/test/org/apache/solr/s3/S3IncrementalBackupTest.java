@@ -17,12 +17,11 @@
 
 package org.apache.solr.s3;
 
-import com.adobe.testing.s3mock.junit4.S3MockRule;
 import java.lang.invoke.MethodHandles;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.solr.cloud.api.collections.AbstractIncrementalBackupTest;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.regions.Region;
@@ -35,9 +34,8 @@ public class S3IncrementalBackupTest extends AbstractIncrementalBackupTest {
 
   private static final String BUCKET_NAME = S3IncrementalBackupTest.class.getSimpleName();
 
-  @ClassRule
-  public static final S3MockRule S3_MOCK_RULE =
-      S3MockRule.builder().silent().withInitialBuckets(BUCKET_NAME).build();
+  public static final S3Mock S3_MOCK =
+      S3Mock.builder().silent().withInitialBuckets(BUCKET_NAME).build();
 
   public static final String SOLR_XML =
       "<solr>\n"
@@ -84,9 +82,11 @@ public class S3IncrementalBackupTest extends AbstractIncrementalBackupTest {
   }
 
   @BeforeClass
-  public static void setupClass() throws Exception {
+  public static void beforeS3IncrementalBackupTest() throws Exception {
     System.setProperty("aws.accessKeyId", "foo");
     System.setProperty("aws.secretAccessKey", "bar");
+
+    S3_MOCK.start();
 
     configureCluster(NUM_SHARDS) // nodes
         .addConfig("conf1", getFile("conf/solrconfig.xml").getParentFile().toPath())
@@ -94,8 +94,14 @@ public class S3IncrementalBackupTest extends AbstractIncrementalBackupTest {
             SOLR_XML
                 .replace("BUCKET", BUCKET_NAME)
                 .replace("REGION", Region.US_EAST_1.id())
-                .replace("ENDPOINT", "http://localhost:" + S3_MOCK_RULE.getHttpPort()))
+                .replace("ENDPOINT", "http://localhost:" + S3_MOCK.getHttpPort()))
         .configure();
+  }
+
+  @AfterClass
+  public static void afterS3IncrementalBackupTest() throws Exception {
+    cluster.shutdown();
+    S3_MOCK.stop();
   }
 
   @Override

@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.FastStreamingDocsCallback;
@@ -41,38 +40,37 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
     BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS();
     FastOutputStream faos = FastOutputStream.wrap(baos);
 
-    try (JavaBinCodec codec = new JavaBinCodec(faos, null)) {
-      codec.writeVal(10);
-      codec.writeVal(100);
-      codec.writeVal("Hello!");
+    try (JavaBinCodec codec = new JavaBinCodec(faos, null, true)) {
+      JavaBinCodec.writeVal(codec, 10);
+      JavaBinCodec.writeVal(codec, 100);
+      JavaBinCodec.writeVal(codec, "Hello!");
     }
 
     faos.flushBuffer();
     faos.close();
-
 
     FastInputStream fis = new FastInputStream(null, baos.getbuf(), 0, baos.size());
     try (FastJavaBinDecoder.StreamCodec scodec = new FastJavaBinDecoder.StreamCodec(fis)) {
       scodec.start();
       Tag tag = scodec.getTag();
       assertEquals(Tag._SINT, tag);
-      assertEquals(10, scodec.readSmallInt(scodec.dis));
+      assertEquals(10, JavaBinCodec.readSmallInt(scodec));
       tag = scodec.getTag();
       assertEquals(Tag._SINT, tag);
-      assertEquals(100, scodec.readSmallInt(scodec.dis));
+      assertEquals(100, JavaBinCodec.readSmallInt(scodec));
       tag = scodec.getTag();
       assertEquals(Tag._STR, tag);
-      assertEquals("Hello!", scodec.readStr(fis));
+      assertEquals("Hello!", JavaBinCodec.readStr(scodec));
     }
   }
 
   public void testSimple() throws IOException {
-    String sampleObj = "{k : v , " +
-        "mapk : {k1: v1, k2 : [v2_1 , v2_2 ]}," +
-        "listk : [ 1, 2, 3 ]," +
-        "maps : [ {id: kov1}, {id : kov2} ,{id:kov3 , longv : 234} ]," +
-        "}";
-
+    String sampleObj =
+        "{k : v , "
+            + "mapk : {k1: v1, k2 : [v2_1 , v2_2 ]},"
+            + "listk : [ 1, 2, 3 ],"
+            + "maps : [ {id: kov1}, {id : kov2} ,{id:kov3 , longv : 234} ],"
+            + "}";
 
     @SuppressWarnings({"rawtypes"})
     Map m = (Map) Utils.fromJSONString(sampleObj);
@@ -87,37 +85,47 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
       m2 = (Map) jbc.unmarshal(new FastInputStream(null, baos.getbuf(), 0, baos.size()));
     }
     @SuppressWarnings({"rawtypes"})
-    LinkedHashMap fastMap = (LinkedHashMap) new FastJavaBinDecoder()
-        .withInputStream(new FastInputStream(null, baos.getbuf(), 0, baos.size()))
-        .decode(FastJavaBinDecoder.getEntryListener());
-    assertEquals(Utils.writeJson(m2, new StringWriter(), true).toString(),
+    LinkedHashMap fastMap =
+        (LinkedHashMap)
+            new FastJavaBinDecoder()
+                .withInputStream(new FastInputStream(null, baos.getbuf(), 0, baos.size()))
+                .decode(FastJavaBinDecoder.getEntryListener());
+    assertEquals(
+        Utils.writeJson(m2, new StringWriter(), true).toString(),
         Utils.writeJson(fastMap, new StringWriter(), true).toString());
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    Object newMap = new FastJavaBinDecoder()
-        .withInputStream(new FastInputStream(null, baos.getbuf(), 0, baos.size()))
-        .decode(e -> {
-          e.listenContainer(new LinkedHashMap<>(), e_ -> {
-            Map rootMap = (Map) e_.ctx();
-            if (e_.type() == DataEntry.Type.ENTRY_ITER) {
-              e_.listenContainer(rootMap.computeIfAbsent(e_.name(), o -> new ArrayList<>()),
-                  FastJavaBinDecoder.getEntryListener());
-            } else if (e_.type() == DataEntry.Type.KEYVAL_ITER) {
-              e_.listenContainer(rootMap.computeIfAbsent(e_.name(), o -> new LinkedHashMap<>()), e1 -> {
-                Map<CharSequence,String> m1 = (Map<CharSequence,String>) e1.ctx();
-                if ("k1".equals(e1.name())) {
-                  m1.put(e1.name(), e1.val().toString());
-                }
-                //eat up k2
-              });
-            } else if (e_.type() == DataEntry.Type.STR) {
-              rootMap.put(e_.name(), e_.val().toString());
-            }
-
-          });
-        });
+    Object newMap =
+        new FastJavaBinDecoder()
+            .withInputStream(new FastInputStream(null, baos.getbuf(), 0, baos.size()))
+            .decode(
+                e -> {
+                  e.listenContainer(
+                      new LinkedHashMap<>(),
+                      e_ -> {
+                        Map rootMap = (Map) e_.ctx();
+                        if (e_.type() == DataEntry.Type.ENTRY_ITER) {
+                          e_.listenContainer(
+                              rootMap.computeIfAbsent(e_.name(), o -> new ArrayList<>()),
+                              FastJavaBinDecoder.getEntryListener());
+                        } else if (e_.type() == DataEntry.Type.KEYVAL_ITER) {
+                          e_.listenContainer(
+                              rootMap.computeIfAbsent(e_.name(), o -> new LinkedHashMap<>()),
+                              e1 -> {
+                                Map<CharSequence, String> m1 = (Map<CharSequence, String>) e1.ctx();
+                                if ("k1".equals(e1.name())) {
+                                  m1.put(e1.name(), e1.val().toString());
+                                }
+                                // eat up k2
+                              });
+                        } else if (e_.type() == DataEntry.Type.STR) {
+                          rootMap.put(e_.name(), e_.val().toString());
+                        }
+                      });
+                });
     ((Map) m2.get("mapk")).remove("k2");
-    assertEquals(Utils.writeJson(m2, new StringWriter(), true).toString(),
+    assertEquals(
+        Utils.writeJson(m2, new StringWriter(), true).toString(),
         Utils.writeJson(newMap, new StringWriter(), true).toString());
   }
 
@@ -134,56 +142,58 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
       list = (SolrDocumentList) o.get("response");
     }
 
-    System.out.println(" " + list.getNumFound() + " , " + list.getStart() + " , " + list.getMaxScore());
+    System.out.println(
+        " " + list.getNumFound() + " , " + list.getStart() + " , " + list.getMaxScore());
     class Pojo {
       long _idx;
       CharSequence id;
       boolean inStock;
       float price;
+
       @SuppressWarnings({"rawtypes"})
       List<NamedList> children;
     }
-    StreamingBinaryResponseParser parser = new StreamingBinaryResponseParser(new FastStreamingDocsCallback() {
+    StreamingBinaryResponseParser parser =
+        new StreamingBinaryResponseParser(
+            new FastStreamingDocsCallback() {
 
-      @Override
-      public Object initDocList(Long numFound, Long start, Float maxScore) {
-        assertEquals((Long) list.getNumFound(), numFound);
-        assertEquals((Long) list.getStart(), start);
-        assertEquals(list.getMaxScore(), maxScore);
-        return new int[1];
-      }
+              @Override
+              public Object initDocList(Long numFound, Long start, Float maxScore) {
+                assertEquals((Long) list.getNumFound(), numFound);
+                assertEquals((Long) list.getStart(), start);
+                assertEquals(list.getMaxScore(), maxScore);
+                return new int[1];
+              }
 
-      @Override
-      public Object startDoc(Object docListObj) {
-        Pojo pojo = new Pojo();
-        pojo._idx = ((int[]) docListObj)[0]++;
-        return pojo;
-      }
+              @Override
+              public Object startDoc(Object docListObj) {
+                Pojo pojo = new Pojo();
+                pojo._idx = ((int[]) docListObj)[0]++;
+                return pojo;
+              }
 
-      @Override
-      public void field(DataEntry field, Object docObj) {
-        Pojo pojo = (Pojo) docObj;
-        if ("id".equals(field.name())) {
-          pojo.id = ((Utf8CharSequence) field.val()).clone();
-        } else if (field.type() == DataEntry.Type.BOOL && "inStock".equals(field.name())) {
-          pojo.inStock = field.boolVal();
-        } else if (field.type() == DataEntry.Type.FLOAT && "price".equals(field.name())) {
-          pojo.price = field.floatVal();
-        }
+              @Override
+              public void field(DataEntry field, Object docObj) {
+                Pojo pojo = (Pojo) docObj;
+                if ("id".equals(field.name())) {
+                  pojo.id = ((Utf8CharSequence) field.val()).clone();
+                } else if (field.type() == DataEntry.Type.BOOL && "inStock".equals(field.name())) {
+                  pojo.inStock = field.boolVal();
+                } else if (field.type() == DataEntry.Type.FLOAT && "price".equals(field.name())) {
+                  pojo.price = field.floatVal();
+                }
+              }
 
-      }
-
-      @Override
-      public void endDoc(Object docObj) {
-        Pojo pojo = (Pojo) docObj;
-        SolrDocument doc = list.get((int) pojo._idx);
-        assertEquals(doc.get("id"), pojo.id.toString());
-        if (doc.get("inStock") != null)
-          assertEquals(doc.get("inStock"), pojo.inStock);
-        if (doc.get("price") != null)
-          assertEquals((Float) doc.get("price"), pojo.price, 0.001);
-      }
-    });
+              @Override
+              public void endDoc(Object docObj) {
+                Pojo pojo = (Pojo) docObj;
+                SolrDocument doc = list.get((int) pojo._idx);
+                assertEquals(doc.get("id"), pojo.id.toString());
+                if (doc.get("inStock") != null) assertEquals(doc.get("inStock"), pojo.inStock);
+                if (doc.get("price") != null)
+                  assertEquals((Float) doc.get("price"), pojo.price, 0.001);
+              }
+            });
     parser.processResponse(new FastInputStream(null, baos.getbuf(), 0, baos.size()), null);
   }
 
@@ -203,7 +213,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
     SimpleOrderedMap<SolrDocumentList> orderedMap = new SimpleOrderedMap<>();
     orderedMap.add("response", sdocs);
 
-    BinaryRequestWriter.BAOS baos = new BinaryRequestWriter.BAOS();
+    BytesOutputStream baos = new BytesOutputStream();
     try (JavaBinCodec jbc = new JavaBinCodec()) {
       jbc.marshal(orderedMap, baos);
     }
@@ -224,7 +234,7 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
         assertEquals(d.getChildDocumentCount(), children.size());
         @SuppressWarnings({"unchecked"})
         List<Long> l = (List<Long>) d.getFieldValue("longs");
-        if(l != null){
+        if (l != null) {
           assertNotNull(longs);
           for (int i = 0; i < l.size(); i++) {
             Long v = l.get(i);
@@ -236,62 +246,60 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
         for (int i = 0; i < childDocuments.size(); i++) {
           children.get(i).compare(childDocuments.get(i));
         }
-
       }
-
     }
     List<Pojo> l = new ArrayList<>();
-    StreamingBinaryResponseParser binaryResponseParser = new StreamingBinaryResponseParser(new FastStreamingDocsCallback() {
+    StreamingBinaryResponseParser binaryResponseParser =
+        new StreamingBinaryResponseParser(
+            new FastStreamingDocsCallback() {
 
-      @Override
-      public Object initDocList(Long numFound, Long start, Float maxScore) {
-        return l;
-      }
+              @Override
+              public Object initDocList(Long numFound, Long start, Float maxScore) {
+                return l;
+              }
 
-      @Override
-      @SuppressWarnings({"unchecked"})
-      public Object startDoc(Object docListObj) {
-        Pojo pojo = new Pojo();
-        ((List) docListObj).add(pojo);
-        return pojo;
-      }
+              @Override
+              @SuppressWarnings({"unchecked"})
+              public Object startDoc(Object docListObj) {
+                Pojo pojo = new Pojo();
+                ((List) docListObj).add(pojo);
+                return pojo;
+              }
 
-      @Override
-      public void field(DataEntry field, Object docObj) {
-        Pojo pojo = (Pojo) docObj;
-        if (field.name().equals("id")) {
-          pojo.id = field.strValue();
-        } else if (field.name().equals("subject")) {
-          pojo.subject = field.strValue();
-        } else if (field.name().equals("cat")) {
-          pojo.cat = field.strValue();
-        } else if (field.type() == DataEntry.Type.ENTRY_ITER && "longs".equals(field.name())) {
-          if(useListener[0]){
-            field.listenContainer(pojo.longs = new long[field.length()], READLONGS);
-          } else {
-            @SuppressWarnings({"unchecked"})
-            List<Long> longList = (List<Long>) field.val();
-            pojo.longs = new long[longList.size()];
-            for (int i = 0; i < longList.size(); i++) {
-              pojo.longs[i] = longList.get(i);
+              @Override
+              public void field(DataEntry field, Object docObj) {
+                Pojo pojo = (Pojo) docObj;
+                if (field.name().equals("id")) {
+                  pojo.id = field.strValue();
+                } else if (field.name().equals("subject")) {
+                  pojo.subject = field.strValue();
+                } else if (field.name().equals("cat")) {
+                  pojo.cat = field.strValue();
+                } else if (field.type() == DataEntry.Type.ENTRY_ITER
+                    && "longs".equals(field.name())) {
+                  if (useListener[0]) {
+                    field.listenContainer(pojo.longs = new long[field.length()], READLONGS);
+                  } else {
+                    @SuppressWarnings({"unchecked"})
+                    List<Long> longList = (List<Long>) field.val();
+                    pojo.longs = new long[longList.size()];
+                    for (int i = 0; i < longList.size(); i++) {
+                      pojo.longs[i] = longList.get(i);
+                    }
+                  }
+                }
+              }
 
-            }
-
-          }
-        }
-
-      }
-
-
-      @Override
-      public Object startChildDoc(Object parentDocObj) {
-        Pojo parent = (Pojo) parentDocObj;
-        Pojo child = new Pojo();
-        parent.children.add(child);
-        return child;
-      }
-    });
-    binaryResponseParser.processResponse(new FastInputStream(null, baos.getbuf(), 0, baos.size()), null);
+              @Override
+              public Object startChildDoc(Object parentDocObj) {
+                Pojo parent = (Pojo) parentDocObj;
+                Pojo child = new Pojo();
+                parent.children.add(child);
+                return child;
+              }
+            });
+    binaryResponseParser.processResponse(
+        new FastInputStream(null, baos.toBytes(), 0, baos.size()), null);
     for (int i = 0; i < sdocs.size(); i++) {
       l.get(i).compare(sdocs.get(i));
     }
@@ -299,18 +307,17 @@ public class TestFastJavabinDecoder extends SolrTestCaseJ4 {
     l.clear();
 
     useListener[0] = false;
-    binaryResponseParser.processResponse(new FastInputStream(null, baos.getbuf(), 0, baos.size()), null);
+    binaryResponseParser.processResponse(
+        new FastInputStream(null, baos.toBytes(), 0, baos.size()), null);
     for (int i = 0; i < sdocs.size(); i++) {
       l.get(i).compare(sdocs.get(i));
     }
-
-
   }
 
-  static final DataEntry.EntryListener READLONGS = e -> {
-    if (e.type() != DataEntry.Type.LONG) return;
-    long[] array = (long[]) e.ctx();
-    array[(int) e.index()] = e.longVal();
-
-  };
+  static final DataEntry.EntryListener READLONGS =
+      e -> {
+        if (e.type() != DataEntry.Type.LONG) return;
+        long[] array = (long[]) e.ctx();
+        array[(int) e.index()] = e.longVal();
+      };
 }

@@ -59,7 +59,10 @@ public class FastInputStream extends DataInputInputStream {
   @Override
   public int read() throws IOException {
     if (pos >= end) {
-      refill();
+      // this will set end to -1 at EOF
+      end = readWrappedStream(buf, 0, buf.length);
+      if (end > 0) readFromStream += end;
+      pos = 0;
       if (pos >= end) return -1;
     }
     return buf[pos++] & 0xff;     
@@ -67,7 +70,10 @@ public class FastInputStream extends DataInputInputStream {
 
   public int peek() throws IOException {
     if (pos >= end) {
-      refill();
+      // this will set end to -1 at EOF
+      end = readWrappedStream(buf, 0, buf.length);
+      if (end > 0) readFromStream += end;
+      pos = 0;
       if (pos >= end) return -1;
     }
     return buf[pos] & 0xff;
@@ -77,7 +83,10 @@ public class FastInputStream extends DataInputInputStream {
   @Override
   public int readUnsignedByte() throws IOException {
     if (pos >= end) {
-      refill();
+      // this will set end to -1 at EOF
+      end = readWrappedStream(buf, 0, buf.length);
+      if (end > 0) readFromStream += end;
+      pos = 0;
       if (pos >= end) {
         throw new EOFException();
       }
@@ -94,7 +103,7 @@ public class FastInputStream extends DataInputInputStream {
     return readFromStream - (end - pos);
   }
 
-  public void refill() throws IOException {
+  protected void refill() throws IOException {
     // this will set end to -1 at EOF
     end = readWrappedStream(buf, 0, buf.length);
     if (end > 0) readFromStream += end;
@@ -147,7 +156,10 @@ public class FastInputStream extends DataInputInputStream {
       }
     }
 
-    refill();
+    // this will set end to -1 at EOF
+    end = readWrappedStream(buf, 0, buf.length);
+    if (end > 0) readFromStream += end;
+    pos = 0;
 
     // read rest from our buffer
     if (end-pos > 0) {
@@ -196,7 +208,10 @@ public class FastInputStream extends DataInputInputStream {
     pos = end;
 
     while (r < n) {
-      refill();
+      // this will set end to -1 at EOF
+      end = readWrappedStream(buf, 0, buf.length);
+      if (end > 0) readFromStream += end;
+      pos = 0;
       if (end-pos <= 0) return r;
       int toRead = Math.min(end-pos, n-r);
       r += toRead;
@@ -214,7 +229,10 @@ public class FastInputStream extends DataInputInputStream {
   @Override
   public byte readByte() throws IOException {
     if (pos >= end) {
-      refill();
+      // this will set end to -1 at EOF
+      end = readWrappedStream(buf, 0, buf.length);
+      if (end > 0) readFromStream += end;
+      pos = 0;
       if (pos >= end) throw new EOFException();
     }
     return buf[pos++];

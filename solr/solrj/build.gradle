@@ -27,6 +27,8 @@ dependencies {
   api 'commons-io:commons-io'
   api 'org.apache.commons:commons-math3'
 
+  api 'it.unimi.dsi:fastutil-core:8.5.6'
+
   api 'org.eclipse.jetty.http2:http2-client'
   api 'org.eclipse.jetty.http2:http2-http-client-transport'
   api 'org.eclipse.jetty:jetty-util'
@@ -57,7 +59,7 @@ dependencies {
 
   testImplementation project(':solr:test-framework')
   testImplementation 'org.eclipse.jetty:jetty-webapp'
-  testImplementation ('org.eclipse.jetty:jetty-alpn-java-server', {
+  testImplementation('org.eclipse.jetty:jetty-alpn-java-server', {
     exclude group: "org.eclipse.jetty.alpn", module: "alpn-api"
   })
   testImplementation 'org.objenesis:objenesis'

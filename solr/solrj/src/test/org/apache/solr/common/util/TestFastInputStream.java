@@ -16,22 +16,24 @@
  */
 package org.apache.solr.common.util;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import org.apache.solr.SolrTestCase;
 import org.junit.Test;
 
-import java.io.*;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
 /**
  * Test for FastInputStream.
- *
  *
  * @see org.apache.solr.common.util.FastInputStream
  */
 public class TestFastInputStream extends SolrTestCase {
   @Test
-  // commented out on: 24-Dec-2018   @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
+  // commented out on: 24-Dec-2018
+  // @BadApple(bugUrl="https://issues.apache.org/jira/browse/SOLR-12028") // added 20-Sep-2018
   public void testgzip() throws Exception {
     ByteArrayOutputStream b = new ByteArrayOutputStream();
     FastOutputStream fos = new FastOutputStream(b);
@@ -39,47 +41,43 @@ public class TestFastInputStream extends SolrTestCase {
     String ss = "Helloooooooooooooooooooo";
     writeChars(gzos, ss, 0, ss.length());
     gzos.close();
-    JavaBinCodec.writeVInt(10, fos);
+    writeVInt(10, fos);
     fos.flushBuffer();
-    GZIPInputStream gzis = new GZIPInputStream(new ByteArrayInputStream(b.toByteArray(), 0, b.size()));
+    GZIPInputStream gzis = new GZIPInputStream(new BytesInputStream(b.toByteArray(), 0, b.size()));
     char[] cbuf = new char[ss.length()];
     readChars(gzis, cbuf, 0, ss.length());
     assertEquals(new String(cbuf), ss);
     // System.out.println("passes w/o FastInputStream");
 
-    ByteArrayInputStream bis = new ByteArrayInputStream(b.toByteArray(), 0, b.size());
+    BytesInputStream bis = new BytesInputStream(b.toByteArray(), 0, b.size());
     gzis = new GZIPInputStream(new FastInputStream(bis));
     cbuf = new char[ss.length()];
     readChars(gzis, cbuf, 0, ss.length());
     assertEquals(new String(cbuf), ss);
-    // System.out.println("passes w FastInputStream");
+    System.out.println("passes w FastInputStream");
   }
 
-  //code copied from NamedListCodec#readChars
+  // code copied from NamedListCodec#readChars
   public static void readChars(InputStream in, char[] buffer, int start, int length)
-          throws IOException {
+      throws IOException {
     final int end = start + length;
     for (int i = start; i < end; i++) {
       int b = in.read();
-      if ((b & 0x80) == 0)
-        buffer[i] = (char) b;
+      if ((b & 0x80) == 0) buffer[i] = (char) b;
       else if ((b & 0xE0) != 0xE0) {
-        buffer[i] = (char) (((b & 0x1F) << 6)
-                | (in.read() & 0x3F));
+        buffer[i] = (char) (((b & 0x1F) << 6) | (in.read() & 0x3F));
       } else
-        buffer[i] = (char) (((b & 0x0F) << 12)
-                | ((in.read() & 0x3F) << 6)
-                | (in.read() & 0x3F));
+        buffer[i] = (char) (((b & 0x0F) << 12) | ((in.read() & 0x3F) << 6) | (in.read() & 0x3F));
     }
   }
 
   // code copied rfrom NamedlistCode#writechars
-  public static void writeChars(OutputStream os, String s, int start, int length) throws IOException {
+  public static void writeChars(OutputStream os, String s, int start, int length)
+      throws IOException {
     final int end = start + length;
     for (int i = start; i < end; i++) {
       final int code = (int) s.charAt(i);
-      if (code >= 0x01 && code <= 0x7F)
-        os.write(code);
+      if (code >= 0x01 && code <= 0x7F) os.write(code);
       else if (((code >= 0x80) && (code <= 0x7FF)) || code == 0) {
         os.write(0xC0 | (code >> 6));
         os.write(0x80 | (code & 0x3F));
@@ -89,5 +87,13 @@ public class TestFastInputStream extends SolrTestCase {
         os.write(0x80 | (code & 0x3F));
       }
     }
+  }
+
+  private static void writeVInt(int i, FastOutputStream out) throws IOException {
+    while ((i & ~0x7F) != 0) {
+      out.writeByte((byte) ((i & 0x7f) | 0x80));
+      i >>>= 7;
+    }
+    out.writeByte((byte) i);
   }
 }

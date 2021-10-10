@@ -116,7 +116,7 @@ public class TestStressLiveNodes extends SolrCloudTestCase {
           log.info("sleeping #{} to give watchers a chance to finish: {} != {}",
               i, expectedCount, result.size());
         }
-        Thread.sleep(200);
+        Thread.sleep(100);
       } else {
         break;
       }
@@ -132,7 +132,7 @@ public class TestStressLiveNodes extends SolrCloudTestCase {
   public void testStress() throws Exception {
 
     // do many iters, so we have "bursts" of adding nodes that we then check
-    final int numIters = atLeast(TEST_NIGHTLY ? 1000 : 100);
+    final int numIters = atLeast(TEST_NIGHTLY ? 1000 : 10);
     for (int iter = 0; iter < numIters; iter++) {
 
       // sanity check that ZK says there is in fact 1 live node
@@ -157,7 +157,7 @@ public class TestStressLiveNodes extends SolrCloudTestCase {
       // odds of concurrent watchers firing regardless of the num CPUs or load on the machine running
       // the test (but we deliberately don't look at availableProcessors() since we want randomization
       // consistency across all machines for a given seed)
-      final int numThreads = TestUtil.nextInt(random(), 2, 5);
+      final int numThreads = TestUtil.nextInt(random(), 2, TEST_NIGHTLY ? 5 : 3);
       
       // use same num for all thrashers, to increase likely hood of them all competing
       // (diff random number would mean heavy concurrency only for ~ the first N=lowest num requests)
@@ -165,7 +165,7 @@ public class TestStressLiveNodes extends SolrCloudTestCase {
       // this does not need to be a large number -- in fact, the higher it is, the more
       // likely we are to see a mistake in early watcher triggers get "corrected" by a later one
       // and overlook a possible bug
-      final int numNodesPerThrasher = TestUtil.nextInt(random(), 1, 5);
+      final int numNodesPerThrasher = TestUtil.nextInt(random(), 1, TEST_NIGHTLY ? 5 : 2);
       
       log.info("preparing parallel adds to live nodes: iter={}, numThreads={} numNodesPerThread={}",
                iter, numThreads, numNodesPerThrasher);

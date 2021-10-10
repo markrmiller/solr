@@ -16,6 +16,7 @@
  */
 package org.apache.solr.analytics.legacy.facet;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -53,6 +54,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+@ThreadLeakLingering(linger = 5000)
 public class LegacyAbstractAnalyticsFacetTest extends SolrTestCaseJ4 {
   protected static final HashMap<String,Object> defaults = new HashMap<>();
 

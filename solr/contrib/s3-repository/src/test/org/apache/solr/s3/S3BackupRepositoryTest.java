@@ -39,7 +39,7 @@ import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.apache.solr.cloud.api.collections.AbstractBackupRepositoryTest;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.backup.repository.BackupRepository;
-import org.junit.ClassRule;
+import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -53,9 +53,14 @@ public class S3BackupRepositoryTest extends AbstractBackupRepositoryTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  @ClassRule
+  @Rule
   public static final S3MockRule S3_MOCK_RULE =
       S3MockRule.builder().silent().withInitialBuckets(BUCKET_NAME).build();
+
+  @AfterClass
+  public static void afterS3OutputStreamTest() {
+    interruptThreadsOnTearDown(); // not closed properly
+  }
 
   /**
    * Sent by {@link org.apache.solr.handler.ReplicationHandler}, ensure we don't choke on the bare

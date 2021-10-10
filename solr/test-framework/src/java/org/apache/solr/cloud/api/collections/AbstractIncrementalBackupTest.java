@@ -48,6 +48,7 @@ import org.apache.solr.core.backup.Checksum;
 import org.apache.solr.core.backup.ShardBackupId;
 import org.apache.solr.core.backup.ShardBackupMetadata;
 import org.apache.solr.core.backup.repository.BackupRepository;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -95,9 +96,14 @@ public abstract class AbstractIncrementalBackupTest extends SolrCloudTestCase {
     protected String testSuffix = "test1";
 
     @BeforeClass
-    public static void createCluster() throws Exception {
+    public static void beforeAbstractIncrementalBackupTest() throws Exception {
         docsSeed = random().nextLong();
         System.setProperty("solr.directoryFactory", "solr.StandardDirectoryFactory");
+    }
+
+    @AfterClass
+    public static void afterAbstractIncrementalBackupTest() throws Exception {
+        interruptThreadsOnTearDown(); // not closed properly
     }
 
     @Before
@@ -316,8 +322,8 @@ public abstract class AbstractIncrementalBackupTest extends SolrCloudTestCase {
                         .setIncremental(true)
                         .setMaxNumberBackupPoints(3)
                         .setRepositoryName(BACKUP_REPO_NAME);
-                if (random().nextBoolean()) {
-                    RequestStatusState state = backup.processAndWait(cluster.getSolrClient(), 1000);
+                if (rarely()) {
+                    RequestStatusState state = backup.processAndWait(cluster.getSolrClient(), 100);
                     if (state != RequestStatusState.FAILED) {
                         fail("This backup should be failed");
                     }

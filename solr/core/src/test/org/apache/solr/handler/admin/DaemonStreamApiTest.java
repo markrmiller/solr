@@ -17,6 +17,7 @@
 
 package org.apache.solr.handler.admin;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakLingering;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,14 +33,17 @@ import org.apache.solr.client.solrj.io.stream.TupleStream;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
+import org.apache.solr.cloud.hdfs.HdfsTestUtil;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.TimeSource;
 import org.apache.solr.handler.TestSQLHandler;
 import org.apache.solr.util.TimeOut;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
+@ThreadLeakLingering(linger = 5000)
 public class DaemonStreamApiTest extends SolrTestCaseJ4 {
 
   private MiniSolrCloudCluster cluster;
@@ -60,6 +64,11 @@ public class DaemonStreamApiTest extends SolrTestCaseJ4 {
   List<String> daemonNames = new ArrayList<>();
 
   private String url;
+
+  @AfterClass
+  public static void afterDaemonStreamApiTest() throws Exception {
+    interruptThreadsOnTearDown();
+  }
 
 
   @Override

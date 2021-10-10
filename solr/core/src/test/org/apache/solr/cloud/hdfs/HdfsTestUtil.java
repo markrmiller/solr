@@ -16,6 +16,8 @@
  */
 package org.apache.solr.cloud.hdfs;
 
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.concurrent.GlobalEventExecutor;
 import java.io.File;
 import java.lang.invoke.MethodHandles;
 import java.net.URI;
@@ -30,6 +32,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -61,6 +64,7 @@ import org.apache.solr.util.HdfsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.lucene.util.LuceneTestCase.TEST_NIGHTLY;
 import static org.apache.lucene.util.LuceneTestCase.random;
 
 public class HdfsTestUtil {
@@ -80,11 +84,11 @@ public class HdfsTestUtil {
   private static FileSystem badTlogOutStreamFs;
 
   public static MiniDFSCluster setupClass(String dir) throws Exception {
-    return setupClass(dir, true, true);
+    return setupClass(dir, TEST_NIGHTLY, true);
   }
 
   public static MiniDFSCluster setupClass(String dir, boolean haTesting) throws Exception {
-    return setupClass(dir, haTesting, true);
+    return setupClass(dir, TEST_NIGHTLY, haTesting);
   }
 
   public static void checkAssumptions() {
@@ -278,6 +282,10 @@ public class HdfsTestUtil {
     conf.setBoolean("dfs.permissions.enabled", false);
     conf.set("hadoop.security.authentication", "simple");
     conf.setBoolean("fs.hdfs.impl.disable.cache", true);
+    conf.setInt("solr.hdfs.lease.recovery.timeout", 300);
+    conf.setInt("solr.hdfs.lease.recovery.first.pause", 10);
+    conf.setInt("solr.hdfs.lease.recovery.pause", 10);
+
     return conf;
   }
 
@@ -331,6 +339,7 @@ public class HdfsTestUtil {
         }
       }
     } finally {
+      GlobalEventExecutor.INSTANCE.shutdownGracefully(0, 0, TimeUnit.SECONDS);
       System.clearProperty("test.build.data");
       System.clearProperty("test.cache.data");
 

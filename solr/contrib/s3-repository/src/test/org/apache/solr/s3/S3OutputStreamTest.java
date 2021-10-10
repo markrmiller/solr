@@ -24,8 +24,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -33,7 +34,7 @@ public class S3OutputStreamTest extends SolrTestCaseJ4 {
 
   private static final String BUCKET = S3OutputStreamTest.class.getSimpleName();
 
-  @ClassRule
+  @Rule
   public static final S3MockRule S3_MOCK_RULE =
       S3MockRule.builder().silent().withInitialBuckets(BUCKET).build();
 
@@ -47,6 +48,11 @@ public class S3OutputStreamTest extends SolrTestCaseJ4 {
   @After
   public void tearDownClient() {
     s3.close();
+  }
+
+  @AfterClass
+  public static void afterS3OutputStreamTest() {
+    interruptThreadsOnTearDown(); // not closed properly
   }
 
   /**

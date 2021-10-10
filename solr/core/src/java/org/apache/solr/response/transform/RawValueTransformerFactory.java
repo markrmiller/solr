@@ -16,11 +16,10 @@
  */
 package org.apache.solr.response.transform;
 
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-
-import com.google.common.base.Strings;
 import org.apache.lucene.index.IndexableField;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.params.CommonParams;
@@ -33,94 +32,85 @@ import org.apache.solr.common.util.WriteableValue;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.QueryResponseWriter;
 
-/**
- * @since solr 5.2
- */
-public class RawValueTransformerFactory extends TransformerFactory
-{
+/** @since solr 5.2 */
+public class RawValueTransformerFactory extends TransformerFactory {
   String applyToWT = null;
-  
-  public RawValueTransformerFactory() {
-    
-  }
+
+  public RawValueTransformerFactory() {}
 
   public RawValueTransformerFactory(String wt) {
     this.applyToWT = wt;
   }
-  
+
   @Override
   public void init(NamedList<?> args) {
     super.init(args);
-    if(defaultUserArgs!=null&&defaultUserArgs.startsWith("wt=")) {
+    if (defaultUserArgs != null && defaultUserArgs.startsWith("wt=")) {
       applyToWT = defaultUserArgs.substring(3);
     }
   }
-  
+
   @Override
   public DocTransformer create(String display, SolrParams params, SolrQueryRequest req) {
     String field = params.get("f");
-    if(Strings.isNullOrEmpty(field)) {
+    if (Strings.isNullOrEmpty(field)) {
       field = display;
     }
     // When a 'wt' is specified in the transformer, only apply it to the same wt
     boolean apply = true;
-    if(applyToWT!=null) {
+    if (applyToWT != null) {
       String qwt = req.getParams().get(CommonParams.WT);
-      if(qwt==null) {
+      if (qwt == null) {
         QueryResponseWriter qw = req.getCore().getQueryResponseWriter(req);
         QueryResponseWriter dw = req.getCore().getQueryResponseWriter(applyToWT);
-        if(qw!=dw) {
+        if (qw != dw) {
           apply = false;
         }
-      }
-      else {
+      } else {
         apply = applyToWT.equals(qwt);
       }
     }
 
-    if(apply) {
-      return new RawTransformer( field, display );
+    if (apply) {
+      return new RawTransformer(field, display);
     }
-    
+
     if (field.equals(display)) {
       // we have to ensure the field is returned
       return new DocTransformer.NoopFieldTransformer(field);
     }
-    return new RenameFieldTransformer( field, display, false );
+    return new RenameFieldTransformer(field, display, false);
   }
-  
-  static class RawTransformer extends DocTransformer
-  {
+
+  static class RawTransformer extends DocTransformer {
     final String field;
     final String display;
 
-    public RawTransformer( String field, String display )
-    {
+    public RawTransformer(String field, String display) {
       this.field = field;
       this.display = display;
     }
 
     @Override
-    public String getName()
-    {
+    public String getName() {
       return display;
     }
 
     @Override
     public void transform(SolrDocument doc, int docid) {
       Object val = doc.remove(field);
-      if(val==null) {
+      if (val == null) {
         return;
       }
-      if(val instanceof Collection) {
-        Collection<?> current = (Collection<?>)val;
-        ArrayList<WriteableStringValue> vals = new ArrayList<RawValueTransformerFactory.WriteableStringValue>();
-        for(Object v : current) {
+      if (val instanceof Collection) {
+        Collection<?> current = (Collection<?>) val;
+        ArrayList<WriteableStringValue> vals =
+            new ArrayList<RawValueTransformerFactory.WriteableStringValue>();
+        for (Object v : current) {
           vals.add(new WriteableStringValue(v));
         }
         doc.setField(display, vals);
-      }
-      else {
+      } else {
         doc.setField(display, new WriteableStringValue(val));
       }
     }
@@ -130,21 +120,20 @@ public class RawValueTransformerFactory extends TransformerFactory
       return new String[] {this.field};
     }
   }
-  
+
   public static class WriteableStringValue extends WriteableValue {
     public final Object val;
-    
+
     public WriteableStringValue(Object val) {
       this.val = val;
     }
-    
+
     @Override
     public void write(String name, TextWriter writer) throws IOException {
       String str = null;
-      if(val instanceof IndexableField) { // delays holding it in memory
-        str = ((IndexableField)val).stringValue();
-      }
-      else {
+      if (val instanceof IndexableField) { // delays holding it in memory
+        str = ((IndexableField) val).stringValue();
+      } else {
         str = val.toString();
       }
       writer.getWriter().write(str);
@@ -153,13 +142,11 @@ public class RawValueTransformerFactory extends TransformerFactory
     @Override
     public Object resolve(Object o, JavaBinCodec codec) throws IOException {
       ObjectResolver orig = codec.getResolver();
-      if(orig != null) {
-        codec.writeVal(orig.resolve(val, codec));
+      if (orig != null) {
+        JavaBinCodec.writeVal(codec, orig.resolve(val, codec));
         return null;
       }
       return val.toString();
     }
   }
 }
-
-

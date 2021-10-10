@@ -23,15 +23,16 @@ import java.nio.charset.Charset;
 import org.apache.commons.io.IOUtils;
 import org.apache.solr.SolrTestCaseJ4;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.ClassRule;
+import org.junit.Rule;
 
 /** Abstract class for test with S3Mock. */
 public class AbstractS3ClientTest extends SolrTestCaseJ4 {
 
   private static final String BUCKET_NAME = "test-bucket";
 
-  @ClassRule
+  @Rule
   public static final S3MockRule S3_MOCK_RULE =
       S3MockRule.builder().silent().withInitialBuckets(BUCKET_NAME).build();
 
@@ -50,6 +51,11 @@ public class AbstractS3ClientTest extends SolrTestCaseJ4 {
   @After
   public void tearDownClient() {
     client.close();
+  }
+
+  @AfterClass
+  public static void afterS3OutputStreamTest() {
+    interruptThreadsOnTearDown(); // not closed properly
   }
 
   /**

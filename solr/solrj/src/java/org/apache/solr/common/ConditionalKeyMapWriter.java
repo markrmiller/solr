@@ -30,7 +30,7 @@ public class ConditionalKeyMapWriter implements MapWriter {
     this.predicate = predicate;
   }
 
-  public static class EntryWriterWrapper implements EntryWriter {
+  public static class EntryWriterWrapper extends EntryWriter {
     private final EntryWriter delegate;
     private final Predicate<CharSequence> predicate;
 
@@ -84,5 +84,4 @@ public class ConditionalKeyMapWriter implements MapWriter {
   public static Predicate<CharSequence> dedupeKeyPredicate(Set<CharSequence> keys) {
     return (k) -> keys.add(k);
   }
-
 }
