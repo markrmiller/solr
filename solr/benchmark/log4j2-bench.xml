@@ -23,8 +23,8 @@
     <Console name="STDOUT" target="SYSTEM_OUT">
       <PatternLayout>
         <Pattern>
-          %maxLen{%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c{1.}
-          %m%notEmpty{ =>%ex{short}}}{10240}%n
+          %d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c
+          %m%notEmpty{ =>%ex{short}}%n
         </Pattern>
       </PatternLayout>
     </Console>
@@ -35,8 +35,8 @@
         filePattern="${sys:solr.log.dir:-work/solr-logs}/${sys:solr.log.name:-solr}.log.%i">
       <PatternLayout>
         <Pattern>
-          %maxLen{%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c{1.}
-          %m%notEmpty{ =>%ex{short}}}{10240}%n
+          %d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c
+          %m%notEmpty{ =>%ex{short}}%n
         </Pattern>
       </PatternLayout>
       <Policies>
@@ -52,8 +52,8 @@
         filePattern="${sys:solr.log.dir:-work/solr-logs}/${sys:solr.log.name:-solr}_slow_requests.log.%i">
       <PatternLayout>
         <Pattern>
-          %maxLen{%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c{1.}
-          %m%notEmpty{ =>%ex{short}}}{10240}%n
+          %d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c
+          %m%notEmpty{ =>%ex{short}}%n
         </Pattern>
       </PatternLayout>
       <Policies>
@@ -69,8 +69,8 @@
         fileName="${sys:solr.log.dir:-build/work/solr-logs}/${sys:solr.log.name:-solr}_random_counts.log">
       <PatternLayout>
         <Pattern>
-          %maxLen{%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c{1.}
-          %m%notEmpty{ =>%ex{short}}}{10240}%n
+          %d{yyyy-MM-dd HH:mm:ss.SSS} %-5p (%t) [%notEmpty{c:%X{collection}}%notEmpty{ s:%X{shard}}%notEmpty{ r:%X{replica}}%notEmpty{ x:%X{core}}] %c
+          %m%notEmpty{ =>%ex{short}}%n
         </Pattern>
       </PatternLayout>
     </RandomAccessFile>
