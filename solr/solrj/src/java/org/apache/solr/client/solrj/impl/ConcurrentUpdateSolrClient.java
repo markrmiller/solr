@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.LongAdder;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
@@ -95,6 +96,10 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
   AtomicInteger blockLoops;
   AtomicInteger emptyQueueLoops;
 
+  LongAdder processedCount;
+  long lastProcessedCount;
+  long lastCheckTime;
+
   /**
    * Use builder to construct this class. Uses the supplied HttpClient to send documents to the Solr
    * server.
@@ -147,6 +152,10 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
       this.blockLoops = new AtomicInteger();
       this.emptyQueueLoops = new AtomicInteger();
     }
+
+    this.processedCount = new LongAdder();
+    this.lastProcessedCount = 0;
+    this.lastCheckTime = System.nanoTime();
   }
 
   public Set<String> getUrlParamNames() {
@@ -398,6 +407,7 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
           } else {
             onSuccess(response);
           }
+          processedCount.increment();
 
         } finally {
           try {
@@ -566,24 +576,28 @@ public class ConcurrentUpdateSolrClient extends SolrClient {
         if (!success) {
           // stall prevention
           int currentQueueSize = queue.size();
+          long currentTime = System.nanoTime();
+          long processed = processedCount.sum();
           if (currentQueueSize != lastQueueSize) {
             // there's still some progress in processing the queue - not stalled
             lastQueueSize = currentQueueSize;
+            lastProcessedCount = processed;
+            lastCheckTime = currentTime;
             lastStallTime = -1;
           } else {
-            if (lastStallTime == -1) {
-              // mark a stall but keep trying
-              lastStallTime = System.nanoTime();
-            } else {
-              long currentStallTime =
-                  TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastStallTime);
-              if (currentStallTime > stallTimeMillis) {
+            long timeElapsed = TimeUnit.NANOSECONDS.toMillis(currentTime - lastCheckTime);
+            if (timeElapsed > stallTimeMillis) {
+              long processedSinceLastCheck = processed - lastProcessedCount;
+              if (processedSinceLastCheck == 0) {
                 throw new IOException(
                     "Request processing has stalled for "
-                        + currentStallTime
+                        + timeElapsed
                         + "ms with "
                         + queue.size()
                         + " remaining elements in the queue.");
+              } else {
+                lastProcessedCount = processed;
+                lastCheckTime = currentTime;
               }
             }
           }
